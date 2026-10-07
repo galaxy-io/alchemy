@@ -1,0 +1,46 @@
+# Local infrastructure only: Postgres and NATS. `server` runs on the Mac;
+# `host` runs in the Lima VM and reaches NATS at host.lima.internal.
+name: alchemy
+
+services:
+  postgres:
+    image: ${POSTGRES_IMAGE:-docker.io/library/postgres:16}
+    # Bound on all interfaces so the Lima VM can reach it. Override the host
+    # port with ALCHEMY_POSTGRES_PORT if 5435 is taken.
+    ports:
+      - "${ALCHEMY_POSTGRES_PORT:-5435}:5432"
+    environment:
+      POSTGRES_USER: alchemy
+      POSTGRES_PASSWORD: alchemy
+      POSTGRES_DB: alchemy
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U alchemy -d alchemy"]
+      interval: 2s
+      timeout: 2s
+      retries: 15
+
+  nats:
+    image: ${NATS_IMAGE:-docker.io/library/nats:2}
+    command: ["-c", "/etc/nats/nats.conf"]
+    ports:
+      - "${ALCHEMY_NATS_PORT:-4223}:4222"
+    configs:
+      - source: nats
+        target: /etc/nats/nats.conf
+    volumes:
+      - nats-data:/data
+
+# Payloads carry whole function inputs and outputs, so the message cap
+# matches the server's payload limit.
+configs:
+  nats:
+    content: |
+      port: 4222
+      max_payload: 64MB
+      jetstream { store_dir: /data }
+
+volumes:
+  postgres-data:
+  nats-data:
