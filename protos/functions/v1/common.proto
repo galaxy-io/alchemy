@@ -1,0 +1,70 @@
+syntax = "proto3";
+
+package functions.v1;
+
+import "google/protobuf/struct.proto";
+
+// InvocationProtocol selects the ABI between the supervisor and the
+// function process. Both are specified in docs/architecture.md.
+enum InvocationProtocol {
+  INVOCATION_PROTOCOL_UNSPECIFIED = 0;
+  // EXEC is one process per invocation: input on stdin, output on stdout,
+  // non-zero exit is a failure. No SDK needed; pays process start every call.
+  INVOCATION_PROTOCOL_EXEC = 1;
+  // RUNTIME_API is one long-lived process that pulls invocations from the
+  // supervisor's local HTTP endpoint. Initialisation happens once and is
+  // captured by the snapshot.
+  INVOCATION_PROTOCOL_RUNTIME_API = 2;
+}
+
+// Contract is the typed I/O boundary of a function version. The platform
+// enforces it on both sides: input before any compute is acquired, output
+// before it is returned to the caller. It is a oneof so that other schema
+// languages can be added later without changing FunctionSpec.
+message Contract {
+  oneof kind {
+    JsonSchemaContract json_schema = 1;
+    ArrowContract arrow = 2;
+  }
+}
+
+// JsonSchemaContract types the boundary with JSON Schema, draft 2020-12.
+// Input and output are one JSON value each, on both the API and the function
+// process's stdin/stdout. Each document must be self-contained: $ref may only
+// point inside it.
+message JsonSchemaContract {
+  google.protobuf.Struct input = 1;
+  google.protobuf.Struct output = 2;
+}
+
+// ArrowContract types the boundary with Arrow schemas, for functions that
+// operate on a batch of rows at a time. Input and output are one record
+// batch each, as an Arrow IPC stream, on both the API and the function
+// process's stdin/stdout. The output is row-aligned with the input: the same number
+// of rows in the same order, so per-row bookkeeping the caller holds (such as
+// an operation vector) applies to the output unchanged.
+//
+// Schemas are matched on field names, types and nullability; field metadata
+// is ignored. A field the contract marks nullable accepts a non-nullable
+// column.
+message ArrowContract {
+  // input_schema and output_schema are Arrow schemas serialized as an IPC
+  // stream containing only the schema message, e.g. pyarrow's
+  // `schema.serialize()`.
+  bytes input_schema = 1;
+  bytes output_schema = 2;
+}
+
+// Resources sizes the microVM. Zero fields take server defaults.
+message Resources {
+  uint32 vcpus = 1;
+  uint32 memory_mib = 2;
+}
+
+// ContractViolation is one schema validation failure. instance_path and
+// schema_path are JSON Pointers (RFC 6901) into the value and the schema.
+message ContractViolation {
+  string instance_path = 1;
+  string schema_path = 2;
+  string message = 3;
+}

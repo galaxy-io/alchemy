@@ -1,0 +1,153 @@
+syntax = "proto3";
+
+package functions.v1;
+
+import "functions/v1/common.proto";
+import "functions/v1/pagination.proto";
+
+// FunctionVersionStatus is the lifecycle of the build that turns a spec into
+// something bootable.
+enum FunctionVersionStatus {
+  FUNCTION_VERSION_STATUS_UNSPECIFIED = 0;
+  // BUILDING: the image is being pulled, converted to a root filesystem and
+  // (when snapshots are enabled) booted and snapshotted.
+  FUNCTION_VERSION_STATUS_BUILDING = 1;
+  FUNCTION_VERSION_STATUS_READY = 2;
+  // FAILED is terminal; status_message carries the build error.
+  FUNCTION_VERSION_STATUS_FAILED = 3;
+}
+
+// FunctionSpec is everything needed to build and run one version.
+message FunctionSpec {
+  // image is an OCI reference, e.g. ghcr.io/galaxy-io/enrich-company:1.4.0.
+  string image = 1;
+  // command is the process to run, as an argv. Empty means the image's own
+  // Entrypoint + Cmd.
+  repeated string command = 2;
+  // env is added on top of the image's Env. Not for secrets.
+  map<string, string> env = 3;
+  InvocationProtocol protocol = 4;
+  Contract contract = 5;
+  Resources resources = 6;
+  // timeout_ms bounds a single invocation's run time, measured from the
+  // moment input is handed to the function. Zero takes the server default.
+  int64 timeout_ms = 7;
+}
+
+// FunctionVersion is an immutable, buildable version of a function. The
+// contract is part of the version, so it never changes underneath a caller
+// that pins one. version increases monotonically per function. Lifecycle
+// stamps are epoch millis; 0 means unset.
+message FunctionVersion {
+  string id = 1;
+  int64 version = 2;
+  int64 created_at = 3;
+  FunctionSpec spec = 4;
+  FunctionVersionStatus status = 5;
+  string status_message = 6;
+  // image_digest is the content digest (sha256:...) spec.image resolved to at
+  // build time. The version always runs this digest, even if the tag moves.
+  string image_digest = 7;
+  int64 build_started_at = 8;
+  int64 build_ended_at = 9;
+  // rootfs_bytes is the size of the built root filesystem image.
+  int64 rootfs_bytes = 10;
+  // build_log is the tail of the build's output, for FAILED versions mostly.
+  string build_log = 11;
+  string created_by_user_id = 12;
+}
+
+// Function is a stable, named handle that callers invoke. It carries no
+// behaviour of its own: current_version is the newest version that reached
+// READY, and is what Invoke runs unless the caller pins a version. Lifecycle
+// stamps are epoch millis; 0 means unset.
+message Function {
+  string tenant_id = 1;
+  string id = 2;
+  string name = 3;
+  string description = 4;
+  FunctionVersion current_version = 5;
+  repeated FunctionVersion versions = 6;
+  int64 created_at = 7;
+  int64 updated_at = 8;
+  string created_by_user_id = 9;
+  string updated_by_user_id = 10;
+}
+
+// CreateFunction creates the function and version 1 from spec. It returns as
+// soon as the version is accepted, in BUILDING.
+message CreateFunctionRequest {
+  string name = 1;
+  string description = 2;
+  FunctionSpec spec = 3;
+}
+
+message CreateFunctionResponse {
+  Function function = 1;
+  FunctionVersion version = 2;
+}
+
+message UpdateFunctionRequest {
+  string function_id = 1;
+  string name = 2;
+  string description = 3;
+}
+
+message UpdateFunctionResponse {
+  Function function = 1;
+}
+
+message GetFunctionRequest {
+  string id = 1;
+  bool include_versions = 2;
+}
+
+message GetFunctionResponse {
+  Function function = 1;
+}
+
+message ListFunctionsRequest {
+  PaginationRequest pagination = 1;
+  string search = 2;
+}
+
+message ListFunctionsResponse {
+  repeated Function functions = 1;
+  PaginationResponse pagination = 2;
+}
+
+message DeleteFunctionRequest {
+  string id = 1;
+}
+
+message DeleteFunctionResponse {}
+
+// CreateFunctionVersion adds a new immutable version. It becomes the
+// function's current_version when it reaches READY.
+message CreateFunctionVersionRequest {
+  string function_id = 1;
+  FunctionSpec spec = 2;
+}
+
+message CreateFunctionVersionResponse {
+  FunctionVersion version = 1;
+}
+
+message GetFunctionVersionRequest {
+  string function_id = 1;
+  int64 version = 2;
+}
+
+message GetFunctionVersionResponse {
+  FunctionVersion version = 1;
+}
+
+message ListFunctionVersionsRequest {
+  string function_id = 1;
+  PaginationRequest pagination = 2;
+}
+
+message ListFunctionVersionsResponse {
+  repeated FunctionVersion versions = 1;
+  PaginationResponse pagination = 2;
+}

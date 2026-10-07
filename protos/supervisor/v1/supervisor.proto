@@ -1,0 +1,72 @@
+syntax = "proto3";
+
+package supervisor.v1;
+
+// Protocol mirrors functions.v1.InvocationProtocol.
+enum Protocol {
+  PROTOCOL_UNSPECIFIED = 0;
+  PROTOCOL_EXEC = 1;
+  PROTOCOL_RUNTIME_API = 2;
+}
+
+// FailureKind is the guest's view of why an invocation failed.
+enum FailureKind {
+  FAILURE_KIND_UNSPECIFIED = 0;
+  FAILURE_KIND_RAISED = 1;
+  FAILURE_KIND_CRASHED = 2;
+  FAILURE_KIND_TIMEOUT = 3;
+}
+
+// StartRequest configures the supervisor. argv is fully resolved (the version's
+// command, or the image's Entrypoint + Cmd) and never empty; env is the image
+// Env overlaid with the version's env; working_dir is inside the function's
+// root filesystem.
+message StartRequest {
+  repeated string argv = 1;
+  map<string, string> env = 2;
+  string working_dir = 3;
+  Protocol protocol = 4;
+}
+
+// StartResponse reports how long the function process took to become ready,
+// in microseconds. Zero for PROTOCOL_EXEC.
+message StartResponse {
+  int64 init_us = 1;
+}
+
+// InvokeRequest carries one invocation. input is JSON, already validated
+// against the input schema.
+message InvokeRequest {
+  string invocation_id = 1;
+  bytes input = 2;
+  // timeout_ms is a run-time budget, not a deadline: the guest clock cannot
+  // be trusted to agree with the host's, least of all right after a restore.
+  int64 timeout_ms = 3;
+  // host_time_ms is the host wall clock at send, in epoch millis. A guest
+  // restored from a snapshot resumes with the wall clock of the moment the
+  // snapshot was taken; the supervisor sets the guest clock from this before
+  // running the function.
+  int64 host_time_ms = 4;
+}
+
+// Failure is mapped by the host onto functions.v1.FunctionError. type is the
+// function-supplied error type, set for RAISED only; exit_code is the
+// function process's exit status, set for CRASHED only.
+message Failure {
+  FailureKind kind = 1;
+  string message = 2;
+  string type = 3;
+  int32 exit_code = 4;
+}
+
+// InvokeResponse carries the function's output, not yet validated, or a
+// Failure. run_us is time spent in the function, measured in the guest on a
+// monotonic clock. log_tail is the last few KB of the function's stderr.
+message InvokeResponse {
+  oneof result {
+    bytes output = 1;
+    Failure failure = 2;
+  }
+  int64 run_us = 3;
+  string log_tail = 4;
+}
