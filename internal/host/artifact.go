@@ -1,0 +1,79 @@
+package host
+
+import (
+	"crypto/sha256"
+	"encoding/hex"
+	"fmt"
+	"maps"
+	"slices"
+	"strings"
+
+	functionsv1 "github.com/galaxy-io/alchemy/api/functions/v1"
+	hostv1 "github.com/galaxy-io/alchemy/api/host/v1"
+	supervisorv1 "github.com/galaxy-io/alchemy/api/supervisor/v1"
+	"github.com/galaxy-io/alchemy/internal/driver"
+)
+
+// artifactID hashes everything that makes two instances interchangeable.
+// The tenant is in it so identical specs across tenants never share an
+// instance; the image digest rather than the tag so a moved tag is a new
+// artifact.
+func artifactID(a *hostv1.Artifact) string {
+	var sb strings.Builder
+	fmt.Fprintf(&sb, "%s\x00%s\x00%s\x00", a.GetTenantId(), a.GetDigest(), a.GetWorkingDir())
+	fmt.Fprintf(&sb, "%d\x00%d\x00%d\x00", a.GetProtocol(), a.GetVcpus(), a.GetMemoryMib())
+	for _, arg := range a.GetArgv() {
+		sb.WriteString(arg)
+		sb.WriteByte(0)
+	}
+	sb.WriteByte(1)
+	for _, k := range slices.Sorted(maps.Keys(a.GetEnv())) {
+		fmt.Fprintf(&sb, "%s=%s\x00", k, a.GetEnv()[k])
+	}
+	sum := sha256.Sum256([]byte(sb.String()))
+	return hex.EncodeToString(sum[:16])
+}
+
+// toProto turns a built artifact into its wire form and assigns its id.
+func toProto(tenantID string, a *driver.Artifact) *hostv1.Artifact {
+	p := &hostv1.Artifact{
+		TenantId:    tenantID,
+		Image:       a.Image,
+		Digest:      a.Digest,
+		RootfsBytes: a.RootfsBytes,
+		Argv:        a.Argv,
+		Env:         a.Env,
+		WorkingDir:  a.WorkingDir,
+		Protocol:    protocolProto(a.Protocol),
+		Vcpus:       a.VCPUs,
+		MemoryMib:   a.MemoryMiB,
+	}
+	p.Id = artifactID(p)
+	return p
+}
+
+// fromProto is the driver's view of a wire artifact.
+func fromProto(p *hostv1.Artifact) *driver.Artifact {
+	return &driver.Artifact{
+		Image:       p.GetImage(),
+		Digest:      p.GetDigest(),
+		RootfsBytes: p.GetRootfsBytes(),
+		Argv:        p.GetArgv(),
+		Env:         p.GetEnv(),
+		WorkingDir:  p.GetWorkingDir(),
+		Protocol:    driver.SupervisorProtocol(p.GetProtocol()),
+		VCPUs:       p.GetVcpus(),
+		MemoryMiB:   p.GetMemoryMib(),
+	}
+}
+
+func protocolProto(p supervisorv1.Protocol) functionsv1.InvocationProtocol {
+	switch p {
+	case supervisorv1.Protocol_PROTOCOL_EXEC:
+		return functionsv1.InvocationProtocol_INVOCATION_PROTOCOL_EXEC
+	case supervisorv1.Protocol_PROTOCOL_RUNTIME_API:
+		return functionsv1.InvocationProtocol_INVOCATION_PROTOCOL_RUNTIME_API
+	default:
+		return functionsv1.InvocationProtocol_INVOCATION_PROTOCOL_UNSPECIFIED
+	}
+}
