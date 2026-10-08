@@ -9,6 +9,8 @@ import (
 	"connectrpc.com/connect"
 	"google.golang.org/protobuf/encoding/protojson"
 
+	"google.golang.org/protobuf/proto"
+
 	functionsv1 "github.com/galaxy-io/alchemy/api/functions/v1"
 	hostv1 "github.com/galaxy-io/alchemy/api/host/v1"
 	supervisorv1 "github.com/galaxy-io/alchemy/api/supervisor/v1"
@@ -104,9 +106,21 @@ func (s *Service) invokeOnHost(ctx context.Context, cv *compiledVersion, req *ho
 	if len(s.liveHosts()) == 0 {
 		return nil, errNoHosts
 	}
+	// Rebuild from the digest the version was built against, not the tag: a
+	// tag may have moved since, and a different image is a different artifact.
 	s.log.Info("no host has the artifact; building", "artifact", cv.artifact.GetId())
-	if _, err := s.requestBuild(ctx, cv.row.TenantID, cv.spec); err != nil {
-		return nil, fmt.Errorf("build on host: %w", err)
+	spec := proto.Clone(cv.spec).(*functionsv1.FunctionSpec) //nolint:errcheck // Clone preserves the type
+	if cv.row.ImageDigest != "" {
+		spec.Image = cv.row.ImageDigest
+	}
+	built, err := s.requestBuild(ctx, cv.row.TenantID, spec)
+	if err != nil {
+		return nil, connect.NewError(connect.CodeFailedPrecondition,
+			fmt.Errorf("version %d can no longer be built from %s: %w; create a new version", cv.row.Version, spec.GetImage(), err))
+	}
+	if built.GetId() != cv.artifact.GetId() {
+		return nil, connect.NewError(connect.CodeFailedPrecondition,
+			fmt.Errorf("version %d rebuilt as a different artifact (%s); create a new version", cv.row.Version, spec.GetImage()))
 	}
 	out = &hostv1.InvokeResponse{}
 	if err := s.bus.Request(reqCtx, bus.InvokeSubject(cv.artifact.GetId()), req, out); err != nil {

@@ -39,8 +39,8 @@ provision:
         curl -fsSL -o "$(basename "$KERNEL")" "$S3/$KERNEL"
       fi
 
-      # A udev rule survives /dev/kvm being recreated and applies to every shell.
-      echo 'KERNEL=="kvm", MODE="0666"' > /etc/udev/rules.d/99-kvm.rules
+      # static_node applies the mode whenever the node is (re)created, not only on a uevent.
+      echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' > /etc/udev/rules.d/99-kvm.rules
       udevadm control --reload
       udevadm trigger --name-match=kvm
 
