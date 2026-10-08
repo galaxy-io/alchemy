@@ -1,0 +1,188 @@
+{
+  "name": "@galaxy-io/alchemy",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "files": [
+    "dist"
+  ],
+  "sideEffects": [
+    "**/*.css",
+    "**/utils/serialization.*"
+  ],
+  "exports": {
+    "./routes": {
+      "types": "./dist/module/routes.d.ts",
+      "import": "./dist/module/routes.js"
+    },
+    "./hooks": {
+      "types": "./dist/module/hooks.d.ts",
+      "import": "./dist/module/hooks.js"
+    },
+    "./nav": {
+      "types": "./dist/module/nav.d.ts",
+      "import": "./dist/module/nav.js"
+    },
+    "./commands": {
+      "types": "./dist/module/commands.d.ts",
+      "import": "./dist/module/commands.js"
+    },
+    "./schemas": {
+      "types": "./dist/module/schemas.d.ts",
+      "import": "./dist/module/schemas.js"
+    },
+    "./types": {
+      "types": "./dist/module/types.d.ts",
+      "import": "./dist/module/types.js"
+    },
+    "./AlchemyLayout": {
+      "types": "./dist/module/AlchemyLayout.d.ts",
+      "import": "./dist/module/AlchemyLayout.js"
+    },
+    "./layouts/ErrorLayout": {
+      "types": "./dist/layouts/ErrorLayout.d.ts",
+      "import": "./dist/layouts/ErrorLayout.js"
+    },
+    "./layouts/PendingLayout": {
+      "types": "./dist/layouts/PendingLayout.d.ts",
+      "import": "./dist/layouts/PendingLayout.js"
+    },
+    "./layouts/EmptyLayout": {
+      "types": "./dist/layouts/EmptyLayout.d.ts",
+      "import": "./dist/layouts/EmptyLayout.js"
+    },
+    "./pages/observability/ObservabilityPage": {
+      "types": "./dist/pages/observability/ObservabilityPage.d.ts",
+      "import": "./dist/pages/observability/ObservabilityPage.js"
+    },
+    "./pages/functions/FunctionsPage": {
+      "types": "./dist/pages/functions/FunctionsPage.d.ts",
+      "import": "./dist/pages/functions/FunctionsPage.js"
+    },
+    "./pages/functions/FunctionPage": {
+      "types": "./dist/pages/functions/FunctionPage.d.ts",
+      "import": "./dist/pages/functions/FunctionPage.js"
+    },
+    "./pages/functions/FunctionOverviewPage": {
+      "types": "./dist/pages/functions/FunctionOverviewPage.d.ts",
+      "import": "./dist/pages/functions/FunctionOverviewPage.js"
+    },
+    "./pages/functions/FunctionWorkbenchPage": {
+      "types": "./dist/pages/functions/FunctionWorkbenchPage.d.ts",
+      "import": "./dist/pages/functions/FunctionWorkbenchPage.js"
+    },
+    "./pages/functions/FunctionContractPage": {
+      "types": "./dist/pages/functions/FunctionContractPage.d.ts",
+      "import": "./dist/pages/functions/FunctionContractPage.js"
+    },
+    "./pages/functions/FunctionVersionsPage": {
+      "types": "./dist/pages/functions/FunctionVersionsPage.d.ts",
+      "import": "./dist/pages/functions/FunctionVersionsPage.js"
+    },
+    "./pages/functions/FunctionInvocationsPage": {
+      "types": "./dist/pages/functions/FunctionInvocationsPage.d.ts",
+      "import": "./dist/pages/functions/FunctionInvocationsPage.js"
+    },
+    "./pages/functions/FunctionSettingsPage": {
+      "types": "./dist/pages/functions/FunctionSettingsPage.d.ts",
+      "import": "./dist/pages/functions/FunctionSettingsPage.js"
+    },
+    "./pages/invocations/InvocationsPage": {
+      "types": "./dist/pages/invocations/InvocationsPage.d.ts",
+      "import": "./dist/pages/invocations/InvocationsPage.js"
+    },
+    "./pages/hosts/HostsPage": {
+      "types": "./dist/pages/hosts/HostsPage.d.ts",
+      "import": "./dist/pages/hosts/HostsPage.js"
+    },
+    "./styles.css": "./dist/styles.css"
+  },
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc -b && vite build",
+    "preview": "vite preview",
+    "codegen": "buf generate",
+    "typecheck": "tsc --noEmit",
+    "typecheck:lib": "tsc -p tsconfig.lib.json --noEmit",
+    "clean": "rm -rf build dist",
+    "format": "biome check --write src",
+    "format:check": "biome check src",
+    "lint": "biome lint --write src",
+    "lint:check": "biome lint src",
+    "build:lib": "vite build --config vite.lib.config.ts",
+    "check:package": "publint --strict"
+  },
+  "dependencies": {
+    "@linaria/react": "^7.0.1",
+    "@phosphor-icons/react": "^2.1.10",
+    "apache-arrow": "^21.2.0",
+    "pluralize": "^8.0.0",
+    "ts-pattern": "^5.9.0",
+    "zod": "^4.3.6"
+  },
+  "peerDependencies": {
+    "@bufbuild/protobuf": "^2.9.0",
+    "@codemirror/autocomplete": "^6.20.3",
+    "@codemirror/state": "^6.6.0",
+    "@codemirror/view": "^6.43.1",
+    "@connectrpc/connect": "^2.1.0",
+    "@connectrpc/connect-query": "^2.1.1",
+    "@galaxy-io/dls": "^2.8.1",
+    "@lezer/highlight": "^1.2.3",
+    "@tanstack/react-query": "^5.90.12",
+    "@tanstack/react-router": "^1.141.2",
+    "@tanstack/react-table": "^8.21.3",
+    "@tanstack/react-virtual": "^3.14.6",
+    "@uiw/codemirror-extensions-langs": "^4.25.10",
+    "@uiw/codemirror-themes": "^4.25.10",
+    "@uiw/react-codemirror": "^4.25.10",
+    "d3-scale": "^4.0.2",
+    "d3-shape": "^3.2.0",
+    "lottie-react": "^2.4.1",
+    "react": "^18 || ^19",
+    "react-dom": "^18 || ^19",
+    "react-syntax-highlighter": "^16.1.1"
+  },
+  "devDependencies": {
+    "@babel/preset-react": "^7.29.7",
+    "@babel/preset-typescript": "^7.29.7",
+    "@biomejs/biome": "^2.5.15",
+    "@bufbuild/buf": "^1.57.2",
+    "@bufbuild/protobuf": "^2.9.0",
+    "@bufbuild/protoc-gen-es": "^2.9.0",
+    "@codemirror/autocomplete": "^6.20.3",
+    "@codemirror/state": "^6.6.0",
+    "@codemirror/view": "^6.43.1",
+    "@connectrpc/connect": "^2.1.0",
+    "@connectrpc/connect-query": "^2.1.1",
+    "@connectrpc/connect-web": "^2.1.0",
+    "@galaxy-io/dls": "^2.8.1",
+    "@lezer/highlight": "^1.2.3",
+    "@tanstack/react-query": "^5.90.12",
+    "@tanstack/react-router": "^1.141.2",
+    "@tanstack/react-table": "^8.21.3",
+    "@tanstack/react-virtual": "^3.14.6",
+    "@tanstack/router-plugin": "^1.141.2",
+    "@types/pluralize": "^0.0.33",
+    "@types/react": "^18.3.27",
+    "@types/react-dom": "^18.3.7",
+    "@uiw/codemirror-extensions-langs": "^4.25.10",
+    "@uiw/codemirror-themes": "^4.25.10",
+    "@uiw/react-codemirror": "^4.25.10",
+    "@vitejs/plugin-react": "^6.0.2",
+    "@wyw-in-js/vite": "^1.1.0",
+    "d3-scale": "^4.0.2",
+    "d3-shape": "^3.2.0",
+    "lottie-react": "^2.4.1",
+    "publint": "^0.3.25",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "react-syntax-highlighter": "^16.1.1",
+    "typescript": "~5.9.3",
+    "vite": "^8.0.16",
+    "vite-plugin-dts": "5.1.2"
+  }
+}
