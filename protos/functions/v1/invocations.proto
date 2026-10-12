@@ -1,0 +1,166 @@
+syntax = "proto3";
+
+package functions.v1;
+
+import "functions/v1/common.proto";
+import "functions/v1/pagination.proto";
+
+// FunctionErrorKind classifies a failure attributable to the function rather
+// than to the caller or the platform.
+enum FunctionErrorKind {
+  FUNCTION_ERROR_KIND_UNSPECIFIED = 0;
+  // RAISED: the function reported an error through its protocol.
+  FUNCTION_ERROR_KIND_RAISED = 1;
+  // CRASHED: the function process died or exited non-zero without a result.
+  FUNCTION_ERROR_KIND_CRASHED = 2;
+  // TIMEOUT: the function ran longer than its version's timeout.
+  FUNCTION_ERROR_KIND_TIMEOUT = 3;
+  // OUTPUT_INVALID: the function returned a value that violates its own
+  // output schema.
+  FUNCTION_ERROR_KIND_OUTPUT_INVALID = 4;
+}
+
+// StartKind is how the microVM that served an invocation came to exist.
+enum StartKind {
+  START_KIND_UNSPECIFIED = 0;
+  // COLD_BOOT booted a kernel for this invocation.
+  START_KIND_COLD_BOOT = 1;
+  // SNAPSHOT_RESTORE restored the version's snapshot for this invocation.
+  START_KIND_SNAPSHOT_RESTORE = 2;
+  // WARM reused a microVM that was already running.
+  START_KIND_WARM = 3;
+}
+
+// FunctionError describes a function that ran and failed. type is the
+// function-supplied error type, set for RAISED only; violations is set for
+// OUTPUT_INVALID only.
+message FunctionError {
+  FunctionErrorKind kind = 1;
+  string message = 2;
+  string type = 3;
+  repeated ContractViolation violations = 4;
+}
+
+// InvocationStats breaks down where the time went, in microseconds, so the
+// cost of each start path can be read directly off a response. acquire_us is
+// from accepting the request to having a microVM ready to take input; run_us
+// is from handing input to the function to receiving its result; total_us is
+// the whole request as seen by the server, including both validations.
+message InvocationStats {
+  StartKind start_kind = 1;
+  int64 acquire_us = 2;
+  int64 run_us = 3;
+  int64 total_us = 4;
+}
+
+// Invoke runs a function synchronously. version 0 runs the function's
+// current_version; any other value pins that version. input is opaque to the
+// platform: the version's contract says what it must be (a JSON value for a
+// JSON Schema contract, an Arrow IPC stream for an Arrow contract) and
+// checks it before anything runs.
+message InvokeRequest {
+  string function_id = 1;
+  int64 version = 2;
+  bytes input = 3;
+}
+
+// InvokeResponse is returned whenever the function ran. output is the
+// function's result in the encoding the contract defines, already checked
+// against the output schema; error means the function ran and failed.
+// version is the one that actually ran.
+message InvokeResponse {
+  string invocation_id = 1;
+  int64 version = 2;
+  oneof result {
+    bytes output = 3;
+    FunctionError error = 4;
+  }
+  InvocationStats stats = 5;
+}
+
+// InvocationStatus is the persisted lifecycle state of an invocation.
+enum InvocationStatus {
+  INVOCATION_STATUS_UNSPECIFIED = 0;
+  // PENDING: accepted and validated, waiting for a instance slot.
+  INVOCATION_STATUS_PENDING = 1;
+  // STARTING: a instance is booting or being restored for it.
+  INVOCATION_STATUS_STARTING = 2;
+  // RUNNING: the input has been handed to the function.
+  INVOCATION_STATUS_RUNNING = 3;
+  INVOCATION_STATUS_SUCCEEDED = 4;
+  // FAILED: the function ran and failed; error is set.
+  INVOCATION_STATUS_FAILED = 5;
+  // ERRORED: the platform could not run it; platform_error is set.
+  INVOCATION_STATUS_ERRORED = 6;
+  // CANCELED: the caller went away before a result.
+  INVOCATION_STATUS_CANCELED = 7;
+}
+
+// Invocation is the persisted record of one Invoke call. Lifecycle stamps
+// are epoch millis; 0 means unset. started_at is when the function received
+// its input, ended_at when the record reached a terminal status.
+message Invocation {
+  string tenant_id = 1;
+  string id = 2;
+  string function_id = 3;
+  int64 version = 4;
+  InvocationStatus status = 5;
+  StartKind start_kind = 6;
+  int64 created_at = 7;
+  int64 started_at = 8;
+  int64 ended_at = 9;
+  InvocationStats stats = 10;
+  FunctionError error = 11;
+  string platform_error = 12;
+  int64 input_bytes = 13;
+  int64 output_bytes = 14;
+  // instance_id names the microVM that served it, while it exists.
+  string instance_id = 15;
+  // log_tail is the last few KB of the function's stderr.
+  string log_tail = 16;
+  string created_by_user_id = 17;
+}
+
+message GetInvocationRequest {
+  string id = 1;
+}
+
+message GetInvocationResponse {
+  Invocation invocation = 1;
+}
+
+// ListInvocations returns newest first. Empty function_id lists the tenant's
+// invocations across functions; empty statuses lists every status. since_ms
+// (inclusive) and until_ms (exclusive) window on created_at; 0 means
+// unbounded.
+message ListInvocationsRequest {
+  // Empty lists match everything.
+  repeated string function_ids = 1;
+  repeated InvocationStatus statuses = 2;
+  repeated StartKind start_kinds = 6;
+  PaginationRequest pagination = 3;
+  int64 since_ms = 4;
+  int64 until_ms = 5;
+}
+
+message ListInvocationsResponse {
+  repeated Invocation invocations = 1;
+  PaginationResponse pagination = 2;
+}
+
+// TailInvocations streams invocation changes. With should_replay the stream
+// first emits every non-terminal invocation (each marked replay=true) so a
+// reconnecting client is current before live events arrive.
+message TailInvocationsRequest {
+  string function_id = 1;
+  bool should_replay = 2;
+}
+
+// TailInvocationsResponse is one lifecycle transition. event_type is the new
+// status as a wire token (e.g. "running", "succeeded").
+message TailInvocationsResponse {
+  Invocation invocation = 1;
+  string event_type = 2;
+  bool replay = 3;
+  int64 emitted_at = 4;
+}

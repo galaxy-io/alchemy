@@ -1,0 +1,43 @@
+syntax = "proto3";
+
+package functions.v1;
+
+import "functions/v1/functions.proto";
+import "functions/v1/host.proto";
+import "functions/v1/invocations.proto";
+
+// FunctionsService is the control plane for typed, image-based functions:
+// it registers functions and their versions, and runs them in microVMs.
+service FunctionsService {
+  // Functions; the stable handle callers invoke.
+  rpc CreateFunction(CreateFunctionRequest) returns (CreateFunctionResponse);
+  rpc UpdateFunction(UpdateFunctionRequest) returns (UpdateFunctionResponse);
+  rpc GetFunction(GetFunctionRequest) returns (GetFunctionResponse);
+  rpc ListFunctions(ListFunctionsRequest) returns (ListFunctionsResponse);
+  rpc DeleteFunction(DeleteFunctionRequest) returns (DeleteFunctionResponse);
+
+  // Function versions; immutable image + contract + resources. Builds are
+  // asynchronous: poll GetFunctionVersion until status leaves BUILDING.
+  rpc CreateFunctionVersion(CreateFunctionVersionRequest) returns (CreateFunctionVersionResponse);
+  rpc GetFunctionVersion(GetFunctionVersionRequest) returns (GetFunctionVersionResponse);
+  rpc ListFunctionVersions(ListFunctionVersionsRequest) returns (ListFunctionVersionsResponse);
+
+  // Invocation; validate input, run one version against it, validate output.
+  // An RPC error means the function did not produce a result: the request was
+  // rejected (unknown function, input violates the contract, no capacity) or
+  // the platform failed. Input violations are INVALID_ARGUMENT with one
+  // ContractViolation error detail each. If the function ran, the RPC
+  // succeeds and the response carries its output or a FunctionError.
+  rpc Invoke(InvokeRequest) returns (InvokeResponse);
+
+  // Invocations; the persisted record of every Invoke, newest first.
+  rpc GetInvocation(GetInvocationRequest) returns (GetInvocationResponse);
+  rpc ListInvocations(ListInvocationsRequest) returns (ListInvocationsResponse);
+
+  // Live view; server-streams invocation transitions with optional replay.
+  rpc TailInvocations(TailInvocationsRequest) returns (stream TailInvocationsResponse);
+
+  // Host; what the hosts are running right now.
+  rpc ListInstances(ListInstancesRequest) returns (ListInstancesResponse);
+  rpc GetHost(GetHostRequest) returns (GetHostResponse);
+}

@@ -1,0 +1,128 @@
+syntax = "proto3";
+
+package host.v1;
+
+import "functions/v1/common.proto";
+import "functions/v1/functions.proto";
+import "functions/v1/host.proto";
+import "functions/v1/invocations.proto";
+import "supervisor/v1/supervisor.proto";
+
+// host.v1 is the contract between the server and the hosts. It rides on
+// NATS rather than a Connect service: a host subscribes to the subjects for
+// the artifacts it has ready, so placement is a subscription and the server
+// keeps no host state beyond what heartbeats last said.
+//
+//   host.build.*                 request/reply, queue group: any host builds,
+//                                replies with the Artifact
+//   host.invoke.<artifact_id>    request/reply, queue group: hosts that have
+//                                the artifact ready; no responders means
+//                                nobody has built it yet
+//   host.describe                request, scatter/gather: every host replies
+//                                with its Host
+//   host.instances               request, scatter/gather: every host replies
+//                                with its instances
+//   host.<name>.heartbeat        publish: a Host, periodically
+//   invocation.<id>.state        publish: InvocationEvent as an invocation
+//                                moves through a host
+//
+// Payloads are protobuf-encoded messages from this file. Request/reply
+// errors are an Error message in the reply, never a NATS-level error.
+
+// Artifact is everything a host needs to start an instance, resolved at
+// build time so the spec is never consulted again. The server stores it on
+// the version and sends it back verbatim with every invoke.
+//
+// id keys instances and the invoke subject: it hashes everything that makes
+// two instances interchangeable, including the tenant, so two functions with
+// the same image but different env never share a warm instance. The rootfs
+// cache is keyed by image digest alone, since that is content-addressed.
+message Artifact {
+  string id = 1;
+  string tenant_id = 2;
+  string image = 3;
+  // digest is what image resolved to at build time; the artifact always runs
+  // this digest even if the tag moves.
+  string digest = 4;
+  int64 rootfs_bytes = 5;
+  repeated string argv = 6;
+  map<string, string> env = 7;
+  string working_dir = 8;
+  functions.v1.InvocationProtocol protocol = 9;
+  uint32 vcpus = 10;
+  uint32 memory_mib = 11;
+}
+
+// Error is a reply that carries no result. code uses Connect's names so the
+// server can map it onto its own status without a table.
+message Error {
+  string code = 1;
+  string message = 2;
+}
+
+message BuildRequest {
+  string tenant_id = 1;
+  functions.v1.FunctionSpec spec = 2;
+}
+
+message BuildResponse {
+  oneof result {
+    Artifact artifact = 1;
+    Error error = 2;
+  }
+  // build_log is the tail of the build's output.
+  string build_log = 3;
+}
+
+// InvokeRequest runs one input, already validated by the server, through an
+// instance of artifact. The host decides how the instance is obtained.
+message InvokeRequest {
+  string invocation_id = 1;
+  Artifact artifact = 2;
+  bytes input = 3;
+  int64 timeout_ms = 4;
+}
+
+// InvokeResponse is returned whenever an instance ran the input, including
+// when the function failed. output is raw: the server validates it against
+// the contract. error means no instance ran it (host at capacity, boot
+// failed) and carries nothing else.
+message InvokeResponse {
+  oneof result {
+    bytes output = 1;
+    supervisor.v1.Failure failure = 2;
+    Error error = 3;
+  }
+  string instance_id = 4;
+  functions.v1.StartKind start_kind = 5;
+  int64 acquire_us = 6;
+  int64 run_us = 7;
+  string log_tail = 8;
+}
+
+// InvocationEvent is published as a host moves an invocation along, so the
+// server can record STARTING and RUNNING before the reply arrives.
+message InvocationEvent {
+  string invocation_id = 1;
+  functions.v1.InvocationStatus status = 2;
+  string instance_id = 3;
+  functions.v1.StartKind start_kind = 4;
+  int64 acquire_us = 5;
+}
+
+message DescribeRequest {}
+
+message DescribeResponse {
+  functions.v1.Host host = 1;
+}
+
+message ListInstancesRequest {}
+
+message ListInstancesResponse {
+  repeated functions.v1.Instance instances = 1;
+}
+
+// Heartbeat is published by every host on its own subject.
+message Heartbeat {
+  functions.v1.Host host = 1;
+}
