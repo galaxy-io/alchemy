@@ -1,13 +1,14 @@
 import { useQuery } from "@connectrpc/connect-query";
 
-import type { GetHostRequest } from "@/gen/functions/v1/host_pb";
 import { FunctionsService } from "@/gen/functions/v1/service_pb";
 
-// Not suspense: GetHost is UNAVAILABLE until a host has sent a heartbeat, and the page still lists
-// instances without one.
-export const useGetHostQuery = ({ input }: { input?: GetHostRequest } = {}) => {
-  return useQuery<
-    typeof FunctionsService.method.getHost.input,
-    typeof FunctionsService.method.getHost.output
-  >(FunctionsService.method.getHost, input);
+const LIST_HOSTS_REFETCH_INTERVAL = 2 * 1000;
+
+// Not suspense: the page still lists instances before any host has sent a heartbeat.
+export const useListHostsQuery = () => {
+  return useQuery(
+    FunctionsService.method.listHosts,
+    {},
+    { refetchInterval: LIST_HOSTS_REFETCH_INTERVAL },
+  );
 };

@@ -147,7 +147,14 @@ func (d *Driver) buildRootfs(ctx context.Context, imageID, out string) error {
 	if err != nil {
 		return err
 	}
-	tmp := out + ".tmp"
+	// Several hosts may share the cache and build the same image at once;
+	// each writes its own file and the rename makes one of them the result.
+	f, err := os.CreateTemp(filepath.Dir(out), ".rootfs-*.ext4")
+	if err != nil {
+		return err
+	}
+	tmp := f.Name()
+	_ = f.Close()
 	mkfs := exec.CommandContext(ctx, "mke2fs", "-q", "-F", "-t", "ext4", "-m", "0", //nolint:gosec // paths are ours
 		"-E", "root_owner=0:0", "-d", root, tmp, fmt.Sprintf("%dM", size+64))
 	if msg, err := mkfs.CombinedOutput(); err != nil {

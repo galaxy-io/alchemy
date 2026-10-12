@@ -264,14 +264,18 @@ func (s *Service) requestBuild(ctx context.Context, tenantID string, spec *funct
 func (s *Service) requestBuildWithLog(ctx context.Context, tenantID string, spec *functionsv1.FunctionSpec) (*hostv1.Artifact, string, error) {
 	ctx, cancel := context.WithTimeout(ctx, s.cfg.BuildTimeout)
 	defer cancel()
-	resp := &hostv1.BuildResponse{}
-	err := s.bus.Request(ctx, bus.BuildSubject, &hostv1.BuildRequest{TenantId: tenantID, Spec: spec}, resp)
+	// Every host builds, so every host can take the function's invocations;
+	// the first host to finish answers for all of them.
+	reply, err := s.bus.First(ctx, bus.BuildSubject, &hostv1.BuildRequest{TenantId: tenantID, Spec: spec}, len(s.liveHosts()),
+		func() proto.Message { return &hostv1.BuildResponse{} },
+		func(m proto.Message) bool { return m.(*hostv1.BuildResponse).GetArtifact() != nil }) //nolint:errcheck // newResp makes BuildResponses
 	switch {
 	case errors.Is(err, bus.ErrNoResponders):
 		return nil, "", errNoHosts
 	case err != nil:
 		return nil, "", err
 	}
+	resp := reply.(*hostv1.BuildResponse) //nolint:errcheck // newResp makes BuildResponses
 	if e := resp.GetError(); e != nil {
 		return nil, resp.GetBuildLog(), errors.New(e.GetMessage())
 	}

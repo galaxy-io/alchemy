@@ -12,7 +12,7 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file functions/v1/host.proto.
  */
 export const file_functions_v1_host: GenFile = /*@__PURE__*/
-  fileDesc("ChdmdW5jdGlvbnMvdjEvaG9zdC5wcm90bxIMZnVuY3Rpb25zLnYxIogCCghJbnN0YW5jZRIKCgJpZBgBIAEoCRITCgtmdW5jdGlvbl9pZBgCIAEoCRIPCgd2ZXJzaW9uGAMgASgDEiwKBnN0YXR1cxgEIAEoDjIcLmZ1bmN0aW9ucy52MS5JbnN0YW5jZVN0YXR1cxIrCgpzdGFydF9raW5kGAUgASgOMhcuZnVuY3Rpb25zLnYxLlN0YXJ0S2luZBISCgpzdGFydGVkX2F0GAYgASgDEhUKDWludm9jYXRpb25faWQYByABKAkSDQoFdmNwdXMYCCABKA0SEgoKbWVtb3J5X21pYhgJIAEoDRITCgthcnRpZmFjdF9pZBgKIAEoCRIMCgRob3N0GAsgASgJIisKFExpc3RJbnN0YW5jZXNSZXF1ZXN0EhMKC2Z1bmN0aW9uX2lkGAEgASgJIkIKFUxpc3RJbnN0YW5jZXNSZXNwb25zZRIpCglpbnN0YW5jZXMYASADKAsyFi5mdW5jdGlvbnMudjEuSW5zdGFuY2Ui1QEKBEhvc3QSEAoIaG9zdG5hbWUYASABKAkSEgoKc3RhcnRlZF9hdBgCIAEoAxINCgVzbG90cxgDIAEoBRIUCgxzbG90c19pbl91c2UYBCABKAUSHAoUbWVtb3J5X21pYl9jb21taXR0ZWQYBSABKAMSGwoTZmlyZWNyYWNrZXJfdmVyc2lvbhgGIAEoCRIOCgZrZXJuZWwYByABKAkSGgoScm9vdGZzX2NhY2hlX2J5dGVzGAggASgDEhsKE3Jvb3Rmc19jYWNoZV9pbWFnZXMYCSABKAUiEAoOR2V0SG9zdFJlcXVlc3QiMwoPR2V0SG9zdFJlc3BvbnNlEiAKBGhvc3QYASABKAsyEi5mdW5jdGlvbnMudjEuSG9zdCqiAQoOSW5zdGFuY2VTdGF0dXMSHwobSU5TVEFOQ0VfU1RBVFVTX1VOU1BFQ0lGSUVEEAASGwoXSU5TVEFOQ0VfU1RBVFVTX0JPT1RJTkcQARIZChVJTlNUQU5DRV9TVEFUVVNfUkVBRFkQAhIYChRJTlNUQU5DRV9TVEFUVVNfQlVTWRADEh0KGUlOU1RBTkNFX1NUQVRVU19SRUxFQVNJTkcQBGIGcHJvdG8z", [file_functions_v1_invocations]);
+  fileDesc("ChdmdW5jdGlvbnMvdjEvaG9zdC5wcm90bxIMZnVuY3Rpb25zLnYxIogCCghJbnN0YW5jZRIKCgJpZBgBIAEoCRITCgtmdW5jdGlvbl9pZBgCIAEoCRIPCgd2ZXJzaW9uGAMgASgDEiwKBnN0YXR1cxgEIAEoDjIcLmZ1bmN0aW9ucy52MS5JbnN0YW5jZVN0YXR1cxIrCgpzdGFydF9raW5kGAUgASgOMhcuZnVuY3Rpb25zLnYxLlN0YXJ0S2luZBISCgpzdGFydGVkX2F0GAYgASgDEhUKDWludm9jYXRpb25faWQYByABKAkSDQoFdmNwdXMYCCABKA0SEgoKbWVtb3J5X21pYhgJIAEoDRITCgthcnRpZmFjdF9pZBgKIAEoCRIMCgRob3N0GAsgASgJIisKFExpc3RJbnN0YW5jZXNSZXF1ZXN0EhMKC2Z1bmN0aW9uX2lkGAEgASgJIkIKFUxpc3RJbnN0YW5jZXNSZXNwb25zZRIpCglpbnN0YW5jZXMYASADKAsyFi5mdW5jdGlvbnMudjEuSW5zdGFuY2Ui1QEKBEhvc3QSEAoIaG9zdG5hbWUYASABKAkSEgoKc3RhcnRlZF9hdBgCIAEoAxINCgVzbG90cxgDIAEoBRIUCgxzbG90c19pbl91c2UYBCABKAUSHAoUbWVtb3J5X21pYl9jb21taXR0ZWQYBSABKAMSGwoTZmlyZWNyYWNrZXJfdmVyc2lvbhgGIAEoCRIOCgZrZXJuZWwYByABKAkSGgoScm9vdGZzX2NhY2hlX2J5dGVzGAggASgDEhsKE3Jvb3Rmc19jYWNoZV9pbWFnZXMYCSABKAUiEgoQTGlzdEhvc3RzUmVxdWVzdCI2ChFMaXN0SG9zdHNSZXNwb25zZRIhCgVob3N0cxgBIAMoCzISLmZ1bmN0aW9ucy52MS5Ib3N0IhAKDkdldEhvc3RSZXF1ZXN0IjMKD0dldEhvc3RSZXNwb25zZRIgCgRob3N0GAEgASgLMhIuZnVuY3Rpb25zLnYxLkhvc3QqogEKDkluc3RhbmNlU3RhdHVzEh8KG0lOU1RBTkNFX1NUQVRVU19VTlNQRUNJRklFRBAAEhsKF0lOU1RBTkNFX1NUQVRVU19CT09USU5HEAESGQoVSU5TVEFOQ0VfU1RBVFVTX1JFQURZEAISGAoUSU5TVEFOQ0VfU1RBVFVTX0JVU1kQAxIdChlJTlNUQU5DRV9TVEFUVVNfUkVMRUFTSU5HEARiBnByb3RvMw", [file_functions_v1_invocations]);
 
 /**
  * Instance is one microVM on a host. A host knows the artifact it runs;
@@ -184,6 +184,38 @@ export const HostSchema: GenMessage<Host> = /*@__PURE__*/
   messageDesc(file_functions_v1_host, 3);
 
 /**
+ * @generated from message functions.v1.ListHostsRequest
+ */
+export type ListHostsRequest = Message<"functions.v1.ListHostsRequest"> & {
+};
+
+/**
+ * Describes the message functions.v1.ListHostsRequest.
+ * Use `create(ListHostsRequestSchema)` to create a new message.
+ */
+export const ListHostsRequestSchema: GenMessage<ListHostsRequest> = /*@__PURE__*/
+  messageDesc(file_functions_v1_host, 4);
+
+/**
+ * @generated from message functions.v1.ListHostsResponse
+ */
+export type ListHostsResponse = Message<"functions.v1.ListHostsResponse"> & {
+  /**
+   * Every host that has sent a heartbeat recently, by hostname.
+   *
+   * @generated from field: repeated functions.v1.Host hosts = 1;
+   */
+  hosts: Host[];
+};
+
+/**
+ * Describes the message functions.v1.ListHostsResponse.
+ * Use `create(ListHostsResponseSchema)` to create a new message.
+ */
+export const ListHostsResponseSchema: GenMessage<ListHostsResponse> = /*@__PURE__*/
+  messageDesc(file_functions_v1_host, 5);
+
+/**
  * @generated from message functions.v1.GetHostRequest
  */
 export type GetHostRequest = Message<"functions.v1.GetHostRequest"> & {
@@ -194,7 +226,7 @@ export type GetHostRequest = Message<"functions.v1.GetHostRequest"> & {
  * Use `create(GetHostRequestSchema)` to create a new message.
  */
 export const GetHostRequestSchema: GenMessage<GetHostRequest> = /*@__PURE__*/
-  messageDesc(file_functions_v1_host, 4);
+  messageDesc(file_functions_v1_host, 6);
 
 /**
  * @generated from message functions.v1.GetHostResponse
@@ -211,7 +243,7 @@ export type GetHostResponse = Message<"functions.v1.GetHostResponse"> & {
  * Use `create(GetHostResponseSchema)` to create a new message.
  */
 export const GetHostResponseSchema: GenMessage<GetHostResponse> = /*@__PURE__*/
-  messageDesc(file_functions_v1_host, 5);
+  messageDesc(file_functions_v1_host, 7);
 
 /**
  * InstanceStatus is the live state of one microVM. Instances are not

@@ -39,5 +39,6 @@ service FunctionsService {
 
   // Host; what the hosts are running right now.
   rpc ListInstances(ListInstancesRequest) returns (ListInstancesResponse);
+  rpc ListHosts(ListHostsRequest) returns (ListHostsResponse);
   rpc GetHost(GetHostRequest) returns (GetHostResponse);
 }

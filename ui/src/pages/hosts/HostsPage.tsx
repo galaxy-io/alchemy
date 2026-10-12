@@ -11,11 +11,11 @@ import HostsInstancesTable from "@/pages/hosts/components/table/HostsInstancesTa
 import { HOSTS_CARD_MIN_WIDTH } from "@/pages/hosts/constants";
 import { countInstancesByHost } from "@/pages/hosts/utils";
 
-import { useGetHostQuery } from "@/api/queries/hosts";
+import { useListHostsQuery } from "@/api/queries/hosts";
 import { useSuspenseListInstancesQuery } from "@/api/queries/instances";
 
 const HostsPage = () => {
-  const { data: hostData } = useGetHostQuery();
+  const { data: hostsData } = useListHostsQuery();
   const { data: instancesData } = useSuspenseListInstancesQuery();
 
   const instanceCountByHost = useMemo(
@@ -27,12 +27,13 @@ const HostsPage = () => {
     <PageLayout title="Hosts">
       <Flex direction={FlexDirection.COLUMN} gap={12} padding={16}>
         <Grid columns={`repeat(auto-fit, minmax(${HOSTS_CARD_MIN_WIDTH}px, 1fr))`} gap={12}>
-          {hostData?.host && (
+          {hostsData?.hosts.map((host) => (
             <HostCard
-              host={hostData.host}
-              instanceCount={instanceCountByHost.get(hostData.host.hostname) ?? 0}
+              key={host.hostname}
+              host={host}
+              instanceCount={instanceCountByHost.get(host.hostname) ?? 0}
             />
-          )}
+          ))}
         </Grid>
         <Widget header="Instances" isFlush gap={0}>
           <HostsInstancesTable instances={instancesData.instances} />
