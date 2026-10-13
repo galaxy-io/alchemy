@@ -1,0 +1,3 @@
+export const PAGE_LAYOUT_HEADER_HEIGHT = 64;
+export const PAGE_LAYOUT_HEADER_INSET = 16;
+export const PAGE_LAYOUT_HEADER_ROW_HEIGHT = 32;

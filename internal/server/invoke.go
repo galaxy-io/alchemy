@@ -98,8 +98,7 @@ func (s *Service) invokeOnHost(ctx context.Context, cv *compiledVersion, req *ho
 	// bound only guards against a host that vanished mid-call.
 	reqCtx, cancel := context.WithTimeout(ctx, timeout+hostGrace)
 	defer cancel()
-	out := &hostv1.InvokeResponse{}
-	err := s.bus.Request(reqCtx, bus.InvokeSubject(cv.artifact.GetId()), req, out)
+	out, err := s.requestInvoke(reqCtx, cv, req)
 	if !errors.Is(err, bus.ErrNoResponders) {
 		return out, err
 	}
@@ -122,12 +121,40 @@ func (s *Service) invokeOnHost(ctx context.Context, cv *compiledVersion, req *ho
 		return nil, connect.NewError(connect.CodeFailedPrecondition,
 			fmt.Errorf("version %d rebuilt as a different artifact (%s); create a new version", cv.row.Version, spec.GetImage()))
 	}
-	out = &hostv1.InvokeResponse{}
-	if err := s.bus.Request(reqCtx, bus.InvokeSubject(cv.artifact.GetId()), req, out); err != nil {
-		return nil, err
-	}
-	return out, nil
+	return s.requestInvoke(reqCtx, cv, req)
 }
+
+// requestInvoke sends one invocation to the hosts serving the artifact. A
+// host at capacity says so straight away; the queue group hands the retry to
+// a random member, so retries spread across hosts and, when every host is
+// full, wait for a slot instead of failing the call.
+func (s *Service) requestInvoke(ctx context.Context, cv *compiledVersion, req *hostv1.InvokeRequest) (*hostv1.InvokeResponse, error) {
+	wait := capacityBackoff
+	deadline := time.Now().Add(capacityWait)
+	for {
+		out := &hostv1.InvokeResponse{}
+		if err := s.bus.Request(ctx, bus.InvokeSubject(cv.artifact.GetId()), req, out); err != nil {
+			return nil, err
+		}
+		if out.GetError().GetCode() != "resource_exhausted" || time.Now().Add(wait).After(deadline) {
+			return out, nil
+		}
+		select {
+		case <-ctx.Done():
+			return out, nil
+		case <-time.After(wait):
+		}
+		wait = min(wait*2, capacityBackoffMax)
+	}
+}
+
+// When every host serving an artifact is full, an invocation waits up to
+// capacityWait for a slot, polling with backoff.
+const (
+	capacityWait       = 30 * time.Second
+	capacityBackoff    = 25 * time.Millisecond
+	capacityBackoffMax = 500 * time.Millisecond
+)
 
 // hostGrace is how long past the function's timeout the server waits for
 // a host's reply before treating the host as gone.

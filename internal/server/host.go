@@ -128,8 +128,13 @@ func (s *Service) ListInstances(ctx context.Context, req *connect.Request[functi
 	return connect.NewResponse(resp), nil
 }
 
-// GetHost returns the first live host. The API still describes one host;
-// ListHosts replaces it when there is more than one worth showing.
+// ListHosts returns every live host, by hostname.
+func (s *Service) ListHosts(context.Context, *connect.Request[functionsv1.ListHostsRequest]) (*connect.Response[functionsv1.ListHostsResponse], error) {
+	return connect.NewResponse(&functionsv1.ListHostsResponse{Hosts: s.liveHosts()}), nil
+}
+
+// GetHost returns the first live host by hostname. ListHosts supersedes it
+// now that there can be several.
 func (s *Service) GetHost(context.Context, *connect.Request[functionsv1.GetHostRequest]) (*connect.Response[functionsv1.GetHostResponse], error) {
 	hosts := s.liveHosts()
 	if len(hosts) == 0 {

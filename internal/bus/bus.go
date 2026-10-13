@@ -19,8 +19,8 @@ const (
 	BuildSubject     = "host.build"
 	DescribeSubject  = "host.describe"
 	InstancesSubject = "host.instances"
-	// HostsQueue is the queue group every host joins for build requests, so
-	// exactly one host builds a given artifact.
+	// HostsQueue is the queue group hosts join on an artifact's invoke
+	// subject, so exactly one host takes each invocation.
 	HostsQueue = "hosts"
 )
 
@@ -90,6 +90,49 @@ func (b *Bus) Request(ctx context.Context, subject string, req, resp proto.Messa
 		return fmt.Errorf("bus: request %s: %w", subject, err)
 	}
 	return proto.Unmarshal(m.Data, resp)
+}
+
+// First sends req to every subscriber of subject and returns the first
+// reply that accept takes. It stops early once expect replies have arrived;
+// when none was accepted it returns the last one, so the caller can report
+// why. With no replies at all it returns ErrNoResponders, or ctx's error.
+func (b *Bus) First(ctx context.Context, subject string, req proto.Message, expect int, newResp func() proto.Message, accept func(proto.Message) bool) (proto.Message, error) {
+	data, err := proto.Marshal(req)
+	if err != nil {
+		return nil, err
+	}
+	inbox := nats.NewInbox()
+	sub, err := b.nc.SubscribeSync(inbox)
+	if err != nil {
+		return nil, fmt.Errorf("bus: request %s: %w", subject, err)
+	}
+	defer func() { _ = sub.Unsubscribe() }()
+	if err := b.nc.PublishRequest(subject, inbox, data); err != nil {
+		return nil, fmt.Errorf("bus: request %s: %w", subject, err)
+	}
+
+	var last proto.Message
+	for got := 0; got < max(expect, 1); {
+		m, err := sub.NextMsgWithContext(ctx)
+		switch {
+		case errors.Is(err, nats.ErrNoResponders):
+			return nil, ErrNoResponders
+		case err != nil && last != nil:
+			return last, nil
+		case err != nil:
+			return nil, fmt.Errorf("bus: request %s: %w", subject, err)
+		}
+		got++
+		resp := newResp()
+		if err := proto.Unmarshal(m.Data, resp); err != nil {
+			continue
+		}
+		if accept(resp) {
+			return resp, nil
+		}
+		last = resp
+	}
+	return last, nil
 }
 
 // Gather sends req on subject and collects every reply that arrives within

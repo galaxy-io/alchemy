@@ -1,0 +1,9 @@
+node_modules/
+build/
+dist/
+.tanstack/
+*.tsbuildinfo
+*.log
+.env
+.env.local
+.DS_Store
