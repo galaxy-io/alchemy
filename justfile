@@ -104,4 +104,4 @@ example:
 # register the four embed functions on the running server and invoke each
 # `count` times with `rows`-row batches; run `just example` first
 demo count="10" rows="100" concurrency="4":
-    go run ./examples/embed/tool demo --count={{ count }} --rows={{ rows }} --concurrency={{ concurrency }}
+    go run ./examples/embed/tool --count={{ count }} --rows={{ rows }} --concurrency={{ concurrency }}

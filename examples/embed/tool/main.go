@@ -1,32 +1,33 @@
-// Command tool is the development helper for the embed example. It
-// owns the Arrow schemas of the contract and converts between JSON rows and
-// the IPC batches the function consumes and produces, so a shell script can
-// drive the function without an Arrow library.
+// Command tool runs the embed example against a running server: it registers
+// embed-go, embed-rust, embed-python and embed-typescript, waits for them to
+// build, then invokes each with batches of sample rows.
 //
-//	tool contract            print the contract as JSON for CreateFunction
-//	tool encode < rows.json  JSON array of {id, text} -> IPC batch
-//	tool decode < batch.ipc  IPC batch -> JSON array of output rows
-//	tool register            create embed-<lang> on a running server
-//	tool invoke              invoke embed-<lang> with generated batches
-//	tool demo                register all four, then invoke each
+//	go run ./examples/embed/tool --count=10 --rows=100 --concurrency=4
 package main
 
 import (
 	"bytes"
-	"encoding/base64"
-	"encoding/json"
+	"context"
+	"flag"
 	"fmt"
-	"io"
+	"net/http"
 	"os"
+	"sync"
+	"time"
 
+	"connectrpc.com/connect"
 	"github.com/apache/arrow-go/v18/arrow"
 	"github.com/apache/arrow-go/v18/arrow/array"
 	"github.com/apache/arrow-go/v18/arrow/ipc"
 	"github.com/apache/arrow-go/v18/arrow/memory"
+
+	functionsv1 "github.com/galaxy-io/alchemy/api/functions/v1"
+	"github.com/galaxy-io/alchemy/api/functions/v1/functionsv1connect"
 )
 
-const dimensions = 64
+var langs = []string{"go", "rust", "python", "typescript"}
 
+// The contract all four implementations share.
 var (
 	inputSchema = arrow.NewSchema([]arrow.Field{
 		{Name: "id", Type: arrow.BinaryTypes.String},
@@ -36,132 +37,195 @@ var (
 		{Name: "id", Type: arrow.BinaryTypes.String},
 		{Name: "cleaned_text", Type: arrow.BinaryTypes.String},
 		{Name: "token_count", Type: arrow.PrimitiveTypes.Uint32},
-		{Name: "embedding", Type: arrow.FixedSizeListOf(dimensions, arrow.PrimitiveTypes.Float64)},
+		{Name: "embedding", Type: arrow.FixedSizeListOf(64, arrow.PrimitiveTypes.Float64)},
 		{Name: "model", Type: arrow.BinaryTypes.String},
 	}, nil)
 )
 
-type inputRow struct {
-	ID   string  `json:"id"`
-	Text *string `json:"text"`
-}
-
-type outputRow struct {
-	ID          string    `json:"id"`
-	CleanedText string    `json:"cleaned_text"`
-	TokenCount  uint32    `json:"token_count"`
-	Embedding   []float64 `json:"embedding"`
-	Model       string    `json:"model"`
+var sampleTexts = []string{
+	"  The QUICK brown fox\tjumps over the lazy dog.  ",
+	"Alchemy runs each invocation in its own Firecracker microVM.",
+	"Arrow batches in,\n\nArrow batches out:  no JSON on the hot path.",
+	"Clean   the text, then hash character trigrams into 64 dimensions.",
+	"Four languages, one contract, identical output.",
+	"\x01Control bytes are dropped\x7f but unicode — ünïcödé — is kept.",
+	"",
 }
 
 func main() {
-	if len(os.Args) < 2 {
-		fail("usage: tool contract|encode|decode|register|invoke|demo [flags]")
+	addr := flag.String("addr", "http://localhost:8780", "server address")
+	rows := flag.Int("rows", 100, "rows per batch")
+	count := flag.Int("count", 10, "invocations per function")
+	concurrency := flag.Int("concurrency", 4, "invocations in flight at once")
+	flag.Parse()
+
+	ctx := context.Background()
+	fns := functionsv1connect.NewFunctionsServiceClient(http.DefaultClient, *addr)
+	input := batch(*rows)
+
+	ids := make(map[string]string, len(langs))
+	for _, lang := range langs {
+		id, err := register(ctx, fns, lang)
+		if err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(1)
+		}
+		ids[lang] = id
 	}
-	var err error
-	switch args := os.Args[2:]; os.Args[1] {
-	case "contract":
-		err = contract()
-	case "encode":
-		err = encode()
-	case "decode":
-		err = decode()
-	case "register":
-		err = registerCmd(args)
-	case "invoke":
-		err = invokeCmd(args)
-	case "demo":
-		err = demoCmd(args)
+	failed := 0
+	for _, lang := range langs {
+		failed += invoke(ctx, fns, "embed-"+lang, ids[lang], input, *count, *concurrency)
+	}
+	if failed > 0 {
+		fmt.Fprintf(os.Stderr, "%d invocations failed\n", failed)
+		os.Exit(1)
+	}
+}
+
+// register builds a version of embed-<lang> from its :dev image and waits
+// for it. A function that already exists gets a new version, so a rebuilt
+// image is always picked up. It returns the function id.
+func register(ctx context.Context, fns functionsv1connect.FunctionsServiceClient, lang string) (string, error) {
+	name := "embed-" + lang
+	spec := &functionsv1.FunctionSpec{
+		Image:    "ghcr.io/galaxy-io/alchemy/embed-" + lang + ":dev",
+		Protocol: functionsv1.InvocationProtocol_INVOCATION_PROTOCOL_EXEC,
+		Contract: &functionsv1.Contract{Kind: &functionsv1.Contract_Arrow{Arrow: &functionsv1.ArrowContract{
+			InputSchema:  schemaBytes(inputSchema),
+			OutputSchema: schemaBytes(outputSchema),
+		}}},
+	}
+
+	var id string
+	var version int64
+	created, err := fns.CreateFunction(ctx, connect.NewRequest(&functionsv1.CreateFunctionRequest{
+		Name:        name,
+		Description: "Clean text and embed it with hashed trigrams, in " + lang + ".",
+		Spec:        spec,
+	}))
+	switch {
+	case err == nil:
+		id, version = created.Msg.GetFunction().GetId(), created.Msg.GetVersion().GetVersion()
+	case connect.CodeOf(err) == connect.CodeAlreadyExists:
+		list, err := fns.ListFunctions(ctx, connect.NewRequest(&functionsv1.ListFunctionsRequest{Search: name}))
+		if err != nil {
+			return "", fmt.Errorf("%s: %w", name, err)
+		}
+		for _, fn := range list.Msg.GetFunctions() {
+			if fn.GetName() == name {
+				id = fn.GetId()
+			}
+		}
+		next, err := fns.CreateFunctionVersion(ctx, connect.NewRequest(&functionsv1.CreateFunctionVersionRequest{FunctionId: id, Spec: spec}))
+		if err != nil {
+			return "", fmt.Errorf("%s: %w", name, err)
+		}
+		version = next.Msg.GetVersion().GetVersion()
 	default:
-		fail("unknown command %q", os.Args[1])
+		return "", fmt.Errorf("%s: %w", name, err)
 	}
-	if err != nil {
-		fail("%v", err)
+
+	fmt.Fprintf(os.Stderr, "%s: building v%d\n", name, version)
+	for {
+		got, err := fns.GetFunctionVersion(ctx, connect.NewRequest(&functionsv1.GetFunctionVersionRequest{FunctionId: id, Version: version}))
+		if err != nil {
+			return "", fmt.Errorf("%s: %w", name, err)
+		}
+		switch v := got.Msg.GetVersion(); v.GetStatus() {
+		case functionsv1.FunctionVersionStatus_FUNCTION_VERSION_STATUS_READY:
+			fmt.Fprintf(os.Stderr, "%s: v%d ready\n", name, version)
+			return id, nil
+		case functionsv1.FunctionVersionStatus_FUNCTION_VERSION_STATUS_FAILED:
+			return "", fmt.Errorf("%s: v%d build failed: %s", name, version, v.GetStatusMessage())
+		}
+		time.Sleep(time.Second)
 	}
 }
 
-func contract() error {
-	return json.NewEncoder(os.Stdout).Encode(map[string]any{
-		"arrow": map[string]string{
-			"input_schema":  base64.StdEncoding.EncodeToString(serializeSchema(inputSchema)),
-			"output_schema": base64.StdEncoding.EncodeToString(serializeSchema(outputSchema)),
-		},
-	})
+// invoke calls the function count times, concurrency at a time, printing a
+// line per call. It returns how many failed.
+func invoke(ctx context.Context, fns functionsv1connect.FunctionsServiceClient, name, id string, input []byte, count, concurrency int) int {
+	var (
+		wg     sync.WaitGroup
+		mu     sync.Mutex
+		failed int
+		sem    = make(chan struct{}, concurrency)
+	)
+	for i := 1; i <= count; i++ {
+		sem <- struct{}{}
+		wg.Go(func() {
+			defer func() { <-sem }()
+			resp, err := fns.Invoke(ctx, connect.NewRequest(&functionsv1.InvokeRequest{FunctionId: id, Input: input}))
+			mu.Lock()
+			defer mu.Unlock()
+			switch {
+			case err != nil:
+				failed++
+				fmt.Fprintf(os.Stderr, "%s #%d: %v\n", name, i, err)
+			case resp.Msg.GetError() != nil:
+				failed++
+				fmt.Fprintf(os.Stderr, "%s #%d: function failed: %s\n", name, i, resp.Msg.GetError().GetMessage())
+			default:
+				st := resp.Msg.GetStats()
+				fmt.Fprintf(os.Stderr, "%s #%d: %-16s acquire %-8s run %-8s total %s\n", name, i,
+					startKind(st.GetStartKind()), micros(st.GetAcquireUs()), micros(st.GetRunUs()), micros(st.GetTotalUs()))
+			}
+		})
+	}
+	wg.Wait()
+	return failed
 }
 
-func serializeSchema(s *arrow.Schema) []byte {
+// batch is n sample rows as an Arrow IPC stream.
+func batch(n int) []byte {
+	b := array.NewRecordBuilder(memory.DefaultAllocator, inputSchema)
+	defer b.Release()
+	ids := b.Field(0).(*array.StringBuilder)   //nolint:errcheck // the schema above fixes the types
+	texts := b.Field(1).(*array.StringBuilder) //nolint:errcheck // the schema above fixes the types
+	for i := range n {
+		ids.Append(fmt.Sprintf("row-%d", i))
+		if i%20 == 19 {
+			texts.AppendNull()
+			continue
+		}
+		texts.Append(sampleTexts[i%len(sampleTexts)])
+	}
+	rec := b.NewRecordBatch()
+	defer rec.Release()
+
 	var buf bytes.Buffer
-	w := ipc.NewWriter(&buf, ipc.WithSchema(s))
+	w := ipc.NewWriter(&buf, ipc.WithSchema(inputSchema))
+	if err := w.Write(rec); err != nil {
+		panic(err)
+	}
 	if err := w.Close(); err != nil {
 		panic(err)
 	}
 	return buf.Bytes()
 }
 
-func encode() error {
-	var rows []inputRow
-	if err := json.NewDecoder(os.Stdin).Decode(&rows); err != nil {
-		return fmt.Errorf("read rows: %w", err)
+// schemaBytes is s as the IPC stream the contract carries.
+func schemaBytes(s *arrow.Schema) []byte {
+	var buf bytes.Buffer
+	if err := ipc.NewWriter(&buf, ipc.WithSchema(s)).Close(); err != nil {
+		panic(err)
 	}
-	b := array.NewRecordBuilder(memory.DefaultAllocator, inputSchema)
-	defer b.Release()
-	ids := b.Field(0).(*array.StringBuilder)
-	texts := b.Field(1).(*array.StringBuilder)
-	for _, r := range rows {
-		ids.Append(r.ID)
-		if r.Text == nil {
-			texts.AppendNull()
-		} else {
-			texts.Append(*r.Text)
-		}
-	}
-	rec := b.NewRecordBatch()
-	defer rec.Release()
-
-	w := ipc.NewWriter(os.Stdout, ipc.WithSchema(inputSchema))
-	if err := w.Write(rec); err != nil {
-		return err
-	}
-	return w.Close()
+	return buf.Bytes()
 }
 
-func decode() error {
-	raw, err := io.ReadAll(os.Stdin)
-	if err != nil {
-		return err
+func startKind(k functionsv1.StartKind) string {
+	switch k {
+	case functionsv1.StartKind_START_KIND_COLD_BOOT:
+		return "cold_boot"
+	case functionsv1.StartKind_START_KIND_SNAPSHOT_RESTORE:
+		return "snapshot_restore"
+	case functionsv1.StartKind_START_KIND_WARM:
+		return "warm"
+	default:
+		return "-"
 	}
-	r, err := ipc.NewReader(bytes.NewReader(raw))
-	if err != nil {
-		return fmt.Errorf("read IPC: %w", err)
-	}
-	defer r.Release()
-	if !r.Next() {
-		return fmt.Errorf("stream holds no batch: %v", r.Err())
-	}
-	rec := r.RecordBatch()
-
-	ids := rec.Column(0).(*array.String)
-	cleaned := rec.Column(1).(*array.String)
-	counts := rec.Column(2).(*array.Uint32)
-	embeddings := rec.Column(3).(*array.FixedSizeList)
-	values := embeddings.ListValues().(*array.Float64)
-	models := rec.Column(4).(*array.String)
-
-	rows := make([]outputRow, rec.NumRows())
-	for i := range rows {
-		start, end := embeddings.ValueOffsets(i)
-		rows[i] = outputRow{
-			ID:          ids.Value(i),
-			CleanedText: cleaned.Value(i),
-			TokenCount:  counts.Value(i),
-			Embedding:   values.Float64Values()[start:end],
-			Model:       models.Value(i),
-		}
-	}
-	return json.NewEncoder(os.Stdout).Encode(rows)
 }
 
-func fail(format string, args ...any) {
-	fmt.Fprintf(os.Stderr, format+"\n", args...)
-	os.Exit(1)
+func micros(us int64) string {
+	return (time.Duration(us) * time.Microsecond).Round(time.Millisecond).String()
 }
