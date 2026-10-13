@@ -55,6 +55,13 @@ message Host {
   int32 rootfs_cache_images = 9;
 }
 
+message ListHostsRequest {}
+
+message ListHostsResponse {
+  // Every host that has sent a heartbeat recently, by hostname.
+  repeated Host hosts = 1;
+}
+
 message GetHostRequest {}
 
 message GetHostResponse {

@@ -24,7 +24,7 @@ var File_functions_v1_service_proto protoreflect.FileDescriptor
 
 const file_functions_v1_service_proto_rawDesc = "" +
 	"\n" +
-	"\x1afunctions/v1/service.proto\x12\ffunctions.v1\x1a\x1cfunctions/v1/functions.proto\x1a\x17functions/v1/host.proto\x1a\x1efunctions/v1/invocations.proto2\xa4\n" +
+	"\x1afunctions/v1/service.proto\x12\ffunctions.v1\x1a\x1cfunctions/v1/functions.proto\x1a\x17functions/v1/host.proto\x1a\x1efunctions/v1/invocations.proto2\xf2\n" +
 	"\n" +
 	"\x10FunctionsService\x12[\n" +
 	"\x0eCreateFunction\x12#.functions.v1.CreateFunctionRequest\x1a$.functions.v1.CreateFunctionResponse\x12[\n" +
@@ -39,7 +39,8 @@ const file_functions_v1_service_proto_rawDesc = "" +
 	"\rGetInvocation\x12\".functions.v1.GetInvocationRequest\x1a#.functions.v1.GetInvocationResponse\x12^\n" +
 	"\x0fListInvocations\x12$.functions.v1.ListInvocationsRequest\x1a%.functions.v1.ListInvocationsResponse\x12`\n" +
 	"\x0fTailInvocations\x12$.functions.v1.TailInvocationsRequest\x1a%.functions.v1.TailInvocationsResponse0\x01\x12X\n" +
-	"\rListInstances\x12\".functions.v1.ListInstancesRequest\x1a#.functions.v1.ListInstancesResponse\x12F\n" +
+	"\rListInstances\x12\".functions.v1.ListInstancesRequest\x1a#.functions.v1.ListInstancesResponse\x12L\n" +
+	"\tListHosts\x12\x1e.functions.v1.ListHostsRequest\x1a\x1f.functions.v1.ListHostsResponse\x12F\n" +
 	"\aGetHost\x12\x1c.functions.v1.GetHostRequest\x1a\x1d.functions.v1.GetHostResponseB\xac\x01\n" +
 	"\x10com.functions.v1B\fServiceProtoP\x01Z9github.com/galaxy-io/alchemy/api/functions/v1;functionsv1\xa2\x02\x03FXX\xaa\x02\fFunctions.V1\xca\x02\fFunctions\\V1\xe2\x02\x18Functions\\V1\\GPBMetadata\xea\x02\rFunctions::V1b\x06proto3"
 
@@ -57,21 +58,23 @@ var file_functions_v1_service_proto_goTypes = []any{
 	(*ListInvocationsRequest)(nil),        // 10: functions.v1.ListInvocationsRequest
 	(*TailInvocationsRequest)(nil),        // 11: functions.v1.TailInvocationsRequest
 	(*ListInstancesRequest)(nil),          // 12: functions.v1.ListInstancesRequest
-	(*GetHostRequest)(nil),                // 13: functions.v1.GetHostRequest
-	(*CreateFunctionResponse)(nil),        // 14: functions.v1.CreateFunctionResponse
-	(*UpdateFunctionResponse)(nil),        // 15: functions.v1.UpdateFunctionResponse
-	(*GetFunctionResponse)(nil),           // 16: functions.v1.GetFunctionResponse
-	(*ListFunctionsResponse)(nil),         // 17: functions.v1.ListFunctionsResponse
-	(*DeleteFunctionResponse)(nil),        // 18: functions.v1.DeleteFunctionResponse
-	(*CreateFunctionVersionResponse)(nil), // 19: functions.v1.CreateFunctionVersionResponse
-	(*GetFunctionVersionResponse)(nil),    // 20: functions.v1.GetFunctionVersionResponse
-	(*ListFunctionVersionsResponse)(nil),  // 21: functions.v1.ListFunctionVersionsResponse
-	(*InvokeResponse)(nil),                // 22: functions.v1.InvokeResponse
-	(*GetInvocationResponse)(nil),         // 23: functions.v1.GetInvocationResponse
-	(*ListInvocationsResponse)(nil),       // 24: functions.v1.ListInvocationsResponse
-	(*TailInvocationsResponse)(nil),       // 25: functions.v1.TailInvocationsResponse
-	(*ListInstancesResponse)(nil),         // 26: functions.v1.ListInstancesResponse
-	(*GetHostResponse)(nil),               // 27: functions.v1.GetHostResponse
+	(*ListHostsRequest)(nil),              // 13: functions.v1.ListHostsRequest
+	(*GetHostRequest)(nil),                // 14: functions.v1.GetHostRequest
+	(*CreateFunctionResponse)(nil),        // 15: functions.v1.CreateFunctionResponse
+	(*UpdateFunctionResponse)(nil),        // 16: functions.v1.UpdateFunctionResponse
+	(*GetFunctionResponse)(nil),           // 17: functions.v1.GetFunctionResponse
+	(*ListFunctionsResponse)(nil),         // 18: functions.v1.ListFunctionsResponse
+	(*DeleteFunctionResponse)(nil),        // 19: functions.v1.DeleteFunctionResponse
+	(*CreateFunctionVersionResponse)(nil), // 20: functions.v1.CreateFunctionVersionResponse
+	(*GetFunctionVersionResponse)(nil),    // 21: functions.v1.GetFunctionVersionResponse
+	(*ListFunctionVersionsResponse)(nil),  // 22: functions.v1.ListFunctionVersionsResponse
+	(*InvokeResponse)(nil),                // 23: functions.v1.InvokeResponse
+	(*GetInvocationResponse)(nil),         // 24: functions.v1.GetInvocationResponse
+	(*ListInvocationsResponse)(nil),       // 25: functions.v1.ListInvocationsResponse
+	(*TailInvocationsResponse)(nil),       // 26: functions.v1.TailInvocationsResponse
+	(*ListInstancesResponse)(nil),         // 27: functions.v1.ListInstancesResponse
+	(*ListHostsResponse)(nil),             // 28: functions.v1.ListHostsResponse
+	(*GetHostResponse)(nil),               // 29: functions.v1.GetHostResponse
 }
 var file_functions_v1_service_proto_depIdxs = []int32{
 	0,  // 0: functions.v1.FunctionsService.CreateFunction:input_type -> functions.v1.CreateFunctionRequest
@@ -87,23 +90,25 @@ var file_functions_v1_service_proto_depIdxs = []int32{
 	10, // 10: functions.v1.FunctionsService.ListInvocations:input_type -> functions.v1.ListInvocationsRequest
 	11, // 11: functions.v1.FunctionsService.TailInvocations:input_type -> functions.v1.TailInvocationsRequest
 	12, // 12: functions.v1.FunctionsService.ListInstances:input_type -> functions.v1.ListInstancesRequest
-	13, // 13: functions.v1.FunctionsService.GetHost:input_type -> functions.v1.GetHostRequest
-	14, // 14: functions.v1.FunctionsService.CreateFunction:output_type -> functions.v1.CreateFunctionResponse
-	15, // 15: functions.v1.FunctionsService.UpdateFunction:output_type -> functions.v1.UpdateFunctionResponse
-	16, // 16: functions.v1.FunctionsService.GetFunction:output_type -> functions.v1.GetFunctionResponse
-	17, // 17: functions.v1.FunctionsService.ListFunctions:output_type -> functions.v1.ListFunctionsResponse
-	18, // 18: functions.v1.FunctionsService.DeleteFunction:output_type -> functions.v1.DeleteFunctionResponse
-	19, // 19: functions.v1.FunctionsService.CreateFunctionVersion:output_type -> functions.v1.CreateFunctionVersionResponse
-	20, // 20: functions.v1.FunctionsService.GetFunctionVersion:output_type -> functions.v1.GetFunctionVersionResponse
-	21, // 21: functions.v1.FunctionsService.ListFunctionVersions:output_type -> functions.v1.ListFunctionVersionsResponse
-	22, // 22: functions.v1.FunctionsService.Invoke:output_type -> functions.v1.InvokeResponse
-	23, // 23: functions.v1.FunctionsService.GetInvocation:output_type -> functions.v1.GetInvocationResponse
-	24, // 24: functions.v1.FunctionsService.ListInvocations:output_type -> functions.v1.ListInvocationsResponse
-	25, // 25: functions.v1.FunctionsService.TailInvocations:output_type -> functions.v1.TailInvocationsResponse
-	26, // 26: functions.v1.FunctionsService.ListInstances:output_type -> functions.v1.ListInstancesResponse
-	27, // 27: functions.v1.FunctionsService.GetHost:output_type -> functions.v1.GetHostResponse
-	14, // [14:28] is the sub-list for method output_type
-	0,  // [0:14] is the sub-list for method input_type
+	13, // 13: functions.v1.FunctionsService.ListHosts:input_type -> functions.v1.ListHostsRequest
+	14, // 14: functions.v1.FunctionsService.GetHost:input_type -> functions.v1.GetHostRequest
+	15, // 15: functions.v1.FunctionsService.CreateFunction:output_type -> functions.v1.CreateFunctionResponse
+	16, // 16: functions.v1.FunctionsService.UpdateFunction:output_type -> functions.v1.UpdateFunctionResponse
+	17, // 17: functions.v1.FunctionsService.GetFunction:output_type -> functions.v1.GetFunctionResponse
+	18, // 18: functions.v1.FunctionsService.ListFunctions:output_type -> functions.v1.ListFunctionsResponse
+	19, // 19: functions.v1.FunctionsService.DeleteFunction:output_type -> functions.v1.DeleteFunctionResponse
+	20, // 20: functions.v1.FunctionsService.CreateFunctionVersion:output_type -> functions.v1.CreateFunctionVersionResponse
+	21, // 21: functions.v1.FunctionsService.GetFunctionVersion:output_type -> functions.v1.GetFunctionVersionResponse
+	22, // 22: functions.v1.FunctionsService.ListFunctionVersions:output_type -> functions.v1.ListFunctionVersionsResponse
+	23, // 23: functions.v1.FunctionsService.Invoke:output_type -> functions.v1.InvokeResponse
+	24, // 24: functions.v1.FunctionsService.GetInvocation:output_type -> functions.v1.GetInvocationResponse
+	25, // 25: functions.v1.FunctionsService.ListInvocations:output_type -> functions.v1.ListInvocationsResponse
+	26, // 26: functions.v1.FunctionsService.TailInvocations:output_type -> functions.v1.TailInvocationsResponse
+	27, // 27: functions.v1.FunctionsService.ListInstances:output_type -> functions.v1.ListInstancesResponse
+	28, // 28: functions.v1.FunctionsService.ListHosts:output_type -> functions.v1.ListHostsResponse
+	29, // 29: functions.v1.FunctionsService.GetHost:output_type -> functions.v1.GetHostResponse
+	15, // [15:30] is the sub-list for method output_type
+	0,  // [0:15] is the sub-list for method input_type
 	0,  // [0:0] is the sub-list for extension type_name
 	0,  // [0:0] is the sub-list for extension extendee
 	0,  // [0:0] is the sub-list for field type_name

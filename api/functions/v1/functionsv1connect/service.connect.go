@@ -71,6 +71,9 @@ const (
 	// FunctionsServiceListInstancesProcedure is the fully-qualified name of the FunctionsService's
 	// ListInstances RPC.
 	FunctionsServiceListInstancesProcedure = "/functions.v1.FunctionsService/ListInstances"
+	// FunctionsServiceListHostsProcedure is the fully-qualified name of the FunctionsService's
+	// ListHosts RPC.
+	FunctionsServiceListHostsProcedure = "/functions.v1.FunctionsService/ListHosts"
 	// FunctionsServiceGetHostProcedure is the fully-qualified name of the FunctionsService's GetHost
 	// RPC.
 	FunctionsServiceGetHostProcedure = "/functions.v1.FunctionsService/GetHost"
@@ -103,6 +106,7 @@ type FunctionsServiceClient interface {
 	TailInvocations(context.Context, *connect.Request[v1.TailInvocationsRequest]) (*connect.ServerStreamForClient[v1.TailInvocationsResponse], error)
 	// Host; what the hosts are running right now.
 	ListInstances(context.Context, *connect.Request[v1.ListInstancesRequest]) (*connect.Response[v1.ListInstancesResponse], error)
+	ListHosts(context.Context, *connect.Request[v1.ListHostsRequest]) (*connect.Response[v1.ListHostsResponse], error)
 	GetHost(context.Context, *connect.Request[v1.GetHostRequest]) (*connect.Response[v1.GetHostResponse], error)
 }
 
@@ -195,6 +199,12 @@ func NewFunctionsServiceClient(httpClient connect.HTTPClient, baseURL string, op
 			connect.WithSchema(functionsServiceMethods.ByName("ListInstances")),
 			connect.WithClientOptions(opts...),
 		),
+		listHosts: connect.NewClient[v1.ListHostsRequest, v1.ListHostsResponse](
+			httpClient,
+			baseURL+FunctionsServiceListHostsProcedure,
+			connect.WithSchema(functionsServiceMethods.ByName("ListHosts")),
+			connect.WithClientOptions(opts...),
+		),
 		getHost: connect.NewClient[v1.GetHostRequest, v1.GetHostResponse](
 			httpClient,
 			baseURL+FunctionsServiceGetHostProcedure,
@@ -219,6 +229,7 @@ type functionsServiceClient struct {
 	listInvocations       *connect.Client[v1.ListInvocationsRequest, v1.ListInvocationsResponse]
 	tailInvocations       *connect.Client[v1.TailInvocationsRequest, v1.TailInvocationsResponse]
 	listInstances         *connect.Client[v1.ListInstancesRequest, v1.ListInstancesResponse]
+	listHosts             *connect.Client[v1.ListHostsRequest, v1.ListHostsResponse]
 	getHost               *connect.Client[v1.GetHostRequest, v1.GetHostResponse]
 }
 
@@ -287,6 +298,11 @@ func (c *functionsServiceClient) ListInstances(ctx context.Context, req *connect
 	return c.listInstances.CallUnary(ctx, req)
 }
 
+// ListHosts calls functions.v1.FunctionsService.ListHosts.
+func (c *functionsServiceClient) ListHosts(ctx context.Context, req *connect.Request[v1.ListHostsRequest]) (*connect.Response[v1.ListHostsResponse], error) {
+	return c.listHosts.CallUnary(ctx, req)
+}
+
 // GetHost calls functions.v1.FunctionsService.GetHost.
 func (c *functionsServiceClient) GetHost(ctx context.Context, req *connect.Request[v1.GetHostRequest]) (*connect.Response[v1.GetHostResponse], error) {
 	return c.getHost.CallUnary(ctx, req)
@@ -319,6 +335,7 @@ type FunctionsServiceHandler interface {
 	TailInvocations(context.Context, *connect.Request[v1.TailInvocationsRequest], *connect.ServerStream[v1.TailInvocationsResponse]) error
 	// Host; what the hosts are running right now.
 	ListInstances(context.Context, *connect.Request[v1.ListInstancesRequest]) (*connect.Response[v1.ListInstancesResponse], error)
+	ListHosts(context.Context, *connect.Request[v1.ListHostsRequest]) (*connect.Response[v1.ListHostsResponse], error)
 	GetHost(context.Context, *connect.Request[v1.GetHostRequest]) (*connect.Response[v1.GetHostResponse], error)
 }
 
@@ -407,6 +424,12 @@ func NewFunctionsServiceHandler(svc FunctionsServiceHandler, opts ...connect.Han
 		connect.WithSchema(functionsServiceMethods.ByName("ListInstances")),
 		connect.WithHandlerOptions(opts...),
 	)
+	functionsServiceListHostsHandler := connect.NewUnaryHandler(
+		FunctionsServiceListHostsProcedure,
+		svc.ListHosts,
+		connect.WithSchema(functionsServiceMethods.ByName("ListHosts")),
+		connect.WithHandlerOptions(opts...),
+	)
 	functionsServiceGetHostHandler := connect.NewUnaryHandler(
 		FunctionsServiceGetHostProcedure,
 		svc.GetHost,
@@ -441,6 +464,8 @@ func NewFunctionsServiceHandler(svc FunctionsServiceHandler, opts ...connect.Han
 			functionsServiceTailInvocationsHandler.ServeHTTP(w, r)
 		case FunctionsServiceListInstancesProcedure:
 			functionsServiceListInstancesHandler.ServeHTTP(w, r)
+		case FunctionsServiceListHostsProcedure:
+			functionsServiceListHostsHandler.ServeHTTP(w, r)
 		case FunctionsServiceGetHostProcedure:
 			functionsServiceGetHostHandler.ServeHTTP(w, r)
 		default:
@@ -502,6 +527,10 @@ func (UnimplementedFunctionsServiceHandler) TailInvocations(context.Context, *co
 
 func (UnimplementedFunctionsServiceHandler) ListInstances(context.Context, *connect.Request[v1.ListInstancesRequest]) (*connect.Response[v1.ListInstancesResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("functions.v1.FunctionsService.ListInstances is not implemented"))
+}
+
+func (UnimplementedFunctionsServiceHandler) ListHosts(context.Context, *connect.Request[v1.ListHostsRequest]) (*connect.Response[v1.ListHostsResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("functions.v1.FunctionsService.ListHosts is not implemented"))
 }
 
 func (UnimplementedFunctionsServiceHandler) GetHost(context.Context, *connect.Request[v1.GetHostRequest]) (*connect.Response[v1.GetHostResponse], error) {
