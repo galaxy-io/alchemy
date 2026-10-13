@@ -16,7 +16,7 @@ import type { AlchemyLayoutSearch } from "@/module/schemas";
 import { Flow } from "@/module/types";
 
 /**
- * The module's own layout: the island with the sidebar and the screens, plus the overlays that open
+ * The module's own layout: the sidebar and the screens, plus the overlays that open
  * from anywhere in the module through the search params `alchemyLayoutSearchSchema` validates on
  * this route. It fills whatever box the host gives it and renders no providers; the host supplies
  * the theme, transport, query client and command palette.

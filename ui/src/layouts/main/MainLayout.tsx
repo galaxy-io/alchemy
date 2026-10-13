@@ -1,30 +1,25 @@
 import type { PropsWithChildren } from "react";
 
-import Box, { BoxVariant } from "@galaxy-io/dls/layout/Box";
-import Divider from "@galaxy-io/dls/layout/Divider";
-import Flex, { FlexDirection, FlexVariant } from "@galaxy-io/dls/layout/Flex";
-import { Orientation, Radius } from "@galaxy-io/dls/theme/enums";
+import { useLocalStorage } from "@galaxy-io/dls/hooks/useLocalStorage";
+import AppFrame from "@galaxy-io/dls/layout/AppFrame";
 
-import { MAIN_LAYOUT_GUTTER } from "@/layouts/main/constants";
+import { MAIN_LAYOUT_SIDEBAR_COLLAPSED_STORAGE_KEY } from "@/layouts/main/constants";
 import MainLayoutSidebar from "@/layouts/main/MainLayoutSidebar";
 
 const MainLayout = ({ children }: PropsWithChildren) => {
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useLocalStorage<boolean>(
+    MAIN_LAYOUT_SIDEBAR_COLLAPSED_STORAGE_KEY,
+    false,
+  );
+
   return (
-    <Box variant={BoxVariant.BASE} height="100%" overflow="hidden" padding={MAIN_LAYOUT_GUTTER}>
-      <Flex
-        height="100%"
-        variant={FlexVariant.PRIMARY}
-        hasBorder
-        radius={Radius.LG}
-        overflow="hidden"
-      >
-        <MainLayoutSidebar />
-        <Divider orientation={Orientation.VERTICAL} />
-        <Flex direction={FlexDirection.COLUMN} grow={1} basis={0} minWidth={0} minHeight={0}>
-          {children}
-        </Flex>
-      </Flex>
-    </Box>
+    <AppFrame
+      sidebar={<MainLayoutSidebar />}
+      isCollapsed={isSidebarCollapsed}
+      onCollapsedChange={setIsSidebarCollapsed}
+    >
+      {children}
+    </AppFrame>
   );
 };
 

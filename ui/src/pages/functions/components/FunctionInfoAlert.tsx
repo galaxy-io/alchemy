@@ -19,7 +19,7 @@ const InfoToneWrapper = styled.div`
   }
 `;
 
-type FunctionInfoAlertProps = Omit<ComponentProps<typeof Alert>, "variant">;
+type FunctionInfoAlertProps = Omit<ComponentProps<typeof Alert>, "variant" | "color">;
 
 const FunctionInfoAlert = (props: FunctionInfoAlertProps) => (
   <InfoToneWrapper>

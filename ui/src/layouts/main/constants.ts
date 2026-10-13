@@ -1,3 +1,1 @@
-export const MAIN_LAYOUT_GUTTER = 12;
-export const MAIN_LAYOUT_SIDEBAR_WIDTH = 240;
-export const MAIN_LAYOUT_WORDMARK_SIZE = 16;
+export const MAIN_LAYOUT_SIDEBAR_COLLAPSED_STORAGE_KEY = "alchemy:sidebar-collapsed";
