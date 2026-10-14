@@ -1,0 +1,26 @@
+import { type UseMutationOptions, useMutation } from "@connectrpc/connect-query";
+import { useQueryClient } from "@tanstack/react-query";
+
+import { FunctionsService } from "@/gen/functions/v1/service_pb";
+
+import { createGetFunctionQueryKey, createListFunctionsQueryKey } from "@/api/queries/functions";
+
+export const useCreateFunctionVersionMutation = (
+  options: UseMutationOptions<
+    typeof FunctionsService.method.createFunctionVersion.input,
+    typeof FunctionsService.method.createFunctionVersion.output
+  > = {},
+) => {
+  const queryClient = useQueryClient();
+  return useMutation<
+    typeof FunctionsService.method.createFunctionVersion.input,
+    typeof FunctionsService.method.createFunctionVersion.output
+  >(FunctionsService.method.createFunctionVersion, {
+    ...options,
+    onSettled: (...args) => {
+      void queryClient.invalidateQueries({ queryKey: createListFunctionsQueryKey() });
+      void queryClient.invalidateQueries({ queryKey: createGetFunctionQueryKey() });
+      return options.onSettled?.(...args);
+    },
+  });
+};

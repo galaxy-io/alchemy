@@ -62,9 +62,14 @@ type Driver struct {
 	log *slog.Logger
 }
 
-// New checks that the configured binaries and kernel exist and prepares the
-// cache and run directories.
+// New checks that KVM is usable, that the configured binaries and kernel
+// exist, and prepares the cache and run directories.
 func New(cfg Config, log *slog.Logger) (*Driver, error) {
+	kvm, err := os.OpenFile("/dev/kvm", os.O_RDWR, 0)
+	if err != nil {
+		return nil, fmt.Errorf("kvm: %w (firecracker needs read-write access to /dev/kvm)", err)
+	}
+	_ = kvm.Close()
 	for name, path := range map[string]string{"firecracker": cfg.FirecrackerBin, "kernel": cfg.Kernel, "supervisor": cfg.SupervisorBin} {
 		if _, err := os.Stat(path); err != nil {
 			return nil, fmt.Errorf("%s: %w", name, err)

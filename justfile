@@ -68,10 +68,14 @@ status:
 infra mode="up" scope="":
     docker --context default compose {{ if mode == "down" { if scope == "volumes" { "down -v" } else { "down" } } else { "up -d --wait" } }}
 
-# run host inside the VM (Ctrl-C stops it); it serves this machine's Firecracker capacity on NATS
-host: build-linux
+# run `count` hosts in the VM with `memory` MiB each, reusing instances for `warm` (0s: always cold boot) and keeping `prewarm` booted per function; Ctrl-C stops them
+host count="3" memory="512" warm="5m" prewarm="0": build-linux
     limactl shell alchemy -- pkill -f 'bin/linux-arm64/host' || true
-    limactl shell alchemy -- bash -c 'cd "{{ justfile_directory() }}" && exec bin/linux-arm64/host --nats="{{ host_nats_url }}"'
+    limactl shell alchemy -- bash -c 'cd "{{ justfile_directory() }}" && trap "kill 0" EXIT INT TERM HUP; \
+      for i in $(seq 1 {{ count }}); do \
+        bin/linux-arm64/host --nats="{{ host_nats_url }}" --name=host-$i --run-dir=/tmp/alchemy/host-$i \
+          --memory-mib={{ memory }} --warm-ttl={{ warm }} --prewarm={{ prewarm }} 2>&1 | sed -u "s/^/[host-$i] /" & \
+      done; wait'
 
 # run server on the Mac on :8780 (Ctrl-C stops it); it applies migrations on start
 server:
@@ -81,15 +85,15 @@ server:
 ui:
     cd ui && pnpm install && pnpm dev
 
-# run host, server and the UI together; Ctrl-C stops all three
-dev:
+# run hosts, server and the UI (when present) together; Ctrl-C stops them all
+dev count="3" memory="512" warm="5m" prewarm="0":
     #!/usr/bin/env bash
     set -euo pipefail
     trap 'kill $(jobs -p) 2>/dev/null; limactl shell alchemy -- pkill -f "bin/linux-arm64/host" 2>/dev/null || true' EXIT
-    just host &
+    just host {{ count }} {{ memory }} {{ warm }} {{ prewarm }} &
     just server &
     until curl -sf http://localhost:8780/healthz > /dev/null 2>&1; do sleep 0.5; done
-    just ui
+    if [ -d ui ]; then just ui; else wait; fi
 
 # build the UI bundle server embeds (go build -tags embedui)
 ui-dist:
@@ -104,4 +108,4 @@ example:
 # register the four embed functions on the running server and invoke each
 # `count` times with `rows`-row batches; run `just example` first
 demo count="10" rows="100" concurrency="4":
-    go run ./examples/embed/tool demo --count={{ count }} --rows={{ rows }} --concurrency={{ concurrency }}
+    go run ./examples/embed/tool --count={{ count }} --rows={{ rows }} --concurrency={{ concurrency }}

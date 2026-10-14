@@ -1,0 +1,125 @@
+{
+  "$schema": "https://biomejs.dev/schemas/2.5.15/schema.json",
+  "extends": [
+    "@galaxy-io/dls/biome"
+  ],
+  "files": {
+    "includes": [
+      "src/**",
+      "!src/routeTree.gen.ts",
+      "!src/gen/**"
+    ]
+  },
+  "formatter": {
+    "enabled": true,
+    "indentStyle": "space",
+    "indentWidth": 2,
+    "lineWidth": 100
+  },
+  "javascript": {
+    "formatter": {
+      "quoteStyle": "double",
+      "semicolons": "always",
+      "trailingCommas": "all"
+    }
+  },
+  "linter": {
+    "enabled": true,
+    "rules": {
+      "recommended": true
+    }
+  },
+  "assist": {
+    "actions": {
+      "source": {
+        "organizeImports": {
+          "level": "on",
+          "options": {
+            "groups": [
+              [
+                "react",
+                "react-dom",
+                "react-dom/**"
+              ],
+              ":BLANK_LINE:",
+              [
+                ":PACKAGE:",
+                "!@galaxy-io/**"
+              ],
+              ":BLANK_LINE:",
+              "@galaxy-io/**",
+              ":BLANK_LINE:",
+              "@/gen/**",
+              ":BLANK_LINE:",
+              "@/components/**",
+              ":BLANK_LINE:",
+              "@/layouts/**",
+              ":BLANK_LINE:",
+              "@/pages/**",
+              ":BLANK_LINE:",
+              "@/routes/**",
+              ":BLANK_LINE:",
+              "@/api/**",
+              ":BLANK_LINE:",
+              "@/hooks/**",
+              ":BLANK_LINE:",
+              [
+                "@/constants",
+                "@/constants/**"
+              ],
+              ":BLANK_LINE:",
+              [
+                ":PATH:"
+              ]
+            ]
+          }
+        }
+      }
+    }
+  },
+  "overrides": [
+    {
+      "includes": [
+        "src/**",
+        "!src/main.tsx",
+        "!src/App.tsx",
+        "!src/router.tsx",
+        "!src/routeTree.gen.ts",
+        "!src/routes/**",
+        "!src/layouts/app/**",
+        "!src/api/transport.ts",
+        "!src/api/queryClient.ts",
+        "!src/api/TransportQueryClientProvider.tsx",
+        "!src/pages/NotFoundPage.tsx"
+      ],
+      "linter": {
+        "rules": {
+          "style": {
+            "noRestrictedImports": {
+              "level": "error",
+              "options": {
+                "patterns": [
+                  {
+                    "group": [
+                      "@/main",
+                      "@/App",
+                      "@/router",
+                      "@/routeTree.gen",
+                      "@/routes/**",
+                      "@/layouts/app/**",
+                      "@/api/transport",
+                      "@/api/queryClient",
+                      "@/api/TransportQueryClientProvider",
+                      "@/pages/NotFoundPage"
+                    ],
+                    "message": "Host-only module. Library code (everything the @galaxy-io/alchemy entries reach) must not import the standalone host."
+                  }
+                ]
+              }
+            }
+          }
+        }
+      }
+    }
+  ]
+}

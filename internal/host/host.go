@@ -37,7 +37,20 @@ type Config struct {
 	// Name is the host's identity on the bus; the hostname by default.
 	Name string
 	// MaxConcurrency is how many invocations may hold an instance at once.
-	MaxConcurrency    int
+	MaxConcurrency int
+	// MemoryMiB is the guest memory this host may commit across booting,
+	// busy and warm instances; 0 means no limit. Warm instances are evicted,
+	// least recently used first, to make room for a cold boot.
+	MemoryMiB int64
+	// WarmTTL is how long a finished instance stays booted for the next
+	// invocation of the same artifact. 0 releases every instance after one
+	// invocation, so every start is a cold boot.
+	WarmTTL time.Duration
+	// Prewarm is how many idle instances the host keeps booted for every
+	// artifact it serves, so even the first invocation skips the boot. They
+	// are booted from free memory only, never by evicting other instances,
+	// and the warm TTL never takes an artifact below this many.
+	Prewarm           int
 	BuildTimeout      time.Duration
 	HeartbeatInterval time.Duration
 }
@@ -46,6 +59,7 @@ type Config struct {
 func DefaultConfig() Config {
 	return Config{
 		MaxConcurrency:    8,
+		WarmTTL:           5 * time.Minute,
 		BuildTimeout:      5 * time.Minute,
 		HeartbeatInterval: 2 * time.Second,
 	}
@@ -68,7 +82,10 @@ type Host struct {
 
 	mu        sync.Mutex
 	artifacts map[string]*bus.Subscription // invoke subscriptions, by artifact id
-	instances map[string]*liveInstance     // by instance id
+	instances map[string]*liveInstance     // every instance, by key
+	warm      map[string][]*liveInstance   // idle instances by artifact id, most recently used last
+	draining  bool                         // shutting down: nothing more is parked
+	filling   map[string]int               // prewarm boots in flight, by artifact id
 }
 
 // New returns a host that is not yet serving; Run starts it.
@@ -85,6 +102,8 @@ func New(cfg Config, d driver.Driver, b *bus.Bus, log *slog.Logger) *Host {
 		stop:       stop,
 		artifacts:  make(map[string]*bus.Subscription),
 		instances:  make(map[string]*liveInstance),
+		warm:       make(map[string][]*liveInstance),
+		filling:    make(map[string]int),
 	}
 }
 
@@ -96,7 +115,8 @@ func (h *Host) Run(ctx context.Context) error {
 		subject, queue string
 		handler        bus.Handler
 	}{
-		{bus.BuildSubject, bus.HostsQueue, h.handleBuild},
+		// Every host builds every artifact, so any of them can serve it.
+		{bus.BuildSubject, "", h.handleBuild},
 		{bus.DescribeSubject, "", h.handleDescribe},
 		{bus.InstancesSubject, "", h.handleInstances},
 	} {
@@ -106,7 +126,7 @@ func (h *Host) Run(ctx context.Context) error {
 		}
 		subs = append(subs, sub)
 	}
-	h.log.Info("host serving", "name", h.cfg.Name, "slots", h.cfg.MaxConcurrency)
+	h.log.Info("host serving", "name", h.cfg.Name, "slots", h.cfg.MaxConcurrency, "memory_mib", h.cfg.MemoryMiB, "warm_ttl", h.cfg.WarmTTL, "prewarm", h.cfg.Prewarm)
 
 	ticker := time.NewTicker(h.cfg.HeartbeatInterval)
 	defer ticker.Stop()
@@ -114,6 +134,7 @@ func (h *Host) Run(ctx context.Context) error {
 	for {
 		select {
 		case <-ticker.C:
+			h.expireWarm(time.Now())
 			h.heartbeat()
 		case <-ctx.Done():
 			for _, s := range subs {
@@ -124,6 +145,7 @@ func (h *Host) Run(ctx context.Context) error {
 				s.Unsubscribe()
 			}
 			h.mu.Unlock()
+			h.drainWarm()
 			h.stop()
 			h.tasks.Wait()
 			return nil
@@ -155,6 +177,7 @@ func (h *Host) handleBuild(ctx context.Context, data []byte) proto.Message {
 	if err := h.serve(artifact); err != nil {
 		return buildError("internal", err)
 	}
+	h.prewarm(artifact)
 	h.log.Info("build ready", "artifact", artifact.GetId(), "digest", artifact.GetDigest(), "took", time.Since(start).Round(time.Millisecond))
 	return &hostv1.BuildResponse{Result: &hostv1.BuildResponse_Artifact{Artifact: artifact}}
 }
@@ -196,22 +219,29 @@ func (h *Host) handleInvoke(ctx context.Context, data []byte) proto.Message {
 	}
 
 	h.publishState(req.GetInvocationId(), functionsv1.InvocationStatus_INVOCATION_STATUS_STARTING, "", functionsv1.StartKind_START_KIND_UNSPECIFIED, 0)
-	artifact := fromProto(req.GetArtifact())
-	live := h.track(req.GetArtifact())
-	instance, startKind, err := h.driver.Acquire(ctx, artifact)
+	live, err := h.admit(req.GetArtifact())
 	if err != nil {
-		h.untrack(live)
-		return invokeError("unavailable", fmt.Errorf("acquire instance: %w", err))
+		return invokeError("resource_exhausted", err)
+	}
+	instance, startKind := live.instance, functionsv1.StartKind_START_KIND_WARM
+	if instance == nil {
+		instance, startKind, err = h.driver.Acquire(ctx, fromProto(req.GetArtifact()))
+		if err != nil {
+			h.untrack(live)
+			return invokeError("unavailable", fmt.Errorf("acquire instance: %w", err))
+		}
 	}
 	live.ready(instance, startKind, req.GetInvocationId())
-	// Teardown must not delay the reply or die with the request.
-	defer h.tasks.Go(func() {
-		live.releasing()
-		releaseCtx, cancel := context.WithTimeout(h.background, releaseTimeout)
-		defer cancel()
-		instance.Release(releaseCtx)
-		h.untrack(live)
-	})
+	// An instance whose supervisor answered can take the next invocation;
+	// one that stopped answering, or any instance when warm reuse is off, is
+	// released. Neither must delay the reply.
+	reusable := false
+	defer func() {
+		if reusable && h.park(live) {
+			return
+		}
+		h.release(live)
+	}()
 	acquired := time.Now()
 	acquireUs := acquired.Sub(start).Microseconds()
 	h.publishState(req.GetInvocationId(), functionsv1.InvocationStatus_INVOCATION_STATUS_RUNNING, instance.ID(), startKind, acquireUs)
@@ -232,6 +262,7 @@ func (h *Host) handleInvoke(ctx context.Context, data []byte) proto.Message {
 	})
 	switch {
 	case err == nil:
+		reusable = true
 		if f := out.GetFailure(); f != nil {
 			resp.Result = &hostv1.InvokeResponse_Failure{Failure: f}
 		} else {
@@ -269,6 +300,192 @@ func (h *Host) publishState(invocationID string, status functionsv1.InvocationSt
 	}
 }
 
+// admit claims an instance for one invocation of a: a warm one if a has
+// any, otherwise room in the memory budget for a cold boot, evicting warm
+// instances of other artifacts, least recently used first, when needed. A
+// returned instance with no driver instance is booting and must be acquired.
+func (h *Host) admit(a *hostv1.Artifact) (*liveInstance, error) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	if idle := h.warm[a.GetId()]; len(idle) > 0 {
+		live := idle[len(idle)-1]
+		h.warm[a.GetId()] = idle[:len(idle)-1]
+		h.prewarmLocked(a)
+		return live, nil
+	}
+	need := int64(a.GetMemoryMib())
+	for h.cfg.MemoryMiB > 0 && h.committedLocked()+need > h.cfg.MemoryMiB {
+		victim := h.oldestWarmLocked()
+		if victim == nil {
+			return nil, fmt.Errorf("host memory is committed (%d of %d MiB)", h.committedLocked(), h.cfg.MemoryMiB)
+		}
+		h.unwarmLocked(victim)
+		delete(h.instances, victim.key)
+		h.tasks.Go(func() { h.kill(victim) })
+	}
+	return h.trackLocked(a), nil
+}
+
+// park returns live to the warm pool for its artifact. It reports false
+// when warm reuse is off, and the caller releases the instance instead.
+func (h *Host) park(live *liveInstance) bool {
+	if h.cfg.WarmTTL <= 0 {
+		return false
+	}
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	if h.draining {
+		return false
+	}
+	live.idle(time.Now())
+	h.warm[live.artifact.GetId()] = append(h.warm[live.artifact.GetId()], live)
+	return true
+}
+
+// drainWarm stops parking and releases every warm instance.
+func (h *Host) drainWarm() {
+	h.mu.Lock()
+	h.draining = true
+	var all []*liveInstance
+	for _, idle := range h.warm {
+		all = append(all, idle...)
+	}
+	h.warm = make(map[string][]*liveInstance)
+	h.mu.Unlock()
+	for _, live := range all {
+		h.release(live)
+	}
+}
+
+// release tears live down in the background. The memory it frees goes to
+// topping its artifact's prewarm pool back up.
+func (h *Host) release(live *liveInstance) {
+	live.releasing()
+	h.tasks.Go(func() {
+		h.kill(live)
+		h.untrack(live)
+		h.prewarm(live.artifact)
+	})
+}
+
+func (h *Host) kill(live *liveInstance) {
+	ctx, cancel := context.WithTimeout(h.background, releaseTimeout)
+	defer cancel()
+	live.instance.Release(ctx)
+}
+
+// expireWarm releases warm instances idle since before now minus WarmTTL.
+func (h *Host) expireWarm(now time.Time) {
+	cutoff := now.Add(-h.cfg.WarmTTL)
+	h.mu.Lock()
+	var expired []*liveInstance
+	for id, idle := range h.warm {
+		// The newest Prewarm instances stay however long they have idled.
+		keepFrom := len(idle) - h.cfg.Prewarm
+		kept := idle[:0]
+		for i, live := range idle {
+			if i < keepFrom && live.lastUsed().Before(cutoff) {
+				expired = append(expired, live)
+			} else {
+				kept = append(kept, live)
+			}
+		}
+		if len(kept) == 0 {
+			delete(h.warm, id)
+		} else {
+			h.warm[id] = kept
+		}
+	}
+	h.mu.Unlock()
+	for _, live := range expired {
+		h.release(live)
+	}
+}
+
+// prewarm tops a's warm pool up to Prewarm idle instances in the background.
+func (h *Host) prewarm(a *hostv1.Artifact) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	h.prewarmLocked(a)
+}
+
+func (h *Host) prewarmLocked(a *hostv1.Artifact) {
+	id := a.GetId()
+	for !h.draining && len(h.warm[id])+h.filling[id] < h.cfg.Prewarm {
+		need := int64(a.GetMemoryMib())
+		if h.cfg.MemoryMiB > 0 && h.committedLocked()+need > h.cfg.MemoryMiB {
+			return
+		}
+		live := h.trackLocked(a)
+		h.filling[id]++
+		h.tasks.Go(func() { h.boot(live) })
+	}
+}
+
+// boot starts a prewarm instance and parks it.
+func (h *Host) boot(live *liveInstance) {
+	id := live.artifact.GetId()
+	instance, kind, err := h.driver.Acquire(h.background, fromProto(live.artifact))
+	h.mu.Lock()
+	h.filling[id]--
+	if h.filling[id] == 0 {
+		delete(h.filling, id)
+	}
+	h.mu.Unlock()
+	if err != nil {
+		h.untrack(live)
+		if h.background.Err() == nil {
+			h.log.Warn("prewarm", "artifact", id, "err", err)
+		}
+		return
+	}
+	live.ready(instance, kind, "")
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	if h.draining {
+		live.releasing()
+		h.tasks.Go(func() {
+			h.kill(live)
+			h.untrack(live)
+		})
+		return
+	}
+	live.idle(time.Now())
+	h.warm[id] = append(h.warm[id], live)
+}
+
+func (h *Host) committedLocked() int64 {
+	var total int64
+	for _, live := range h.instances {
+		total += int64(live.artifact.GetMemoryMib())
+	}
+	return total
+}
+
+func (h *Host) oldestWarmLocked() *liveInstance {
+	var oldest *liveInstance
+	for _, idle := range h.warm {
+		if len(idle) > 0 && (oldest == nil || idle[0].lastUsed().Before(oldest.lastUsed())) {
+			oldest = idle[0]
+		}
+	}
+	return oldest
+}
+
+func (h *Host) unwarmLocked(live *liveInstance) {
+	id := live.artifact.GetId()
+	idle := h.warm[id]
+	for i, candidate := range idle {
+		if candidate == live {
+			h.warm[id] = append(idle[:i], idle[i+1:]...)
+			break
+		}
+	}
+	if len(h.warm[id]) == 0 {
+		delete(h.warm, id)
+	}
+}
+
 func (h *Host) handleDescribe(context.Context, []byte) proto.Message {
 	return &hostv1.DescribeResponse{Host: h.describe()}
 }
@@ -292,10 +509,7 @@ func (h *Host) handleInstances(context.Context, []byte) proto.Message {
 func (h *Host) describe() *functionsv1.Host {
 	info := h.driver.Info(h.background)
 	h.mu.Lock()
-	var committed int64
-	for _, live := range h.instances {
-		committed += int64(live.artifact.GetMemoryMib())
-	}
+	committed := h.committedLocked()
 	h.mu.Unlock()
 	return &functionsv1.Host{
 		Hostname:           h.cfg.Name,
@@ -321,12 +535,13 @@ type liveInstance struct {
 	startKind functionsv1.StartKind
 	startedAt time.Time
 	invID     string
+	usedAt    time.Time
 	instance  driver.Instance
 }
 
-// track registers an instance that is about to be acquired. Until the
+// trackLocked registers an instance that is about to be acquired. Until the
 // driver returns, it has a placeholder id and is BOOTING.
-func (h *Host) track(a *hostv1.Artifact) *liveInstance {
+func (h *Host) trackLocked(a *hostv1.Artifact) *liveInstance {
 	raw := make([]byte, 4)
 	_, _ = rand.Read(raw)
 	key := "booting-" + hex.EncodeToString(raw)
@@ -337,9 +552,7 @@ func (h *Host) track(a *hostv1.Artifact) *liveInstance {
 		status:    functionsv1.InstanceStatus_INSTANCE_STATUS_BOOTING,
 		startedAt: time.Now(),
 	}
-	h.mu.Lock()
 	h.instances[live.key] = live
-	h.mu.Unlock()
 	return live
 }
 
@@ -357,6 +570,21 @@ func (live *liveInstance) ready(in driver.Instance, kind functionsv1.StartKind, 
 	live.invID = invocationID
 	live.status = functionsv1.InstanceStatus_INSTANCE_STATUS_BUSY
 	live.id = in.ID()
+}
+
+// idle marks live warm: booted, between invocations.
+func (live *liveInstance) idle(now time.Time) {
+	live.mu.Lock()
+	defer live.mu.Unlock()
+	live.status = functionsv1.InstanceStatus_INSTANCE_STATUS_READY
+	live.invID = ""
+	live.usedAt = now
+}
+
+func (live *liveInstance) lastUsed() time.Time {
+	live.mu.Lock()
+	defer live.mu.Unlock()
+	return live.usedAt
 }
 
 func (live *liveInstance) releasing() {

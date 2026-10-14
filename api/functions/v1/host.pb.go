@@ -405,6 +405,87 @@ func (x *Host) GetRootfsCacheImages() int32 {
 	return 0
 }
 
+type ListHostsRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListHostsRequest) Reset() {
+	*x = ListHostsRequest{}
+	mi := &file_functions_v1_host_proto_msgTypes[4]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListHostsRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListHostsRequest) ProtoMessage() {}
+
+func (x *ListHostsRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_functions_v1_host_proto_msgTypes[4]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListHostsRequest.ProtoReflect.Descriptor instead.
+func (*ListHostsRequest) Descriptor() ([]byte, []int) {
+	return file_functions_v1_host_proto_rawDescGZIP(), []int{4}
+}
+
+type ListHostsResponse struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Every host that has sent a heartbeat recently, by hostname.
+	Hosts         []*Host `protobuf:"bytes,1,rep,name=hosts,proto3" json:"hosts,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListHostsResponse) Reset() {
+	*x = ListHostsResponse{}
+	mi := &file_functions_v1_host_proto_msgTypes[5]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListHostsResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListHostsResponse) ProtoMessage() {}
+
+func (x *ListHostsResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_functions_v1_host_proto_msgTypes[5]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListHostsResponse.ProtoReflect.Descriptor instead.
+func (*ListHostsResponse) Descriptor() ([]byte, []int) {
+	return file_functions_v1_host_proto_rawDescGZIP(), []int{5}
+}
+
+func (x *ListHostsResponse) GetHosts() []*Host {
+	if x != nil {
+		return x.Hosts
+	}
+	return nil
+}
+
 type GetHostRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	unknownFields protoimpl.UnknownFields
@@ -413,7 +494,7 @@ type GetHostRequest struct {
 
 func (x *GetHostRequest) Reset() {
 	*x = GetHostRequest{}
-	mi := &file_functions_v1_host_proto_msgTypes[4]
+	mi := &file_functions_v1_host_proto_msgTypes[6]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -425,7 +506,7 @@ func (x *GetHostRequest) String() string {
 func (*GetHostRequest) ProtoMessage() {}
 
 func (x *GetHostRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_functions_v1_host_proto_msgTypes[4]
+	mi := &file_functions_v1_host_proto_msgTypes[6]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -438,7 +519,7 @@ func (x *GetHostRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetHostRequest.ProtoReflect.Descriptor instead.
 func (*GetHostRequest) Descriptor() ([]byte, []int) {
-	return file_functions_v1_host_proto_rawDescGZIP(), []int{4}
+	return file_functions_v1_host_proto_rawDescGZIP(), []int{6}
 }
 
 type GetHostResponse struct {
@@ -450,7 +531,7 @@ type GetHostResponse struct {
 
 func (x *GetHostResponse) Reset() {
 	*x = GetHostResponse{}
-	mi := &file_functions_v1_host_proto_msgTypes[5]
+	mi := &file_functions_v1_host_proto_msgTypes[7]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -462,7 +543,7 @@ func (x *GetHostResponse) String() string {
 func (*GetHostResponse) ProtoMessage() {}
 
 func (x *GetHostResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_functions_v1_host_proto_msgTypes[5]
+	mi := &file_functions_v1_host_proto_msgTypes[7]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -475,7 +556,7 @@ func (x *GetHostResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetHostResponse.ProtoReflect.Descriptor instead.
 func (*GetHostResponse) Descriptor() ([]byte, []int) {
-	return file_functions_v1_host_proto_rawDescGZIP(), []int{5}
+	return file_functions_v1_host_proto_rawDescGZIP(), []int{7}
 }
 
 func (x *GetHostResponse) GetHost() *Host {
@@ -524,7 +605,10 @@ const file_functions_v1_host_proto_rawDesc = "" +
 	"\x13firecracker_version\x18\x06 \x01(\tR\x12firecrackerVersion\x12\x16\n" +
 	"\x06kernel\x18\a \x01(\tR\x06kernel\x12,\n" +
 	"\x12rootfs_cache_bytes\x18\b \x01(\x03R\x10rootfsCacheBytes\x12.\n" +
-	"\x13rootfs_cache_images\x18\t \x01(\x05R\x11rootfsCacheImages\"\x10\n" +
+	"\x13rootfs_cache_images\x18\t \x01(\x05R\x11rootfsCacheImages\"\x12\n" +
+	"\x10ListHostsRequest\"=\n" +
+	"\x11ListHostsResponse\x12(\n" +
+	"\x05hosts\x18\x01 \x03(\v2\x12.functions.v1.HostR\x05hosts\"\x10\n" +
 	"\x0eGetHostRequest\"9\n" +
 	"\x0fGetHostResponse\x12&\n" +
 	"\x04host\x18\x01 \x01(\v2\x12.functions.v1.HostR\x04host*\xa2\x01\n" +
@@ -549,27 +633,30 @@ func file_functions_v1_host_proto_rawDescGZIP() []byte {
 }
 
 var file_functions_v1_host_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_functions_v1_host_proto_msgTypes = make([]protoimpl.MessageInfo, 6)
+var file_functions_v1_host_proto_msgTypes = make([]protoimpl.MessageInfo, 8)
 var file_functions_v1_host_proto_goTypes = []any{
 	(InstanceStatus)(0),           // 0: functions.v1.InstanceStatus
 	(*Instance)(nil),              // 1: functions.v1.Instance
 	(*ListInstancesRequest)(nil),  // 2: functions.v1.ListInstancesRequest
 	(*ListInstancesResponse)(nil), // 3: functions.v1.ListInstancesResponse
 	(*Host)(nil),                  // 4: functions.v1.Host
-	(*GetHostRequest)(nil),        // 5: functions.v1.GetHostRequest
-	(*GetHostResponse)(nil),       // 6: functions.v1.GetHostResponse
-	(StartKind)(0),                // 7: functions.v1.StartKind
+	(*ListHostsRequest)(nil),      // 5: functions.v1.ListHostsRequest
+	(*ListHostsResponse)(nil),     // 6: functions.v1.ListHostsResponse
+	(*GetHostRequest)(nil),        // 7: functions.v1.GetHostRequest
+	(*GetHostResponse)(nil),       // 8: functions.v1.GetHostResponse
+	(StartKind)(0),                // 9: functions.v1.StartKind
 }
 var file_functions_v1_host_proto_depIdxs = []int32{
 	0, // 0: functions.v1.Instance.status:type_name -> functions.v1.InstanceStatus
-	7, // 1: functions.v1.Instance.start_kind:type_name -> functions.v1.StartKind
+	9, // 1: functions.v1.Instance.start_kind:type_name -> functions.v1.StartKind
 	1, // 2: functions.v1.ListInstancesResponse.instances:type_name -> functions.v1.Instance
-	4, // 3: functions.v1.GetHostResponse.host:type_name -> functions.v1.Host
-	4, // [4:4] is the sub-list for method output_type
-	4, // [4:4] is the sub-list for method input_type
-	4, // [4:4] is the sub-list for extension type_name
-	4, // [4:4] is the sub-list for extension extendee
-	0, // [0:4] is the sub-list for field type_name
+	4, // 3: functions.v1.ListHostsResponse.hosts:type_name -> functions.v1.Host
+	4, // 4: functions.v1.GetHostResponse.host:type_name -> functions.v1.Host
+	5, // [5:5] is the sub-list for method output_type
+	5, // [5:5] is the sub-list for method input_type
+	5, // [5:5] is the sub-list for extension type_name
+	5, // [5:5] is the sub-list for extension extendee
+	0, // [0:5] is the sub-list for field type_name
 }
 
 func init() { file_functions_v1_host_proto_init() }
@@ -584,7 +671,7 @@ func file_functions_v1_host_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_functions_v1_host_proto_rawDesc), len(file_functions_v1_host_proto_rawDesc)),
 			NumEnums:      1,
-			NumMessages:   6,
+			NumMessages:   8,
 			NumExtensions: 0,
 			NumServices:   0,
 		},
