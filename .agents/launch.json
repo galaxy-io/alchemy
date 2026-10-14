@@ -1,0 +1,49 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "alchemy-ui",
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": [
+        "--dir",
+        "ui",
+        "dev"
+      ],
+      "port": 5173
+    },
+    {
+      "name": "alchemy-ui-attach",
+      "url": "http://localhost:5173",
+      "port": 5173
+    },
+    {
+      "name": "alchemy-ui-verify",
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": [
+        "--dir",
+        "ui",
+        "exec",
+        "vite",
+        "--mode",
+        "verify",
+        "--port",
+        "5175",
+        "--strictPort"
+      ],
+      "port": 5175
+    },
+    {
+      "name": "alchemy-host-fixture",
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": [
+        "--dir",
+        "ui",
+        "exec",
+        "vite",
+        "--config",
+        "fixtures/host/vite.config.ts"
+      ],
+      "port": 5176
+    }
+  ]
+}

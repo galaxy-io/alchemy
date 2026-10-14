@@ -1,0 +1,14 @@
+version: v2
+clean: true
+inputs:
+  - directory: ../protos
+    # host.v1 and supervisor.v1 are the server's internal contracts, not public API.
+    exclude_paths:
+      - ../protos/host
+      - ../protos/supervisor
+plugins:
+  - local: protoc-gen-es
+    out: src/gen
+    opt:
+      - target=ts
+      - import_extension=none

@@ -1,0 +1,12 @@
+# Our own packages ship fresh by design; exempt them from the release-age
+# supply-chain quarantine.
+minimumReleaseAgeExclude:
+  - "@galaxy-io/*"
+
+# CodeMirror extensions must share the same state and view instances.
+overrides:
+  "@codemirror/state": "6.7.5"
+  "@codemirror/view": "6.43.12"
+
+allowBuilds:
+  "@bufbuild/buf": true
