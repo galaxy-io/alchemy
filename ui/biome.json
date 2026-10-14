@@ -1,0 +1,110 @@
+{
+  "$schema": "https://biomejs.dev/schemas/2.5.15/schema.json",
+  "extends": ["@galaxy-io/dls/biome"],
+  "files": {
+    "includes": ["src/**", "fixtures/**", "scripts/**", "!src/host/routeTree.gen.ts", "!src/gen"]
+  },
+  "formatter": {
+    "enabled": true,
+    "indentStyle": "space",
+    "indentWidth": 2,
+    "lineWidth": 100
+  },
+  "javascript": {
+    "formatter": {
+      "quoteStyle": "double",
+      "semicolons": "always",
+      "trailingCommas": "all"
+    }
+  },
+  "linter": {
+    "enabled": true,
+    "rules": {
+      "recommended": true
+    }
+  },
+  "assist": {
+    "actions": {
+      "source": {
+        "organizeImports": {
+          "level": "on",
+          "options": {
+            "groups": [
+              ["react", "react-dom", "react-dom/**"],
+              ":BLANK_LINE:",
+              [":PACKAGE:", "!@galaxy-io/**"],
+              ":BLANK_LINE:",
+              "@galaxy-io/**",
+              ":BLANK_LINE:",
+              "@/gen/**",
+              ":BLANK_LINE:",
+              "@/components/**",
+              ":BLANK_LINE:",
+              "@/layouts/**",
+              ":BLANK_LINE:",
+              "@/pages/**",
+              ":BLANK_LINE:",
+              "@/module/**",
+              ":BLANK_LINE:",
+              "@/host/**",
+              ":BLANK_LINE:",
+              "@/api/**",
+              ":BLANK_LINE:",
+              "@/hooks/**",
+              ":BLANK_LINE:",
+              ["@/constants", "@/constants/**"],
+              ":BLANK_LINE:",
+              [":PATH:"]
+            ]
+          }
+        }
+      }
+    }
+  },
+  "overrides": [
+    {
+      "includes": ["src/**", "!src/host/**"],
+      "linter": {
+        "rules": {
+          "style": {
+            "noRestrictedImports": {
+              "level": "error",
+              "options": {
+                "patterns": [
+                  {
+                    "group": ["@/host/**"],
+                    "message": "Host-only module. Library code must not import src/host."
+                  },
+                  {
+                    "group": ["@galaxy-io/alchemy-ui", "@galaxy-io/alchemy-ui/**"],
+                    "message": "Import library code by @/ path. The package name is for hosts."
+                  }
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "includes": ["src/host/**"],
+      "linter": {
+        "rules": {
+          "style": {
+            "noRestrictedImports": {
+              "level": "error",
+              "options": {
+                "patterns": [
+                  {
+                    "group": ["@galaxy-io/alchemy-ui", "@galaxy-io/alchemy-ui/**"],
+                    "message": "Import library code by @/ path. The package name is for hosts."
+                  }
+                ]
+              }
+            }
+          }
+        }
+      }
+    }
+  ]
+}
