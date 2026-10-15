@@ -95,9 +95,25 @@ dev count="3" memory="512" warm="5m" prewarm="0":
     until curl -sf http://localhost:8780/healthz > /dev/null 2>&1; do sleep 0.5; done
     if [ -d ui ]; then just ui; else wait; fi
 
-# build the UI bundle server embeds (go build -tags embedui)
-ui-dist:
+# build the web UI into ui/build, which server embeds with -tags embedui
+ui-build:
     cd ui && pnpm install && pnpm build
+
+# build linux release binaries into bin/linux-<arch>/ (server embeds ui/build)
+binaries arch="amd64": ui-build (build-linux arch)
+    GOOS=linux GOARCH={{ arch }} CGO_ENABLED=0 go build -tags embedui -trimpath -ldflags='-s -w' -o bin/linux-{{ arch }}/server ./cmd/server
+
+# Biome formatting for the UI package
+ui-format mode="fix":
+    cd ui && pnpm run {{ if mode == "check" { "format:check" } else { "format" } }}
+
+# Biome lint for the UI package
+ui-lint mode="fix":
+    cd ui && pnpm run {{ if mode == "check" { "lint:check" } else { "lint" } }}
+
+# run every UI gate: types, lint, format, both builds, the package checks, and the committed route tree
+ui-check:
+    cd ui && pnpm install --frozen-lockfile && pnpm check && git diff --exit-code src/host/routeTree.gen.ts
 
 # build the embed example in all four languages into the VM's Docker daemon
 example:

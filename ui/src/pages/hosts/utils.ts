@@ -1,12 +1,17 @@
-import type { Host, Instance } from "@/gen/functions/v1/host_pb";
+import { type Host, type Instance, InstanceStatus } from "@/gen/functions/v1/host_pb";
 
-export const countInstancesByHost = (instances: Instance[]) => {
-  const counts = new Map<Host["hostname"], number>();
-  for (const instance of instances) {
-    counts.set(instance.host, (counts.get(instance.host) ?? 0) + 1);
-  }
-  return counts;
-};
+import { HOSTS_FIRECRACKER_PREFIX } from "@/pages/hosts/constants";
 
-export const getHostSlotsPercent = (host: Host) =>
-  host.slots === 0 ? 0 : (host.slotsInUse / host.slots) * 100;
+export const getHostsInstances = (host: Host, instances: Instance[]) =>
+  instances.filter((instance) => instance.host === host.hostname);
+
+export const getHostsBusyInstances = (instances: Instance[]) =>
+  instances
+    .filter((instance) => instance.status === InstanceStatus.BUSY)
+    .sort((a, b) => Number(a.startedAt - b.startedAt));
+
+export const getHostsKernelName = (kernel: Host["kernel"]) =>
+  kernel.slice(kernel.lastIndexOf("/") + 1);
+
+export const getHostsFirecrackerVersion = (version: Host["firecrackerVersion"]) =>
+  version.replace(HOSTS_FIRECRACKER_PREFIX, "");

@@ -1,51 +1,69 @@
-import { useMemo } from "react";
+import type { FC } from "react";
 
-import MetricGroup from "@/components/metrics/MetricGroup";
+import BigNumber from "@galaxy-io/dls/charts/BigNumber";
+import BigNumberGroup, { BigNumberGroupVariant } from "@galaxy-io/dls/charts/BigNumberGroup";
 
-import InvocationStatusSwatch from "@/pages/invocations/components/InvocationStatusSwatch";
 import {
+  INVOCATION_SETTLED_STATUSES,
   INVOCATION_STATUS_TO_LABEL_MAP,
-  INVOCATIONS_DEFAULT_TIMEFRAME,
-} from "@/pages/invocations/constants";
-import {
-  countInvocationsByStatus,
-  filterInvocationsInTimeframe,
-  getInvocationDurations,
-  getPercentile,
-  getWarmRate,
-} from "@/pages/invocations/utils";
-import { OBSERVABILITY_INVOCATION_STATUSES } from "@/pages/observability/constants";
+  INVOCATIONS_TIMEFRAME_TO_CONFIG_MAP,
+} from "@/components/invocations/constants";
+import { useInvocationMetrics } from "@/components/invocations/hooks/useInvocationMetrics";
+import InvocationStatusSwatch from "@/components/invocations/InvocationStatusSwatch";
 
-import { useSuspenseListInvocationsQuery } from "@/api/queries/invocations";
+import { useObservabilityBucketStart } from "@/pages/observability/hooks/useObservabilityBucketStart";
+import { createTimeframeSince } from "@/pages/observability/utils";
 
 import { useObservabilitySearch } from "@/module/hooks";
-import { formatCount, formatMicros, formatPercent } from "@/utils/format";
 
-const ObservabilityMetricsWidget = () => {
-  const { timeframe = INVOCATIONS_DEFAULT_TIMEFRAME } = useObservabilitySearch();
-  const { data } = useSuspenseListInvocationsQuery();
+import { formatCount, formatMillis, formatRatio } from "@/utils/format";
 
-  const invocations = useMemo(
-    () => filterInvocationsInTimeframe(data.invocations, timeframe),
-    [data.invocations, timeframe],
+const ObservabilityMetricsWidget: FC = () => {
+  const { timeframe } = useObservabilitySearch();
+  const bucketStartMs = useObservabilityBucketStart(
+    INVOCATIONS_TIMEFRAME_TO_CONFIG_MAP[timeframe].granularity,
   );
-  const counts = countInvocationsByStatus(invocations);
-  const durations = getInvocationDurations(invocations, "totalUs");
+  const metrics = useInvocationMetrics({ sinceMs: createTimeframeSince(timeframe, bucketStartMs) });
 
   return (
-    <MetricGroup
-      primary={{ label: "Invocations", value: formatCount(invocations.length) }}
-      tiles={[
-        ...OBSERVABILITY_INVOCATION_STATUSES.map((status) => ({
-          label: INVOCATION_STATUS_TO_LABEL_MAP[status],
-          value: formatCount(counts[status]),
-          mark: <InvocationStatusSwatch status={status} />,
-        })),
-        { label: "p50", value: formatMicros(getPercentile(durations, 50)) },
-        { label: "p95", value: formatMicros(getPercentile(durations, 95)) },
-        { label: "Warm", value: formatPercent(getWarmRate(invocations), 0) },
-      ]}
-    />
+    <BigNumberGroup
+      ariaLabel="Invocation metrics"
+      variant={BigNumberGroupVariant.PRIMARY}
+      hasBorder
+      fillWidth
+      primary={
+        <BigNumber
+          label="Invocations"
+          value={formatCount(metrics.count)}
+          isLoading={metrics.isTotalsLoading}
+        />
+      }
+    >
+      {INVOCATION_SETTLED_STATUSES.map((status) => (
+        <BigNumber
+          key={status}
+          label={INVOCATION_STATUS_TO_LABEL_MAP[status]}
+          value={formatCount(metrics.countByStatus.get(status) ?? 0)}
+          suffix={<InvocationStatusSwatch status={status} />}
+          isLoading={metrics.isStatusLoading}
+        />
+      ))}
+      <BigNumber
+        label="Avg duration"
+        value={formatMillis(metrics.meanTotalMs)}
+        isLoading={metrics.isTotalsLoading}
+      />
+      <BigNumber
+        label="Avg acquire"
+        value={formatMillis(metrics.meanAcquireMs)}
+        isLoading={metrics.isTotalsLoading}
+      />
+      <BigNumber
+        label="Warm"
+        value={formatRatio(metrics.warmRatio, 0)}
+        isLoading={metrics.isStartKindLoading}
+      />
+    </BigNumberGroup>
   );
 };
 

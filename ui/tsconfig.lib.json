@@ -1,16 +1,8 @@
 {
   "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "allowImportingTsExtensions": false
+  },
   "include": ["src"],
-  "exclude": [
-    "src/main.tsx",
-    "src/App.tsx",
-    "src/router.tsx",
-    "src/routeTree.gen.ts",
-    "src/routes/**",
-    "src/layouts/app/**",
-    "src/api/transport.ts",
-    "src/api/queryClient.ts",
-    "src/api/TransportQueryClientProvider.tsx",
-    "src/pages/NotFoundPage.tsx"
-  ]
+  "exclude": ["src/host/**"]
 }

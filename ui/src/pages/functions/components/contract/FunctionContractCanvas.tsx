@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import type { FC, ReactNode } from "react";
 
 import { styled } from "@linaria/react";
 
@@ -27,7 +27,7 @@ interface FunctionContractCanvasProps {
   output: ReactNode;
 }
 
-const FunctionContractCanvas = ({ input, output }: FunctionContractCanvasProps) => (
+const FunctionContractCanvas: FC<FunctionContractCanvasProps> = ({ input, output }) => (
   <Flex
     alignItems={AlignItems.STRETCH}
     grow={1}

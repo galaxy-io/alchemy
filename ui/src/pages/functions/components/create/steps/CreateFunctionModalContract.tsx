@@ -1,6 +1,8 @@
+import type { FC } from "react";
+
 import { match } from "ts-pattern";
 
-import ToggleInput from "@galaxy-io/dls/inputs/ToggleInput";
+import ToggleInput, { type ToggleOption } from "@galaxy-io/dls/inputs/ToggleInput";
 import Divider from "@galaxy-io/dls/layout/Divider";
 import Flex, { FlexDirection } from "@galaxy-io/dls/layout/Flex";
 
@@ -12,14 +14,21 @@ import {
 import { CREATE_FUNCTION_MODAL_CONTRACT_KINDS } from "@/pages/functions/components/create/constants";
 import CreateFunctionModalContractArrowFields from "@/pages/functions/components/create/steps/components/CreateFunctionModalContractArrowFields";
 import CreateFunctionModalContractSchemaEditor from "@/pages/functions/components/create/steps/components/CreateFunctionModalContractSchemaEditor";
-import { CreateFunctionModalContractSide } from "@/pages/functions/components/create/types";
 import { FUNCTION_CONTRACT_KIND_TO_LABEL_MAP } from "@/pages/functions/constants";
+import type { FunctionContractKind } from "@/pages/functions/types";
+import { FunctionContractSide } from "@/pages/functions/types";
 
-const CreateFunctionModalContract = () => {
+const CREATE_FUNCTION_MODAL_CONTRACT_KIND_OPTIONS: ToggleOption<FunctionContractKind>[] =
+  CREATE_FUNCTION_MODAL_CONTRACT_KINDS.map((kind) => ({
+    id: kind,
+    label: FUNCTION_CONTRACT_KIND_TO_LABEL_MAP[kind],
+  }));
+
+const CreateFunctionModalContract: FC = () => {
   const { contractKind } = useCreateFunctionModalState();
   const { setContractKind } = useCreateFunctionModalActions();
 
-  const renderSide = (side: CreateFunctionModalContractSide) =>
+  const renderSide = (side: FunctionContractSide) =>
     match(contractKind)
       .with("jsonSchema", () => <CreateFunctionModalContractSchemaEditor side={side} />)
       .with("arrow", () => <CreateFunctionModalContractArrowFields side={side} />)
@@ -30,18 +39,15 @@ const CreateFunctionModalContract = () => {
       <Flex padding={[12, 16]} shrink={0}>
         <ToggleInput
           ariaLabel="Contract kind"
-          options={CREATE_FUNCTION_MODAL_CONTRACT_KINDS.map((kind) => ({
-            id: kind,
-            label: FUNCTION_CONTRACT_KIND_TO_LABEL_MAP[kind],
-          }))}
+          options={CREATE_FUNCTION_MODAL_CONTRACT_KIND_OPTIONS}
           value={contractKind}
           onChange={setContractKind}
         />
       </Flex>
       <Divider />
       <FunctionContractCanvas
-        input={renderSide(CreateFunctionModalContractSide.INPUT)}
-        output={renderSide(CreateFunctionModalContractSide.OUTPUT)}
+        input={renderSide(FunctionContractSide.INPUT)}
+        output={renderSide(FunctionContractSide.OUTPUT)}
       />
     </Flex>
   );

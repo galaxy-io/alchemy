@@ -1,13 +1,13 @@
 import {
   createContext,
   type Dispatch,
+  type FC,
   type PropsWithChildren,
   useContext,
   useMemo,
   useReducer,
 } from "react";
 
-import type { InvocationProtocol } from "@/gen/functions/v1/common_pb";
 import type { Function as AlchemyFunction } from "@/gen/functions/v1/functions_pb";
 
 import {
@@ -21,18 +21,18 @@ import {
 } from "@/pages/functions/components/create/constants";
 import createFunctionModalReducer from "@/pages/functions/components/create/reducer";
 import { mapCreateFunctionModalStateToSpec } from "@/pages/functions/components/create/serialize";
-import {
-  type CreateFunctionModalArrowField,
-  type CreateFunctionModalContextValue,
-  CreateFunctionModalContractSide,
-  type CreateFunctionModalState,
-  type CreateFunctionModalStep,
+import type {
+  CreateFunctionModalArrowField,
+  CreateFunctionModalContextValue,
+  CreateFunctionModalState,
+  CreateFunctionModalStep,
 } from "@/pages/functions/components/create/types";
 import {
-  createInitialState,
+  createInitialCreateFunctionModalState,
   getCreateFunctionModalStepHints,
 } from "@/pages/functions/components/create/utils";
 import type { FunctionContractKind } from "@/pages/functions/types";
+import { FunctionContractSide } from "@/pages/functions/types";
 import { getFunctionNameError, getFunctionSchemaError } from "@/pages/functions/utils";
 
 const CreateFunctionModalStateContext = createContext<CreateFunctionModalContextValue | null>(null);
@@ -70,17 +70,15 @@ export const useCreateFunctionModalActions = () => {
         dispatch({ type: CreateFunctionModalActionType.SET_DESCRIPTION, payload }),
       setImage: (payload: CreateFunctionModalState["image"]) =>
         dispatch({ type: CreateFunctionModalActionType.SET_IMAGE, payload }),
-      setProtocol: (payload: InvocationProtocol) =>
-        dispatch({ type: CreateFunctionModalActionType.SET_PROTOCOL, payload }),
       setCommand: (payload: CreateFunctionModalState["command"]) =>
         dispatch({ type: CreateFunctionModalActionType.SET_COMMAND, payload }),
       setEnv: (payload: CreateFunctionModalState["env"]) =>
         dispatch({ type: CreateFunctionModalActionType.SET_ENV, payload }),
       setContractKind: (payload: FunctionContractKind) =>
         dispatch({ type: CreateFunctionModalActionType.SET_CONTRACT_KIND, payload }),
-      setSchemaText: (side: CreateFunctionModalContractSide, text: string) =>
+      setSchemaText: (side: FunctionContractSide, text: string) =>
         dispatch({ type: CreateFunctionModalActionType.SET_SCHEMA_TEXT, payload: { side, text } }),
-      addArrowField: (side: CreateFunctionModalContractSide) =>
+      addArrowField: (side: FunctionContractSide) =>
         dispatch({
           type: CreateFunctionModalActionType.ADD_ARROW_FIELD,
           payload: {
@@ -94,7 +92,7 @@ export const useCreateFunctionModalActions = () => {
           },
         }),
       updateArrowField: (
-        side: CreateFunctionModalContractSide,
+        side: FunctionContractSide,
         id: CreateFunctionModalArrowField["id"],
         partial: Partial<CreateFunctionModalArrowField>,
       ) =>
@@ -102,10 +100,7 @@ export const useCreateFunctionModalActions = () => {
           type: CreateFunctionModalActionType.UPDATE_ARROW_FIELD,
           payload: { side, id, partial },
         }),
-      removeArrowField: (
-        side: CreateFunctionModalContractSide,
-        id: CreateFunctionModalArrowField["id"],
-      ) =>
+      removeArrowField: (side: FunctionContractSide, id: CreateFunctionModalArrowField["id"]) =>
         dispatch({ type: CreateFunctionModalActionType.REMOVE_ARROW_FIELD, payload: { side, id } }),
       setVcpus: (payload: CreateFunctionModalState["vcpus"]) =>
         dispatch({ type: CreateFunctionModalActionType.SET_VCPUS, payload }),
@@ -125,29 +120,32 @@ export const useCreateFunctionModalActions = () => {
 };
 
 interface CreateFunctionModalProviderProps {
-  fn?: AlchemyFunction;
+  alchemyFunction?: AlchemyFunction;
 }
 
-const CreateFunctionModalProvider = ({
-  fn,
+const CreateFunctionModalProvider: FC<PropsWithChildren<CreateFunctionModalProviderProps>> = ({
+  alchemyFunction,
   children,
-}: PropsWithChildren<CreateFunctionModalProviderProps>) => {
-  const [state, dispatch] = useReducer(createFunctionModalReducer, fn, createInitialState);
+}) => {
+  const [state, dispatch] = useReducer(
+    createFunctionModalReducer,
+    alchemyFunction,
+    createInitialCreateFunctionModalState,
+  );
 
   const value = useMemo<CreateFunctionModalContextValue>(() => {
     const steps = CREATE_FUNCTION_MODAL_MODE_TO_STEP_ORDER_MAP[state.mode];
     const stepIndex = steps.indexOf(state.step);
     const name = state.name.trim();
-    const nameError = state.isNameTouched || name === "" ? getFunctionNameError(name) : undefined;
+    const nameError = state.isNameTouched || !name ? getFunctionNameError(name) : undefined;
+    const isJsonSchema = state.contractKind === "jsonSchema";
     const schemaErrors = {
-      [CreateFunctionModalContractSide.INPUT]:
-        state.contractKind === "jsonSchema"
-          ? getFunctionSchemaError(state.schemaTexts[CreateFunctionModalContractSide.INPUT])
-          : undefined,
-      [CreateFunctionModalContractSide.OUTPUT]:
-        state.contractKind === "jsonSchema"
-          ? getFunctionSchemaError(state.schemaTexts[CreateFunctionModalContractSide.OUTPUT])
-          : undefined,
+      [FunctionContractSide.INPUT]: isJsonSchema
+        ? getFunctionSchemaError(state.schemaTexts[FunctionContractSide.INPUT])
+        : undefined,
+      [FunctionContractSide.OUTPUT]: isJsonSchema
+        ? getFunctionSchemaError(state.schemaTexts[FunctionContractSide.OUTPUT])
+        : undefined,
     };
     const stepHints = getCreateFunctionModalStepHints(state, { nameError, schemaErrors });
     const isNextDisabled = stepHints.length > 0 || state.isSubmitting;

@@ -1,39 +1,69 @@
+import { create } from "@bufbuild/protobuf";
 import { match } from "ts-pattern";
 
 import type { HeatmapCellDatum } from "@galaxy-io/dls/charts/Heatmap";
 
-import { type Invocation, StartKind } from "@/gen/functions/v1/invocations_pb";
+import { StartKind } from "@/gen/functions/v1/invocations_pb";
+import {
+  Metric,
+  MetricDimension,
+  QueryTimeseriesRequestSchema,
+  type Timeseries,
+} from "@/gen/metrics/v1/metrics_pb";
+
+import { mapWireTokenToStartKind } from "@/components/invocations/utils";
 
 import {
   OBSERVABILITY_TRAFFIC_DAYS,
+  OBSERVABILITY_TRAFFIC_DURATION_MS,
+  OBSERVABILITY_TRAFFIC_GRANULARITY,
   OBSERVABILITY_TRAFFIC_HOURS,
 } from "@/pages/observability/components/traffic/constants";
 import { ObservabilityTrafficFill } from "@/pages/observability/types";
+import { createWindowSince } from "@/pages/observability/utils";
 
-import { formatCount, formatPercent } from "@/utils/format";
+import { formatCount, formatRatio } from "@/utils/format";
+
+const OBSERVABILITY_TRAFFIC_HOUR_LABEL_PATTERN = /^\d+$/;
 
 interface ObservabilityTrafficCount {
   total: number;
   cold: number;
 }
 
-const OBSERVABILITY_TRAFFIC_HOUR_LABEL_PATTERN = /^\d+$/;
+const getWeekdayIndex = (unixMillis: number) => (new Date(unixMillis).getDay() + 6) % 7;
 
-const getObservabilityTrafficWeekday = (unixMillis: number) =>
-  (new Date(unixMillis).getDay() + 6) % 7;
+export const createObservabilityTrafficInput = (bucketStartMs: number) =>
+  create(QueryTimeseriesRequestSchema, {
+    metrics: [Metric.INVOCATION_COUNT],
+    groupBy: MetricDimension.START_KIND,
+    granularity: OBSERVABILITY_TRAFFIC_GRANULARITY,
+    sinceMs: createWindowSince(
+      OBSERVABILITY_TRAFFIC_GRANULARITY,
+      OBSERVABILITY_TRAFFIC_DURATION_MS,
+      bucketStartMs,
+    ),
+    tzOffsetMinutes: -new Date(bucketStartMs).getTimezoneOffset(),
+  });
 
 export const createObservabilityTrafficCells = (
-  invocations: Invocation[],
+  series: Timeseries[],
   fill: ObservabilityTrafficFill,
 ): HeatmapCellDatum[] => {
   const counts = new Map<string, ObservabilityTrafficCount>();
-  for (const invocation of invocations) {
-    const createdAt = Number(invocation.createdAt);
-    const key = `${getObservabilityTrafficWeekday(createdAt)}:${new Date(createdAt).getHours()}`;
-    const count = counts.get(key) ?? { total: 0, cold: 0 };
-    count.total += 1;
-    if (invocation.startKind === StartKind.COLD_BOOT) count.cold += 1;
-    counts.set(key, count);
+  for (const startKindSeries of series) {
+    const isCold = mapWireTokenToStartKind(startKindSeries.key) === StartKind.COLD_BOOT;
+    for (const point of startKindSeries.points) {
+      const value = point.values[0] ?? 0;
+      if (!value) continue;
+      const startMs = Number(point.bucketStartMs);
+      const key = `${getWeekdayIndex(startMs)}:${new Date(startMs).getHours()}`;
+      const count = counts.get(key) ?? { total: 0, cold: 0 };
+      counts.set(key, {
+        total: count.total + value,
+        cold: count.cold + (isCold ? value : 0),
+      });
+    }
   }
   return OBSERVABILITY_TRAFFIC_DAYS.flatMap((day, dayIndex) =>
     OBSERVABILITY_TRAFFIC_HOURS.map((hour) => {
@@ -55,5 +85,5 @@ export const formatObservabilityTrafficLabel = (label: string) =>
 export const formatObservabilityTrafficValue = (value: number, fill: ObservabilityTrafficFill) =>
   match(fill)
     .with(ObservabilityTrafficFill.VOLUME, () => formatCount(Math.round(value)))
-    .with(ObservabilityTrafficFill.COLD, () => formatPercent(value, 0))
+    .with(ObservabilityTrafficFill.COLD, () => formatRatio(value, 0))
     .exhaustive();
