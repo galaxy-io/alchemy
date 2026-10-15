@@ -1,0 +1,85 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "alchemy.server.fullname" . }}
+  namespace: {{ include "alchemy.namespace" . }}
+  labels:
+    {{- include "alchemy.server.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.server.replicas }}
+  selector:
+    matchLabels:
+      {{- include "alchemy.server.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      annotations:
+        checksum/secret: {{ include (print $.Template.BasePath "/secret.yaml") . | sha256sum }}
+      labels:
+        {{- include "alchemy.server.selectorLabels" . | nindent 8 }}
+    spec:
+      serviceAccountName: {{ include "alchemy.server.serviceAccountName" . }}
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65532
+        runAsGroup: 65532
+        seccompProfile:
+          type: RuntimeDefault
+      {{- with .Values.server.image.pullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: server
+          image: {{ .Values.server.image.repository }}:{{ .Values.server.image.tag | default .Chart.AppVersion }}
+          imagePullPolicy: {{ .Values.server.image.pullPolicy }}
+          args:
+            - --addr=:{{ .Values.server.service.port }}
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          ports:
+            - name: http
+              containerPort: {{ .Values.server.service.port }}
+              protocol: TCP
+          # The server applies migrations before it listens, so the startup
+          # probe allows for a slow first install.
+          startupProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            periodSeconds: 5
+            timeoutSeconds: 2
+            failureThreshold: 24
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            periodSeconds: 10
+            timeoutSeconds: 3
+            failureThreshold: 2
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            periodSeconds: 20
+            timeoutSeconds: 3
+          envFrom:
+            - secretRef:
+                name: {{ include "alchemy.secretName" . }}
+          resources:
+            {{- toYaml .Values.server.resources | nindent 12 }}
+      {{- with .Values.server.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.server.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.server.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}

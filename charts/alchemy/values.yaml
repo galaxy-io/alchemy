@@ -1,0 +1,231 @@
+# Default values for the Alchemy Helm chart.
+#
+# This file is intentionally production-safe: connection strings must be
+# supplied by the installer or by an existing Secret.
+
+# -- Provide a name in place of `alchemy`.
+nameOverride: ""
+
+# -- String to fully override the generated release name.
+fullnameOverride: ""
+
+# -- Override the namespace used in rendered manifests.
+namespaceOverride: ""
+
+# -- Labels added to all Alchemy resources.
+commonLabels: {}
+
+# -- Existing runtime Secret with `PERSISTENCE_DSN` and `NATS_URL`. The server
+# reads both; hosts read only `NATS_URL`.
+existingSecret: ""
+
+persistence:
+  postgresql:
+    # -- PostgreSQL connection string stored in the chart-created Secret as `PERSISTENCE_DSN`.
+    # Required unless `existingSecret` is set. The server applies migrations on start.
+    # @default -- required
+    dsn: ""
+
+eventBus:
+  nats:
+    # -- NATS connection URL stored in the chart-created Secret as `NATS_URL`.
+    # Required unless `existingSecret` is set. The server must allow 64MB
+    # payloads (`max_payload`), since messages carry whole function inputs and outputs.
+    # @default -- required
+    url: ""
+
+server:
+  image:
+    # -- Server image repository.
+    repository: ghcr.io/galaxy-io/alchemy/server
+    # -- Server image tag.
+    # @default -- `""` (defaults to chart appVersion)
+    tag: ""
+    # -- Server image pull policy.
+    pullPolicy: IfNotPresent
+    # -- Image pull secrets for the server Deployment.
+    pullSecrets: []
+
+  serviceAccount:
+    # -- Existing ServiceAccount name for the server. When set, the chart does not create one.
+    name: ""
+    # -- Annotations for the chart-created server ServiceAccount, e.g. an IRSA role ARN.
+    annotations: {}
+
+  # -- Number of server replicas. Keep at 1: invocation state events are not
+  # yet shared between replicas.
+  replicas: 1
+
+  service:
+    # -- Service type.
+    type: ClusterIP
+    # -- Server service and container port.
+    port: 8780
+    # -- Annotations for the Service, e.g. cloud load balancer settings.
+    annotations: {}
+
+  ingress:
+    # -- Enable an Ingress for the server API.
+    enabled: false
+    # -- IngressClass name, e.g. `nginx` or `alb`. Empty uses the cluster default.
+    className: ""
+    # -- Annotations for the Ingress, e.g. a cert-manager issuer or ALB settings.
+    annotations: {}
+    # -- Path served by the Ingress.
+    path: /
+    # -- PathType for the path.
+    pathType: Prefix
+    # -- Hostnames served by the Ingress.
+    hosts:
+      - alchemy.example.com
+    # -- Ingress TLS configuration, passed through verbatim.
+    tls: []
+
+  # -- Server resource requests and limits.
+  # @default -- `{}` (See [values.yaml])
+  resources: {}
+  # -- Node selector for the server. It needs no KVM and can run anywhere.
+  nodeSelector: {}
+  # -- Tolerations for the server.
+  tolerations: []
+  # -- Affinity for the server.
+  affinity: {}
+
+host:
+  image:
+    # -- Host image repository. The image carries Firecracker, the guest kernel and the supervisor.
+    repository: ghcr.io/galaxy-io/alchemy/host
+    # -- Host image tag.
+    # @default -- `""` (defaults to chart appVersion)
+    tag: ""
+    # -- Host image pull policy.
+    pullPolicy: IfNotPresent
+    # -- Image pull secrets for the host Deployment.
+    pullSecrets: []
+
+  serviceAccount:
+    # -- Existing ServiceAccount name for hosts. When set, the chart does not create one.
+    name: ""
+    # -- Annotations for the chart-created host ServiceAccount.
+    annotations: {}
+
+  # -- Number of hosts. Each runs on its own node; on an autoscaled cluster,
+  # raising this is what brings up more KVM nodes.
+  replicas: 1
+
+  # -- Nodes that run a host. They must expose `/dev/kvm`: bare
+  # metal, or virtual machines with nested virtualization enabled.
+  nodeSelector:
+    alchemy.galaxy.io/kvm: "true"
+  # -- Tolerations for hosts. The default tolerates the taint that keeps
+  # everything else off KVM nodes: `alchemy.galaxy.io/kvm=true:NoSchedule`.
+  tolerations:
+    - key: alchemy.galaxy.io/kvm
+      operator: Equal
+      value: "true"
+      effect: NoSchedule
+  # -- Affinity for hosts, merged with the built-in anti-affinity that keeps one host per node.
+  affinity: {}
+
+  kvm:
+    # -- How the host reaches `/dev/kvm`. `privileged` mounts the node's device
+    # into a privileged container and works everywhere. `devicePlugin` requests
+    # `kvm.resourceName` from a KVM device plugin and runs unprivileged.
+    mode: privileged
+    # -- Extended resource the KVM device plugin advertises. Used when `kvm.mode` is `devicePlugin`.
+    resourceName: devices.kubevirt.io/kvm
+
+  # -- Invocations allowed to hold an instance at once (`--max-concurrency`).
+  maxConcurrency: 8
+  # -- Guest memory in MiB the host may commit across busy and warm instances
+  # (`--memory-mib`). 0 means no limit. Guest memory is charged to the host
+  # pod, so `resources.limits.memory` must leave room for it.
+  memoryMiB: 0
+  # -- How long a finished instance stays booted for the next invocation
+  # (`--warm-ttl`). `0s` cold boots every invocation.
+  warmTTL: 5m
+  # -- Idle instances kept booted per function before any invocation arrives (`--prewarm`).
+  prewarm: 0
+  # -- Keep the guest serial console on (`--console`). Observable, slower boot.
+  console: false
+
+  cache:
+    # -- Size limit for the rootfs cache `emptyDir`. Empty means no limit.
+    sizeLimit: ""
+
+  # -- Seconds a host gets to stop its microVMs on shutdown.
+  terminationGracePeriodSeconds: 60
+  # -- Hosts replaced at a time during a rolling update.
+  maxUnavailable: 1
+
+  # -- Host resource requests and limits. Size these for the microVMs, not the
+  # host process: guest memory and vCPUs are charged to this pod.
+  # @default -- `{}` (See [values.yaml])
+  resources: {}
+
+# Vendored PostgreSQL configuration.
+postgresql:
+  # -- Enable the vendored Bitnami PostgreSQL chart for local or test clusters. See the [Bitnami PostgreSQL chart](https://artifacthub.io/packages/helm/bitnami/postgresql) for additional configuration.
+  enabled: false
+  # -- Full name override for the vendored PostgreSQL release.
+  fullnameOverride: alchemy-postgresql
+  auth:
+    # -- Disable the default `postgres` superuser in the vendored PostgreSQL chart.
+    enablePostgresUser: false
+    # -- Database created by the vendored PostgreSQL chart.
+    database: alchemy
+    # -- Username created by the vendored PostgreSQL chart.
+    username: alchemy
+    # -- Password for the vendored PostgreSQL user. Must match `persistence.postgresql.dsn` when vendored PostgreSQL is enabled.
+    # @default -- required when `postgresql.enabled=true`
+    password: ""
+  primary:
+    # -- Resources for the vendored PostgreSQL primary. Overrides the upstream
+    # `nano` preset (192Mi memory limit), which risks OOM kills and unclean
+    # shutdowns under real load.
+    resources:
+      requests:
+        cpu: 250m
+        memory: 512Mi
+      limits:
+        memory: 1Gi
+    persistence:
+      # -- PVC size for the vendored PostgreSQL primary.
+      size: 8Gi
+    # Protect cold starts and crash recovery from liveness restarts for up to
+    # five minutes. Readiness still removes an unhealthy primary promptly.
+    startupProbe:
+      enabled: true
+      initialDelaySeconds: 0
+      periodSeconds: 10
+      timeoutSeconds: 5
+      failureThreshold: 30
+      successThreshold: 1
+    readinessProbe:
+      failureThreshold: 2
+
+# Vendored NATS configuration.
+nats:
+  # -- Enable the vendored NATS chart for local or test clusters. See the [NATS chart](https://artifacthub.io/packages/helm/nats/nats) for additional configuration.
+  enabled: false
+  # -- Full name override for the vendored NATS release.
+  fullnameOverride: alchemy-nats
+  config:
+    jetstream:
+      # -- Enable JetStream in the vendored NATS chart. Alchemy uses core NATS only.
+      enabled: false
+    merge:
+      # -- Largest message NATS accepts. Payloads carry whole function inputs
+      # and outputs, so this matches the server's payload limit.
+      max_payload: << 64MB >>
+  container:
+    # -- Merged into the vendored NATS container spec. Sets resources so the
+    # pod is not BestEffort QoS (first evicted under node pressure); the
+    # upstream chart sets none.
+    merge:
+      resources:
+        requests:
+          cpu: 100m
+          memory: 256Mi
+        limits:
+          memory: 512Mi
