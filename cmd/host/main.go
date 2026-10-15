@@ -16,6 +16,7 @@ import (
 	"github.com/galaxy-io/alchemy/internal/bus"
 	"github.com/galaxy-io/alchemy/internal/driver/firecracker"
 	"github.com/galaxy-io/alchemy/internal/host"
+	"github.com/galaxy-io/alchemy/internal/registry"
 )
 
 func main() {
@@ -35,6 +36,7 @@ func run(log *slog.Logger) error {
 		CacheDir:       filepath.Join(userCacheDir(), "alchemy"),
 		RunDir:         filepath.Join(os.TempDir(), "alchemy"),
 		Console:        true,
+		Keychain:       registry.Keychain(registry.AWS(), registry.GCP()),
 	}
 
 	natsURL := flag.String("nats", envOr("NATS_URL", "nats://localhost:4223"), "NATS URL (env NATS_URL)")

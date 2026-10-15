@@ -32,3 +32,10 @@ go.work.sum
 # Editor/IDE
 # .idea/
 # .vscode/
+
+# Vendored charts
+charts/alchemy/charts/*
+charts/alchemy/values-*.yaml
+
+# Local demo driver
+examples/embed/tool/

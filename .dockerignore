@@ -1,0 +1,3 @@
+# The Dockerfiles under cmd/ only copy prebuilt binaries from bin/alchemy.
+*
+!bin/alchemy

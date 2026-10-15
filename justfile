@@ -41,6 +41,17 @@ build-linux arch="arm64":
     GOOS=linux GOARCH={{ arch }} CGO_ENABLED=0 go build -trimpath -ldflags='-s -w' -o bin/linux-{{ arch }}/host ./cmd/host
     GOOS=linux GOARCH={{ arch }} CGO_ENABLED=0 go build -trimpath -ldflags='-s -w' -o bin/linux-{{ arch }}/supervisor ./cmd/supervisor
 
+# build the Linux binaries the container images ship, the server with the UI embedded (`arch`: amd64 or arm64, default this machine's)
+binaries arch=`go env GOARCH`: ui-dist
+    CGO_ENABLED=0 GOOS=linux GOARCH={{ arch }} go build -tags embedui -trimpath -ldflags='-s -w' -o bin/alchemy/server ./cmd/server
+    CGO_ENABLED=0 GOOS=linux GOARCH={{ arch }} go build -trimpath -ldflags='-s -w' -o bin/alchemy/host ./cmd/host
+    CGO_ENABLED=0 GOOS=linux GOARCH={{ arch }} go build -trimpath -ldflags='-s -w' -o bin/alchemy/supervisor ./cmd/supervisor
+
+# build the server and host container images for `arch`
+images arch=`go env GOARCH`: (binaries arch)
+    docker build --platform linux/{{ arch }} -f cmd/server/Dockerfile -t galaxy-io/alchemy/server:latest .
+    docker build --platform linux/{{ arch }} -f cmd/host/Dockerfile -t galaxy-io/alchemy/host:latest .
+
 # start the KVM host VM, creating it on first run; `just vm down` stops it, `just vm delete` removes it
 vm mode="up":
     #!/usr/bin/env bash
@@ -98,14 +109,3 @@ dev count="3" memory="512" warm="5m" prewarm="0":
 # build the UI bundle server embeds (go build -tags embedui)
 ui-dist:
     cd ui && pnpm install && pnpm build
-
-# build the embed example in all four languages into the VM's Docker daemon
-example:
-    for lang in go python typescript rust; do \
-      docker --context lima-alchemy build --quiet --tag ghcr.io/galaxy-io/alchemy/embed-$lang:dev examples/embed/$lang || exit 1; \
-    done
-
-# register the four embed functions on the running server and invoke each
-# `count` times with `rows`-row batches; run `just example` first
-demo count="10" rows="100" concurrency="4":
-    go run ./examples/embed/tool --count={{ count }} --rows={{ rows }} --concurrency={{ concurrency }}
