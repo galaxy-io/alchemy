@@ -1,9 +1,14 @@
+import { ChipVariant } from "@galaxy-io/dls/chips/Chip";
 import type { RoleColor } from "@galaxy-io/dls/theme/tokens/types";
 
-import { InvocationProtocol } from "@/gen/functions/v1/common_pb";
+import {
+  type ArrowContract,
+  InvocationProtocol,
+  type JsonSchemaContract,
+} from "@/gen/functions/v1/common_pb";
 import { FunctionVersionStatus } from "@/gen/functions/v1/functions_pb";
 
-import type { FunctionContractKind } from "@/pages/functions/types";
+import { type FunctionContractKind, FunctionContractSide } from "@/pages/functions/types";
 
 export const FUNCTION_NAME_PATTERN = /^[a-z][a-z0-9-]{1,62}$/;
 export const FUNCTION_NAME_MAX_LENGTH = 63;
@@ -16,28 +21,33 @@ export const FUNCTION_VERSION_STATUS_TO_LABEL_MAP: Record<FunctionVersionStatus,
   [FunctionVersionStatus.FAILED]: "Failed",
 };
 
-export const FUNCTION_VERSION_STATUS_TO_HUE_MAP: Record<FunctionVersionStatus, RoleColor | null> = {
-  [FunctionVersionStatus.UNSPECIFIED]: null,
-  [FunctionVersionStatus.BUILDING]: "blue",
-  [FunctionVersionStatus.READY]: "success",
-  [FunctionVersionStatus.FAILED]: "error",
-};
-
-export const INVOCATION_PROTOCOL_TO_LABEL_MAP: Record<InvocationProtocol, string> = {
-  [InvocationProtocol.UNSPECIFIED]: "Unknown",
-  [InvocationProtocol.EXEC]: "Exec",
-  [InvocationProtocol.RUNTIME_API]: "Runtime API",
-};
-
-export const INVOCATION_PROTOCOL_TO_DESCRIPTION_MAP: Record<InvocationProtocol, string> = {
-  [InvocationProtocol.UNSPECIFIED]: "",
-  [InvocationProtocol.EXEC]:
-    "One process per invocation. Input on stdin, output on stdout, non-zero exit is a failure. No SDK; pays process start on every call.",
-  [InvocationProtocol.RUNTIME_API]:
-    "One long-lived process that pulls invocations from the supervisor's local endpoint. Initialisation happens once and is captured by the snapshot.",
+export const FUNCTION_VERSION_STATUS_TO_TONE_MAP: Record<
+  FunctionVersionStatus,
+  { color: RoleColor } | { variant: ChipVariant }
+> = {
+  [FunctionVersionStatus.UNSPECIFIED]: { variant: ChipVariant.SECONDARY },
+  [FunctionVersionStatus.BUILDING]: { color: "blue" },
+  [FunctionVersionStatus.READY]: { color: "success" },
+  [FunctionVersionStatus.FAILED]: { color: "error" },
 };
 
 export const FUNCTION_CONTRACT_KIND_TO_LABEL_MAP: Record<FunctionContractKind, string> = {
   jsonSchema: "JSON Schema",
   arrow: "Arrow",
 };
+
+export const FUNCTION_PROTOCOL_TO_TOKEN_MAP: Record<InvocationProtocol, string> = {
+  [InvocationProtocol.UNSPECIFIED]: "unspecified",
+  [InvocationProtocol.EXEC]: "exec",
+  [InvocationProtocol.RUNTIME_API]: "runtime_api",
+};
+
+export const FUNCTION_CONTRACT_SIDE_TO_JSON_SCHEMA_KEY_MAP = {
+  [FunctionContractSide.INPUT]: "input",
+  [FunctionContractSide.OUTPUT]: "output",
+} as const satisfies Record<FunctionContractSide, keyof JsonSchemaContract>;
+
+export const FUNCTION_CONTRACT_SIDE_TO_ARROW_SCHEMA_KEY_MAP = {
+  [FunctionContractSide.INPUT]: "inputSchema",
+  [FunctionContractSide.OUTPUT]: "outputSchema",
+} as const satisfies Record<FunctionContractSide, keyof ArrowContract>;

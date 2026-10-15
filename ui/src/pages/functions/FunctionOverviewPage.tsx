@@ -1,95 +1,47 @@
-import { useMemo } from "react";
+import { type FC, useMemo } from "react";
 
-import { create } from "@bufbuild/protobuf";
+import { ListMagnifyingGlassIcon } from "@phosphor-icons/react";
 
 import Divider from "@galaxy-io/dls/layout/Divider";
+import EmptyLayout from "@galaxy-io/dls/layout/EmptyLayout";
 import Flex, { FlexDirection } from "@galaxy-io/dls/layout/Flex";
 
+import InvocationsTable from "@/components/invocations/table/InvocationsTable";
+import { InvocationsTableVariant } from "@/components/invocations/table/types";
+
+import FunctionOverviewMetrics from "@/pages/functions/overview/FunctionOverviewMetrics";
+
+import { useFunctionParams } from "@/module/hooks";
+
 import {
-  type Invocation,
-  InvocationStatus,
-  ListInvocationsRequestSchema,
-} from "@/gen/functions/v1/invocations_pb";
+  createListInvocationsInput,
+  useSuspenseListInvocationsInfiniteQuery,
+} from "@/api/queries/invocations";
 
-import MetricGroup from "@/components/metrics/MetricGroup";
-
-import InvocationStatusSwatch from "@/pages/invocations/components/InvocationStatusSwatch";
-import InvocationsTable from "@/pages/invocations/components/table/InvocationsTable";
-import { InvocationsTimeframe } from "@/pages/invocations/types";
-import {
-  countInvocationsByStatus,
-  filterInvocationsInTimeframe,
-  getInvocationDurations,
-  getPercentile,
-  getWarmRate,
-} from "@/pages/invocations/utils";
-
-import { useSuspenseListInvocationsQuery } from "@/api/queries/invocations";
-
-import { useAlchemyLayoutSearch, useAlchemySearchUpdate, useFunctionParams } from "@/module/hooks";
-import type { AlchemyLayoutSearch } from "@/module/schemas";
-import { formatCount, formatMicros, formatPercent } from "@/utils/format";
-
-const FunctionOverviewPage = () => {
-  const updateSearch = useAlchemySearchUpdate<AlchemyLayoutSearch>();
+const FunctionOverviewPage: FC = () => {
   const { id } = useFunctionParams();
-  const { invocationId } = useAlchemyLayoutSearch();
 
-  const { data } = useSuspenseListInvocationsQuery({
-    input: create(ListInvocationsRequestSchema, { functionIds: [id] }),
-  });
-  const invocations = data.invocations;
-
-  const windowed = useMemo(
-    () => filterInvocationsInTimeframe(invocations, InvocationsTimeframe.TWENTY_FOUR_HOURS),
-    [invocations],
-  );
-  const counts = countInvocationsByStatus(windowed);
-
-  const handleSelect = (invocation: Invocation) => {
-    void updateSearch((prev) => ({ ...prev, invocationId: invocation.id }));
-  };
+  const { data, hasNextPage, isFetchingNextPage, fetchNextPage } =
+    useSuspenseListInvocationsInfiniteQuery({
+      input: createListInvocationsInput({ functionId: id }),
+    });
+  const invocations = useMemo(() => data.pages.flatMap((page) => page.invocations), [data.pages]);
 
   return (
-    <Flex direction={FlexDirection.COLUMN} grow={1} minHeight={0}>
+    <Flex direction={FlexDirection.COLUMN} grow={1} basis={0} minHeight={0} fillWidth>
       <Flex padding={16} shrink={0}>
-        <MetricGroup
-          primary={{ label: "Invocations · 24h", value: formatCount(windowed.length) }}
-          tiles={[
-            {
-              label: "Succeeded",
-              value: formatCount(counts[InvocationStatus.SUCCEEDED]),
-              mark: <InvocationStatusSwatch status={InvocationStatus.SUCCEEDED} />,
-            },
-            {
-              label: "Failed",
-              value: formatCount(
-                counts[InvocationStatus.FAILED] + counts[InvocationStatus.ERRORED],
-              ),
-              mark: <InvocationStatusSwatch status={InvocationStatus.FAILED} />,
-            },
-            {
-              label: "Success",
-              value: formatPercent(
-                windowed.length === 0 ? null : counts[InvocationStatus.SUCCEEDED] / windowed.length,
-                1,
-              ),
-            },
-            {
-              label: "p50",
-              value: formatMicros(getPercentile(getInvocationDurations(windowed, "totalUs"), 50)),
-            },
-            { label: "Warm", value: formatPercent(getWarmRate(windowed), 0) },
-          ]}
-        />
+        <FunctionOverviewMetrics functionId={id} />
       </Flex>
       <Divider />
-      <Flex direction={FlexDirection.COLUMN} grow={1} minHeight={0}>
+      <Flex direction={FlexDirection.COLUMN} grow={1} basis={0} minHeight={0}>
         <InvocationsTable
           invocations={invocations}
-          hasFunctionColumn={false}
-          activeId={invocationId}
-          onSelect={handleSelect}
+          variant={InvocationsTableVariant.FUNCTION_SCOPED}
+          isLoading={isFetchingNextPage}
+          onEndReached={() => {
+            if (hasNextPage) fetchNextPage();
+          }}
+          emptyState={<EmptyLayout icon={ListMagnifyingGlassIcon} header="No invocations yet" />}
         />
       </Flex>
     </Flex>

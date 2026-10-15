@@ -1,7 +1,13 @@
-// `process.env.NODE_ENV` instead of `import.meta.env`: Vite inlines it in the app build and leaves it
-// for the consumer in the library build, so the module is debuggable inside a host too.
+import { InvocationStatus } from "@/gen/functions/v1/invocations_pb";
+
 export const IS_DEBUG = process.env.NODE_ENV !== "production";
 
 export const GITHUB_REPO_URL: string = "https://github.com/galaxy-io/alchemy";
-export const DOCUMENTATION_URL: string = "https://docs.getgalaxy.io/alchemy";
-export const PUBLIC_API_URL: string = "https://alchemy.getgalaxy.io";
+
+export const LIST_SEARCH_DEBOUNCE_MS = 300;
+
+export const ACTIVE_INVOCATION_STATUSES = new Set<InvocationStatus>([
+  InvocationStatus.PENDING,
+  InvocationStatus.STARTING,
+  InvocationStatus.RUNNING,
+]);

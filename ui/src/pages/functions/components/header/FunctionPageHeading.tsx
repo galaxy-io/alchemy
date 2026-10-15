@@ -1,17 +1,22 @@
-import { create } from "@bufbuild/protobuf";
-import { styled } from "@linaria/react";
+import type { FC } from "react";
 
+import { create } from "@bufbuild/protobuf";
+import { ArrowLeftIcon } from "@phosphor-icons/react";
+
+import Button, { ButtonVariant } from "@galaxy-io/dls/buttons/Button";
 import Flex, { AlignItems } from "@galaxy-io/dls/layout/Flex";
 import EditableText from "@galaxy-io/dls/text/EditableText";
 import { TextSize, TextWeight } from "@galaxy-io/dls/text/Text";
-import { t } from "@galaxy-io/dls/theme/tokens/t";
 import { ToastVariant } from "@galaxy-io/dls/toast/Toast";
 import { useToast } from "@galaxy-io/dls/toast/useToast";
 
 import {
-  GetFunctionRequestSchema,
+  type Function as AlchemyFunction,
+  type UpdateFunctionRequest,
   UpdateFunctionRequestSchema,
 } from "@/gen/functions/v1/functions_pb";
+
+import RouterLink from "@/components/RouterLink";
 
 import FunctionPageVersionSelect from "@/pages/functions/components/header/FunctionPageVersionSelect";
 import {
@@ -20,57 +25,28 @@ import {
 } from "@/pages/functions/constants";
 import { getFunctionNameError } from "@/pages/functions/utils";
 
-import { useSuspenseGetFunctionQuery, useUpdateFunctionMutation } from "@/api/queries/functions";
+import { AlchemyPath, createAlchemyHref } from "@/module/paths";
 
-import { useFunctionParams } from "@/module/hooks";
+import { useUpdateFunctionMutation } from "@/api/queries/functions";
+
 import { getErrorMessage } from "@/utils/errors";
 
-// EditableText paints text.primary; the description reads one step quieter.
-const MutedDescriptionWrapper = styled.span`
-  display: inline-flex;
-  min-width: 0;
-  color: ${t.color.text.secondary};
+interface FunctionPageHeadingProps {
+  alchemyFunction: AlchemyFunction;
+}
 
-  & [class*="gx-Text-PRIMARY"] {
-    color: inherit;
-  }
-`;
-
-const FunctionPageHeading = () => {
+const FunctionPageHeading: FC<FunctionPageHeadingProps> = ({ alchemyFunction }) => {
   const { toast } = useToast();
-  const { id } = useFunctionParams();
-
-  const { data } = useSuspenseGetFunctionQuery({
-    input: create(GetFunctionRequestSchema, { id, includeVersions: true }),
-  });
-  const fn = data.function;
-
   const { mutate: updateFunction } = useUpdateFunctionMutation();
 
-  if (!fn) return null;
-
-  const handleRename = (name: string) => {
-    const nextName = name.trim();
-    if (nextName === fn.name) return;
-    const nameError = getFunctionNameError(nextName);
-    if (nameError) {
-      toast({ header: "Rename failed", description: nameError });
-      return;
-    }
+  const handleUpdate = (patch: Pick<UpdateFunctionRequest, "name" | "description">) => {
     updateFunction(
-      create(UpdateFunctionRequestSchema, {
-        functionId: fn.id,
-        name: nextName,
-        description: fn.description,
-      }),
+      create(UpdateFunctionRequestSchema, { functionId: alchemyFunction.id, ...patch }),
       {
-        onSuccess: () => {
-          toast({ header: "Function renamed" });
-        },
         onError: (error) => {
           toast({
-            header: "Rename failed",
-            description: getErrorMessage(error, "Failed to rename function"),
+            header: "Save failed",
+            description: getErrorMessage(error, "Failed to save image"),
             variant: ToastVariant.ERROR,
           });
         },
@@ -78,52 +54,50 @@ const FunctionPageHeading = () => {
     );
   };
 
-  const handleDescriptionChange = (description: string) => {
-    const nextDescription = description.trim();
-    if (nextDescription === fn.description) return;
-    updateFunction(
-      create(UpdateFunctionRequestSchema, {
-        functionId: fn.id,
-        name: fn.name,
-        description: nextDescription,
-      }),
-      {
-        onSuccess: () => {
-          toast({ header: "Description saved" });
-        },
-        onError: (error) => {
-          toast({
-            header: "Save failed",
-            description: getErrorMessage(error, "Failed to save description"),
-            variant: ToastVariant.ERROR,
-          });
-        },
-      },
-    );
+  const handleRename = (value: string) => {
+    const name = value.trim();
+    if (name === alchemyFunction.name) return;
+    const nameError = getFunctionNameError(name);
+    if (nameError) {
+      toast({ header: "Rename failed", description: nameError, variant: ToastVariant.ERROR });
+      return;
+    }
+    handleUpdate({ name, description: alchemyFunction.description });
+  };
+
+  const handleDescriptionChange = (value: string) => {
+    const description = value.trim();
+    if (description === alchemyFunction.description) return;
+    handleUpdate({ name: alchemyFunction.name, description });
   };
 
   return (
     <Flex gap={8} alignItems={AlignItems.CENTER} minWidth={0}>
+      <Button
+        icon={ArrowLeftIcon}
+        variant={ButtonVariant.TERTIARY}
+        ariaLabel="All images"
+        tooltip="All images"
+        href={createAlchemyHref(AlchemyPath.FUNCTIONS)}
+        as={RouterLink}
+      />
       <EditableText
-        ariaLabel="Function name"
-        value={fn.name}
+        ariaLabel="Image name"
+        value={alchemyFunction.name}
         onChange={handleRename}
         size={TextSize.HEADING_MD}
         weight={TextWeight.MEDIUM}
         maxLength={FUNCTION_NAME_MAX_LENGTH}
       />
-      <FunctionPageVersionSelect />
+      <FunctionPageVersionSelect alchemyFunction={alchemyFunction} />
       <Flex minWidth={0} padding={[0, 0, 0, 8]}>
-        <MutedDescriptionWrapper>
-          <EditableText
-            ariaLabel="Function description"
-            value={fn.description}
-            placeholder="Add a description..."
-            onChange={handleDescriptionChange}
-            size={TextSize.BODY_MD}
-            maxLength={FUNCTION_DESCRIPTION_MAX_LENGTH}
-          />
-        </MutedDescriptionWrapper>
+        <EditableText
+          ariaLabel="Image description"
+          value={alchemyFunction.description}
+          placeholder="Add a description..."
+          onChange={handleDescriptionChange}
+          maxLength={FUNCTION_DESCRIPTION_MAX_LENGTH}
+        />
       </Flex>
     </Flex>
   );

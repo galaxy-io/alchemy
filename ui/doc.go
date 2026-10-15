@@ -5,7 +5,10 @@
 // works without Node or a UI build. To embed the real UI into a binary:
 //
 //	cd ui && pnpm install && pnpm build   # produces ui/build
-//	go build -tags embedui ./cmd/server
+//	go build -C cmd/server -tags embedui .
 //
-// `just binaries` does both.
+// `just binaries` does both. Deployable binaries opt in by mounting the
+// handler, e.g.:
+//
+//	mux.Handle("/", ui.Handler())
 package ui

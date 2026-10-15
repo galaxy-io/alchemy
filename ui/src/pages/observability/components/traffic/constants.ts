@@ -1,9 +1,16 @@
 import { ChartPalette } from "@galaxy-io/dls/charts/types";
 import type { ToggleOption } from "@galaxy-io/dls/inputs/ToggleInput";
 
+import { MetricGranularity } from "@/gen/metrics/v1/metrics_pb";
+
+import { INVOCATIONS_DAY_MS } from "@/components/invocations/constants";
+
 import { ObservabilityTrafficFill } from "@/pages/observability/types";
 
 const OBSERVABILITY_TRAFFIC_HOURS_PER_DAY = 24;
+
+export const OBSERVABILITY_TRAFFIC_GRANULARITY = MetricGranularity.HOUR;
+export const OBSERVABILITY_TRAFFIC_DURATION_MS = 7 * INVOCATIONS_DAY_MS;
 
 export const OBSERVABILITY_TRAFFIC_DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 

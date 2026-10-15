@@ -1,4 +1,4 @@
-import { Children, type PropsWithChildren } from "react";
+import { Children, type FC, type PropsWithChildren } from "react";
 
 import { styled } from "@linaria/react";
 
@@ -8,7 +8,7 @@ import { Radius } from "@galaxy-io/dls/theme/enums";
 import { t } from "@galaxy-io/dls/theme/tokens/t";
 
 const ListItem = styled.div`
-  padding: 10px 12px;
+  padding: ${t.space[12]};
 
   &:not(:last-child) {
     border-bottom: ${HAIRLINE_WIDTH} solid ${t.color.border.primary};
@@ -20,11 +20,11 @@ interface KeyValueListProps {
   hasBorder?: boolean;
 }
 
-const KeyValueList = ({
+const KeyValueList: FC<PropsWithChildren<KeyValueListProps>> = ({
   variant = BoxVariant.PRIMARY,
   hasBorder = true,
   children,
-}: PropsWithChildren<KeyValueListProps>) => {
+}) => {
   return (
     <Box
       variant={variant}

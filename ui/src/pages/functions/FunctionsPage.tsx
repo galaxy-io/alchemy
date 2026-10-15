@@ -1,67 +1,61 @@
-import { useMemo } from "react";
+import { type FC, type RefObject, useMemo } from "react";
 
-import { create } from "@bufbuild/protobuf";
 import { FloppyDiskIcon, MagnifyingGlassIcon, PlusIcon } from "@phosphor-icons/react";
 
 import Button, { ButtonSize } from "@galaxy-io/dls/buttons/Button";
-import SearchInput from "@galaxy-io/dls/inputs/SearchInput";
-import Flex from "@galaxy-io/dls/layout/Flex";
+import { useEndReached } from "@galaxy-io/dls/hooks/useEndReached";
+import Box from "@galaxy-io/dls/layout/Box";
+import EmptyLayout from "@galaxy-io/dls/layout/EmptyLayout";
 import Grid from "@galaxy-io/dls/layout/Grid";
+import PageLayout from "@galaxy-io/dls/layout/PageLayout";
+import ScrollArea from "@galaxy-io/dls/layout/ScrollArea";
 
-import { ListFunctionsRequestSchema } from "@/gen/functions/v1/functions_pb";
-
-import EmptyLayout from "@/layouts/EmptyLayout";
-import PageLayout from "@/layouts/page/PageLayout";
+import { FUNCTION_CREATE_TITLE } from "@/components/functions/constants";
+import ListSearch from "@/components/ListSearch";
 
 import { FUNCTION_CARD_GRID_MIN_WIDTH } from "@/pages/functions/components/card/constants";
 import FunctionCard from "@/pages/functions/components/card/FunctionCard";
-import { createFunctionCardRows } from "@/pages/functions/components/card/utils";
+import { useFunctionCardMetrics } from "@/pages/functions/hooks/useFunctionCardMetrics";
 
-import { useSuspenseListFunctionsQuery } from "@/api/queries/functions";
-import { useSuspenseListInvocationsQuery } from "@/api/queries/invocations";
-import { createListSearchInput } from "@/api/utils";
-
-import { useAlchemySearchUpdate, useFunctionsSearch } from "@/module/hooks";
-import type { AlchemyLayoutSearch, FunctionsSearch } from "@/module/schemas";
+import { useAlchemyFlowOpen, useFunctionsSearch } from "@/module/hooks";
 import { Flow } from "@/module/types";
 
-const FunctionsPage = () => {
-  const updateSearch = useAlchemySearchUpdate<FunctionsSearch & AlchemyLayoutSearch>();
+import {
+  createListFunctionsInput,
+  useSuspenseListFunctionsInfiniteQuery,
+} from "@/api/queries/functions";
+
+const FunctionsPage: FC = () => {
+  const openFlow = useAlchemyFlowOpen();
   const search = useFunctionsSearch();
-  const { q = "" } = search;
+  const metricsById = useFunctionCardMetrics();
 
-  const { data: functionsData } = useSuspenseListFunctionsQuery({
-    input: create(ListFunctionsRequestSchema, createListSearchInput(search)),
+  const { data, hasNextPage, isFetchingNextPage, fetchNextPage } =
+    useSuspenseListFunctionsInfiniteQuery({ input: createListFunctionsInput(search) });
+  const functions = useMemo(() => data.pages.flatMap((page) => page.functions), [data.pages]);
+  const endRef = useEndReached({
+    onEndReached: hasNextPage ? () => void fetchNextPage() : undefined,
+    isEnabled: !isFetchingNextPage,
+    itemCount: functions.length,
   });
-  const { data: invocationsData } = useSuspenseListInvocationsQuery();
-
-  const rows = useMemo(
-    () => createFunctionCardRows(functionsData.functions, invocationsData.invocations),
-    [functionsData.functions, invocationsData.invocations],
-  );
-
-  const handleSearch = (term: string) => {
-    if (term === q) return;
-    void updateSearch((prev) => ({ ...prev, q: term || undefined }), { replace: true });
-  };
 
   const handleNewFunction = () => {
-    void updateSearch((prev) => ({ ...prev, flow: Flow.CREATE_FUNCTION }));
+    openFlow(Flow.CREATE_FUNCTION);
   };
 
   const renderContent = () => {
-    if (!rows.length && q) {
+    if (!functions.length && search.q) {
       return <EmptyLayout icon={MagnifyingGlassIcon} header="No images match your search" />;
     }
-    if (!rows.length) {
+    if (!functions.length) {
       return (
         <EmptyLayout
           icon={FloppyDiskIcon}
           header="No images yet"
-          description="An image plus a typed contract, built once and booted on demand."
+          description="An image plus a typed contract, built once and booted on demand"
           actions={
             <Button
-              label="New image"
+              label={FUNCTION_CREATE_TITLE}
               icon={PlusIcon}
               size={ButtonSize.LARGE}
               onClick={handleNewFunction}
@@ -71,33 +65,31 @@ const FunctionsPage = () => {
       );
     }
     return (
-      <Grid
-        columns={`repeat(auto-fill, minmax(${FUNCTION_CARD_GRID_MIN_WIDTH}px, 1fr))`}
-        gap={12}
-        padding={16}
-      >
-        {rows.map((row) => (
-          <FunctionCard key={row.fn.id} row={row} />
-        ))}
-      </Grid>
+      <ScrollArea>
+        <Box padding={16}>
+          <Grid
+            columns={`repeat(auto-fill, minmax(${FUNCTION_CARD_GRID_MIN_WIDTH}px, 1fr))`}
+            gap={12}
+          >
+            {functions.map((alchemyFunction) => (
+              <FunctionCard
+                key={alchemyFunction.id}
+                alchemyFunction={alchemyFunction}
+                metrics={metricsById.get(alchemyFunction.id)}
+              />
+            ))}
+          </Grid>
+          <div ref={endRef as RefObject<HTMLDivElement>} />
+        </Box>
+      </ScrollArea>
     );
   };
 
   return (
     <PageLayout
-      title="Images"
-      actions={<Button label="New image" icon={PlusIcon} onClick={handleNewFunction} />}
-      toolbar={
-        <Flex grow={1} minWidth={0}>
-          <SearchInput
-            ariaLabel="Search functions"
-            placeholder="Search"
-            defaultValue={q}
-            onSearch={handleSearch}
-            fillWidth
-          />
-        </Flex>
-      }
+      header="Images"
+      actions={<Button label={FUNCTION_CREATE_TITLE} icon={PlusIcon} onClick={handleNewFunction} />}
+      toolbar={<ListSearch placeholder="Search images" />}
     >
       {renderContent()}
     </PageLayout>

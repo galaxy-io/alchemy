@@ -7,3 +7,8 @@ export interface FunctionArrowField {
   type: string;
   nullable: boolean;
 }
+
+export enum FunctionContractSide {
+  INPUT = "INPUT",
+  OUTPUT = "OUTPUT",
+}

@@ -1,14 +1,15 @@
-import { useQuery } from "@connectrpc/connect-query";
+import { create } from "@bufbuild/protobuf";
+import { useSuspenseQuery } from "@connectrpc/connect-query";
 
+import { GetHostRequestSchema } from "@/gen/functions/v1/host_pb";
 import { FunctionsService } from "@/gen/functions/v1/service_pb";
 
-const LIST_HOSTS_REFETCH_INTERVAL = 2 * 1000;
+import { HOSTS_REFETCH_INTERVAL } from "@/api/queries/constants";
 
-// Not suspense: the page still lists instances before any host has sent a heartbeat.
-export const useListHostsQuery = () => {
-  return useQuery(
-    FunctionsService.method.listHosts,
-    {},
-    { refetchInterval: LIST_HOSTS_REFETCH_INTERVAL },
-  );
+const GET_HOST_INPUT = create(GetHostRequestSchema);
+
+export const useSuspenseGetHostQuery = () => {
+  return useSuspenseQuery(FunctionsService.method.getHost, GET_HOST_INPUT, {
+    refetchInterval: HOSTS_REFETCH_INTERVAL,
+  });
 };

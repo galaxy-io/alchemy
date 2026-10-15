@@ -1,17 +1,14 @@
 import type { JsonValue } from "@bufbuild/protobuf";
 
+const JSON_INDENT = 2;
+const JSON_PARSE_PREFIX = /^JSON\.parse: /;
+
 const encoder = new TextEncoder();
 const decoder = new TextDecoder();
 
-export const formatJson = (value: unknown): string => {
-  try {
-    return JSON.stringify(value, null, 2);
-  } catch {
-    return String(value);
-  }
-};
+export const formatJson = (value: unknown) => JSON.stringify(value, null, JSON_INDENT) ?? "";
 
-export const encodeJson = (value: JsonValue): Uint8Array => encoder.encode(JSON.stringify(value));
+export const encodeJson = (value: JsonValue) => encoder.encode(JSON.stringify(value));
 
 export const decodeJson = (bytes: Uint8Array): JsonValue | undefined => {
   if (bytes.length === 0) return undefined;
@@ -28,7 +25,10 @@ export const parseJson = (text: string): { value?: JsonValue; error?: string } =
   } catch (error) {
     return {
       error:
-        error instanceof Error ? error.message.replace(/^JSON\.parse: /, "") : "Enter valid JSON",
+        error instanceof Error ? error.message.replace(JSON_PARSE_PREFIX, "") : "Enter valid JSON",
     };
   }
 };
+
+export const isJsonObject = (value: JsonValue | undefined): value is { [key: string]: JsonValue } =>
+  value !== null && value !== undefined && typeof value === "object" && !Array.isArray(value);

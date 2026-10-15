@@ -1,3 +1,5 @@
+import type { FC } from "react";
+
 import { ArrowLeftIcon, ArrowRightIcon, WarningIcon } from "@phosphor-icons/react";
 import { match } from "ts-pattern";
 
@@ -5,6 +7,7 @@ import Button, { ButtonVariant } from "@galaxy-io/dls/buttons/Button";
 import Chip, { ChipSize, ChipVariant } from "@galaxy-io/dls/chips/Chip";
 import Flex, { JustifyContent } from "@galaxy-io/dls/layout/Flex";
 import BulletedList from "@galaxy-io/dls/lists/BulletedList";
+import { ToastVariant } from "@galaxy-io/dls/toast/Toast";
 import { useToast } from "@galaxy-io/dls/toast/useToast";
 
 import type { Function as AlchemyFunction } from "@/gen/functions/v1/functions_pb";
@@ -22,19 +25,21 @@ import {
   mapCreateFunctionModalStateToVersionRequest,
 } from "@/pages/functions/components/create/serialize";
 import { CreateFunctionModalMode } from "@/pages/functions/components/create/types";
-import { formatFunctionVersion } from "@/pages/functions/utils";
+
+import { useAlchemyNavigate } from "@/module/hooks";
+import { AlchemyPath } from "@/module/paths";
 
 import { useCreateFunctionVersionMutation } from "@/api/queries/function_versions";
 import { useCreateFunctionMutation } from "@/api/queries/functions";
 
-import { useAlchemyNavigate } from "@/module/hooks";
 import { getErrorMessage } from "@/utils/errors";
+import { formatVersion } from "@/utils/format";
 
 interface CreateFunctionModalFooterProps {
   onClose: () => void;
 }
 
-const CreateFunctionModalFooter = ({ onClose }: CreateFunctionModalFooterProps) => {
+const CreateFunctionModalFooter: FC<CreateFunctionModalFooterProps> = ({ onClose }) => {
   const navigate = useAlchemyNavigate();
   const { toast } = useToast();
   const state = useCreateFunctionModalState();
@@ -46,14 +51,15 @@ const CreateFunctionModalFooter = ({ onClose }: CreateFunctionModalFooterProps) 
 
   const handleCreated = (id: AlchemyFunction["id"], version: bigint) => {
     onClose();
-    void navigate({ to: "./images/$id/versions", params: { id }, search: { version } });
+    void navigate({ to: AlchemyPath.FUNCTION_VERSIONS, params: { id }, search: { version } });
   };
 
   const handleError = (error: unknown) => {
     setSubmitting(false);
     toast({
       header: "Create failed",
-      description: getErrorMessage(error, "Could not create the function."),
+      description: getErrorMessage(error, "Failed to create image"),
+      variant: ToastVariant.ERROR,
     });
   };
 
@@ -61,13 +67,10 @@ const CreateFunctionModalFooter = ({ onClose }: CreateFunctionModalFooterProps) 
     if (!spec) return;
     setSubmitting(true);
     createFunction(mapCreateFunctionModalStateToRequest(state, spec), {
-      onSuccess: ({ function: fn, version }) => {
-        if (!fn) return;
-        toast({
-          header: "Function created",
-          description: `${fn.name} is building v1. It becomes invokable when the build is ready.`,
-        });
-        handleCreated(fn.id, version?.version ?? 1n);
+      onSuccess: ({ function: created, version }) => {
+        if (!created) return;
+        toast({ header: "Image created", variant: ToastVariant.SUCCESS });
+        handleCreated(created.id, version?.version ?? 1n);
       },
       onError: handleError,
     });
@@ -80,39 +83,13 @@ const CreateFunctionModalFooter = ({ onClose }: CreateFunctionModalFooterProps) 
       onSuccess: ({ version }) => {
         if (!version) return;
         toast({
-          header: "Version created",
-          description: `${formatFunctionVersion(version.version)} is building.`,
+          header: `${formatVersion(version.version)} building`,
+          variant: ToastVariant.SUCCESS,
         });
         handleCreated(functionId, version.version);
       },
       onError: handleError,
     });
-  };
-
-  const renderAction = () => {
-    if (!isLastStep) {
-      return (
-        <Button
-          label="Next"
-          icon={ArrowRightIcon}
-          isIconTrailing
-          isDisabled={isNextDisabled}
-          onClick={goNext}
-        />
-      );
-    }
-    return (
-      <Button
-        label={isSubmitting ? "Creating..." : CREATE_FUNCTION_MODAL_MODE_TO_SUBMIT_LABEL_MAP[mode]}
-        icon={CREATE_FUNCTION_MODAL_MODE_TO_SUBMIT_ICON_MAP[mode]}
-        isLoading={isSubmitting}
-        isDisabled={spec === null}
-        onClick={match(mode)
-          .with(CreateFunctionModalMode.FUNCTION, () => handleCreateFunction)
-          .with(CreateFunctionModalMode.VERSION, () => handleCreateVersion)
-          .exhaustive()}
-      />
-    );
   };
 
   return (
@@ -134,7 +111,26 @@ const CreateFunctionModalFooter = ({ onClose }: CreateFunctionModalFooterProps) 
             tooltip={hints.length === 1 ? hints[0] : <BulletedList items={hints} />}
           />
         )}
-        {renderAction()}
+        {isLastStep ? (
+          <Button
+            label={CREATE_FUNCTION_MODAL_MODE_TO_SUBMIT_LABEL_MAP[mode]}
+            icon={CREATE_FUNCTION_MODAL_MODE_TO_SUBMIT_ICON_MAP[mode]}
+            isLoading={isSubmitting}
+            isDisabled={isNextDisabled || !spec}
+            onClick={match(mode)
+              .with(CreateFunctionModalMode.FUNCTION, () => handleCreateFunction)
+              .with(CreateFunctionModalMode.VERSION, () => handleCreateVersion)
+              .exhaustive()}
+          />
+        ) : (
+          <Button
+            label="Next"
+            icon={ArrowRightIcon}
+            isIconTrailing
+            isDisabled={isNextDisabled}
+            onClick={goNext}
+          />
+        )}
       </Flex>
     </Flex>
   );

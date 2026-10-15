@@ -1,25 +1,21 @@
-import { create } from "@bufbuild/protobuf";
-
-import { type FunctionVersion, GetFunctionRequestSchema } from "@/gen/functions/v1/functions_pb";
+import type { FunctionVersion } from "@/gen/functions/v1/functions_pb";
 
 import { getFunctionCurrentVersion } from "@/pages/functions/utils";
 
-import { useSuspenseGetFunctionQuery } from "@/api/queries/functions";
-
 import { useFunctionParams, useFunctionSearch } from "@/module/hooks";
+
+import { createGetFunctionInput, useSuspenseGetFunctionQuery } from "@/api/queries/functions";
 
 export const useFunctionVersion = (): FunctionVersion | undefined => {
   const { id } = useFunctionParams();
   const { version } = useFunctionSearch();
 
-  const { data } = useSuspenseGetFunctionQuery({
-    input: create(GetFunctionRequestSchema, { id, includeVersions: true }),
-  });
-  const fn = data.function;
+  const { data } = useSuspenseGetFunctionQuery({ input: createGetFunctionInput(id) });
+  const alchemyFunction = data.function;
 
   return (
-    fn?.versions.find((candidate) => candidate.version === version) ??
-    (fn && getFunctionCurrentVersion(fn)) ??
-    fn?.versions[0]
+    alchemyFunction?.versions.find((candidate) => candidate.version === version) ??
+    (alchemyFunction && getFunctionCurrentVersion(alchemyFunction)) ??
+    alchemyFunction?.versions[0]
   );
 };

@@ -1,55 +1,78 @@
-import type { BarChartGroupDatum } from "@galaxy-io/dls/charts/BarChart";
-import type { LineChartLineDatum } from "@galaxy-io/dls/charts/LineChart";
+import { create } from "@bufbuild/protobuf";
+import { match } from "ts-pattern";
 
 import {
-  INVOCATION_STATUS_TO_CHART_PALETTE_MAP,
-  INVOCATION_STATUS_TO_LABEL_MAP,
-  START_KINDS,
-} from "@/pages/invocations/constants";
-import {
-  countInvocationsByStatus,
-  getInvocationDurations,
-  getPercentile,
-  type InvocationsBucket,
-} from "@/pages/invocations/utils";
-import { OBSERVABILITY_INVOCATION_STATUSES } from "@/pages/observability/constants";
+  type Metric,
+  type MetricDimension,
+  type MetricFilter,
+  MetricGranularity,
+  type QueryTimeseriesRequest,
+  QueryTimeseriesRequestSchema,
+} from "@/gen/metrics/v1/metrics_pb";
 
-const MICROS_PER_MILLI = 1000;
+import { INVOCATIONS_TIMEFRAME_TO_CONFIG_MAP } from "@/components/invocations/constants";
+import type { InvocationsTimeframe } from "@/components/invocations/types";
 
-export const createObservabilityInvocationsGroups = (
-  buckets: InvocationsBucket[],
-): BarChartGroupDatum<"invocations">[] =>
-  buckets.map((bucket) => {
-    const counts = countInvocationsByStatus(bucket.invocations);
-    return {
-      label: bucket.label,
-      bars: [
-        {
-          metric: "invocations",
-          components: OBSERVABILITY_INVOCATION_STATUSES.map((status) => ({
-            key: String(status),
-            label: INVOCATION_STATUS_TO_LABEL_MAP[status],
-            value: counts[status],
-            color: INVOCATION_STATUS_TO_CHART_PALETTE_MAP[status],
-          })),
-        },
-      ],
-    };
-  });
+import { OBSERVABILITY_GRANULARITY_TO_DURATION_MS_MAP } from "@/pages/observability/constants";
 
-export const createObservabilityLatencyLines = (
-  buckets: InvocationsBucket[],
-): LineChartLineDatum<string>[] =>
-  START_KINDS.map((startKind) => ({
-    metric: String(startKind),
-    points: buckets.map((bucket) => {
-      const value = getPercentile(
-        getInvocationDurations(
-          bucket.invocations.filter((invocation) => invocation.startKind === startKind),
-          "totalUs",
+const formatTimeBucketLabel = (bucketKey: string) =>
+  new Date(Number(bucketKey)).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+
+const formatDayBucketLabel = (bucketKey: string) =>
+  new Date(Number(bucketKey)).toLocaleDateString([], { weekday: "short" });
+
+export const getBucketLabelFormatter = (granularity: MetricGranularity) =>
+  match(granularity)
+    .with(MetricGranularity.DAY, () => formatDayBucketLabel)
+    .otherwise(() => formatTimeBucketLabel);
+
+export const getBucketStart = (granularity: MetricGranularity, date: Date) =>
+  match(granularity)
+    .with(
+      MetricGranularity.DAY,
+      () => new Date(date.getFullYear(), date.getMonth(), date.getDate()),
+    )
+    .with(
+      MetricGranularity.MINUTE,
+      () =>
+        new Date(
+          date.getFullYear(),
+          date.getMonth(),
+          date.getDate(),
+          date.getHours(),
+          date.getMinutes(),
         ),
-        50,
-      );
-      return { x: bucket.label, y: value === null ? null : value / MICROS_PER_MILLI };
-    }),
-  }));
+    )
+    .otherwise(
+      () => new Date(date.getFullYear(), date.getMonth(), date.getDate(), date.getHours()),
+    );
+
+export const getNextBucketStart = (granularity: MetricGranularity, start: Date) =>
+  match(granularity)
+    .with(MetricGranularity.DAY, () =>
+      new Date(start.getFullYear(), start.getMonth(), start.getDate() + 1).getTime(),
+    )
+    .otherwise(() => start.getTime() + OBSERVABILITY_GRANULARITY_TO_DURATION_MS_MAP[granularity]);
+
+export const createWindowSince = (
+  granularity: MetricGranularity,
+  durationMs: number,
+  bucketStartMs: number,
+) => BigInt(bucketStartMs + OBSERVABILITY_GRANULARITY_TO_DURATION_MS_MAP[granularity] - durationMs);
+
+export const createTimeframeSince = (timeframe: InvocationsTimeframe, bucketStartMs: number) => {
+  const { granularity, durationMs } = INVOCATIONS_TIMEFRAME_TO_CONFIG_MAP[timeframe];
+  return createWindowSince(granularity, durationMs, bucketStartMs);
+};
+
+export const createObservabilityTimeseriesInput = (
+  timeframe: InvocationsTimeframe,
+  bucketStartMs: number,
+  init: { metrics: Metric[]; groupBy?: MetricDimension; filters?: MetricFilter[] },
+): QueryTimeseriesRequest =>
+  create(QueryTimeseriesRequestSchema, {
+    ...init,
+    sinceMs: createTimeframeSince(timeframe, bucketStartMs),
+    granularity: INVOCATIONS_TIMEFRAME_TO_CONFIG_MAP[timeframe].granularity,
+    tzOffsetMinutes: -new Date(bucketStartMs).getTimezoneOffset(),
+  });

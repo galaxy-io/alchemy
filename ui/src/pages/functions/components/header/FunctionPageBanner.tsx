@@ -1,69 +1,62 @@
-import type { ReactNode } from "react";
+import type { FC } from "react";
 
-import { create } from "@bufbuild/protobuf";
 import { match } from "ts-pattern";
 
 import Button, { ButtonSize, ButtonVariant } from "@galaxy-io/dls/buttons/Button";
 import Alert, { AlertVariant } from "@galaxy-io/dls/feedback/Alert";
 
-import { FunctionVersionStatus, GetFunctionRequestSchema } from "@/gen/functions/v1/functions_pb";
+import {
+  type Function as AlchemyFunction,
+  FunctionVersionStatus,
+} from "@/gen/functions/v1/functions_pb";
 
-import FunctionInfoAlert from "@/pages/functions/components/FunctionInfoAlert";
-import { formatFunctionVersion } from "@/pages/functions/utils";
+import { useAlchemyNavigate } from "@/module/hooks";
+import { AlchemyPath } from "@/module/paths";
 
-import { useSuspenseGetFunctionQuery } from "@/api/queries/functions";
+import { formatVersion } from "@/utils/format";
 
-import { useAlchemyNavigate, useFunctionParams } from "@/module/hooks";
+interface FunctionPageBannerProps {
+  alchemyFunction: AlchemyFunction;
+}
 
-const FunctionPageBanner = () => {
+const FunctionPageBanner: FC<FunctionPageBannerProps> = ({ alchemyFunction }) => {
   const navigate = useAlchemyNavigate();
-  const { id } = useFunctionParams();
-
-  const { data } = useSuspenseGetFunctionQuery({
-    input: create(GetFunctionRequestSchema, { id, includeVersions: true }),
-  });
-  const newest = data.function?.versions[0];
+  const newest = alchemyFunction.versions[0];
 
   if (!newest) return null;
 
-  const handleViewBuild = () => {
-    void navigate({
-      to: "./images/$id/versions",
-      params: { id },
-      search: { version: newest.version },
-    });
-  };
+  const viewBuildAction = (
+    <Button
+      label="View build"
+      size={ButtonSize.SMALL}
+      variant={ButtonVariant.SECONDARY}
+      onClick={() =>
+        void navigate({
+          to: AlchemyPath.FUNCTION_VERSIONS,
+          params: { id: alchemyFunction.id },
+          search: { version: newest.version },
+        })
+      }
+    />
+  );
 
-  return match<FunctionVersionStatus, ReactNode>(newest.status)
+  return match(newest.status)
     .with(FunctionVersionStatus.BUILDING, () => (
-      <FunctionInfoAlert
+      <Alert
         isBanner
-        header={`Building ${formatFunctionVersion(newest.version)}`}
-        actions={
-          <Button
-            label="View build"
-            size={ButtonSize.SMALL}
-            variant={ButtonVariant.SECONDARY}
-            onClick={handleViewBuild}
-          />
-        }
+        color="blue"
+        header={`Building ${formatVersion(newest.version)}`}
+        actions={viewBuildAction}
       >
         {newest.statusMessage || "Queued"}
-      </FunctionInfoAlert>
+      </Alert>
     ))
     .with(FunctionVersionStatus.FAILED, () => (
       <Alert
         isBanner
         variant={AlertVariant.ERROR}
-        header={`${formatFunctionVersion(newest.version)} failed to build`}
-        actions={
-          <Button
-            label="View build"
-            size={ButtonSize.SMALL}
-            variant={ButtonVariant.SECONDARY}
-            onClick={handleViewBuild}
-          />
-        }
+        header={`${formatVersion(newest.version)} failed to build`}
+        actions={viewBuildAction}
       >
         {newest.statusMessage}
       </Alert>

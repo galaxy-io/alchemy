@@ -1,3 +1,4 @@
+import { create } from "@bufbuild/protobuf";
 import type { Transport } from "@connectrpc/connect";
 import {
   createConnectQueryKey,
@@ -5,33 +6,48 @@ import {
   type UseQueryOptions,
   useMutation,
   useQuery,
-  useSuspenseQuery,
+  useSuspenseInfiniteQuery,
+  useTransport,
 } from "@connectrpc/connect-query";
 import { useQueryClient } from "@tanstack/react-query";
 
-import type {
-  GetInvocationRequest,
-  GetInvocationResponse,
-  Invocation,
-  ListInvocationsRequest,
-  ListInvocationsResponse,
+import type { Function as AlchemyFunction } from "@/gen/functions/v1/functions_pb";
+import {
+  type GetInvocationRequest,
+  GetInvocationRequestSchema,
+  type GetInvocationResponse,
+  type Invocation,
+  type InvocationStatus,
+  type ListInvocationsRequest,
+  type ListInvocationsResponse,
 } from "@/gen/functions/v1/invocations_pb";
 import { FunctionsService } from "@/gen/functions/v1/service_pb";
 
-import { ACTIVE_INVOCATION_STATUSES } from "@/api/queries/constants";
+import { ACTIVE_INVOCATIONS_REFETCH_INTERVAL } from "@/api/queries/constants";
 import { createListInstancesQueryKey } from "@/api/queries/instances";
+import { getNextPageParam, INITIAL_PAGE_PARAM, type InfiniteQueryInput } from "@/api/utils";
 
-const ACTIVE_INVOCATIONS_REFETCH_INTERVAL = 1000;
-const IDLE_INVOCATIONS_REFETCH_INTERVAL = 3000;
+import { ACTIVE_INVOCATION_STATUSES } from "@/constants";
 
-const getInvocationsRefetchInterval = (invocations: (Invocation | undefined)[] | undefined) => {
-  if (!invocations) return false;
-  return invocations.some(
-    (invocation) => invocation && ACTIVE_INVOCATION_STATUSES.has(invocation.status),
-  )
+const getInvocationsRefetchInterval = (invocations: Invocation[] | undefined) => {
+  return invocations?.some((invocation) => ACTIVE_INVOCATION_STATUSES.has(invocation.status))
     ? ACTIVE_INVOCATIONS_REFETCH_INTERVAL
-    : IDLE_INVOCATIONS_REFETCH_INTERVAL;
+    : false;
 };
+
+export const createListInvocationsInput = ({
+  functionId,
+  statuses = [],
+  sinceMs = 0n,
+}: {
+  functionId?: AlchemyFunction["id"];
+  statuses?: InvocationStatus[];
+  sinceMs?: bigint;
+}): InfiniteQueryInput<typeof FunctionsService.method.listInvocations.input> => ({
+  functionIds: functionId ? [functionId] : [],
+  statuses,
+  sinceMs,
+});
 
 export const createListInvocationsQueryKey = (
   input?: ListInvocationsRequest,
@@ -41,7 +57,7 @@ export const createListInvocationsQueryKey = (
     schema: FunctionsService.method.listInvocations,
     input,
     transport,
-    cardinality: "finite",
+    cardinality: undefined,
   });
 };
 
@@ -55,32 +71,33 @@ export const useListInvocationsQuery = ({
     ListInvocationsResponse
   >;
 } = {}) => {
-  return useQuery<
-    typeof FunctionsService.method.listInvocations.input,
-    typeof FunctionsService.method.listInvocations.output
-  >(FunctionsService.method.listInvocations, input, {
+  return useQuery(FunctionsService.method.listInvocations, input, {
     refetchInterval: (query) => getInvocationsRefetchInterval(query.state.data?.invocations),
     ...options,
   });
 };
 
-export const useSuspenseListInvocationsQuery = ({
+export const useSuspenseListInvocationsInfiniteQuery = ({
   input,
 }: {
-  input?: ListInvocationsRequest;
+  input?: InfiniteQueryInput<typeof FunctionsService.method.listInvocations.input>;
 } = {}) => {
-  return useSuspenseQuery<
-    typeof FunctionsService.method.listInvocations.input,
-    typeof FunctionsService.method.listInvocations.output
-  >(FunctionsService.method.listInvocations, input, {
-    refetchInterval: (query) => getInvocationsRefetchInterval(query.state.data?.invocations),
-  });
+  return useSuspenseInfiniteQuery(
+    FunctionsService.method.listInvocations,
+    { ...input, pagination: INITIAL_PAGE_PARAM },
+    {
+      pageParamKey: "pagination",
+      getNextPageParam,
+      refetchInterval: (query) =>
+        getInvocationsRefetchInterval(query.state.data?.pages.flatMap((page) => page.invocations)),
+    },
+  );
 };
 
-export const createGetInvocationQueryKey = (
-  input?: GetInvocationRequest,
-  transport?: Transport,
-) => {
+export const createGetInvocationInput = (id: Invocation["id"]) =>
+  create(GetInvocationRequestSchema, { id });
+
+const createGetInvocationQueryKey = (input?: GetInvocationRequest, transport?: Transport) => {
   return createConnectQueryKey({
     schema: FunctionsService.method.getInvocation,
     input,
@@ -99,15 +116,10 @@ export const useGetInvocationQuery = ({
     GetInvocationResponse
   >;
 }) => {
-  return useQuery<
-    typeof FunctionsService.method.getInvocation.input,
-    typeof FunctionsService.method.getInvocation.output
-  >(FunctionsService.method.getInvocation, input, {
+  return useQuery(FunctionsService.method.getInvocation, input, {
     refetchInterval: (query) => {
       const invocation = query.state.data?.invocation;
-      return invocation && ACTIVE_INVOCATION_STATUSES.has(invocation.status)
-        ? ACTIVE_INVOCATIONS_REFETCH_INTERVAL
-        : false;
+      return getInvocationsRefetchInterval(invocation ? [invocation] : undefined);
     },
     ...options,
   });
@@ -120,15 +132,19 @@ export const useInvokeMutation = (
   > = {},
 ) => {
   const queryClient = useQueryClient();
-  return useMutation<
-    typeof FunctionsService.method.invoke.input,
-    typeof FunctionsService.method.invoke.output
-  >(FunctionsService.method.invoke, {
+  const transport = useTransport();
+  return useMutation(FunctionsService.method.invoke, {
     ...options,
     onSettled: (...args) => {
-      void queryClient.invalidateQueries({ queryKey: createListInvocationsQueryKey() });
-      void queryClient.invalidateQueries({ queryKey: createGetInvocationQueryKey() });
-      void queryClient.invalidateQueries({ queryKey: createListInstancesQueryKey() });
+      void queryClient.invalidateQueries({
+        queryKey: createListInvocationsQueryKey(undefined, transport),
+      });
+      void queryClient.invalidateQueries({
+        queryKey: createGetInvocationQueryKey(undefined, transport),
+      });
+      void queryClient.invalidateQueries({
+        queryKey: createListInstancesQueryKey(undefined, transport),
+      });
       return options.onSettled?.(...args);
     },
   });

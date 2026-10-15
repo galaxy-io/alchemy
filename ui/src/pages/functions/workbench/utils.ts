@@ -1,10 +1,18 @@
 import type { JsonObject, JsonValue } from "@bufbuild/protobuf";
 import type { Schema } from "apache-arrow";
+import { match } from "ts-pattern";
 
 import type { Contract } from "@/gen/functions/v1/common_pb";
-import { type FunctionVersion, FunctionVersionStatus } from "@/gen/functions/v1/functions_pb";
+import type { FunctionVersion } from "@/gen/functions/v1/functions_pb";
 
-import { FUNCTION_WORKBENCH_DEFAULT_INPUT } from "@/pages/functions/workbench/constants";
+import { createContractSideJson } from "@/pages/functions/contract/utils";
+import { FunctionContractSide } from "@/pages/functions/types";
+import { createFunctionSpecJson } from "@/pages/functions/utils";
+import {
+  FUNCTION_WORKBENCH_DEFAULT_INPUT,
+  FUNCTION_WORKBENCH_FILES,
+} from "@/pages/functions/workbench/constants";
+import { FunctionWorkbenchFile } from "@/pages/functions/workbench/types";
 
 import {
   createArrowSampleRows,
@@ -12,48 +20,56 @@ import {
   decodeArrowSchema,
   encodeArrowRows,
 } from "@/utils/arrow";
-import { decodeJson, encodeJson } from "@/utils/json";
+import { decodeJson, encodeJson, formatJson, isJsonObject } from "@/utils/json";
+import { createJsonSchemaSample } from "@/utils/jsonSchema";
 
-/** The requested version, else the current one (the newest READY), else the newest. */
-export const getFunctionWorkbenchVersion = (
-  versions: FunctionVersion[],
-  requestedVersion: FunctionVersion["version"] | undefined,
-): FunctionVersion | undefined =>
-  (requestedVersion === undefined
-    ? undefined
-    : versions.find((version) => version.version === requestedVersion)) ??
-  versions.find((version) => version.status === FunctionVersionStatus.READY) ??
-  versions[0];
+export const isFunctionWorkbenchFile = (id: string): id is FunctionWorkbenchFile =>
+  FUNCTION_WORKBENCH_FILES.some((file) => file === id);
 
-/** The input schema of an Arrow contract; a JSON Schema contract takes plain JSON. */
-export const getFunctionWorkbenchArrowSchema = (
-  contract: Contract | undefined,
-): Schema | undefined =>
+export const getFunctionWorkbenchArrowSchema = (contract: Contract | undefined) =>
   contract?.kind.case === "arrow" ? decodeArrowSchema(contract.kind.value.inputSchema) : undefined;
 
-export const createFunctionWorkbenchDefaultInput = (arrowSchema: Schema | undefined): JsonValue =>
-  arrowSchema ? createArrowSampleRows(arrowSchema) : FUNCTION_WORKBENCH_DEFAULT_INPUT;
-
-const isJsonObject = (value: JsonValue): value is JsonObject =>
-  value !== null && typeof value === "object" && !Array.isArray(value);
+export const createFunctionWorkbenchDefaultInput = (
+  contract: Contract | undefined,
+  arrowSchema: Schema | undefined,
+): JsonValue => {
+  if (arrowSchema) return createArrowSampleRows(arrowSchema);
+  if (contract?.kind.case === "jsonSchema") {
+    return createJsonSchemaSample(contract.kind.value.input) ?? FUNCTION_WORKBENCH_DEFAULT_INPUT;
+  }
+  return FUNCTION_WORKBENCH_DEFAULT_INPUT;
+};
 
 export const getFunctionWorkbenchInputError = (
   value: JsonValue | undefined,
   arrowSchema: Schema | undefined,
-): string | undefined =>
+) =>
   arrowSchema && !(Array.isArray(value) && value.every(isJsonObject))
     ? "Enter an array of rows"
     : undefined;
 
-/** Arrow contracts take one record batch; the rows are checked by `getFunctionWorkbenchInputError`. */
-export const encodeFunctionWorkbenchInput = (
-  value: JsonValue,
-  arrowSchema: Schema | undefined,
-): Uint8Array =>
+export const encodeFunctionWorkbenchInput = (value: JsonValue, arrowSchema: Schema | undefined) =>
   arrowSchema ? encodeArrowRows(arrowSchema, value as JsonObject[]) : encodeJson(value);
 
-export const decodeFunctionWorkbenchOutput = (
-  bytes: Uint8Array,
-  contract: Contract | undefined,
-): JsonValue | undefined =>
+export const decodeFunctionWorkbenchOutput = (bytes: Uint8Array, contract: Contract | undefined) =>
   contract?.kind.case === "arrow" ? decodeArrowRows(bytes) : decodeJson(bytes);
+
+export const formatFunctionWorkbenchReadOnlyFile = (
+  file: Exclude<FunctionWorkbenchFile, FunctionWorkbenchFile.INPUT>,
+  version: FunctionVersion | undefined,
+) => {
+  const contract = version?.spec?.contract?.kind;
+  return formatJson(
+    match(file)
+      .with(FunctionWorkbenchFile.CONTRACT_INPUT, () =>
+        contract ? createContractSideJson(contract, FunctionContractSide.INPUT) : null,
+      )
+      .with(FunctionWorkbenchFile.CONTRACT_OUTPUT, () =>
+        contract ? createContractSideJson(contract, FunctionContractSide.OUTPUT) : null,
+      )
+      .with(FunctionWorkbenchFile.SPEC, () =>
+        version?.spec ? createFunctionSpecJson(version.spec) : null,
+      )
+      .exhaustive(),
+  );
+};

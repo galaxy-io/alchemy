@@ -1,14 +1,8 @@
 {
   "$schema": "https://biomejs.dev/schemas/2.5.15/schema.json",
-  "extends": [
-    "@galaxy-io/dls/biome"
-  ],
+  "extends": ["@galaxy-io/dls/biome"],
   "files": {
-    "includes": [
-      "src/**",
-      "!src/routeTree.gen.ts",
-      "!src/gen/**"
-    ]
+    "includes": ["src/**", "fixtures/**", "scripts/**", "!src/host/routeTree.gen.ts", "!src/gen"]
   },
   "formatter": {
     "enabled": true,
@@ -36,16 +30,9 @@
           "level": "on",
           "options": {
             "groups": [
-              [
-                "react",
-                "react-dom",
-                "react-dom/**"
-              ],
+              ["react", "react-dom", "react-dom/**"],
               ":BLANK_LINE:",
-              [
-                ":PACKAGE:",
-                "!@galaxy-io/**"
-              ],
+              [":PACKAGE:", "!@galaxy-io/**"],
               ":BLANK_LINE:",
               "@galaxy-io/**",
               ":BLANK_LINE:",
@@ -57,20 +44,17 @@
               ":BLANK_LINE:",
               "@/pages/**",
               ":BLANK_LINE:",
-              "@/routes/**",
+              "@/module/**",
+              ":BLANK_LINE:",
+              "@/host/**",
               ":BLANK_LINE:",
               "@/api/**",
               ":BLANK_LINE:",
               "@/hooks/**",
               ":BLANK_LINE:",
-              [
-                "@/constants",
-                "@/constants/**"
-              ],
+              ["@/constants", "@/constants/**"],
               ":BLANK_LINE:",
-              [
-                ":PATH:"
-              ]
+              [":PATH:"]
             ]
           }
         }
@@ -79,19 +63,7 @@
   },
   "overrides": [
     {
-      "includes": [
-        "src/**",
-        "!src/main.tsx",
-        "!src/App.tsx",
-        "!src/router.tsx",
-        "!src/routeTree.gen.ts",
-        "!src/routes/**",
-        "!src/layouts/app/**",
-        "!src/api/transport.ts",
-        "!src/api/queryClient.ts",
-        "!src/api/TransportQueryClientProvider.tsx",
-        "!src/pages/NotFoundPage.tsx"
-      ],
+      "includes": ["src/**", "!src/host/**"],
       "linter": {
         "rules": {
           "style": {
@@ -100,19 +72,32 @@
               "options": {
                 "patterns": [
                   {
-                    "group": [
-                      "@/main",
-                      "@/App",
-                      "@/router",
-                      "@/routeTree.gen",
-                      "@/routes/**",
-                      "@/layouts/app/**",
-                      "@/api/transport",
-                      "@/api/queryClient",
-                      "@/api/TransportQueryClientProvider",
-                      "@/pages/NotFoundPage"
-                    ],
-                    "message": "Host-only module. Library code (everything the @galaxy-io/alchemy entries reach) must not import the standalone host."
+                    "group": ["@/host/**"],
+                    "message": "Host-only module. Library code must not import src/host."
+                  },
+                  {
+                    "group": ["@galaxy-io/alchemy-ui", "@galaxy-io/alchemy-ui/**"],
+                    "message": "Import library code by @/ path. The package name is for hosts."
+                  }
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "includes": ["src/host/**"],
+      "linter": {
+        "rules": {
+          "style": {
+            "noRestrictedImports": {
+              "level": "error",
+              "options": {
+                "patterns": [
+                  {
+                    "group": ["@galaxy-io/alchemy-ui", "@galaxy-io/alchemy-ui/**"],
+                    "message": "Import library code by @/ path. The package name is for hosts."
                   }
                 ]
               }

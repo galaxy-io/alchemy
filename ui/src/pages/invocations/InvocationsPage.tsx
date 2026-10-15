@@ -1,114 +1,48 @@
-import { useMemo } from "react";
+import { type FC, useMemo } from "react";
 
-import { ListMagnifyingGlassIcon, MagnifyingGlassIcon } from "@phosphor-icons/react";
-
-import Button, { ButtonVariant } from "@galaxy-io/dls/buttons/Button";
-import SearchInput from "@galaxy-io/dls/inputs/SearchInput";
 import Flex, { FlexDirection } from "@galaxy-io/dls/layout/Flex";
+import PageLayout from "@galaxy-io/dls/layout/PageLayout";
 
-import type { Invocation, InvocationStatus } from "@/gen/functions/v1/invocations_pb";
-
-import EmptyLayout from "@/layouts/EmptyLayout";
-import PageLayout from "@/layouts/page/PageLayout";
-
-import InvocationsStatusFilter from "@/pages/invocations/components/InvocationsStatusFilter";
-import InvocationsTimeframeToggle from "@/pages/invocations/components/InvocationsTimeframeToggle";
-import InvocationsTable from "@/pages/invocations/components/table/InvocationsTable";
-import { INVOCATIONS_DEFAULT_TIMEFRAME } from "@/pages/invocations/constants";
-import type { InvocationsTimeframe } from "@/pages/invocations/types";
-import { filterInvocations } from "@/pages/invocations/utils";
-
-import { useSuspenseListInvocationsQuery } from "@/api/queries/invocations";
+import { useInvocationsFilters } from "@/components/invocations/hooks/useInvocationsFilters";
+import InvocationsEmptyState from "@/components/invocations/InvocationsEmptyState";
+import InvocationsStatusFilter from "@/components/invocations/InvocationsStatusFilter";
+import InvocationsTimeframeToggle from "@/components/invocations/InvocationsTimeframeToggle";
+import InvocationsTable from "@/components/invocations/table/InvocationsTable";
 
 import {
-  useAlchemyLayoutSearch,
-  useAlchemySearchUpdate,
-  useInvocationsSearch,
-} from "@/module/hooks";
-import type { AlchemyLayoutSearch, InvocationsSearch } from "@/module/schemas";
+  createListInvocationsInput,
+  useSuspenseListInvocationsInfiniteQuery,
+} from "@/api/queries/invocations";
 
-const InvocationsPage = () => {
-  const updateSearch = useAlchemySearchUpdate<InvocationsSearch & AlchemyLayoutSearch>();
-  const {
-    q: term = "",
-    timeframe = INVOCATIONS_DEFAULT_TIMEFRAME,
-    statuses = [],
-  } = useInvocationsSearch();
-  const { invocationId } = useAlchemyLayoutSearch();
+const InvocationsPage: FC = () => {
+  const { timeframe, statuses, sinceMs, handleTimeframeChange, handleStatusesChange } =
+    useInvocationsFilters();
 
-  const { data } = useSuspenseListInvocationsQuery();
+  const { data, hasNextPage, isFetchingNextPage, fetchNextPage } =
+    useSuspenseListInvocationsInfiniteQuery({
+      input: createListInvocationsInput({ statuses, sinceMs }),
+    });
 
-  const invocations = useMemo(
-    () => filterInvocations(data.invocations, { timeframe, statuses, term }),
-    [data.invocations, timeframe, statuses, term],
-  );
-  const isFiltered = statuses.length > 0 || term !== "";
-
-  const handleSearch = (nextTerm: string) => {
-    void updateSearch((prev) => ({ ...prev, q: nextTerm || undefined }), { replace: true });
-  };
-
-  const handleTimeframeChange = (nextTimeframe: InvocationsTimeframe) => {
-    void updateSearch(
-      (prev) => ({
-        ...prev,
-        timeframe: nextTimeframe === INVOCATIONS_DEFAULT_TIMEFRAME ? undefined : nextTimeframe,
-      }),
-      { replace: true },
-    );
-  };
-
-  const handleStatusesChange = (nextStatuses: InvocationStatus[]) => {
-    void updateSearch(
-      (prev) => ({ ...prev, statuses: nextStatuses.length ? nextStatuses : undefined }),
-      { replace: true },
-    );
-  };
-
-  const handleSelect = (invocation: Invocation) => {
-    void updateSearch((prev) => ({ ...prev, invocationId: invocation.id }));
-  };
+  const invocations = useMemo(() => data.pages.flatMap((page) => page.invocations), [data.pages]);
 
   return (
     <PageLayout
-      title="Invocations"
+      header="Invocations"
       actions={<InvocationsTimeframeToggle value={timeframe} onChange={handleTimeframeChange} />}
-      toolbar={
-        <>
-          <Flex grow={1} minWidth={0}>
-            <SearchInput
-              ariaLabel="Search invocations"
-              placeholder="Search"
-              defaultValue={term}
-              onSearch={handleSearch}
-              fillWidth
-            />
-          </Flex>
-          <InvocationsStatusFilter value={statuses} onChange={handleStatusesChange} />
-        </>
-      }
+      toolbar={<InvocationsStatusFilter value={statuses} onChange={handleStatusesChange} />}
     >
-      <Flex direction={FlexDirection.COLUMN} grow={1} minHeight={0}>
+      <Flex direction={FlexDirection.COLUMN} grow={1} basis={0} minHeight={0} fillWidth>
         <InvocationsTable
           invocations={invocations}
-          activeId={invocationId}
-          onSelect={handleSelect}
+          isLoading={isFetchingNextPage}
+          onEndReached={() => {
+            if (hasNextPage) fetchNextPage();
+          }}
           emptyState={
-            isFiltered ? (
-              <EmptyLayout
-                icon={MagnifyingGlassIcon}
-                header="No invocations match"
-                actions={
-                  <Button
-                    label="Clear filters"
-                    variant={ButtonVariant.SECONDARY}
-                    onClick={() => handleStatusesChange([])}
-                  />
-                }
-              />
-            ) : (
-              <EmptyLayout icon={ListMagnifyingGlassIcon} header="No invocations in this window" />
-            )
+            <InvocationsEmptyState
+              hasFilters={statuses.length > 0}
+              onClear={() => handleStatusesChange([])}
+            />
           }
         />
       </Flex>

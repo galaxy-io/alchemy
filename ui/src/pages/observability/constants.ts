@@ -1,12 +1,12 @@
-import type { ChartSeriesStyles } from "@galaxy-io/dls/charts/types";
-
-import { InvocationStatus } from "@/gen/functions/v1/invocations_pb";
+import { StartKind } from "@/gen/functions/v1/invocations_pb";
+import { MetricGranularity } from "@/gen/metrics/v1/metrics_pb";
 
 import {
-  START_KIND_TO_CHART_PALETTE_MAP,
-  START_KIND_TO_LABEL_MAP,
-  START_KINDS,
-} from "@/pages/invocations/constants";
+  INVOCATIONS_DAY_MS,
+  INVOCATIONS_HOUR_MS,
+  INVOCATIONS_MINUTE_MS,
+} from "@/components/invocations/constants";
+
 import { ObservabilityTrafficFill } from "@/pages/observability/types";
 
 export const OBSERVABILITY_DEFAULT_TRAFFIC_FILL = ObservabilityTrafficFill.VOLUME;
@@ -14,18 +14,15 @@ export const OBSERVABILITY_DEFAULT_TRAFFIC_FILL = ObservabilityTrafficFill.VOLUM
 export const OBSERVABILITY_CHART_HEIGHT = 240;
 export const OBSERVABILITY_CHART_MIN_WIDTH = 420;
 
-export const OBSERVABILITY_INVOCATION_STATUSES = [
-  InvocationStatus.SUCCEEDED,
-  InvocationStatus.FAILED,
-  InvocationStatus.ERRORED,
+export const OBSERVABILITY_START_KINDS = [
+  StartKind.COLD_BOOT,
+  StartKind.SNAPSHOT_RESTORE,
+  StartKind.WARM,
 ];
 
-export const OBSERVABILITY_LATENCY_SERIES: ChartSeriesStyles<string> = Object.fromEntries(
-  START_KINDS.map((startKind) => [
-    String(startKind),
-    {
-      label: START_KIND_TO_LABEL_MAP[startKind],
-      color: START_KIND_TO_CHART_PALETTE_MAP[startKind],
-    },
-  ]),
-);
+export const OBSERVABILITY_GRANULARITY_TO_DURATION_MS_MAP: Record<MetricGranularity, number> = {
+  [MetricGranularity.UNSPECIFIED]: INVOCATIONS_HOUR_MS,
+  [MetricGranularity.MINUTE]: INVOCATIONS_MINUTE_MS,
+  [MetricGranularity.HOUR]: INVOCATIONS_HOUR_MS,
+  [MetricGranularity.DAY]: INVOCATIONS_DAY_MS,
+};
