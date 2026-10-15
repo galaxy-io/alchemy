@@ -1,0 +1,117 @@
+{{- $kvm := .Values.host.kvm }}
+{{- if not (has $kvm.mode (list "privileged" "devicePlugin")) }}
+{{- fail "host.kvm.mode must be privileged or devicePlugin" }}
+{{- end }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "alchemy.host.fullname" . }}
+  namespace: {{ include "alchemy.namespace" . }}
+  labels:
+    {{- include "alchemy.host.labels" . | nindent 4 }}
+spec:
+  # One host per node. Pending hosts are what make a node autoscaler such as
+  # Karpenter launch KVM nodes; a DaemonSet would never ask for one.
+  replicas: {{ .Values.host.replicas }}
+  selector:
+    matchLabels:
+      {{- include "alchemy.host.selectorLabels" . | nindent 6 }}
+  # No surge: a surged host would need a node of its own.
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 0
+      maxUnavailable: {{ .Values.host.maxUnavailable }}
+  template:
+    metadata:
+      annotations:
+        checksum/secret: {{ include (print $.Template.BasePath "/secret.yaml") . | sha256sum }}
+      labels:
+        {{- include "alchemy.host.selectorLabels" . | nindent 8 }}
+    spec:
+      serviceAccountName: {{ include "alchemy.host.serviceAccountName" . }}
+      automountServiceAccountToken: false
+      # Long enough to stop every microVM, busy ones included.
+      terminationGracePeriodSeconds: {{ .Values.host.terminationGracePeriodSeconds }}
+      securityContext:
+        seccompProfile:
+          type: RuntimeDefault
+      {{- with .Values.host.image.pullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: host
+          image: {{ .Values.host.image.repository }}:{{ .Values.host.image.tag | default .Chart.AppVersion }}
+          imagePullPolicy: {{ .Values.host.image.pullPolicy }}
+          args:
+            - --name=$(NODE_NAME)
+            - --max-concurrency={{ .Values.host.maxConcurrency }}
+            - --memory-mib={{ .Values.host.memoryMiB }}
+            - --warm-ttl={{ .Values.host.warmTTL }}
+            - --prewarm={{ .Values.host.prewarm }}
+            - --console={{ .Values.host.console }}
+            - --cache-dir=/var/cache/alchemy
+            - --run-dir=/run/alchemy
+          env:
+            - name: NODE_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: spec.nodeName
+            - name: NATS_URL
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "alchemy.secretName" . }}
+                  key: NATS_URL
+          securityContext:
+            {{- if eq $kvm.mode "privileged" }}
+            privileged: true
+            {{- else }}
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+            {{- end }}
+          resources:
+            {{- $resources := deepCopy .Values.host.resources }}
+            {{- if eq $kvm.mode "devicePlugin" }}
+            {{- $_ := set $resources "limits" (merge (dict $kvm.resourceName 1) ($resources.limits | default dict)) }}
+            {{- end }}
+            {{- toYaml $resources | nindent 12 }}
+          volumeMounts:
+            - name: cache
+              mountPath: /var/cache/alchemy
+            - name: run
+              mountPath: /run/alchemy
+            {{- if eq $kvm.mode "privileged" }}
+            - name: kvm
+              mountPath: /dev/kvm
+            {{- end }}
+      volumes:
+        # Built root filesystems, keyed by image digest. Losing them only
+        # means rebuilding on the next invocation.
+        - name: cache
+          {{- with .Values.host.cache.sizeLimit }}
+          emptyDir:
+            sizeLimit: {{ . }}
+          {{- else }}
+          emptyDir: {}
+          {{- end }}
+        - name: run
+          emptyDir: {}
+        {{- if eq $kvm.mode "privileged" }}
+        - name: kvm
+          hostPath:
+            path: /dev/kvm
+            type: CharDevice
+        {{- end }}
+      {{- with .Values.host.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.host.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      affinity:
+        {{- $onePerNode := dict "requiredDuringSchedulingIgnoredDuringExecution" (list (dict "topologyKey" "kubernetes.io/hostname" "labelSelector" (dict "matchLabels" (include "alchemy.host.selectorLabels" . | fromYaml)))) }}
+        {{- toYaml (merge (dict "podAntiAffinity" $onePerNode) (deepCopy .Values.host.affinity)) | nindent 8 }}

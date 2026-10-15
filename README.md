@@ -24,7 +24,7 @@ just vm
 just dev
 ```
 
-Open <http://localhost:5173> to use the web UI. `just example` builds the example functions and `just demo` registers and invokes them.
+Open <http://localhost:5173> to use the web UI.
 
 When you are finished, stop the local infrastructure with:
 

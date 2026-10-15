@@ -23,6 +23,7 @@ import (
 	"time"
 
 	"connectrpc.com/connect"
+	"github.com/google/go-containerregistry/pkg/authn"
 
 	functionsv1 "github.com/galaxy-io/alchemy/api/functions/v1"
 	supervisorv1 "github.com/galaxy-io/alchemy/api/supervisor/v1"
@@ -54,6 +55,8 @@ type Config struct {
 	// Console keeps the guest's serial console on and logs it. It makes
 	// boots observable and slower.
 	Console bool
+	// Keychain finds credentials for pulling function images.
+	Keychain authn.Keychain
 }
 
 // Driver implements driver.Driver with Firecracker microVMs.

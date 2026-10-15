@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"connectrpc.com/connect"
+	"github.com/google/go-containerregistry/pkg/name"
 	"google.golang.org/protobuf/encoding/protojson"
 
 	"google.golang.org/protobuf/proto"
@@ -105,12 +106,15 @@ func (s *Service) invokeOnHost(ctx context.Context, cv *compiledVersion, req *ho
 	if len(s.liveHosts()) == 0 {
 		return nil, errNoHosts
 	}
-	// Rebuild from the digest the version was built against, not the tag: a
-	// tag may have moved since, and a different image is a different artifact.
+	// Rebuild from the digest the version was built against (repo@digest),
+	// not the tag: a tag may have moved since, and a different image is a
+	// different artifact.
 	s.log.Info("no host has the artifact; building", "artifact", cv.artifact.GetId())
 	spec := proto.Clone(cv.spec).(*functionsv1.FunctionSpec) //nolint:errcheck // Clone preserves the type
 	if cv.row.ImageDigest != "" {
-		spec.Image = cv.row.ImageDigest
+		if ref, err := name.ParseReference(spec.GetImage()); err == nil {
+			spec.Image = ref.Context().Digest(cv.row.ImageDigest).String()
+		}
 	}
 	built, err := s.requestBuild(ctx, cv.row.TenantID, spec)
 	if err != nil {
