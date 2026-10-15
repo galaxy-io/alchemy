@@ -1,14 +1,17 @@
-import type { InvocationProtocol, Resources } from "@/gen/functions/v1/common_pb";
+import type { Resources } from "@/gen/functions/v1/common_pb";
 import type { Function as AlchemyFunction, FunctionSpec } from "@/gen/functions/v1/functions_pb";
 
-import type { FunctionArrowField, FunctionContractKind } from "@/pages/functions/types";
+import type {
+  FunctionArrowField,
+  FunctionContractKind,
+  FunctionContractSide,
+} from "@/pages/functions/types";
 
 export enum CreateFunctionModalStep {
   DETAILS = "DETAILS",
   RUNTIME = "RUNTIME",
   CONTRACT = "CONTRACT",
   RESOURCES = "RESOURCES",
-  REVIEW = "REVIEW",
 }
 
 export enum CreateFunctionModalMode {
@@ -16,23 +19,18 @@ export enum CreateFunctionModalMode {
   VERSION = "VERSION",
 }
 
-export enum CreateFunctionModalContractSide {
-  INPUT = "INPUT",
-  OUTPUT = "OUTPUT",
-}
-
 export interface CreateFunctionModalArrowField extends FunctionArrowField {
   id: string;
 }
 
-export interface CreateFunctionModalEnvEntry {
+interface CreateFunctionModalEnvEntry {
   key: string;
   value: string;
 }
 
 export interface CreateFunctionModalState {
   mode: CreateFunctionModalMode;
-  functionId: AlchemyFunction["id"] | null;
+  functionId: AlchemyFunction["id"] | undefined;
   step: CreateFunctionModalStep;
   name: AlchemyFunction["name"];
   isNameTouched: boolean;
@@ -40,10 +38,9 @@ export interface CreateFunctionModalState {
   image: FunctionSpec["image"];
   command: FunctionSpec["command"];
   env: CreateFunctionModalEnvEntry[];
-  protocol: InvocationProtocol;
   contractKind: FunctionContractKind;
-  schemaTexts: Record<CreateFunctionModalContractSide, string>;
-  arrowFields: Record<CreateFunctionModalContractSide, CreateFunctionModalArrowField[]>;
+  schemaTexts: Record<FunctionContractSide, string>;
+  arrowFields: Record<FunctionContractSide, CreateFunctionModalArrowField[]>;
   vcpus: Resources["vcpus"];
   memoryMib: Resources["memoryMib"];
   timeoutMs: number;
@@ -58,8 +55,8 @@ export interface CreateFunctionModalDerivedState {
   isNextDisabled: boolean;
   hints: string[];
   nameError: string | undefined;
-  schemaErrors: Record<CreateFunctionModalContractSide, string | undefined>;
-  spec: FunctionSpec | null;
+  schemaErrors: Record<FunctionContractSide, string | undefined>;
+  spec: FunctionSpec | undefined;
 }
 
 export type CreateFunctionModalContextValue = CreateFunctionModalState &

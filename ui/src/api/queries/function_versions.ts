@@ -1,4 +1,4 @@
-import { type UseMutationOptions, useMutation } from "@connectrpc/connect-query";
+import { type UseMutationOptions, useMutation, useTransport } from "@connectrpc/connect-query";
 import { useQueryClient } from "@tanstack/react-query";
 
 import { FunctionsService } from "@/gen/functions/v1/service_pb";
@@ -12,14 +12,16 @@ export const useCreateFunctionVersionMutation = (
   > = {},
 ) => {
   const queryClient = useQueryClient();
-  return useMutation<
-    typeof FunctionsService.method.createFunctionVersion.input,
-    typeof FunctionsService.method.createFunctionVersion.output
-  >(FunctionsService.method.createFunctionVersion, {
+  const transport = useTransport();
+  return useMutation(FunctionsService.method.createFunctionVersion, {
     ...options,
     onSettled: (...args) => {
-      void queryClient.invalidateQueries({ queryKey: createListFunctionsQueryKey() });
-      void queryClient.invalidateQueries({ queryKey: createGetFunctionQueryKey() });
+      void queryClient.invalidateQueries({
+        queryKey: createGetFunctionQueryKey(undefined, transport),
+      });
+      void queryClient.invalidateQueries({
+        queryKey: createListFunctionsQueryKey(undefined, transport),
+      });
       return options.onSettled?.(...args);
     },
   });

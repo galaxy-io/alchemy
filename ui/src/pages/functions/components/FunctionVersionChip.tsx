@@ -1,20 +1,21 @@
+import type { FC } from "react";
+
 import Chip, { ChipSize, ChipVariant } from "@galaxy-io/dls/chips/Chip";
 
 import type { FunctionVersion } from "@/gen/functions/v1/functions_pb";
 
-import { formatFunctionVersion } from "@/pages/functions/utils";
+import { formatVersion } from "@/utils/format";
 
 interface FunctionVersionChipProps {
   version: FunctionVersion["version"] | undefined;
   size?: ChipSize;
 }
 
-const FunctionVersionChip = ({ version, size = ChipSize.SMALL }: FunctionVersionChipProps) => (
-  <Chip
-    label={version === undefined ? "No build" : formatFunctionVersion(version)}
-    variant={version === undefined ? ChipVariant.WARNING : ChipVariant.TERTIARY}
-    size={size}
-  />
-);
+const FunctionVersionChip: FC<FunctionVersionChipProps> = ({ version, size = ChipSize.SMALL }) =>
+  version ? (
+    <Chip label={formatVersion(version)} variant={ChipVariant.TERTIARY} size={size} />
+  ) : (
+    <Chip label="No build" variant={ChipVariant.WARNING} size={size} />
+  );
 
 export default FunctionVersionChip;

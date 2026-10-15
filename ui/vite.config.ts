@@ -4,31 +4,38 @@ import { tanstackRouter } from "@tanstack/router-plugin/vite";
 import viteReact from "@vitejs/plugin-react";
 import { defineConfig } from "vite";
 
+import { GalaxyTheme } from "@galaxy-io/dls/theme/enums";
 import { galaxyDls } from "@galaxy-io/dls/vite";
 
-// The standalone app. `vite.lib.config.ts` builds the same source as the `@galaxy-io/alchemy` module.
-export default defineConfig({
+export const CLASS_PREFIX = "alchemy";
+const API_PROXY_TARGET = process.env.API_PROXY_TARGET ?? "http://localhost:8780";
+const API_SERVICE_PATHS = ["/functions.v1.FunctionsService", "/metrics.v1.MetricsService"];
+
+export const API_PROXY = Object.fromEntries(
+  API_SERVICE_PATHS.map((servicePath) => [
+    servicePath,
+    { target: API_PROXY_TARGET, changeOrigin: true },
+  ]),
+);
+const VERIFY_MODE = "verify";
+const VERIFY_CACHE_DIR = "node_modules/.vite-verify";
+
+export default defineConfig(({ mode }) => ({
+  cacheDir: mode === VERIFY_MODE ? VERIFY_CACHE_DIR : undefined,
   plugins: [
     tanstackRouter({
       target: "react",
       autoCodeSplitting: true,
+      routesDirectory: "./src/host/routes",
+      generatedRouteTree: "./src/host/routeTree.gen.ts",
     }),
     viteReact(),
-    galaxyDls({ prefix: "alchemy" }),
+    galaxyDls({ prefix: CLASS_PREFIX, theme: GalaxyTheme.SYSTEM }),
   ],
   server: {
     port: 5173,
     strictPort: true,
-    proxy: {
-      "/functions.v1.FunctionsService": {
-        target: "http://localhost:8780",
-        changeOrigin: true,
-      },
-      "/metrics.v1.MetricsService": {
-        target: "http://localhost:8780",
-        changeOrigin: true,
-      },
-    },
+    proxy: API_PROXY,
   },
   resolve: {
     alias: {
@@ -38,7 +45,7 @@ export default defineConfig({
   build: {
     outDir: "build",
     target: "esnext",
-    rollupOptions: {
+    rolldownOptions: {
       onwarn(warning, warn) {
         if (
           warning.code === "PURE_COMMENT_POSITION" ||
@@ -50,4 +57,4 @@ export default defineConfig({
       },
     },
   },
-});
+}));

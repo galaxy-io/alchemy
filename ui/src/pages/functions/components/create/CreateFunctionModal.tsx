@@ -1,57 +1,81 @@
-import { create } from "@bufbuild/protobuf";
+import type { FC } from "react";
+
 import { match } from "ts-pattern";
 
+import Box, { BoxVariant } from "@galaxy-io/dls/layout/Box";
 import Divider from "@galaxy-io/dls/layout/Divider";
 import Flex, { FlexDirection, FlexVariant } from "@galaxy-io/dls/layout/Flex";
+import FlexItem from "@galaxy-io/dls/layout/FlexItem";
+import PendingLayout from "@galaxy-io/dls/layout/PendingLayout";
+import ScrollArea from "@galaxy-io/dls/layout/ScrollArea";
 import Modal, { ModalSize } from "@galaxy-io/dls/modal/Modal";
 import { Orientation, Radius } from "@galaxy-io/dls/theme/enums";
 
-import {
-  type Function as AlchemyFunction,
-  GetFunctionRequestSchema,
-} from "@/gen/functions/v1/functions_pb";
+import type { Function as AlchemyFunction } from "@/gen/functions/v1/functions_pb";
 
 import CreateFunctionModalProvider, {
   useCreateFunctionModalState,
 } from "@/pages/functions/components/create/CreateFunctionModalProvider";
 import CreateFunctionModalFooter from "@/pages/functions/components/create/components/CreateFunctionModalFooter";
 import CreateFunctionModalSidebar from "@/pages/functions/components/create/components/CreateFunctionModalSidebar";
-import { CREATE_FUNCTION_MODAL_STEP_TO_PADDING_MAP } from "@/pages/functions/components/create/constants";
+import {
+  CREATE_FUNCTION_MODAL_MODE_TO_HEADER_MAP,
+  CREATE_FUNCTION_MODAL_STEP_TO_IS_PADDED_MAP,
+} from "@/pages/functions/components/create/constants";
 import CreateFunctionModalContract from "@/pages/functions/components/create/steps/CreateFunctionModalContract";
 import CreateFunctionModalDetails from "@/pages/functions/components/create/steps/CreateFunctionModalDetails";
 import CreateFunctionModalResources from "@/pages/functions/components/create/steps/CreateFunctionModalResources";
-import CreateFunctionModalReview from "@/pages/functions/components/create/steps/CreateFunctionModalReview";
 import CreateFunctionModalRuntime from "@/pages/functions/components/create/steps/CreateFunctionModalRuntime";
-import { CreateFunctionModalStep } from "@/pages/functions/components/create/types";
+import {
+  CreateFunctionModalMode,
+  CreateFunctionModalStep,
+} from "@/pages/functions/components/create/types";
 
-import { useGetFunctionQuery } from "@/api/queries/functions";
+import { createGetFunctionInput, useGetFunctionQuery } from "@/api/queries/functions";
+
+import { useOverlaySession } from "@/hooks/useOverlaySession";
 
 interface CreateFunctionModalContentProps {
-  fn?: AlchemyFunction;
+  isOpen: boolean;
   onClose: () => void;
 }
 
-const CreateFunctionModalContent = ({ fn, onClose }: CreateFunctionModalContentProps) => {
-  const { step, isSubmitting } = useCreateFunctionModalState();
+const CreateFunctionModalContent: FC<CreateFunctionModalContentProps> = ({ isOpen, onClose }) => {
+  const { mode, step, name, isSubmitting } = useCreateFunctionModalState();
 
-  const renderBody = () =>
-    match(step)
-      .with(CreateFunctionModalStep.DETAILS, () => <CreateFunctionModalDetails />)
+  const renderBody = () => {
+    const body = match(step)
       .with(CreateFunctionModalStep.RUNTIME, () => <CreateFunctionModalRuntime />)
       .with(CreateFunctionModalStep.CONTRACT, () => <CreateFunctionModalContract />)
       .with(CreateFunctionModalStep.RESOURCES, () => <CreateFunctionModalResources />)
-      .with(CreateFunctionModalStep.REVIEW, () => <CreateFunctionModalReview />)
+      .with(CreateFunctionModalStep.DETAILS, () => <CreateFunctionModalDetails />)
       .exhaustive();
+
+    if (CREATE_FUNCTION_MODAL_STEP_TO_IS_PADDED_MAP[step]) {
+      return (
+        <ScrollArea>
+          <Box padding={16}>{body}</Box>
+        </ScrollArea>
+      );
+    }
+
+    return (
+      <Flex direction={FlexDirection.COLUMN} height="100%">
+        {body}
+      </Flex>
+    );
+  };
 
   return (
     <Modal
-      isOpen
+      isOpen={isOpen}
       size={ModalSize.X_LARGE}
-      header={fn ? `New version of ${fn.name}` : "New image"}
+      header={CREATE_FUNCTION_MODAL_MODE_TO_HEADER_MAP[mode]}
+      subheader={mode === CreateFunctionModalMode.VERSION ? name : undefined}
       isDismissable={!isSubmitting}
       footer={<CreateFunctionModalFooter onClose={onClose} />}
-      onOpenChange={(isOpen) => {
-        if (!isOpen) onClose();
+      onOpenChange={(open) => {
+        if (!open) onClose();
       }}
     >
       <Flex
@@ -63,39 +87,53 @@ const CreateFunctionModalContent = ({ fn, onClose }: CreateFunctionModalContentP
       >
         <CreateFunctionModalSidebar />
         <Divider orientation={Orientation.VERTICAL} />
-        <Flex
-          direction={FlexDirection.COLUMN}
-          variant={FlexVariant.BASE}
-          height="100%"
-          width="100%"
-          minWidth={0}
-          padding={CREATE_FUNCTION_MODAL_STEP_TO_PADDING_MAP[step]}
-          overflow="auto"
-        >
-          {renderBody()}
-        </Flex>
+        <FlexItem grow={1} basis={0} minWidth={0}>
+          <Box variant={BoxVariant.BASE} height="100%">
+            {renderBody()}
+          </Box>
+        </FlexItem>
       </Flex>
     </Modal>
   );
 };
 
 interface CreateFunctionModalProps {
+  isOpen: boolean;
   functionId?: AlchemyFunction["id"];
   onClose: () => void;
 }
 
-const CreateFunctionModal = ({ functionId, onClose }: CreateFunctionModalProps) => {
-  const { data: functionData } = useGetFunctionQuery({
-    input: create(GetFunctionRequestSchema, { id: functionId ?? "", includeVersions: true }),
-    options: { enabled: !!functionId },
-  });
-  const fn = functionData?.function;
+const CreateFunctionModal: FC<CreateFunctionModalProps> = ({ isOpen, functionId, onClose }) => {
+  const session = useOverlaySession(isOpen);
 
-  if (functionId && !fn) return null;
+  const { data } = useGetFunctionQuery({
+    input: createGetFunctionInput(functionId ?? ""),
+    options: { enabled: !!session && !!functionId },
+  });
+  const alchemyFunction = data?.function;
+
+  if (!session) {
+    return null;
+  }
+
+  if (functionId && !alchemyFunction) {
+    return (
+      <Modal
+        isOpen={isOpen}
+        size={ModalSize.MEDIUM}
+        header="New version"
+        onOpenChange={(open) => {
+          if (!open) onClose();
+        }}
+      >
+        <PendingLayout />
+      </Modal>
+    );
+  }
 
   return (
-    <CreateFunctionModalProvider fn={fn}>
-      <CreateFunctionModalContent fn={fn} onClose={onClose} />
+    <CreateFunctionModalProvider key={session} alchemyFunction={alchemyFunction}>
+      <CreateFunctionModalContent isOpen={isOpen} onClose={onClose} />
     </CreateFunctionModalProvider>
   );
 };

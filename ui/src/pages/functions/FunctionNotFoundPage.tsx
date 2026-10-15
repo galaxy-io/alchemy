@@ -1,29 +1,28 @@
-import { QuestionIcon } from "@phosphor-icons/react";
+import type { FC } from "react";
 
-import Button, { ButtonVariant } from "@galaxy-io/dls/buttons/Button";
+import { ArrowLeftIcon, ImageBrokenIcon } from "@phosphor-icons/react";
+
+import Button from "@galaxy-io/dls/buttons/Button";
+import ErrorLayout from "@galaxy-io/dls/layout/ErrorLayout";
 
 import RouterLink from "@/components/RouterLink";
 
-import EmptyLayout from "@/layouts/EmptyLayout";
-import PageLayout from "@/layouts/page/PageLayout";
+import { AlchemyPath, createAlchemyHref } from "@/module/paths";
 
-const FunctionNotFoundPage = () => {
-  return (
-    <PageLayout title="Not found">
-      <EmptyLayout
-        icon={QuestionIcon}
-        header="No such function"
-        actions={
-          <Button
-            label="Back to images"
-            variant={ButtonVariant.SECONDARY}
-            href="./images"
-            as={RouterLink}
-          />
-        }
+const FunctionNotFoundPage: FC = () => (
+  <ErrorLayout
+    icon={ImageBrokenIcon}
+    header="Image not found"
+    description="The image you are looking for does not exist"
+    actions={
+      <Button
+        label="Go back to images"
+        icon={ArrowLeftIcon}
+        href={createAlchemyHref(AlchemyPath.FUNCTIONS)}
+        as={RouterLink}
       />
-    </PageLayout>
-  );
-};
+    }
+  />
+);
 
 export default FunctionNotFoundPage;

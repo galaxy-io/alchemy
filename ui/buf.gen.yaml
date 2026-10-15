@@ -1,11 +1,11 @@
 version: v2
 clean: true
-# The repository's buf workspace; host and supervisor protos are internal to the backend.
 inputs:
-  - directory: ..
-    paths:
-      - ../protos/functions
-      - ../protos/metrics
+  - directory: ../protos
+    # host.v1 and supervisor.v1 are the server's internal contracts, not public API.
+    exclude_paths:
+      - ../protos/host
+      - ../protos/supervisor
 plugins:
   - local: protoc-gen-es
     out: src/gen

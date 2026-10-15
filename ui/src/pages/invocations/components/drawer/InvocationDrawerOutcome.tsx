@@ -1,40 +1,35 @@
+import type { FC } from "react";
+
 import Alert from "@galaxy-io/dls/feedback/Alert";
 import Flex, { FlexDirection } from "@galaxy-io/dls/layout/Flex";
-import Text, { TextSize } from "@galaxy-io/dls/text/Text";
+import Text, { TextSize, TextWeight } from "@galaxy-io/dls/text/Text";
 import { FontFamily } from "@galaxy-io/dls/theme/enums";
 
 import type { Invocation } from "@/gen/functions/v1/invocations_pb";
 
-import { INVOCATION_STATUS_TO_ALERT_VARIANT_MAP } from "@/pages/invocations/components/drawer/constants";
-import { formatInvocationOutcome } from "@/pages/invocations/components/drawer/utils";
-import InvocationPhaseBar from "@/pages/invocations/components/InvocationPhaseBar";
+import { FUNCTION_ERROR_KIND_TO_LABEL_MAP } from "@/components/invocations/constants";
+import InvocationError from "@/components/invocations/InvocationError";
+import InvocationPhaseBar from "@/components/invocations/InvocationPhaseBar";
+import { formatInvocationOutcome } from "@/components/invocations/utils";
+
+import { INVOCATION_DRAWER_STATUS_TO_ALERT_VARIANT_MAP } from "@/pages/invocations/components/drawer/constants";
 
 interface InvocationDrawerOutcomeProps {
   invocation: Invocation;
 }
 
-const InvocationDrawerOutcome = ({ invocation }: InvocationDrawerOutcomeProps) => (
+const InvocationDrawerOutcome: FC<InvocationDrawerOutcomeProps> = ({ invocation }) => (
   <Alert
-    variant={INVOCATION_STATUS_TO_ALERT_VARIANT_MAP[invocation.status]}
+    variant={INVOCATION_DRAWER_STATUS_TO_ALERT_VARIANT_MAP[invocation.status]}
     header={formatInvocationOutcome(invocation)}
   >
     <Flex direction={FlexDirection.COLUMN} gap={12}>
       {invocation.error && (
-        <Text size={TextSize.BODY_SM} family={FontFamily.MONO} isSelectable>
-          {invocation.error.type ? `${invocation.error.type}: ` : ""}
-          {invocation.error.message}
+        <Text size={TextSize.BODY_SM} weight={TextWeight.MEDIUM}>
+          {FUNCTION_ERROR_KIND_TO_LABEL_MAP[invocation.error.kind]}
         </Text>
       )}
-      {invocation.error?.violations.map((violation) => (
-        <Text
-          key={violation.instancePath}
-          size={TextSize.CAPTION}
-          family={FontFamily.MONO}
-          isSelectable
-        >
-          {violation.instancePath || "/"} {violation.message}
-        </Text>
-      ))}
+      {invocation.error && <InvocationError error={invocation.error} />}
       {invocation.platformError && (
         <Text size={TextSize.BODY_SM} family={FontFamily.MONO} isSelectable>
           {invocation.platformError}

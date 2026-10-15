@@ -27,13 +27,10 @@ import {
   Utf8,
 } from "apache-arrow";
 
-/*
- * Contracts carry Arrow schemas as an IPC stream holding only the schema message, and Arrow
- * payloads as an IPC stream holding one record batch. The UI names types with pyarrow's tokens
- * (`utf8`, `uint32`, `fixed_size_list<float64>[64]`).
- */
-
 const LIST_ITEM_NAME = "item";
+const ARROW_SAMPLE_STRING = "example";
+const ARROW_SAMPLE_INT = 1;
+const ARROW_SAMPLE_FLOAT = 0.5;
 
 const TIME_UNIT_TO_TOKEN_MAP: Record<TimeUnit, string> = {
   [TimeUnit.SECOND]: "s",
@@ -125,8 +122,6 @@ export const decodeArrowSchema = (bytes: Uint8Array): Schema | undefined => {
 
 export const encodeArrowSchema = (schema: Schema): Uint8Array =>
   tableToIPC(new Table(schema), "stream");
-
-// JSON has no 64-bit integers or dates; widen them to what Arrow's builders take.
 const coerceArrowValue = (value: JsonValue | undefined, type: DataType): unknown => {
   if (value === null || value === undefined) return value;
   if (DataType.isInt(type) && type.bitWidth === 64 && typeof value !== "object") {
@@ -137,7 +132,6 @@ const coerceArrowValue = (value: JsonValue | undefined, type: DataType): unknown
   return value;
 };
 
-/** One record batch holding `rows`, typed by `schema` exactly so the contract check passes. */
 export const encodeArrowRows = (schema: Schema, rows: JsonObject[]): Uint8Array => {
   const children = schema.fields.map((field) => {
     const builder = makeBuilder({ type: field.type, nullValues: [null, undefined] });
@@ -159,7 +153,6 @@ export const decodeArrowRows = (bytes: Uint8Array): JsonValue | undefined => {
     const rows = tableFromIPC(bytes)
       .toArray()
       .map((row) => row.toJSON());
-    // Round-trip through JSON so vectors, typed arrays and bigints become plain JSON values.
     return JSON.parse(JSON.stringify(rows)) as JsonValue;
   } catch {
     return undefined;
@@ -167,17 +160,17 @@ export const decodeArrowRows = (bytes: Uint8Array): JsonValue | undefined => {
 };
 
 const createArrowSampleValue = (type: DataType): JsonValue => {
-  if (DataType.isUtf8(type) || DataType.isLargeUtf8(type)) return "";
-  if (DataType.isBool(type)) return false;
-  if (DataType.isInt(type) || DataType.isFloat(type)) return 0;
-  if (DataType.isList(type)) return [];
+  if (DataType.isUtf8(type) || DataType.isLargeUtf8(type)) return ARROW_SAMPLE_STRING;
+  if (DataType.isBool(type)) return true;
+  if (DataType.isInt(type)) return ARROW_SAMPLE_INT;
+  if (DataType.isFloat(type)) return ARROW_SAMPLE_FLOAT;
+  if (DataType.isList(type)) return [createArrowSampleValue(type.valueType)];
   if (DataType.isFixedSizeList(type)) {
     return Array.from({ length: type.listSize }, () => createArrowSampleValue(type.valueType));
   }
   return null;
 };
 
-/** A one-row example for `schema`, for seeding an editor. */
 export const createArrowSampleRows = (schema: Schema): JsonObject[] => [
   Object.fromEntries(
     schema.fields.map((field) => [

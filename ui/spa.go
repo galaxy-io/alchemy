@@ -1,5 +1,3 @@
-//go:build embedui
-
 package ui
 
 import (

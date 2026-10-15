@@ -1,17 +1,13 @@
-import type { Icon } from "@phosphor-icons/react";
 import {
   ChartLineIcon,
   CpuIcon,
   FloppyDiskIcon,
+  type Icon,
   ListMagnifyingGlassIcon,
 } from "@phosphor-icons/react";
 
-export enum AlchemyNavItem {
-  OBSERVABILITY = "OBSERVABILITY",
-  IMAGES = "IMAGES",
-  HOSTS = "HOSTS",
-  INVOCATIONS = "INVOCATIONS",
-}
+import { AlchemyPath } from "@/module/paths";
+import { AlchemyNavItem } from "@/module/types";
 
 export const ALCHEMY_NAV_ITEMS: AlchemyNavItem[] = [
   AlchemyNavItem.OBSERVABILITY,
@@ -34,12 +30,11 @@ export const ALCHEMY_NAV_ITEM_TO_ICON_MAP: Record<AlchemyNavItem, Icon> = {
   [AlchemyNavItem.INVOCATIONS]: ListMagnifyingGlassIcon,
 };
 
-// Relative to the route that mounts `alchemyLayoutRoute`; a host links to them with `from` set to that path.
-export const ALCHEMY_NAV_ITEM_TO_PATH_MAP: Record<AlchemyNavItem, string> = {
-  [AlchemyNavItem.OBSERVABILITY]: "./observability",
-  [AlchemyNavItem.IMAGES]: "./images",
-  [AlchemyNavItem.HOSTS]: "./hosts",
-  [AlchemyNavItem.INVOCATIONS]: "./invocations",
+export const ALCHEMY_NAV_ITEM_TO_PATH_MAP: Record<AlchemyNavItem, AlchemyPath> = {
+  [AlchemyNavItem.OBSERVABILITY]: AlchemyPath.OBSERVABILITY,
+  [AlchemyNavItem.IMAGES]: AlchemyPath.FUNCTIONS,
+  [AlchemyNavItem.HOSTS]: AlchemyPath.HOSTS,
+  [AlchemyNavItem.INVOCATIONS]: AlchemyPath.INVOCATIONS,
 };
 
 export const ALCHEMY_NAV_ITEM_TO_KEYWORDS_MAP: Record<AlchemyNavItem, string[]> = {

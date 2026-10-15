@@ -1,36 +1,30 @@
-import Chip, { ChipSize, ChipVariant } from "@galaxy-io/dls/chips/Chip";
+import type { FC } from "react";
+
+import Chip, { ChipSize } from "@galaxy-io/dls/chips/Chip";
 import Flasher from "@galaxy-io/dls/transform/Flasher";
 
 import { FunctionVersionStatus } from "@/gen/functions/v1/functions_pb";
 
 import {
-  FUNCTION_VERSION_STATUS_TO_HUE_MAP,
   FUNCTION_VERSION_STATUS_TO_LABEL_MAP,
+  FUNCTION_VERSION_STATUS_TO_TONE_MAP,
 } from "@/pages/functions/constants";
 
 interface FunctionVersionStatusChipProps {
   status: FunctionVersionStatus;
   message?: string;
-  size?: ChipSize;
 }
 
-const FunctionVersionStatusChip = ({
-  status,
-  message,
-  size = ChipSize.SMALL,
-}: FunctionVersionStatusChipProps) => {
-  const hue = FUNCTION_VERSION_STATUS_TO_HUE_MAP[status];
-  const chip = (
+const FunctionVersionStatusChip: FC<FunctionVersionStatusChipProps> = ({ status, message }) => (
+  <Flasher isFlashing={status === FunctionVersionStatus.BUILDING}>
     <Chip
       label={FUNCTION_VERSION_STATUS_TO_LABEL_MAP[status]}
-      {...(hue === null ? { variant: ChipVariant.SECONDARY } : { color: hue })}
-      size={size}
+      {...FUNCTION_VERSION_STATUS_TO_TONE_MAP[status]}
+      size={ChipSize.SMALL}
       hasDot
-      {...(message ? { tooltip: message } : {})}
+      tooltip={message || undefined}
     />
-  );
-
-  return status === FunctionVersionStatus.BUILDING ? <Flasher isFlashing>{chip}</Flasher> : chip;
-};
+  </Flasher>
+);
 
 export default FunctionVersionStatusChip;

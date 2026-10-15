@@ -11,14 +11,14 @@ const stubPage = `<!doctype html>
     <p>Alchemy UI is not embedded in this binary.</p>
     <p>Build it with:</p>
     <pre>cd ui && pnpm install && pnpm build
-go build -tags embedui ./cmd/server</pre>
+go build -tags embedui ./...</pre>
   </body>
 </html>`
 
 // Handler returns a placeholder page. Compile with -tags embedui (after
 // building ui/build) to serve the real web UI instead.
 func Handler() http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
 		w.WriteHeader(http.StatusOK)
 		_, _ = w.Write([]byte(stubPage))

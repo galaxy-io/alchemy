@@ -42,7 +42,7 @@ build-linux arch="arm64":
     GOOS=linux GOARCH={{ arch }} CGO_ENABLED=0 go build -trimpath -ldflags='-s -w' -o bin/linux-{{ arch }}/supervisor ./cmd/supervisor
 
 # build the Linux binaries the container images ship, the server with the UI embedded (`arch`: amd64 or arm64, default this machine's)
-binaries arch=`go env GOARCH`: ui-dist
+binaries arch=`go env GOARCH`: ui-build
     CGO_ENABLED=0 GOOS=linux GOARCH={{ arch }} go build -tags embedui -trimpath -ldflags='-s -w' -o bin/alchemy/server ./cmd/server
     CGO_ENABLED=0 GOOS=linux GOARCH={{ arch }} go build -trimpath -ldflags='-s -w' -o bin/alchemy/host ./cmd/host
     CGO_ENABLED=0 GOOS=linux GOARCH={{ arch }} go build -trimpath -ldflags='-s -w' -o bin/alchemy/supervisor ./cmd/supervisor
@@ -106,6 +106,18 @@ dev count="3" memory="512" warm="5m" prewarm="0":
     until curl -sf http://localhost:8780/healthz > /dev/null 2>&1; do sleep 0.5; done
     if [ -d ui ]; then just ui; else wait; fi
 
-# build the UI bundle server embeds (go build -tags embedui)
-ui-dist:
+# build the web UI into ui/build, which server embeds with -tags embedui
+ui-build:
     cd ui && pnpm install && pnpm build
+
+# Biome formatting for the UI package
+ui-format mode="fix":
+    cd ui && pnpm run {{ if mode == "check" { "format:check" } else { "format" } }}
+
+# Biome lint for the UI package
+ui-lint mode="fix":
+    cd ui && pnpm run {{ if mode == "check" { "lint:check" } else { "lint" } }}
+
+# run every UI gate: types, lint, format, both builds, the package checks, and the committed route tree
+ui-check:
+    cd ui && pnpm install --frozen-lockfile && pnpm check && git diff --exit-code src/host/routeTree.gen.ts

@@ -1,6 +1,5 @@
 import { styled } from "@linaria/react";
 
-// DLS CodeEditor has no fill-height mode; this stretches it and lets its scroller own overflow.
 const FunctionCodeEditorFrame = styled.div`
   display: flex;
   flex: 1 1 0;

@@ -1,13 +1,19 @@
-import { z } from "zod";
+import z from "zod";
 
 import { InvocationStatus } from "@/gen/functions/v1/invocations_pb";
 
-import { InvocationsTimeframe } from "@/pages/invocations/types";
+import { InvocationsTimeframe } from "@/components/invocations/types";
+
+import { FunctionWorkbenchFile } from "@/pages/functions/workbench/types";
 import { ObservabilityTrafficFill } from "@/pages/observability/types";
 
-import { listSearchParamsSchema } from "@/api/utils";
-
 import { Flow } from "@/module/types";
+
+export const listSearchParamsSchema = z.object({
+  q: z.string().optional().catch(undefined),
+});
+
+export type ListSearchParams = z.infer<typeof listSearchParamsSchema>;
 
 export const alchemyLayoutSearchSchema = z.object({
   flow: z.enum(Flow).optional().catch(undefined),
@@ -26,7 +32,7 @@ export type ObservabilitySearch = z.infer<typeof observabilitySearchSchema>;
 
 export const functionsSearchSchema = listSearchParamsSchema;
 
-export type FunctionsSearch = z.infer<typeof functionsSearchSchema>;
+export const functionParamsSchema = z.object({ id: z.string() });
 
 export const functionSearchSchema = z.object({
   version: z.coerce.bigint().positive().optional().catch(undefined),
@@ -34,16 +40,15 @@ export const functionSearchSchema = z.object({
 
 export type FunctionSearch = z.infer<typeof functionSearchSchema>;
 
-export const functionInvocationsSearchSchema = z.object({
-  timeframe: z.enum(InvocationsTimeframe).optional().catch(undefined),
-  statuses: z.array(z.enum(InvocationStatus)).optional().catch(undefined),
-});
-
-export type FunctionInvocationsSearch = z.infer<typeof functionInvocationsSearchSchema>;
-
-export const invocationsSearchSchema = listSearchParamsSchema.extend({
+export const invocationsSearchSchema = z.object({
   timeframe: z.enum(InvocationsTimeframe).optional().catch(undefined),
   statuses: z.array(z.enum(InvocationStatus)).optional().catch(undefined),
 });
 
 export type InvocationsSearch = z.infer<typeof invocationsSearchSchema>;
+
+export const functionWorkbenchSearchSchema = z.object({
+  file: z.enum(FunctionWorkbenchFile).optional().catch(undefined),
+});
+
+export type FunctionWorkbenchSearch = z.infer<typeof functionWorkbenchSearchSchema>;

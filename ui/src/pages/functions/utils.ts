@@ -1,9 +1,14 @@
-import type { JsonValue } from "@bufbuild/protobuf";
 import { Field, Schema } from "apache-arrow";
 
-import type { Function as AlchemyFunction, FunctionVersion } from "@/gen/functions/v1/functions_pb";
+import type { JsonValue } from "@galaxy-io/dls/json/JsonViewer";
 
-import { FUNCTION_NAME_PATTERN } from "@/pages/functions/constants";
+import type {
+  Function as AlchemyFunction,
+  FunctionSpec,
+  FunctionVersion,
+} from "@/gen/functions/v1/functions_pb";
+
+import { FUNCTION_NAME_PATTERN, FUNCTION_PROTOCOL_TO_TOKEN_MAP } from "@/pages/functions/constants";
 import type { FunctionArrowField } from "@/pages/functions/types";
 
 import {
@@ -12,30 +17,24 @@ import {
   formatArrowType,
   parseArrowType,
 } from "@/utils/arrow";
+import { isJsonObject, parseJson } from "@/utils/json";
 
-export const formatFunctionVersion = (version: FunctionVersion["version"]) => `Version ${version}`;
+export const getFunctionCurrentVersion = (
+  alchemyFunction: AlchemyFunction,
+): FunctionVersion | undefined =>
+  alchemyFunction.currentVersion?.id ? alchemyFunction.currentVersion : undefined;
 
-/** The version Invoke runs. The API sends an empty message rather than none before a build is ready. */
-export const getFunctionCurrentVersion = (fn: AlchemyFunction): FunctionVersion | undefined =>
-  fn.currentVersion?.id ? fn.currentVersion : undefined;
+export const getFunctionNameError = (name: string) => {
+  if (!name) return "Name is required";
+  return FUNCTION_NAME_PATTERN.test(name)
+    ? undefined
+    : "Use lowercase letters, digits and dashes, starting with a letter";
+};
 
-export const getFunctionNameError = (name: string): string | undefined =>
-  name === ""
-    ? "Name is required"
-    : FUNCTION_NAME_PATTERN.test(name)
-      ? undefined
-      : "Lowercase letters, digits and dashes, starting with a letter";
-
-export const getFunctionSchemaError = (text: string): string | undefined => {
-  try {
-    const value = JSON.parse(text) as JsonValue;
-    if (value === null || typeof value !== "object" || Array.isArray(value)) {
-      return "Enter a JSON Schema object";
-    }
-    return undefined;
-  } catch {
-    return "Enter valid JSON";
-  }
+export const getFunctionSchemaError = (text: string) => {
+  const { value, error } = parseJson(text);
+  if (error) return error;
+  return isJsonObject(value) ? undefined : "Enter a JSON Schema object";
 };
 
 export const decodeFunctionArrowFields = (bytes: Uint8Array): FunctionArrowField[] =>
@@ -45,8 +44,7 @@ export const decodeFunctionArrowFields = (bytes: Uint8Array): FunctionArrowField
     nullable: field.nullable,
   }));
 
-/** Throws on a type token `parseArrowType` does not know. */
-export const encodeFunctionArrowFields = (fields: FunctionArrowField[]): Uint8Array =>
+export const encodeFunctionArrowFields = (fields: FunctionArrowField[]) =>
   encodeArrowSchema(
     new Schema(
       fields.map(({ name, type, nullable }) => {
@@ -56,3 +54,15 @@ export const encodeFunctionArrowFields = (fields: FunctionArrowField[]): Uint8Ar
       }),
     ),
   );
+
+export const createFunctionSpecJson = (spec: FunctionSpec): JsonValue => ({
+  image: spec.image,
+  command: spec.command,
+  env: spec.env,
+  protocol: FUNCTION_PROTOCOL_TO_TOKEN_MAP[spec.protocol],
+  resources: {
+    vcpus: spec.resources?.vcpus ?? 0,
+    memoryMib: spec.resources?.memoryMib ?? 0,
+  },
+  timeoutMs: Number(spec.timeoutMs),
+});

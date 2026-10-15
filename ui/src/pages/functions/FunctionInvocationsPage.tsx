@@ -1,103 +1,59 @@
-import { useMemo } from "react";
+import { type FC, useMemo } from "react";
 
-import { create } from "@bufbuild/protobuf";
-import { ListMagnifyingGlassIcon, MagnifyingGlassIcon } from "@phosphor-icons/react";
-
-import Button, { ButtonVariant } from "@galaxy-io/dls/buttons/Button";
 import Divider from "@galaxy-io/dls/layout/Divider";
-import Flex, { AlignItems, FlexDirection } from "@galaxy-io/dls/layout/Flex";
+import Flex, { AlignItems, FlexDirection, JustifyContent } from "@galaxy-io/dls/layout/Flex";
+
+import { useInvocationsFilters } from "@/components/invocations/hooks/useInvocationsFilters";
+import InvocationsEmptyState from "@/components/invocations/InvocationsEmptyState";
+import InvocationsStatusFilter from "@/components/invocations/InvocationsStatusFilter";
+import InvocationsTimeframeToggle from "@/components/invocations/InvocationsTimeframeToggle";
+import InvocationsTable from "@/components/invocations/table/InvocationsTable";
+import { InvocationsTableVariant } from "@/components/invocations/table/types";
+
+import { useFunctionParams } from "@/module/hooks";
 
 import {
-  type Invocation,
-  type InvocationStatus,
-  ListInvocationsRequestSchema,
-} from "@/gen/functions/v1/invocations_pb";
+  createListInvocationsInput,
+  useSuspenseListInvocationsInfiniteQuery,
+} from "@/api/queries/invocations";
 
-import EmptyLayout from "@/layouts/EmptyLayout";
-
-import InvocationsStatusFilter from "@/pages/invocations/components/InvocationsStatusFilter";
-import InvocationsTimeframeToggle from "@/pages/invocations/components/InvocationsTimeframeToggle";
-import InvocationsTable from "@/pages/invocations/components/table/InvocationsTable";
-import { INVOCATIONS_DEFAULT_TIMEFRAME } from "@/pages/invocations/constants";
-import type { InvocationsTimeframe } from "@/pages/invocations/types";
-import { filterInvocations } from "@/pages/invocations/utils";
-
-import { useSuspenseListInvocationsQuery } from "@/api/queries/invocations";
-
-import {
-  useAlchemyLayoutSearch,
-  useAlchemySearchUpdate,
-  useFunctionInvocationsSearch,
-  useFunctionParams,
-} from "@/module/hooks";
-import type { AlchemyLayoutSearch, FunctionInvocationsSearch } from "@/module/schemas";
-
-const FunctionInvocationsPage = () => {
-  const updateSearch = useAlchemySearchUpdate<FunctionInvocationsSearch & AlchemyLayoutSearch>();
+const FunctionInvocationsPage: FC = () => {
   const { id } = useFunctionParams();
-  const { invocationId } = useAlchemyLayoutSearch();
-  const { timeframe = INVOCATIONS_DEFAULT_TIMEFRAME, statuses = [] } =
-    useFunctionInvocationsSearch();
+  const { timeframe, statuses, sinceMs, handleTimeframeChange, handleStatusesChange } =
+    useInvocationsFilters();
 
-  const { data } = useSuspenseListInvocationsQuery({
-    input: create(ListInvocationsRequestSchema, { functionIds: [id] }),
-  });
-  const invocations = useMemo(
-    () => filterInvocations(data.invocations, { timeframe, statuses }),
-    [data.invocations, timeframe, statuses],
-  );
-
-  const handleTimeframeChange = (nextTimeframe: InvocationsTimeframe) => {
-    void updateSearch(
-      (prev) => ({
-        ...prev,
-        timeframe: nextTimeframe === INVOCATIONS_DEFAULT_TIMEFRAME ? undefined : nextTimeframe,
-      }),
-      { replace: true },
-    );
-  };
-
-  const handleStatusesChange = (nextStatuses: InvocationStatus[]) => {
-    void updateSearch(
-      (prev) => ({ ...prev, statuses: nextStatuses.length ? nextStatuses : undefined }),
-      { replace: true },
-    );
-  };
-
-  const handleSelect = (invocation: Invocation) => {
-    void updateSearch((prev) => ({ ...prev, invocationId: invocation.id }));
-  };
+  const { data, hasNextPage, isFetchingNextPage, fetchNextPage } =
+    useSuspenseListInvocationsInfiniteQuery({
+      input: createListInvocationsInput({ functionId: id, statuses, sinceMs }),
+    });
+  const invocations = useMemo(() => data.pages.flatMap((page) => page.invocations), [data.pages]);
 
   return (
-    <Flex direction={FlexDirection.COLUMN} grow={1} minHeight={0}>
-      <Flex alignItems={AlignItems.CENTER} gap={8} padding={[8, 16]} shrink={0}>
+    <Flex direction={FlexDirection.COLUMN} grow={1} basis={0} minHeight={0} fillWidth>
+      <Flex
+        alignItems={AlignItems.CENTER}
+        justifyContent={JustifyContent.SPACE_BETWEEN}
+        gap={8}
+        padding={[8, 16]}
+        shrink={0}
+      >
         <InvocationsStatusFilter value={statuses} onChange={handleStatusesChange} />
-        <Flex grow={1} />
         <InvocationsTimeframeToggle value={timeframe} onChange={handleTimeframeChange} />
       </Flex>
       <Divider />
-      <Flex direction={FlexDirection.COLUMN} grow={1} minHeight={0}>
+      <Flex direction={FlexDirection.COLUMN} grow={1} basis={0} minHeight={0}>
         <InvocationsTable
           invocations={invocations}
-          hasFunctionColumn={false}
-          activeId={invocationId}
-          onSelect={handleSelect}
+          variant={InvocationsTableVariant.FUNCTION_SCOPED}
+          isLoading={isFetchingNextPage}
+          onEndReached={() => {
+            if (hasNextPage) fetchNextPage();
+          }}
           emptyState={
-            statuses.length > 0 ? (
-              <EmptyLayout
-                icon={MagnifyingGlassIcon}
-                header="No invocations match"
-                actions={
-                  <Button
-                    label="Clear filters"
-                    variant={ButtonVariant.SECONDARY}
-                    onClick={() => handleStatusesChange([])}
-                  />
-                }
-              />
-            ) : (
-              <EmptyLayout icon={ListMagnifyingGlassIcon} header="No invocations in this window" />
-            )
+            <InvocationsEmptyState
+              hasFilters={statuses.length > 0}
+              onClear={() => handleStatusesChange([])}
+            />
           }
         />
       </Flex>

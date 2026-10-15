@@ -1,182 +1,117 @@
 import type { JsonObject } from "@bufbuild/protobuf";
-import { CheckIcon, HammerIcon, type Icon as PhosphorIcon } from "@phosphor-icons/react";
-
-import { InvocationProtocol } from "@/gen/functions/v1/common_pb";
+import { HammerIcon, type Icon, PlusIcon } from "@phosphor-icons/react";
 
 import {
   type CreateFunctionModalArrowField,
-  CreateFunctionModalContractSide,
   CreateFunctionModalMode,
   type CreateFunctionModalState,
   CreateFunctionModalStep,
 } from "@/pages/functions/components/create/types";
 import type { FunctionContractKind } from "@/pages/functions/types";
+import { FunctionContractSide } from "@/pages/functions/types";
 
 import { formatJson } from "@/utils/json";
 
-export const CREATE_FUNCTION_MODAL_SIDEBAR_WIDTH = 232;
+export const CREATE_FUNCTION_MODAL_SIDEBAR_WIDTH = 240;
 export const CREATE_FUNCTION_MODAL_RESOURCES_MAX_WIDTH = 560;
-export const CREATE_FUNCTION_MODAL_REVIEW_MAX_WIDTH = 640;
-export const CREATE_FUNCTION_MODAL_ARROW_TYPE_WIDTH = 200;
+export const CREATE_FUNCTION_MODAL_ARROW_TYPE_WIDTH = 180;
+export const CREATE_FUNCTION_MODAL_DESCRIPTION_MIN_ROWS = 12;
 
 export const CREATE_FUNCTION_MODAL_MODE_TO_STEP_ORDER_MAP: Record<
   CreateFunctionModalMode,
   CreateFunctionModalStep[]
 > = {
   [CreateFunctionModalMode.FUNCTION]: [
-    CreateFunctionModalStep.DETAILS,
     CreateFunctionModalStep.RUNTIME,
     CreateFunctionModalStep.CONTRACT,
     CreateFunctionModalStep.RESOURCES,
-    CreateFunctionModalStep.REVIEW,
+    CreateFunctionModalStep.DETAILS,
   ],
   [CreateFunctionModalMode.VERSION]: [
     CreateFunctionModalStep.RUNTIME,
     CreateFunctionModalStep.CONTRACT,
     CreateFunctionModalStep.RESOURCES,
-    CreateFunctionModalStep.REVIEW,
   ],
 };
 
 export const CREATE_FUNCTION_MODAL_STEP_TO_TITLE_MAP: Record<CreateFunctionModalStep, string> = {
-  [CreateFunctionModalStep.DETAILS]: "Basics",
-  [CreateFunctionModalStep.RUNTIME]: "Runtime",
-  [CreateFunctionModalStep.CONTRACT]: "Contract",
-  [CreateFunctionModalStep.RESOURCES]: "Resources",
-  [CreateFunctionModalStep.REVIEW]: "Review",
+  [CreateFunctionModalStep.RUNTIME]: "Choose image",
+  [CreateFunctionModalStep.CONTRACT]: "Define contract",
+  [CreateFunctionModalStep.RESOURCES]: "Set resources",
+  [CreateFunctionModalStep.DETAILS]: "Name image",
 };
 
 export const CREATE_FUNCTION_MODAL_STEP_TO_DESCRIPTION_MAP: Record<
   CreateFunctionModalStep,
   string
 > = {
+  [CreateFunctionModalStep.RUNTIME]:
+    "Point at the OCI image to run, and override its command or environment if you need to.",
+  [CreateFunctionModalStep.CONTRACT]:
+    "Describe what the image takes and returns. Every invocation is checked against it.",
+  [CreateFunctionModalStep.RESOURCES]: "Size the microVM each invocation runs in.",
   [CreateFunctionModalStep.DETAILS]:
-    "The handle callers invoke. Everything else lives on versions.",
-  [CreateFunctionModalStep.RUNTIME]: "The image to boot and how the supervisor talks to it.",
-  [CreateFunctionModalStep.CONTRACT]: "Input and output are checked against this on every call.",
-  [CreateFunctionModalStep.RESOURCES]: "The microVM's size and the run-time limit.",
-  [CreateFunctionModalStep.REVIEW]: "What will be built.",
+    "Name your image and add an optional description so your team knows what it does.",
 };
 
 export const CREATE_FUNCTION_MODAL_STEP_TO_HINT_MAP: Record<CreateFunctionModalStep, string> = {
-  [CreateFunctionModalStep.DETAILS]: "Enter a name",
   [CreateFunctionModalStep.RUNTIME]: "Choose an image",
   [CreateFunctionModalStep.CONTRACT]: "Fix the schemas",
   [CreateFunctionModalStep.RESOURCES]: "Fix the limits",
-  [CreateFunctionModalStep.REVIEW]: "",
+  [CreateFunctionModalStep.DETAILS]: "Enter a valid image name",
 };
 
-export const CREATE_FUNCTION_MODAL_STEP_TO_PADDING_MAP: Record<CreateFunctionModalStep, 0 | 16> = {
-  [CreateFunctionModalStep.DETAILS]: 16,
-  [CreateFunctionModalStep.RUNTIME]: 16,
-  [CreateFunctionModalStep.CONTRACT]: 0,
-  [CreateFunctionModalStep.RESOURCES]: 16,
-  [CreateFunctionModalStep.REVIEW]: 16,
+export const CREATE_FUNCTION_MODAL_STEP_TO_IS_PADDED_MAP: Record<CreateFunctionModalStep, boolean> =
+  {
+    [CreateFunctionModalStep.RUNTIME]: true,
+    [CreateFunctionModalStep.CONTRACT]: false,
+    [CreateFunctionModalStep.RESOURCES]: true,
+    [CreateFunctionModalStep.DETAILS]: true,
+  };
+
+export const CREATE_FUNCTION_MODAL_MODE_TO_HEADER_MAP: Record<CreateFunctionModalMode, string> = {
+  [CreateFunctionModalMode.FUNCTION]: "New image",
+  [CreateFunctionModalMode.VERSION]: "New version",
 };
 
 export const CREATE_FUNCTION_MODAL_MODE_TO_SUBMIT_LABEL_MAP: Record<
   CreateFunctionModalMode,
   string
 > = {
-  [CreateFunctionModalMode.FUNCTION]: "Create function",
+  [CreateFunctionModalMode.FUNCTION]: "Create image",
   [CreateFunctionModalMode.VERSION]: "Build version",
 };
 
-export const CREATE_FUNCTION_MODAL_MODE_TO_SUBMIT_ICON_MAP: Record<
-  CreateFunctionModalMode,
-  PhosphorIcon
-> = {
-  [CreateFunctionModalMode.FUNCTION]: CheckIcon,
-  [CreateFunctionModalMode.VERSION]: HammerIcon,
-};
-
-export const CREATE_FUNCTION_MODAL_MODE_TO_REVIEW_HEADER_MAP: Record<
-  CreateFunctionModalMode,
-  string
-> = {
-  [CreateFunctionModalMode.FUNCTION]: "Version 1 starts building",
-  [CreateFunctionModalMode.VERSION]: "A new version starts building",
-};
-
-export const CREATE_FUNCTION_MODAL_MODE_TO_REVIEW_DESCRIPTION_MAP: Record<
-  CreateFunctionModalMode,
-  string
-> = {
-  [CreateFunctionModalMode.FUNCTION]: "The image is invokable once the build is ready.",
-  [CreateFunctionModalMode.VERSION]: "It becomes current once the build is ready.",
-};
+export const CREATE_FUNCTION_MODAL_MODE_TO_SUBMIT_ICON_MAP: Record<CreateFunctionModalMode, Icon> =
+  {
+    [CreateFunctionModalMode.FUNCTION]: PlusIcon,
+    [CreateFunctionModalMode.VERSION]: HammerIcon,
+  };
 
 export const CREATE_FUNCTION_MODAL_CONTRACT_SIDE_TO_LABEL_MAP: Record<
-  CreateFunctionModalContractSide,
+  FunctionContractSide,
   string
 > = {
-  [CreateFunctionModalContractSide.INPUT]: "Input",
-  [CreateFunctionModalContractSide.OUTPUT]: "Output",
+  [FunctionContractSide.INPUT]: "Input",
+  [FunctionContractSide.OUTPUT]: "Output",
 };
 
-export const CREATE_FUNCTION_MODAL_CONTRACT_SIDES = Object.values(CreateFunctionModalContractSide);
+export const CREATE_FUNCTION_MODAL_CONTRACT_SIDES = Object.values(FunctionContractSide);
 
 export const CREATE_FUNCTION_MODAL_CONTRACT_KINDS: FunctionContractKind[] = ["jsonSchema", "arrow"];
-
-export const CREATE_FUNCTION_MODAL_PROTOCOLS = Object.values(InvocationProtocol).filter(
-  (protocol): protocol is InvocationProtocol =>
-    typeof protocol === "number" && protocol !== InvocationProtocol.UNSPECIFIED,
-);
 
 export const CREATE_FUNCTION_MODAL_IMAGE_PATTERN =
   /^[a-z0-9.\-_/]+(:[\w.-]+)?(@sha256:[a-f0-9]{64})?$/;
 
 export const CREATE_FUNCTION_MODAL_VCPUS_MIN = 1;
-export const CREATE_FUNCTION_MODAL_VCPUS_MAX = 16;
-export const CREATE_FUNCTION_MODAL_VCPUS_SLIDER_MAX = 8;
+export const CREATE_FUNCTION_MODAL_VCPUS_MAX = 8;
 export const CREATE_FUNCTION_MODAL_VCPUS_MARKS = [1, 2, 4, 8];
 export const CREATE_FUNCTION_MODAL_MEMORY_MIB_MIN = 64;
-export const CREATE_FUNCTION_MODAL_MEMORY_MIB_MAX = 16384;
-export const CREATE_FUNCTION_MODAL_MEMORY_MIB_SLIDER_MAX = 8192;
+export const CREATE_FUNCTION_MODAL_MEMORY_MIB_MAX = 8192;
 export const CREATE_FUNCTION_MODAL_MEMORY_MIB_STEP = 64;
 export const CREATE_FUNCTION_MODAL_MEMORY_MIB_MARKS = [64, 2048, 4096, 8192];
 export const CREATE_FUNCTION_MODAL_TIMEOUT_MIN_MS = 1_000;
-export const CREATE_FUNCTION_MODAL_TIMEOUT_MAX_MS = 900_000;
-
-export const CREATE_FUNCTION_MODAL_DEFAULT_RESOURCES = { vcpus: 1, memoryMib: 256 };
-export const CREATE_FUNCTION_MODAL_DEFAULT_TIMEOUT_MS = 30_000;
-
-export const CREATE_FUNCTION_MODAL_DEFAULT_CONTRACT: Record<
-  CreateFunctionModalContractSide,
-  JsonObject
-> = {
-  [CreateFunctionModalContractSide.INPUT]: {
-    $schema: "https://json-schema.org/draft/2020-12/schema",
-    type: "object",
-    properties: {
-      text: { type: "string", description: "The text to transform." },
-    },
-    required: ["text"],
-    additionalProperties: false,
-  },
-  [CreateFunctionModalContractSide.OUTPUT]: {
-    $schema: "https://json-schema.org/draft/2020-12/schema",
-    type: "object",
-    properties: {
-      text: { type: "string" },
-      length: { type: "integer", minimum: 0 },
-    },
-    required: ["text", "length"],
-    additionalProperties: false,
-  },
-};
-
-export const CREATE_FUNCTION_MODAL_DEFAULT_ARROW_FIELDS: Record<
-  CreateFunctionModalContractSide,
-  CreateFunctionModalArrowField[]
-> = {
-  [CreateFunctionModalContractSide.INPUT]: [
-    { id: "in_id", name: "id", type: "utf8", nullable: false },
-  ],
-  [CreateFunctionModalContractSide.OUTPUT]: [
-    { id: "out_id", name: "id", type: "utf8", nullable: false },
-  ],
-};
+export const CREATE_FUNCTION_MODAL_TIMEOUT_MAX_MS = 300_000;
 
 export const CREATE_FUNCTION_MODAL_DEFAULT_ARROW_TYPE = "utf8";
 
@@ -194,29 +129,34 @@ export const CREATE_FUNCTION_MODAL_ARROW_TYPES = [
   "fixed_size_list<float32>[384]",
 ];
 
+const CREATE_FUNCTION_MODAL_DEFAULT_SCHEMA: JsonObject = { type: "object" };
+
+const CREATE_FUNCTION_MODAL_DEFAULT_ARROW_FIELDS: Record<
+  FunctionContractSide,
+  CreateFunctionModalArrowField[]
+> = {
+  [FunctionContractSide.INPUT]: [{ id: "in_id", name: "id", type: "utf8", nullable: false }],
+  [FunctionContractSide.OUTPUT]: [{ id: "out_id", name: "id", type: "utf8", nullable: false }],
+};
+
 export const CREATE_FUNCTION_MODAL_DEFAULT_STATE: CreateFunctionModalState = {
   mode: CreateFunctionModalMode.FUNCTION,
-  functionId: null,
-  step: CreateFunctionModalStep.DETAILS,
+  functionId: undefined,
+  step: CreateFunctionModalStep.RUNTIME,
   name: "",
   isNameTouched: false,
   description: "",
   image: "",
   command: [],
   env: [],
-  protocol: InvocationProtocol.EXEC,
   contractKind: "jsonSchema",
   schemaTexts: {
-    [CreateFunctionModalContractSide.INPUT]: formatJson(
-      CREATE_FUNCTION_MODAL_DEFAULT_CONTRACT[CreateFunctionModalContractSide.INPUT],
-    ),
-    [CreateFunctionModalContractSide.OUTPUT]: formatJson(
-      CREATE_FUNCTION_MODAL_DEFAULT_CONTRACT[CreateFunctionModalContractSide.OUTPUT],
-    ),
+    [FunctionContractSide.INPUT]: formatJson(CREATE_FUNCTION_MODAL_DEFAULT_SCHEMA),
+    [FunctionContractSide.OUTPUT]: formatJson(CREATE_FUNCTION_MODAL_DEFAULT_SCHEMA),
   },
   arrowFields: CREATE_FUNCTION_MODAL_DEFAULT_ARROW_FIELDS,
-  vcpus: CREATE_FUNCTION_MODAL_DEFAULT_RESOURCES.vcpus,
-  memoryMib: CREATE_FUNCTION_MODAL_DEFAULT_RESOURCES.memoryMib,
-  timeoutMs: CREATE_FUNCTION_MODAL_DEFAULT_TIMEOUT_MS,
+  vcpus: 1,
+  memoryMib: 256,
+  timeoutMs: 30_000,
   isSubmitting: false,
 };
