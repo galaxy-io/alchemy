@@ -1,67 +1,73 @@
-import { Code, ConnectError } from "@connectrpc/connect";
-import { BugIcon } from "@phosphor-icons/react";
-import type { ErrorComponentProps } from "@tanstack/react-router";
+import type { FC } from "react";
 
-import ErrorLayout from "@/layouts/ErrorLayout";
+import type { ErrorComponentProps } from "@tanstack/react-router";
 
 import FunctionNotFoundPage from "@/pages/functions/FunctionNotFoundPage";
 
+import AlchemyErrorComponent from "@/module/AlchemyErrorComponent";
+import AlchemyFunctionErrorComponent from "@/module/AlchemyFunctionErrorComponent";
+import AlchemyPendingComponent from "@/module/AlchemyPendingComponent";
 import {
   alchemyLayoutSearchSchema,
-  functionInvocationsSearchSchema,
   functionSearchSchema,
   functionsSearchSchema,
+  functionWorkbenchSearchSchema,
   invocationsSearchSchema,
   observabilitySearchSchema,
 } from "@/module/schemas";
 
-/*
- * Route contents without paths or components. A host decides where each screen lives and writes
- * one file route per bundle, adding the page it imports so the router plugin can code-split it:
- * `createFileRoute("/_app/_main/_alchemy/images/$id")({ ...functionRoute, component: FunctionPage })`.
- * The layout bundle (`AlchemyLayout`) must wrap every other bundle: it validates the overlay params
- * and marks the module's base.
- */
+interface AlchemyRouteComponents {
+  errorComponent: FC<ErrorComponentProps>;
+  pendingComponent: FC;
+}
 
-export const AlchemyErrorComponent = ({ error }: Pick<ErrorComponentProps, "error">) => (
-  <ErrorLayout
-    icon={BugIcon}
-    header="Looks like there was a glitch in the matrix"
-    description="Please try again later"
-    error={error instanceof Error ? error : undefined}
-  />
-);
+const createAlchemyRouteOptions = <TOptions extends object>(
+  options: TOptions,
+): AlchemyRouteComponents & TOptions => ({
+  errorComponent: AlchemyErrorComponent,
+  pendingComponent: AlchemyPendingComponent,
+  ...options,
+});
 
-const FunctionErrorComponent = ({ error }: ErrorComponentProps) =>
-  error instanceof ConnectError && error.code === Code.NotFound ? (
-    <FunctionNotFoundPage />
-  ) : (
-    <AlchemyErrorComponent error={error} />
-  );
-
-export const alchemyLayoutRoute = {
+export const alchemyLayoutRouteOptions = createAlchemyRouteOptions({
   validateSearch: alchemyLayoutSearchSchema,
   staticData: { alchemy: true },
-};
+});
 
-export const observabilityRoute = {
+export const alchemyNotFoundRouteOptions = createAlchemyRouteOptions({});
+
+export const observabilityRouteOptions = createAlchemyRouteOptions({
   validateSearch: observabilitySearchSchema,
-};
+});
 
-export const functionsRoute = {
+export const functionsRouteOptions = createAlchemyRouteOptions({
   validateSearch: functionsSearchSchema,
-};
+});
 
-export const functionRoute = {
+export const functionRouteOptions = createAlchemyRouteOptions({
   validateSearch: functionSearchSchema,
-  errorComponent: FunctionErrorComponent,
+  errorComponent: AlchemyFunctionErrorComponent,
   notFoundComponent: FunctionNotFoundPage,
-};
+});
 
-export const functionInvocationsRoute = {
-  validateSearch: functionInvocationsSearchSchema,
-};
+export const functionOverviewRouteOptions = createAlchemyRouteOptions({});
 
-export const invocationsRoute = {
+export const functionWorkbenchRouteOptions = createAlchemyRouteOptions({
+  validateSearch: functionWorkbenchSearchSchema,
+});
+
+export const functionContractRouteOptions = createAlchemyRouteOptions({});
+
+export const functionVersionsRouteOptions = createAlchemyRouteOptions({});
+
+export const functionInvocationsRouteOptions = createAlchemyRouteOptions({
   validateSearch: invocationsSearchSchema,
-};
+});
+
+export const functionSettingsRouteOptions = createAlchemyRouteOptions({});
+
+export const hostsRouteOptions = createAlchemyRouteOptions({});
+
+export const invocationsRouteOptions = createAlchemyRouteOptions({
+  validateSearch: invocationsSearchSchema,
+});

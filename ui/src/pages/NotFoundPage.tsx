@@ -1,34 +1,28 @@
-import { CompassIcon } from "@phosphor-icons/react";
+import type { FC } from "react";
 
-import Button, { ButtonVariant } from "@galaxy-io/dls/buttons/Button";
-import EmptyState, { EmptyStateSize } from "@galaxy-io/dls/feedback/EmptyState";
-import Flex, { JustifyContent } from "@galaxy-io/dls/layout/Flex";
+import { ArrowLeftIcon, ImageBrokenIcon } from "@phosphor-icons/react";
+
+import Button from "@galaxy-io/dls/buttons/Button";
+import ErrorLayout from "@galaxy-io/dls/layout/ErrorLayout";
 
 import RouterLink from "@/components/RouterLink";
 
-import PageLayout from "@/layouts/page/PageLayout";
+import { AlchemyPath, createAlchemyHref } from "@/module/paths";
 
-const NotFoundPage = () => {
-  return (
-    <PageLayout title="Not found">
-      <Flex padding={48} grow={1} justifyContent={JustifyContent.CENTER}>
-        <EmptyState
-          size={EmptyStateSize.LARGE}
-          icon={CompassIcon}
-          header="There is nothing here"
-          description="The page may have moved, or the link is wrong."
-          actions={
-            <Button
-              label="Go to overview"
-              variant={ButtonVariant.SECONDARY}
-              href="/observability"
-              as={RouterLink}
-            />
-          }
-        />
-      </Flex>
-    </PageLayout>
-  );
-};
+const NotFoundPage: FC = () => (
+  <ErrorLayout
+    icon={ImageBrokenIcon}
+    header="Page not found"
+    description="The page you are looking for does not exist"
+    actions={
+      <Button
+        label="Go back to app"
+        icon={ArrowLeftIcon}
+        href={createAlchemyHref(AlchemyPath.OBSERVABILITY)}
+        as={RouterLink}
+      />
+    }
+  />
+);
 
 export default NotFoundPage;

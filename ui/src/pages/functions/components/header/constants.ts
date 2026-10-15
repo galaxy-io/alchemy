@@ -1,5 +1,7 @@
 import { FunctionPageTab } from "@/pages/functions/components/header/types";
 
+import { AlchemyPath } from "@/module/paths";
+
 export const FUNCTION_PAGE_VERSION_SELECT_WIDTH = 120;
 export const FUNCTION_PAGE_TABS_INSET = 16;
 
@@ -21,12 +23,11 @@ export const FUNCTION_PAGE_TAB_TO_LABEL_MAP: Record<FunctionPageTab, string> = {
   [FunctionPageTab.SETTINGS]: "Settings",
 };
 
-// Relative to the module base; `RouterLink` and `useAlchemyMatchRoute` resolve them.
-export const FUNCTION_PAGE_TAB_TO_ROUTE_MAP: Record<FunctionPageTab, string> = {
-  [FunctionPageTab.OVERVIEW]: "./images/$id",
-  [FunctionPageTab.WORKBENCH]: "./images/$id/workbench",
-  [FunctionPageTab.CONTRACT]: "./images/$id/contract",
-  [FunctionPageTab.VERSIONS]: "./images/$id/versions",
-  [FunctionPageTab.INVOCATIONS]: "./images/$id/invocations",
-  [FunctionPageTab.SETTINGS]: "./images/$id/settings",
+export const FUNCTION_PAGE_TAB_TO_PATH_MAP: Record<FunctionPageTab, AlchemyPath> = {
+  [FunctionPageTab.OVERVIEW]: AlchemyPath.FUNCTION,
+  [FunctionPageTab.WORKBENCH]: AlchemyPath.FUNCTION_WORKBENCH,
+  [FunctionPageTab.CONTRACT]: AlchemyPath.FUNCTION_CONTRACT,
+  [FunctionPageTab.VERSIONS]: AlchemyPath.FUNCTION_VERSIONS,
+  [FunctionPageTab.INVOCATIONS]: AlchemyPath.FUNCTION_INVOCATIONS,
+  [FunctionPageTab.SETTINGS]: AlchemyPath.FUNCTION_SETTINGS,
 };

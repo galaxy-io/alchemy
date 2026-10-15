@@ -19,6 +19,7 @@ import (
 	"github.com/galaxy-io/alchemy/datastore/postgres"
 	"github.com/galaxy-io/alchemy/internal/bus"
 	"github.com/galaxy-io/alchemy/internal/server"
+	"github.com/galaxy-io/alchemy/ui"
 )
 
 func main() {
@@ -67,6 +68,7 @@ func run(log *slog.Logger) error {
 	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusNoContent)
 	})
+	mux.Handle("/", ui.Handler())
 
 	// Unencrypted HTTP/2 lets gRPC clients connect without TLS.
 	protocols := new(http.Protocols)

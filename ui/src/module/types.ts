@@ -8,3 +8,10 @@ declare module "@tanstack/react-router" {
     alchemy?: boolean;
   }
 }
+
+export enum AlchemyNavItem {
+  OBSERVABILITY = "OBSERVABILITY",
+  IMAGES = "IMAGES",
+  HOSTS = "HOSTS",
+  INVOCATIONS = "INVOCATIONS",
+}

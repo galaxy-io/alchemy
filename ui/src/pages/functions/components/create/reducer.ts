@@ -11,7 +11,6 @@ import {
   type SetImageAction,
   type SetMemoryMibAction,
   type SetNameAction,
-  type SetProtocolAction,
   type SetSchemaTextAction,
   type SetSubmittingAction,
   type SetTimeoutMsAction,
@@ -37,13 +36,6 @@ function setImage(
   action: SetImageAction,
 ): CreateFunctionModalState {
   return { ...state, image: action.payload };
-}
-
-function setProtocol(
-  state: CreateFunctionModalState,
-  action: SetProtocolAction,
-): CreateFunctionModalState {
-  return { ...state, protocol: action.payload };
 }
 
 function setCommand(
@@ -175,8 +167,6 @@ const createFunctionModalReducer = (
       return setDescription(state, action);
     case CreateFunctionModalActionType.SET_IMAGE:
       return setImage(state, action);
-    case CreateFunctionModalActionType.SET_PROTOCOL:
-      return setProtocol(state, action);
     case CreateFunctionModalActionType.SET_COMMAND:
       return setCommand(state, action);
     case CreateFunctionModalActionType.SET_ENV:

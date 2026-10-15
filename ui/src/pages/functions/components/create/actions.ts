@@ -1,18 +1,14 @@
-import type { InvocationProtocol } from "@/gen/functions/v1/common_pb";
-
 import type {
   CreateFunctionModalArrowField,
-  CreateFunctionModalContractSide,
   CreateFunctionModalState,
   CreateFunctionModalStep,
 } from "@/pages/functions/components/create/types";
-import type { FunctionContractKind } from "@/pages/functions/types";
+import type { FunctionContractKind, FunctionContractSide } from "@/pages/functions/types";
 
 export enum CreateFunctionModalActionType {
   SET_NAME = "SET_NAME",
   SET_DESCRIPTION = "SET_DESCRIPTION",
   SET_IMAGE = "SET_IMAGE",
-  SET_PROTOCOL = "SET_PROTOCOL",
   SET_COMMAND = "SET_COMMAND",
   SET_ENV = "SET_ENV",
   SET_CONTRACT_KIND = "SET_CONTRACT_KIND",
@@ -44,11 +40,6 @@ export interface SetImageAction {
   payload: CreateFunctionModalState["image"];
 }
 
-export interface SetProtocolAction {
-  type: CreateFunctionModalActionType.SET_PROTOCOL;
-  payload: InvocationProtocol;
-}
-
 export interface SetCommandAction {
   type: CreateFunctionModalActionType.SET_COMMAND;
   payload: CreateFunctionModalState["command"];
@@ -66,18 +57,18 @@ export interface SetContractKindAction {
 
 export interface SetSchemaTextAction {
   type: CreateFunctionModalActionType.SET_SCHEMA_TEXT;
-  payload: { side: CreateFunctionModalContractSide; text: string };
+  payload: { side: FunctionContractSide; text: string };
 }
 
 export interface AddArrowFieldAction {
   type: CreateFunctionModalActionType.ADD_ARROW_FIELD;
-  payload: { side: CreateFunctionModalContractSide; field: CreateFunctionModalArrowField };
+  payload: { side: FunctionContractSide; field: CreateFunctionModalArrowField };
 }
 
 export interface UpdateArrowFieldAction {
   type: CreateFunctionModalActionType.UPDATE_ARROW_FIELD;
   payload: {
-    side: CreateFunctionModalContractSide;
+    side: FunctionContractSide;
     id: CreateFunctionModalArrowField["id"];
     partial: Partial<CreateFunctionModalArrowField>;
   };
@@ -85,7 +76,7 @@ export interface UpdateArrowFieldAction {
 
 export interface RemoveArrowFieldAction {
   type: CreateFunctionModalActionType.REMOVE_ARROW_FIELD;
-  payload: { side: CreateFunctionModalContractSide; id: CreateFunctionModalArrowField["id"] };
+  payload: { side: FunctionContractSide; id: CreateFunctionModalArrowField["id"] };
 }
 
 export interface SetVcpusAction {
@@ -125,7 +116,6 @@ export type CreateFunctionModalAction =
   | SetNameAction
   | SetDescriptionAction
   | SetImageAction
-  | SetProtocolAction
   | SetCommandAction
   | SetEnvAction
   | SetContractKindAction

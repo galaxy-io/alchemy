@@ -1,4 +1,4 @@
-import type { PropsWithChildren, ReactNode } from "react";
+import type { FC, PropsWithChildren, ReactNode } from "react";
 
 import Divider from "@galaxy-io/dls/layout/Divider";
 import Flex, {
@@ -19,13 +19,13 @@ interface FunctionContractIslandProps {
   actions?: ReactNode;
 }
 
-const FunctionContractIsland = ({
+const FunctionContractIsland: FC<PropsWithChildren<FunctionContractIslandProps>> = ({
   label,
   caption,
   error,
   actions,
   children,
-}: PropsWithChildren<FunctionContractIslandProps>) => (
+}) => (
   <Flex
     direction={FlexDirection.COLUMN}
     grow={1}
