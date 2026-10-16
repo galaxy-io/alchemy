@@ -127,8 +127,8 @@ lint mode="fix": (go-lint mode) (ui-lint mode)
 # gofumpt + goimports across every Go module (settings in .golangci.yaml)
 go-format mode="fix": (_each ("GOWORK=off golangci-lint fmt " + (if mode == "check" { "--diff " } else { "" }) + "./..."))
 
-# Go linters across every Go module
-go-lint mode="fix": (_each ("GOWORK=off golangci-lint run " + (if mode == "check" { "" } else { "--fix " }) + "./..."))
+# Go linters across every Go module, once per GOOS so platform-specific files are checked everywhere
+go-lint mode="fix": (_each ("for goos in linux darwin; do GOOS=$goos GOWORK=off golangci-lint run " + (if mode == "check" { "" } else { "--fix " }) + "./... || exit 1; done"))
 
 # Biome formatting for the UI package
 ui-format mode="fix":

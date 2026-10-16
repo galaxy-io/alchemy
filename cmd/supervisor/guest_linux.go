@@ -24,7 +24,7 @@ func initGuest() error {
 		{"tmpfs", "/run", "tmpfs", unix.MS_NOSUID | unix.MS_NODEV, "mode=755"},
 	}
 	for _, m := range mounts {
-		if err := os.MkdirAll(m.target, 0o755); err != nil && !os.IsExist(err) {
+		if err := os.MkdirAll(m.target, 0o755); err != nil && !os.IsExist(err) { //nolint:gosec // system mount points every guest user traverses
 			// A read-only root cannot grow new directories; the builder is
 			// expected to have created them.
 			return fmt.Errorf("%s: %w", m.target, err)
