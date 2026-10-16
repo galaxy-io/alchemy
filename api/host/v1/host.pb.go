@@ -806,8 +806,12 @@ func (x *ListInstancesResponse) GetInstances() []*v1.Instance {
 
 // Heartbeat is published by every host on its own subject.
 type Heartbeat struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Host          *v1.Host               `protobuf:"bytes,1,opt,name=host,proto3" json:"host,omitempty"`
+	state protoimpl.MessageState `protogen:"open.v1"`
+	Host  *v1.Host               `protobuf:"bytes,1,opt,name=host,proto3" json:"host,omitempty"`
+	// artifact_ids are the artifacts the host is taking invocations for. The
+	// server builds the current version of every function on any host that
+	// lacks it.
+	ArtifactIds   []string `protobuf:"bytes,2,rep,name=artifact_ids,json=artifactIds,proto3" json:"artifact_ids,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -845,6 +849,13 @@ func (*Heartbeat) Descriptor() ([]byte, []int) {
 func (x *Heartbeat) GetHost() *v1.Host {
 	if x != nil {
 		return x.Host
+	}
+	return nil
+}
+
+func (x *Heartbeat) GetArtifactIds() []string {
+	if x != nil {
+		return x.ArtifactIds
 	}
 	return nil
 }
@@ -916,9 +927,10 @@ const file_host_v1_host_proto_rawDesc = "" +
 	"\x04host\x18\x01 \x01(\v2\x12.functions.v1.HostR\x04host\"\x16\n" +
 	"\x14ListInstancesRequest\"M\n" +
 	"\x15ListInstancesResponse\x124\n" +
-	"\tinstances\x18\x01 \x03(\v2\x16.functions.v1.InstanceR\tinstances\"3\n" +
+	"\tinstances\x18\x01 \x03(\v2\x16.functions.v1.InstanceR\tinstances\"V\n" +
 	"\tHeartbeat\x12&\n" +
-	"\x04host\x18\x01 \x01(\v2\x12.functions.v1.HostR\x04hostB\x86\x01\n" +
+	"\x04host\x18\x01 \x01(\v2\x12.functions.v1.HostR\x04host\x12!\n" +
+	"\fartifact_ids\x18\x02 \x03(\tR\vartifactIdsB\x86\x01\n" +
 	"\vcom.host.v1B\tHostProtoP\x01Z/github.com/galaxy-io/alchemy/api/host/v1;hostv1\xa2\x02\x03HXX\xaa\x02\aHost.V1\xca\x02\aHost\\V1\xe2\x02\x13Host\\V1\\GPBMetadata\xea\x02\bHost::V1b\x06proto3"
 
 var (

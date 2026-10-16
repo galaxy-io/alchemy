@@ -258,6 +258,49 @@ func (q *Queries) ListBuildingFunctionVersions(ctx context.Context) ([]*Function
 	return items, nil
 }
 
+const listCurrentFunctionVersions = `-- name: ListCurrentFunctionVersions :many
+SELECT DISTINCT ON (function_id) id, tenant_id, function_id, version, spec, status, status_message, image_digest, rootfs_bytes, artifact_id, artifact, build_log, build_started_at, build_ended_at, created_by_user_id, created_at FROM function_versions
+WHERE status = 'ready'
+ORDER BY function_id, version DESC
+`
+
+func (q *Queries) ListCurrentFunctionVersions(ctx context.Context) ([]*FunctionVersion, error) {
+	rows, err := q.db.Query(ctx, listCurrentFunctionVersions)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []*FunctionVersion
+	for rows.Next() {
+		var i FunctionVersion
+		if err := rows.Scan(
+			&i.ID,
+			&i.TenantID,
+			&i.FunctionID,
+			&i.Version,
+			&i.Spec,
+			&i.Status,
+			&i.StatusMessage,
+			&i.ImageDigest,
+			&i.RootfsBytes,
+			&i.ArtifactID,
+			&i.Artifact,
+			&i.BuildLog,
+			&i.BuildStartedAt,
+			&i.BuildEndedAt,
+			&i.CreatedByUserID,
+			&i.CreatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, &i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listFunctionVersions = `-- name: ListFunctionVersions :many
 SELECT id, tenant_id, function_id, version, spec, status, status_message, image_digest, rootfs_bytes, artifact_id, artifact, build_log, build_started_at, build_ended_at, created_by_user_id, created_at FROM function_versions
 WHERE function_id = $1

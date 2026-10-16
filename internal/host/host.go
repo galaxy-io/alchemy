@@ -117,6 +117,8 @@ func (h *Host) Run(ctx context.Context) error {
 	}{
 		// Every host builds every artifact, so any of them can serve it.
 		{bus.BuildSubject, "", h.handleBuild},
+		// The server sends builds here for artifacts this host should serve but lacks.
+		{bus.HostBuildSubject(h.cfg.Name), "", h.handleBuild},
 		{bus.DescribeSubject, "", h.handleDescribe},
 		{bus.InstancesSubject, "", h.handleInstances},
 	} {
@@ -154,7 +156,13 @@ func (h *Host) Run(ctx context.Context) error {
 }
 
 func (h *Host) heartbeat() {
-	if err := h.bus.Publish(bus.HeartbeatSubject(h.cfg.Name), &hostv1.Heartbeat{Host: h.describe()}); err != nil {
+	h.mu.Lock()
+	ids := make([]string, 0, len(h.artifacts))
+	for id := range h.artifacts {
+		ids = append(ids, id)
+	}
+	h.mu.Unlock()
+	if err := h.bus.Publish(bus.HeartbeatSubject(h.cfg.Name), &hostv1.Heartbeat{Host: h.describe(), ArtifactIds: ids}); err != nil {
 		h.log.Warn("heartbeat", "err", err)
 	}
 }

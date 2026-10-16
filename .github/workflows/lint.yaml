@@ -19,7 +19,10 @@ jobs:
       contents: read
       pull-requests: read
     outputs:
+      go: ${{ steps.filter.outputs.go }}
       ui: ${{ steps.filter.outputs.ui }}
+      chart: ${{ steps.filter.outputs.chart }}
+      migrations: ${{ steps.filter.outputs.migrations }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
@@ -27,11 +30,48 @@ jobs:
         id: filter
         with:
           filters: |
+            go:
+              - "**.go"
+              - "**/go.mod"
+              - "**/go.sum"
+              - ".golangci.yaml"
+              - "justfile"
+              - ".github/workflows/lint.yaml"
             ui:
               - "ui/**"
               - "protos/**"
               - "justfile"
               - ".github/workflows/lint.yaml"
+            chart:
+              - "charts/**"
+              - ".github/workflows/lint.yaml"
+            migrations:
+              - "datastore/*/migrations/**"
+
+  go:
+    needs: changes
+    if: needs.changes.outputs.go == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+          cache-dependency-path: "**/go.sum"
+
+      - uses: golangci/golangci-lint-action@ba0d7d2ec06a0ea1cb5fa41b2e4a3ab91d21278a # v9.3.0
+        with:
+          version: v2.13.2
+          install-only: true
+
+      - uses: extractions/setup-just@53165ef7e734c5c07cb06b3c8e7b647c5aa16db3 # v4.0.0
+
+      - name: Lint
+        run: just go-lint check
+
+      - name: Format
+        run: just go-format check
 
   ui:
     needs: changes
@@ -55,8 +95,79 @@ jobs:
       - name: Check
         run: just ui-check
 
+  chart:
+    needs: changes
+    if: needs.changes.outputs.chart == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: azure/setup-helm@9bc31f4ebc9c6b171d7bfbaa5d006ae7abdb4310 # v5.0.1
+        with:
+          version: v3.21.4
+
+      - name: Dependencies
+        run: |
+          helm repo add bitnami https://charts.bitnami.com/bitnami
+          helm repo add nats https://nats-io.github.io/k8s/helm/charts
+          helm dependency build charts/alchemy
+
+      - name: Lint
+        run: helm lint charts/alchemy
+
+      - name: Render
+        run: |
+          helm template alchemy charts/alchemy > /dev/null
+          helm template alchemy charts/alchemy --set existingSecret=byo > /dev/null
+          helm template alchemy charts/alchemy --set server.ingress.enabled=true --set "server.ingress.hosts[0]=alchemy.example.com" > /dev/null
+          helm template alchemy charts/alchemy --set host.kvm.mode=devicePlugin > /dev/null
+          helm template alchemy charts/alchemy --set postgresql.enabled=true --set postgresql.auth.password=p --set nats.enabled=true > /dev/null
+
+      - name: Package
+        run: helm package charts/alchemy --destination /tmp
+
+  migrations:
+    needs: changes
+    if: needs.changes.outputs.migrations == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+          cache-dependency-path: "**/go.sum"
+
+      - name: Validate
+        run: |
+          version=$(go list -m -f '{{.Version}}' github.com/pressly/goose/v3)
+          for dir in datastore/*/migrations; do
+            go run "github.com/pressly/goose/v3/cmd/goose@${version}" -dir "$dir" validate -v
+          done
+
+      - name: Versions
+        run: |
+          for dir in datastore/*/migrations; do
+            versions=$(ls "$dir" | sed -E 's/^([0-9]+)_.*\.sql$/\1/' | sort -n)
+            if ! diff <(echo "$versions") <(seq -f '%05g' 1 "$(echo "$versions" | wc -l)"); then
+              echo "$dir: versions must be unique and contiguous from 00001"
+              exit 1
+            fi
+          done
+
+      - name: Append-only
+        run: |
+          changed=$(git diff --name-only --diff-filter=MDR "origin/${GITHUB_BASE_REF}...HEAD" -- 'datastore/*/migrations/')
+          if [[ -n "$changed" ]]; then
+            echo "shipped migrations are append-only; changed:"
+            echo "$changed"
+            exit 1
+          fi
+
   lint-ok:
-    needs: [changes, ui]
+    needs: [changes, go, ui, chart, migrations]
     if: always()
     runs-on: ubuntu-latest
     steps:

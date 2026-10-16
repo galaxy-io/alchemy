@@ -60,7 +60,7 @@ func main() {
 
 		outIDs.Append(ids.Value(i))
 		outCleaned.Append(cleaned)
-		outCounts.Append(uint32(len(tokens)))
+		outCounts.Append(uint32(len(tokens))) //nolint:gosec // a row's token count fits
 		outEmbeddings.Append(true)
 		outValues.AppendValues(embed(tokens), nil)
 		outModels.Append(model)

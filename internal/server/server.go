@@ -73,9 +73,10 @@ type Service struct {
 	tasks      sync.WaitGroup
 	subs       []*bus.Subscription
 
-	mu       sync.Mutex
-	versions map[string]*compiledVersion // by version id
-	hosts    map[string]*knownHost       // by host name, from heartbeats
+	mu         sync.Mutex
+	versions   map[string]*compiledVersion // by version id
+	hosts      map[string]*knownHost       // by host name, from heartbeats
+	hostBuilds map[string]time.Time        // builds sent to one host, by host/artifact
 }
 
 // compiledVersion is the in-memory half of a ready version.
@@ -102,6 +103,7 @@ func New(ctx context.Context, cfg Config, store *postgres.Store, b *bus.Bus, log
 		stop:       stop,
 		versions:   make(map[string]*compiledVersion),
 		hosts:      make(map[string]*knownHost),
+		hostBuilds: make(map[string]time.Time),
 	}
 
 	n, err := store.CancelStaleInvocations(ctx)
@@ -125,6 +127,7 @@ func New(ctx context.Context, cfg Config, store *postgres.Store, b *bus.Bus, log
 		log.Info("resuming build", "function", v.FunctionID, "version", v.Version)
 		s.startBuild(v)
 	}
+	s.tasks.Go(s.reconcileHosts)
 	return s, nil
 }
 
