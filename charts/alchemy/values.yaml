@@ -56,6 +56,11 @@ server:
   # yet shared between replicas.
   replicas: 1
 
+  # -- Server log level: `debug`, `info`, `warn` or `error`.
+  logLevel: info
+  # -- Server log format: `json` or `text`.
+  logFormat: json
+
   service:
     # -- Service type.
     type: ClusterIP
@@ -148,6 +153,11 @@ host:
   prewarm: 0
   # -- Keep the guest serial console on (`--console`). Observable, slower boot.
   console: false
+
+  # -- Host log level: `debug`, `info`, `warn` or `error`.
+  logLevel: info
+  # -- Host log format: `json` or `text`.
+  logFormat: json
 
   cache:
     # -- Size limit for the rootfs cache `emptyDir`. Empty means no limit.

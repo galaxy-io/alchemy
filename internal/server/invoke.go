@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"time"
 
 	"connectrpc.com/connect"
@@ -56,7 +57,7 @@ func (s *Service) Invoke(ctx context.Context, req *connect.Request[functionsv1.I
 	}
 
 	timeout := time.Duration(cv.spec.GetTimeoutMs()) * time.Millisecond
-	out, err := s.invokeOnHost(ctx, cv, &hostv1.InvokeRequest{
+	out, err := s.invokeOnHost(ctx, inv.log, cv, &hostv1.InvokeRequest{
 		InvocationId: inv.row.ID,
 		Artifact:     cv.artifact,
 		Input:        input.Wire,
@@ -94,7 +95,7 @@ func (s *Service) Invoke(ctx context.Context, req *connect.Request[functionsv1.I
 // No responders means nobody has built it, which happens after every host
 // restarts: one build request later, a host subscribes and the invoke is
 // retried once.
-func (s *Service) invokeOnHost(ctx context.Context, cv *compiledVersion, req *hostv1.InvokeRequest, timeout time.Duration) (*hostv1.InvokeResponse, error) {
+func (s *Service) invokeOnHost(ctx context.Context, log *slog.Logger, cv *compiledVersion, req *hostv1.InvokeRequest, timeout time.Duration) (*hostv1.InvokeResponse, error) {
 	// The host enforces the function timeout and its own acquire; this
 	// bound only guards against a host that vanished mid-call.
 	reqCtx, cancel := context.WithTimeout(ctx, timeout+hostGrace)
@@ -109,7 +110,7 @@ func (s *Service) invokeOnHost(ctx context.Context, cv *compiledVersion, req *ho
 	// Rebuild from the digest the version was built against (repo@digest),
 	// not the tag: a tag may have moved since, and a different image is a
 	// different artifact.
-	s.log.Info("no host has the artifact; building", "artifact", cv.artifact.GetId())
+	log.Info("no host has the artifact; building")
 	spec := proto.Clone(cv.spec).(*functionsv1.FunctionSpec) //nolint:errcheck // Clone preserves the type
 	if cv.row.ImageDigest != "" {
 		if ref, err := name.ParseReference(spec.GetImage()); err == nil {
@@ -287,6 +288,7 @@ func failedPrecondition(err error, format string, args ...any) error {
 // row and publishes the new state.
 type invocation struct {
 	s   *Service
+	log *slog.Logger
 	row *sqlcgen.Invocation
 }
 
@@ -297,11 +299,12 @@ func (s *Service) newInvocation(ctx context.Context, cv *compiledVersion, inputB
 		Version:    cv.row.Version,
 		InputBytes: inputBytes,
 	})
+	log := s.log.With("function_id", cv.row.FunctionID, "version", cv.row.Version, "artifact_id", cv.artifact.GetId())
 	if err != nil {
-		s.log.Error("create invocation", "err", err)
+		log.Error("create invocation", "err", err)
 		return nil
 	}
-	inv := &invocation{s: s, row: row}
+	inv := &invocation{s: s, log: log.With("invocation_id", row.ID), row: row}
 	inv.publish()
 	return inv
 }
@@ -313,7 +316,7 @@ func (i *invocation) ctx() context.Context {
 
 func (i *invocation) update(row *sqlcgen.Invocation, err error) {
 	if err != nil {
-		i.s.log.Error("update invocation", "id", i.row.ID, "err", err)
+		i.log.Error("update invocation", "err", err)
 		return
 	}
 	i.row = row
@@ -338,10 +341,12 @@ func (i *invocation) finished(resp *functionsv1.InvokeResponse, logTail string) 
 	} else {
 		params.OutputBytes = int64(len(resp.GetOutput()))
 	}
+	i.log.Debug("invocation finished", "status", params.Status, "run_us", params.RunUs, "total_us", params.TotalUs)
 	i.update(i.s.store.FinishInvocation(i.ctx(), params))
 }
 
 func (i *invocation) errored(msg string) {
+	i.log.Warn("invocation errored", "err", msg)
 	i.update(i.s.store.FinishInvocation(i.ctx(), sqlcgen.FinishInvocationParams{
 		ID:            i.row.ID,
 		Status:        sqlcgen.InvocationStatusErrored,
@@ -350,6 +355,7 @@ func (i *invocation) errored(msg string) {
 }
 
 func (i *invocation) canceled() {
+	i.log.Debug("invocation canceled")
 	i.update(i.s.store.FinishInvocation(i.ctx(), sqlcgen.FinishInvocationParams{
 		ID:            i.row.ID,
 		Status:        sqlcgen.InvocationStatusCanceled,

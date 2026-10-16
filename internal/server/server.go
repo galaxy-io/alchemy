@@ -122,7 +122,7 @@ func New(ctx context.Context, cfg Config, store *postgres.Store, b *bus.Bus, log
 		return nil, err
 	}
 	for _, v := range building {
-		log.Info("resuming build", "function", v.FunctionID, "version", v.Version)
+		log.Info("resuming build", "function_id", v.FunctionID, "version", v.Version)
 		s.startBuild(v)
 	}
 	return s, nil

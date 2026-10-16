@@ -224,11 +224,11 @@ func (s *instance) Release(context.Context) {
 		_ = s.process.Wait()
 	}
 	if s.keepDir {
-		s.driver.log.Warn("keeping instance dir for inspection", "dir", s.dir)
+		s.driver.log.Warn("keeping instance dir for inspection", "instance_id", s.ID(), "dir", s.dir)
 		return
 	}
 	if err := os.RemoveAll(s.dir); err != nil {
-		s.driver.log.Warn("remove instance dir", "dir", s.dir, "err", err)
+		s.driver.log.Warn("remove instance dir", "instance_id", s.ID(), "dir", s.dir, "err", err)
 	}
 }
 

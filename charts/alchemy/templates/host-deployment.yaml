@@ -25,6 +25,7 @@ spec:
   template:
     metadata:
       annotations:
+        checksum/config: {{ include (print $.Template.BasePath "/host-configmap.yaml") . | sha256sum }}
         checksum/secret: {{ include (print $.Template.BasePath "/secret.yaml") . | sha256sum }}
       labels:
         {{- include "alchemy.host.selectorLabels" . | nindent 8 }}
@@ -63,6 +64,9 @@ spec:
                 secretKeyRef:
                   name: {{ include "alchemy.secretName" . }}
                   key: NATS_URL
+          envFrom:
+            - configMapRef:
+                name: {{ include "alchemy.host.fullname" . }}
           securityContext:
             {{- if eq $kvm.mode "privileged" }}
             privileged: true
