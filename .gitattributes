@@ -3,4 +3,4 @@ api/**/*.pb.go                linguist-generated=true
 api/**/*.connect.go           linguist-generated=true
 datastore/postgres/sqlcgen/** linguist-generated=true
 ui/src/gen/**                 linguist-generated=true
-ui/src/routeTree.gen.ts       linguist-generated=true
+ui/src/host/routeTree.gen.ts  linguist-generated=true

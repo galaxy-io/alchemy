@@ -8,49 +8,9 @@ host_nats_url := "nats://host.lima.internal:4223"
 default:
     @just --list
 
-# generate all checked-in generated code
-gen: proto sqlc ui-gen
-
-# generate the UI's TypeScript protobuf clients
-ui-gen:
-    cd ui && pnpm install && pnpm codegen
-
-# generate sqlc Go code from datastore/postgres/{migrations,queries}
-sqlc:
-    sqlc generate -f datastore/postgres/sqlc.yaml
-
-# generate protobuf and ConnectRPC Go stubs
-proto:
-    buf generate
-
-# lint protobuf definitions
-proto-lint:
-    buf lint
-
-# format protobuf definitions
-proto-format mode="fix":
-    buf format {{ if mode == "check" { "-d --exit-code" } else { "-w" } }}
-
-# verify generated protobuf files are up to date
-proto-check:
-    buf generate
-    git diff --exit-code -- api
-
-# build host and the supervisor for the KVM host (the Lima VM is linux/arm64 on Apple silicon)
-build-linux arch="arm64":
-    GOOS=linux GOARCH={{ arch }} CGO_ENABLED=0 go build -trimpath -ldflags='-s -w' -o bin/linux-{{ arch }}/host ./cmd/host
-    GOOS=linux GOARCH={{ arch }} CGO_ENABLED=0 go build -trimpath -ldflags='-s -w' -o bin/linux-{{ arch }}/supervisor ./cmd/supervisor
-
-# build the Linux binaries the container images ship, the server with the UI embedded (`arch`: amd64 or arm64, default this machine's)
-binaries arch=`go env GOARCH`: ui-build
-    CGO_ENABLED=0 GOOS=linux GOARCH={{ arch }} go build -tags embedui -trimpath -ldflags='-s -w' -o bin/alchemy/server ./cmd/server
-    CGO_ENABLED=0 GOOS=linux GOARCH={{ arch }} go build -trimpath -ldflags='-s -w' -o bin/alchemy/host ./cmd/host
-    CGO_ENABLED=0 GOOS=linux GOARCH={{ arch }} go build -trimpath -ldflags='-s -w' -o bin/alchemy/supervisor ./cmd/supervisor
-
-# build the server and host container images for `arch`
-images arch=`go env GOARCH`: (binaries arch)
-    docker build --platform linux/{{ arch }} -f cmd/server/Dockerfile -t galaxy-io/alchemy/server:latest .
-    docker build --platform linux/{{ arch }} -f cmd/host/Dockerfile -t galaxy-io/alchemy/host:latest .
+# start local infra (Postgres, NATS); `just infra down` stops it, `just infra down volumes` also drops the data
+infra mode="up" scope="":
+    docker --context default compose {{ if mode == "down" { if scope == "volumes" { "down -v" } else { "down" } } else { "up -d --wait" } }}
 
 # start the KVM host VM, creating it on first run; `just vm down` stops it, `just vm delete` removes it
 vm mode="up":
@@ -74,10 +34,6 @@ status:
       echo "host:     $(limactl shell alchemy -- pgrep -af 'bin/linux-arm64/host' | grep -v pgrep || echo none)"
       echo "microVMs:   $(limactl shell alchemy -- pgrep -c firecracker || true)"
     fi
-
-# start local infra (Postgres, NATS); `just infra down` stops it, `just infra down volumes` also drops the data
-infra mode="up" scope="":
-    docker --context default compose {{ if mode == "down" { if scope == "volumes" { "down -v" } else { "down" } } else { "up -d --wait" } }}
 
 # run `count` hosts in the VM with `memory` MiB each, reusing instances for `warm` (0s: always cold boot) and keeping `prewarm` booted per function; Ctrl-C stops them
 host count="3" memory="512" warm="5m" prewarm="0": build-linux
@@ -106,9 +62,73 @@ dev count="3" memory="512" warm="5m" prewarm="0":
     until curl -sf http://localhost:8780/healthz > /dev/null 2>&1; do sleep 0.5; done
     if [ -d ui ]; then just ui; else wait; fi
 
+# generate all checked-in generated code
+gen: proto sqlc ui-gen
+
+# generate the UI's TypeScript protobuf clients
+ui-gen:
+    cd ui && pnpm install && pnpm codegen
+
+# generate protobuf and ConnectRPC Go stubs
+proto:
+    buf generate
+
+# generate sqlc Go code from datastore/postgres/{migrations,queries}
+sqlc:
+    sqlc generate -f datastore/postgres/sqlc.yaml
+
+# lint protobuf definitions
+proto-lint:
+    buf lint
+
+# format protobuf definitions
+proto-format mode="fix":
+    buf format {{ if mode == "check" { "-d --exit-code" } else { "-w" } }}
+
+# verify generated protobuf files are up to date
+proto-check:
+    buf generate
+    git diff --exit-code -- api
+
 # build the web UI into ui/build, which server embeds with -tags embedui
 ui-build:
     cd ui && pnpm install && pnpm build
+
+# run every UI gate: types, lint, format, both builds, the package checks, and the committed route tree
+ui-check:
+    cd ui && pnpm install --frozen-lockfile && pnpm check && git diff --exit-code src/host/routeTree.gen.ts
+
+# build host and the supervisor for the KVM host (the Lima VM is linux/arm64 on Apple silicon)
+build-linux arch="arm64":
+    GOOS=linux GOARCH={{ arch }} CGO_ENABLED=0 go build -trimpath -ldflags='-s -w' -o bin/linux-{{ arch }}/host ./cmd/host
+    GOOS=linux GOARCH={{ arch }} CGO_ENABLED=0 go build -trimpath -ldflags='-s -w' -o bin/linux-{{ arch }}/supervisor ./cmd/supervisor
+
+# build the Linux binaries the container images ship, the server with the UI embedded (`arch`: amd64 or arm64, default this machine's)
+binaries arch=`go env GOARCH`: ui-build
+    CGO_ENABLED=0 GOOS=linux GOARCH={{ arch }} go build -tags embedui -trimpath -ldflags='-s -w' -o bin/alchemy/server ./cmd/server
+    CGO_ENABLED=0 GOOS=linux GOARCH={{ arch }} go build -trimpath -ldflags='-s -w' -o bin/alchemy/host ./cmd/host
+    CGO_ENABLED=0 GOOS=linux GOARCH={{ arch }} go build -trimpath -ldflags='-s -w' -o bin/alchemy/supervisor ./cmd/supervisor
+
+# build the server and host container images for `arch`
+images arch=`go env GOARCH`: (binaries arch)
+    docker build --platform linux/{{ arch }} -f cmd/server/Dockerfile -t galaxy-io/alchemy/server:latest .
+    docker build --platform linux/{{ arch }} -f cmd/host/Dockerfile -t galaxy-io/alchemy/host:latest .
+
+# run cmd in every Go module
+_each cmd:
+    for dir in $(find . -name go.mod -not -path "./ui/*" -exec dirname {} \;); do (cd "$dir" && {{ cmd }}) || exit 1; done
+
+# format Go, UI and proto; `just format check` verifies without writing
+format mode="fix": (go-format mode) (ui-format mode) (proto-format mode)
+
+# run all linters; `just lint check` runs without fixing
+lint mode="fix": (go-lint mode) (ui-lint mode)
+
+# gofumpt + goimports across every Go module (settings in .golangci.yaml)
+go-format mode="fix": (_each ("GOWORK=off golangci-lint fmt " + (if mode == "check" { "--diff " } else { "" }) + "./..."))
+
+# Go linters across every Go module
+go-lint mode="fix": (_each ("GOWORK=off golangci-lint run " + (if mode == "check" { "" } else { "--fix " }) + "./..."))
 
 # Biome formatting for the UI package
 ui-format mode="fix":
@@ -118,6 +138,8 @@ ui-format mode="fix":
 ui-lint mode="fix":
     cd ui && pnpm run {{ if mode == "check" { "lint:check" } else { "lint" } }}
 
-# run every UI gate: types, lint, format, both builds, the package checks, and the committed route tree
-ui-check:
-    cd ui && pnpm install --frozen-lockfile && pnpm check && git diff --exit-code src/host/routeTree.gen.ts
+# run the unit tests in every Go module
+test: (_each "GOWORK=off go test ./...")
+
+# tidy go.mod and go.sum in every Go module
+tidy: (_each "GOWORK=off go mod tidy")
