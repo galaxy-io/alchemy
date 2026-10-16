@@ -16,6 +16,11 @@ WHERE function_id = $1 AND status = 'ready'
 ORDER BY version DESC
 LIMIT 1;
 
+-- name: ListCurrentFunctionVersions :many
+SELECT DISTINCT ON (function_id) * FROM function_versions
+WHERE status = 'ready'
+ORDER BY function_id, version DESC;
+
 -- name: ListFunctionVersions :many
 SELECT * FROM function_versions
 WHERE function_id = $1

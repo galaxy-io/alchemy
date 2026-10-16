@@ -22,6 +22,8 @@ import "supervisor/v1/supervisor.proto";
 //                                with its Host
 //   host.instances               request, scatter/gather: every host replies
 //                                with its instances
+//   host.<name>.build            request/reply: that host builds, replies
+//                                with the Artifact; reconciles a host
 //   host.<name>.heartbeat        publish: a Host, periodically
 //   invocation.<id>.state        publish: InvocationEvent as an invocation
 //                                moves through a host
@@ -125,4 +127,8 @@ message ListInstancesResponse {
 // Heartbeat is published by every host on its own subject.
 message Heartbeat {
   functions.v1.Host host = 1;
+  // artifact_ids are the artifacts the host is taking invocations for. The
+  // server builds the current version of every function on any host that
+  // lacks it.
+  repeated string artifact_ids = 2;
 }

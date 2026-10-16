@@ -27,6 +27,9 @@ const (
 // InvokeSubject is where hosts that have artifactID ready take invocations.
 func InvokeSubject(artifactID string) string { return "host.invoke." + artifactID }
 
+// HostBuildSubject is where host name alone takes builds.
+func HostBuildSubject(name string) string { return "host." + name + ".build" }
+
 // HeartbeatSubject is where host name announces itself.
 func HeartbeatSubject(name string) string { return "host." + name + ".heartbeat" }
 

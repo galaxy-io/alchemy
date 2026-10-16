@@ -107,16 +107,8 @@ func (s *Service) invokeOnHost(ctx context.Context, log *slog.Logger, cv *compil
 	if len(s.liveHosts()) == 0 {
 		return nil, errNoHosts
 	}
-	// Rebuild from the digest the version was built against (repo@digest),
-	// not the tag: a tag may have moved since, and a different image is a
-	// different artifact.
 	log.Info("no host has the artifact; building")
-	spec := proto.Clone(cv.spec).(*functionsv1.FunctionSpec) //nolint:errcheck // Clone preserves the type
-	if cv.row.ImageDigest != "" {
-		if ref, err := name.ParseReference(spec.GetImage()); err == nil {
-			spec.Image = ref.Context().Digest(cv.row.ImageDigest).String()
-		}
-	}
+	spec := cv.pinnedSpec()
 	built, err := s.requestBuild(ctx, cv.row.TenantID, spec)
 	if err != nil {
 		return nil, connect.NewError(connect.CodeFailedPrecondition,
@@ -127,6 +119,19 @@ func (s *Service) invokeOnHost(ctx context.Context, log *slog.Logger, cv *compil
 			fmt.Errorf("version %d rebuilt as a different artifact (%s); create a new version", cv.row.Version, spec.GetImage()))
 	}
 	return s.requestInvoke(reqCtx, cv, req)
+}
+
+// pinnedSpec is the version's spec with the image pinned to the digest it
+// was built against (repo@digest), not the tag: a tag may have moved since,
+// and a different image is a different artifact.
+func (cv *compiledVersion) pinnedSpec() *functionsv1.FunctionSpec {
+	spec := proto.Clone(cv.spec).(*functionsv1.FunctionSpec) //nolint:errcheck // Clone preserves the type
+	if cv.row.ImageDigest != "" {
+		if ref, err := name.ParseReference(spec.GetImage()); err == nil {
+			spec.Image = ref.Context().Digest(cv.row.ImageDigest).String()
+		}
+	}
+	return spec
 }
 
 // requestInvoke sends one invocation to the hosts serving the artifact. A
