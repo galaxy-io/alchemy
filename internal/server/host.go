@@ -16,8 +16,9 @@ import (
 
 // knownHost is what a host last said about itself.
 type knownHost struct {
-	host *functionsv1.Host
-	seen time.Time
+	host      *functionsv1.Host
+	artifacts map[string]bool // ids the host is taking invocations for
+	seen      time.Time
 }
 
 // listen subscribes to what hosts publish: heartbeats, and the progress
@@ -41,8 +42,12 @@ func (s *Service) onHeartbeat(_ context.Context, data []byte) proto.Message {
 	if err := proto.Unmarshal(data, msg); err != nil || msg.GetHost() == nil {
 		return nil
 	}
+	artifacts := make(map[string]bool, len(msg.GetArtifactIds()))
+	for _, id := range msg.GetArtifactIds() {
+		artifacts[id] = true
+	}
 	s.mu.Lock()
-	s.hosts[msg.GetHost().GetHostname()] = &knownHost{host: msg.GetHost(), seen: time.Now()}
+	s.hosts[msg.GetHost().GetHostname()] = &knownHost{host: msg.GetHost(), artifacts: artifacts, seen: time.Now()}
 	s.mu.Unlock()
 	return nil
 }
