@@ -1,6 +1,6 @@
 {
   "name": "@galaxy-io/alchemy-ui",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Alchemy's web UI as a Galaxy module a host app mounts",
   "repository": {
     "type": "git",
