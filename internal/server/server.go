@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"log/slog"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"connectrpc.com/connect"
@@ -77,6 +78,8 @@ type Service struct {
 	versions   map[string]*compiledVersion // by version id
 	hosts      map[string]*knownHost       // by host name, from heartbeats
 	hostBuilds map[string]time.Time        // builds sent to one host, by host/artifact
+
+	waiting atomic.Int64 // invocations held for a slot, see Scaling
 }
 
 // compiledVersion is the in-memory half of a ready version.

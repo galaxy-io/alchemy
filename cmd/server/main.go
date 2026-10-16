@@ -5,6 +5,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"flag"
 	"fmt"
@@ -73,6 +74,11 @@ func run(log *slog.Logger) error {
 	mux.Handle(metricsv1connect.NewMetricsServiceHandler(svc.NewMetricsService()))
 	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusNoContent)
+	})
+	// KEDA scales hosts on this (charts/alchemy, host.autoscaling).
+	mux.HandleFunc("GET /scaling", func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(svc.Scaling())
 	})
 	mux.Handle("/", ui.Handler())
 
