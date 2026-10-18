@@ -12,7 +12,9 @@ metadata:
 spec:
   # One host per node. Pending hosts are what make a node autoscaler such as
   # Karpenter launch KVM nodes; a DaemonSet would never ask for one.
+  {{- if not .Values.host.autoscaling.enabled }}
   replicas: {{ .Values.host.replicas }}
+  {{- end }}
   selector:
     matchLabels:
       {{- include "alchemy.host.selectorLabels" . | nindent 6 }}

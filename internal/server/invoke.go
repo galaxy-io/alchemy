@@ -141,6 +141,12 @@ func (cv *compiledVersion) pinnedSpec() *functionsv1.FunctionSpec {
 func (s *Service) requestInvoke(ctx context.Context, cv *compiledVersion, req *hostv1.InvokeRequest) (*hostv1.InvokeResponse, error) {
 	wait := capacityBackoff
 	deadline := time.Now().Add(capacityWait)
+	waiting := false
+	defer func() {
+		if waiting {
+			s.waiting.Add(-1)
+		}
+	}()
 	for {
 		out := &hostv1.InvokeResponse{}
 		if err := s.bus.Request(ctx, bus.InvokeSubject(cv.artifact.GetId()), req, out); err != nil {
@@ -148,6 +154,11 @@ func (s *Service) requestInvoke(ctx context.Context, cv *compiledVersion, req *h
 		}
 		if out.GetError().GetCode() != "resource_exhausted" || time.Now().Add(wait).After(deadline) {
 			return out, nil
+		}
+		// Counted until it gets a slot or gives up, so hosts scale on it.
+		if !waiting {
+			waiting = true
+			s.waiting.Add(1)
 		}
 		select {
 		case <-ctx.Done():
