@@ -24,7 +24,7 @@ vm mode="up":
         if limactl list --quiet | grep -qx alchemy; then limactl start alchemy; else limactl start --name alchemy --tty=false --mount-only "{{ justfile_directory() }}:w" lima.yaml; fi
         docker context inspect lima-alchemy >/dev/null 2>&1 || docker context create lima-alchemy --docker "host=unix://$HOME/.lima/alchemy/sock/docker.sock"
         ;;
-      down)   limactl shell alchemy -- pkill -f 'bin/linux-arm64/host' || true; limactl stop alchemy ;;
+      down)   limactl shell alchemy -- sudo pkill -f 'bin/linux-arm64/host' || true; limactl stop alchemy ;;
       delete) limactl delete --force alchemy; docker context rm -f lima-alchemy >/dev/null 2>&1 || true ;;
       *)      echo "unknown mode {{ mode }}" >&2; exit 2 ;;
     esac
@@ -39,11 +39,13 @@ status:
     fi
 
 # run `count` hosts in the VM with `memory` MiB each, reusing instances for `warm` (0s: always cold boot) and keeping `prewarm` booted per function; Ctrl-C stops them
+# hosts run as root for the jailer, each in a systemd scope of its own so it can manage its microVMs' cgroups, as in a pod
 host count="3" memory="512" warm="5m" prewarm="0": build-linux
-    limactl shell alchemy -- pkill -f 'bin/linux-arm64/host' || true
+    limactl shell alchemy -- sudo pkill -f 'bin/linux-arm64/host' || true
     limactl shell alchemy -- bash -c 'cd "{{ justfile_directory() }}" && trap "kill 0" EXIT INT TERM HUP; \
       for i in $(seq 1 {{ count }}); do \
-        LOG_FORMAT={{ LOG_FORMAT }} LOG_LEVEL={{ LOG_LEVEL }} bin/linux-arm64/host --nats="{{ host_nats_url }}" --name=host-$i --run-dir=/tmp/alchemy/host-$i \
+        sudo systemd-run --scope --quiet -p Delegate=yes -- env LOG_FORMAT={{ LOG_FORMAT }} LOG_LEVEL={{ LOG_LEVEL }} \
+          bin/linux-arm64/host --nats="{{ host_nats_url }}" --name=host-$i --data-dir=/var/lib/alchemy/host-$i --uid-base=$((100000 * i)) \
           --memory-mib={{ memory }} --warm-ttl={{ warm }} --prewarm={{ prewarm }} 2>&1 | sed -u "s/^/[host-$i] /" & \
       done; wait'
 
@@ -59,7 +61,7 @@ ui:
 dev count="3" memory="512" warm="5m" prewarm="0":
     #!/usr/bin/env bash
     set -euo pipefail
-    trap 'kill $(jobs -p) 2>/dev/null; limactl shell alchemy -- pkill -f "bin/linux-arm64/host" 2>/dev/null || true' EXIT
+    trap 'kill $(jobs -p) 2>/dev/null; limactl shell alchemy -- sudo pkill -f "bin/linux-arm64/host" 2>/dev/null || true' EXIT
     just host {{ count }} {{ memory }} {{ warm }} {{ prewarm }} &
     just server &
     until curl -sf http://localhost:8780/healthz > /dev/null 2>&1; do sleep 0.5; done

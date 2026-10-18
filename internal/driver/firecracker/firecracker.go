@@ -1,16 +1,17 @@
 // Package firecracker runs each instance as a Firecracker microVM: one
 // process per microVM, configured over its API socket, with the function's
 // image as a read-only root filesystem and the supervisor as the guest's
-// init. Linux with /dev/kvm only.
+// init. Every microVM runs under the jailer (see jail.go). Linux with
+// /dev/kvm and cgroup v2 only, run as root.
 //
-// This is the cold-boot path: every Acquire boots a kernel. No jailer and no
-// snapshots yet.
+// This is the cold-boot path: every Acquire boots a kernel. No snapshots yet.
 package firecracker
 
 import (
 	"context"
 	"crypto/rand"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"log/slog"
 	"net"
@@ -41,17 +42,21 @@ const (
 type Config struct {
 	// FirecrackerBin is the firecracker executable.
 	FirecrackerBin string
+	// JailerBin is the jailer from the same Firecracker release.
+	JailerBin string
 	// Kernel is an uncompressed guest kernel (vmlinux on x86_64, Image on
-	// aarch64) built with Firecracker's guest config.
+	// aarch64) built with Firecracker's guest config. It is copied into
+	// DataDir at start.
 	Kernel string
 	// SupervisorBin is a static Linux build of cmd/supervisor for the guest
 	// architecture. It is copied into every rootfs.
 	SupervisorBin string
-	// CacheDir holds built rootfs images, keyed by image digest.
-	CacheDir string
-	// RunDir holds one directory per running microVM: API socket, vsock
-	// socket, console log.
-	RunDir string
+	// DataDir holds the kernel, built rootfs images keyed by image digest,
+	// and one jail per running microVM. It must be one filesystem, since
+	// jails hard-link the kernel and rootfs.
+	DataDir string
+	// UIDBase is the first of the uids microVMs run as, one each.
+	UIDBase int
 	// Console keeps the guest's serial console on and logs it. It makes
 	// boots observable and slower.
 	Console bool
@@ -61,29 +66,75 @@ type Config struct {
 
 // Driver implements driver.Driver with Firecracker microVMs.
 type Driver struct {
-	cfg Config
-	log *slog.Logger
+	cfg  Config
+	log  *slog.Logger
+	uids *uids
+	// parentCgroup is where the jailer creates each microVM's cgroup,
+	// relative to cgroupRoot.
+	parentCgroup string
 }
 
-// New checks that KVM is usable, that the configured binaries and kernel
-// exist, and prepares the cache and run directories.
+// New checks that the host runs as root with KVM usable and the configured
+// binaries and kernel present, prepares DataDir, and sets up the cgroup the
+// microVMs go under.
 func New(cfg Config, log *slog.Logger) (*Driver, error) {
+	if os.Geteuid() != 0 {
+		return nil, errors.New("the host must run as root: the jailer chroots, sets up cgroups and drops each microVM to its own uid")
+	}
 	kvm, err := os.OpenFile("/dev/kvm", os.O_RDWR, 0)
 	if err != nil {
 		return nil, fmt.Errorf("kvm: %w (firecracker needs read-write access to /dev/kvm)", err)
 	}
 	_ = kvm.Close()
-	for name, path := range map[string]string{"firecracker": cfg.FirecrackerBin, "kernel": cfg.Kernel, "supervisor": cfg.SupervisorBin} {
+	for name, path := range map[string]string{"firecracker": cfg.FirecrackerBin, "jailer": cfg.JailerBin, "kernel": cfg.Kernel, "supervisor": cfg.SupervisorBin} {
 		if _, err := os.Stat(path); err != nil {
 			return nil, fmt.Errorf("%s: %w", name, err)
 		}
 	}
-	for _, dir := range []string{cfg.CacheDir, cfg.RunDir} {
+
+	d := &Driver{cfg: cfg, log: log, uids: newUIDs(cfg.UIDBase)}
+	// Jails left by a previous run belong to microVMs that are gone.
+	if err := os.RemoveAll(filepath.Join(cfg.DataDir, "jail")); err != nil {
+		return nil, err
+	}
+	for _, dir := range []string{d.rootfsDir(), filepath.Join(cfg.DataDir, "jail")} {
 		if err := os.MkdirAll(dir, 0o750); err != nil {
 			return nil, err
 		}
 	}
-	return &Driver{cfg: cfg, log: log}, nil
+	if err := installFile(cfg.Kernel, d.kernel(), 0o444); err != nil {
+		return nil, fmt.Errorf("copy kernel into %s: %w", cfg.DataDir, err)
+	}
+	if err := installFile(cfg.FirecrackerBin, d.firecracker(), 0o555); err != nil { //nolint:gosec // run by the jailer as each microVM's uid
+		return nil, fmt.Errorf("copy firecracker into %s: %w", cfg.DataDir, err)
+	}
+	if d.parentCgroup, err = setupCgroups(); err != nil {
+		return nil, fmt.Errorf("cgroups: %w", err)
+	}
+	return d, nil
+}
+
+// kernel is the copy of the guest kernel jails link to.
+func (d *Driver) kernel() string { return filepath.Join(d.cfg.DataDir, "vmlinux") }
+
+// firecracker is the copy of Firecracker the jailer runs. The jailer names
+// each jail's directory after its --exec-file, so a fixed name here fixes
+// the jail layout whatever the operator's binary is called.
+func (d *Driver) firecracker() string { return filepath.Join(d.cfg.DataDir, jailExec) }
+
+// rootfsDir holds built root filesystems, keyed by image digest.
+func (d *Driver) rootfsDir() string { return filepath.Join(d.cfg.DataDir, "rootfs") }
+
+// installFile copies src to dst with mode, which no microVM uid may write.
+// The copy is renamed into place, so an interrupted one never leaves a
+// partial file at dst.
+func installFile(src, dst string, mode os.FileMode) error {
+	tmp := dst + ".tmp"
+	if err := copyFile(src, tmp, mode); err != nil {
+		_ = os.Remove(tmp)
+		return err
+	}
+	return os.Rename(tmp, dst)
 }
 
 // Acquire boots a fresh microVM for a and returns it ready for one
@@ -95,9 +146,13 @@ func (d *Driver) Acquire(ctx context.Context, a *driver.Artifact) (driver.Instan
 	if _, err := rand.Read(raw); err != nil {
 		return nil, none, err
 	}
-	sb := &instance{driver: d, id: hex.EncodeToString(raw)}
-	sb.dir = filepath.Join(d.cfg.RunDir, sb.id)
-	if err := os.Mkdir(sb.dir, 0o750); err != nil {
+	uid, err := d.uids.take()
+	if err != nil {
+		return nil, none, err
+	}
+	sb := &instance{driver: d, id: hex.EncodeToString(raw), uid: uid}
+	if sb.jail, err = d.newJail(sb.id, uid, d.rootfsPath(a.Digest)); err != nil {
+		sb.Release(context.WithoutCancel(ctx))
 		return nil, none, err
 	}
 
@@ -111,30 +166,33 @@ func (d *Driver) Acquire(ctx context.Context, a *driver.Artifact) (driver.Instan
 type instance struct {
 	driver    *Driver
 	id        string
-	dir       string
+	uid       int
+	jail      *jail
 	process   *exec.Cmd
 	transport *http.Transport
 	client    supervisorv1connect.SupervisorServiceClient
-	// keepDir preserves the run directory on Release, for post-mortems.
+	// keepDir preserves the jail on Release, for post-mortems.
 	keepDir bool
 }
 
-// boot starts a Firecracker process, configures the microVM, starts it, and
-// waits for the supervisor to accept on vsock.
+// boot starts Firecracker in its jail, configures the microVM, starts it,
+// and waits for the supervisor to accept on vsock.
 func (s *instance) boot(ctx context.Context, a *driver.Artifact) error {
-	apiSock := filepath.Join(s.dir, "api.sock")
-	vsockPath := filepath.Join(s.dir, "v.sock")
+	apiSock := s.jail.host(jailAPISocket)
+	vsockPath := s.jail.host(jailVsock)
 
-	logFile, err := os.Create(filepath.Join(s.dir, "firecracker.log"))
+	logFile, err := os.Create(s.logPath())
 	if err != nil {
 		return err
 	}
 	defer func() { _ = logFile.Close() }()
-	s.process = exec.Command(s.driver.cfg.FirecrackerBin, "--api-sock", apiSock) //nolint:gosec // the binary path is operator configuration
+	// Without --daemonize the jailer execs into Firecracker, so this process
+	// is the microVM's for the rest of its life.
+	s.process = exec.Command(s.driver.cfg.JailerBin, s.driver.jailerArgs(s.id, s.uid, a.VCPUs)...) //nolint:gosec // the binary path is operator configuration
 	s.process.Stdout = logFile
 	s.process.Stderr = logFile
 	if err := s.process.Start(); err != nil {
-		return fmt.Errorf("start firecracker: %w", err)
+		return fmt.Errorf("start jailer: %w", err)
 	}
 	if err := waitForSocket(ctx, apiSock); err != nil {
 		return s.failed(fmt.Errorf("api socket: %w", err))
@@ -156,10 +214,10 @@ func (s *instance) boot(ctx context.Context, a *driver.Artifact) error {
 		path string
 		body any
 	}{
-		{"/boot-source", map[string]any{"kernel_image_path": s.driver.cfg.Kernel, "boot_args": bootArgs}},
-		{"/drives/rootfs", map[string]any{"drive_id": "rootfs", "path_on_host": a.Image, "is_root_device": true, "is_read_only": true}},
+		{"/boot-source", map[string]any{"kernel_image_path": jailKernel, "boot_args": bootArgs}},
+		{"/drives/rootfs", map[string]any{"drive_id": "rootfs", "path_on_host": jailRootfs, "is_root_device": true, "is_read_only": true}},
 		{"/machine-config", map[string]any{"vcpu_count": a.VCPUs, "mem_size_mib": a.MemoryMiB}},
-		{"/vsock", map[string]any{"guest_cid": guestCID, "uds_path": vsockPath}},
+		{"/vsock", map[string]any{"guest_cid": guestCID, "uds_path": jailVsock}},
 		// virtio-rng: without it the guest's RNG takes seconds to seed and
 		// anything that calls getrandom early (OpenSSL, Node) blocks.
 		{"/entropy", map[string]any{}},
@@ -189,16 +247,20 @@ func (s *instance) boot(ctx context.Context, a *driver.Artifact) error {
 	return nil
 }
 
-// failed keeps the run directory and appends the console tail to err so a
-// boot failure can be diagnosed from the API error alone.
+// logPath is Firecracker's output, kept beside the chroot so the guest
+// cannot reach it.
+func (s *instance) logPath() string { return filepath.Join(s.jail.dir, "firecracker.log") }
+
+// failed keeps the jail and appends the console tail to err so a boot
+// failure can be diagnosed from the API error alone.
 func (s *instance) failed(err error) error {
 	s.keepDir = true
-	if raw, readErr := os.ReadFile(filepath.Join(s.dir, "firecracker.log")); readErr == nil {
+	if raw, readErr := os.ReadFile(s.logPath()); readErr == nil {
 		lines := strings.Split(strings.TrimSpace(string(raw)), "\n")
 		if len(lines) > 8 {
 			lines = lines[len(lines)-8:]
 		}
-		return fmt.Errorf("%w; log %s ends:\n%s", err, s.dir, strings.Join(lines, "\n"))
+		return fmt.Errorf("%w; log %s ends:\n%s", err, s.jail.dir, strings.Join(lines, "\n"))
 	}
 	return err
 }
@@ -214,21 +276,27 @@ func (s *instance) Invoke(ctx context.Context, req *supervisorv1.InvokeRequest) 
 }
 
 // Release kills the microVM. The rootfs is read-only and shared, so there is
-// nothing to flush; killing the process is the fastest teardown.
+// nothing to flush; killing the process is the fastest teardown. Then the
+// cgroup, the jail and the uid go.
 func (s *instance) Release(context.Context) {
+	log := s.driver.log.With("instance_id", s.ID())
 	if s.transport != nil {
 		s.transport.CloseIdleConnections()
 	}
 	if s.process != nil && s.process.Process != nil {
 		_ = s.process.Process.Kill()
 		_ = s.process.Wait()
+		if err := os.Remove(s.driver.cgroup(s.id)); err != nil && !errors.Is(err, os.ErrNotExist) {
+			log.Warn("remove cgroup", "err", err)
+		}
 	}
+	s.driver.uids.give(s.uid)
 	if s.keepDir {
-		s.driver.log.Warn("keeping instance dir for inspection", "instance_id", s.ID(), "dir", s.dir)
+		log.Warn("keeping jail for inspection", "dir", s.jail.dir)
 		return
 	}
-	if err := os.RemoveAll(s.dir); err != nil {
-		s.driver.log.Warn("remove instance dir", "instance_id", s.ID(), "dir", s.dir, "err", err)
+	if err := os.RemoveAll(s.jail.dir); err != nil {
+		log.Warn("remove jail", "dir", s.jail.dir, "err", err)
 	}
 }
 
@@ -238,7 +306,7 @@ func (d *Driver) Info(ctx context.Context) driver.HostInfo {
 	if out, err := exec.CommandContext(ctx, d.cfg.FirecrackerBin, "--version").Output(); err == nil { //nolint:gosec // operator-configured path
 		info.FirecrackerVersion = strings.TrimSpace(strings.SplitN(string(out), "\n", 2)[0])
 	}
-	if entries, err := os.ReadDir(filepath.Join(d.cfg.CacheDir, "rootfs")); err == nil {
+	if entries, err := os.ReadDir(d.rootfsDir()); err == nil {
 		for _, e := range entries {
 			if fi, err := e.Info(); err == nil && !fi.IsDir() && strings.HasSuffix(e.Name(), ".ext4") {
 				info.RootfsCacheBytes += fi.Size()

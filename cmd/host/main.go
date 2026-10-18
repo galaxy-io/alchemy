@@ -37,9 +37,10 @@ func run(log *slog.Logger) error {
 	cfg.Name, _ = os.Hostname()
 	fcCfg := firecracker.Config{
 		FirecrackerBin: "/usr/local/bin/firecracker",
+		JailerBin:      "/usr/local/bin/jailer",
 		SupervisorBin:  filepath.Join(filepath.Dir(os.Args[0]), "supervisor"),
-		CacheDir:       filepath.Join(userCacheDir(), "alchemy"),
-		RunDir:         filepath.Join(os.TempDir(), "alchemy"),
+		DataDir:        "/var/lib/alchemy",
+		UIDBase:        100000,
 		Console:        true,
 		Keychain:       registry.Keychain(registry.AWS(), registry.GCP()),
 	}
@@ -51,10 +52,11 @@ func run(log *slog.Logger) error {
 	flag.DurationVar(&cfg.WarmTTL, "warm-ttl", cfg.WarmTTL, "how long a finished instance stays booted for the next invocation (0: cold boot every time)")
 	flag.IntVar(&cfg.Prewarm, "prewarm", cfg.Prewarm, "idle instances kept booted per artifact before any invocation arrives")
 	flag.StringVar(&fcCfg.FirecrackerBin, "firecracker", fcCfg.FirecrackerBin, "firecracker executable")
+	flag.StringVar(&fcCfg.JailerBin, "jailer", fcCfg.JailerBin, "jailer executable from the same Firecracker release")
 	flag.StringVar(&fcCfg.Kernel, "kernel", "", "guest kernel image (default: newest /var/lib/firecracker/vmlinux-*)")
 	flag.StringVar(&fcCfg.SupervisorBin, "supervisor", fcCfg.SupervisorBin, "static Linux build of cmd/supervisor to put in every rootfs")
-	flag.StringVar(&fcCfg.CacheDir, "cache-dir", fcCfg.CacheDir, "where built rootfs images are kept")
-	flag.StringVar(&fcCfg.RunDir, "run-dir", fcCfg.RunDir, "where running microVMs keep their sockets and logs")
+	flag.StringVar(&fcCfg.DataDir, "data-dir", fcCfg.DataDir, "kernel, rootfs cache and microVM jails, on one filesystem")
+	flag.IntVar(&fcCfg.UIDBase, "uid-base", fcCfg.UIDBase, "first of the 65536 uids microVMs run as, one each")
 	flag.BoolVar(&fcCfg.Console, "console", fcCfg.Console, "keep the guest serial console on (observable, slower boot)")
 	flag.Parse()
 	if fcCfg.Kernel == "" {
@@ -85,11 +87,4 @@ func envOr(key, fallback string) string {
 		return v
 	}
 	return fallback
-}
-
-func userCacheDir() string {
-	if dir, err := os.UserCacheDir(); err == nil {
-		return dir
-	}
-	return os.TempDir()
 }

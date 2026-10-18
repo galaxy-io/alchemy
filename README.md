@@ -57,6 +57,8 @@ The server accepts functions and invocations over its API, stores durable state 
 
 Finished microVMs stay booted for a while so the next invocation of the same function starts warm, and hosts can keep instances booted before any invocation arrives.
 
+Every microVM runs under Firecracker's jailer. It is chrooted into a directory holding only its kernel and root filesystem, placed in a cgroup capped at its vCPUs, and run as a uid no other microVM shares. A guest that escapes the VM lands in a process that can reach nothing else on the host. The host itself runs as root to set this up.
+
 ## Developing Alchemy
 
 Alchemy is written in Go, with a React and TypeScript web UI. Contributions to the runtime, the UI, deployment tooling, tests and documentation are welcome.

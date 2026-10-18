@@ -45,8 +45,8 @@ provision:
       udevadm trigger --name-match=kvm
 
 probes:
-  - description: "firecracker installed and /dev/kvm usable"
+  - description: "firecracker and jailer installed and /dev/kvm usable"
     script: |
       #!/bin/bash
       set -eu
-      [ -x /usr/local/bin/firecracker ] && [ -r /dev/kvm ] && [ -w /dev/kvm ]
+      [ -x /usr/local/bin/firecracker ] && [ -x /usr/local/bin/jailer ] && [ -r /dev/kvm ] && [ -w /dev/kvm ]

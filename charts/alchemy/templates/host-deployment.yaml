@@ -1,7 +1,3 @@
-{{- $kvm := .Values.host.kvm }}
-{{- if not (has $kvm.mode (list "privileged" "devicePlugin")) }}
-{{- fail "host.kvm.mode must be privileged or devicePlugin" }}
-{{- end }}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -54,8 +50,7 @@ spec:
             - --warm-ttl={{ .Values.host.warmTTL }}
             - --prewarm={{ .Values.host.prewarm }}
             - --console={{ .Values.host.console }}
-            - --cache-dir=/var/cache/alchemy
-            - --run-dir=/run/alchemy
+            - --data-dir=/var/lib/alchemy
           env:
             - name: NODE_NAME
               valueFrom:
@@ -69,47 +64,32 @@ spec:
           envFrom:
             - configMapRef:
                 name: {{ include "alchemy.host.fullname" . }}
+          # Root with every capability: the jailer chroots each microVM, makes
+          # its device nodes, manages its cgroup and drops it to its own uid.
           securityContext:
-            {{- if eq $kvm.mode "privileged" }}
             privileged: true
-            {{- else }}
-            allowPrivilegeEscalation: false
-            capabilities:
-              drop: ["ALL"]
-            {{- end }}
           resources:
-            {{- $resources := deepCopy .Values.host.resources }}
-            {{- if eq $kvm.mode "devicePlugin" }}
-            {{- $_ := set $resources "limits" (merge (dict $kvm.resourceName 1) ($resources.limits | default dict)) }}
-            {{- end }}
-            {{- toYaml $resources | nindent 12 }}
+            {{- toYaml .Values.host.resources | nindent 12 }}
           volumeMounts:
-            - name: cache
-              mountPath: /var/cache/alchemy
-            - name: run
-              mountPath: /run/alchemy
-            {{- if eq $kvm.mode "privileged" }}
+            - name: data
+              mountPath: /var/lib/alchemy
             - name: kvm
               mountPath: /dev/kvm
-            {{- end }}
       volumes:
-        # Built root filesystems, keyed by image digest. Losing them only
-        # means rebuilding on the next invocation.
-        - name: cache
-          {{- with .Values.host.cache.sizeLimit }}
+        # The kernel, built root filesystems keyed by image digest, and one
+        # jail per microVM. One volume, since jails hard-link the kernel and
+        # rootfs. Losing it only means rebuilding on the next invocation.
+        - name: data
+          {{- with .Values.host.data.sizeLimit }}
           emptyDir:
             sizeLimit: {{ . }}
           {{- else }}
           emptyDir: {}
           {{- end }}
-        - name: run
-          emptyDir: {}
-        {{- if eq $kvm.mode "privileged" }}
         - name: kvm
           hostPath:
             path: /dev/kvm
             type: CharDevice
-        {{- end }}
       {{- with .Values.host.nodeSelector }}
       nodeSelector:
         {{- toYaml . | nindent 8 }}
