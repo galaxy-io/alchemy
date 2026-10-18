@@ -13,6 +13,7 @@ import (
 	"path/filepath"
 	"syscall"
 
+	"github.com/galaxy-io/alchemy/cmd/internal/logger"
 	"github.com/galaxy-io/alchemy/internal/bus"
 	"github.com/galaxy-io/alchemy/internal/driver/firecracker"
 	"github.com/galaxy-io/alchemy/internal/host"
@@ -20,7 +21,11 @@ import (
 )
 
 func main() {
-	log := slog.New(slog.NewTextHandler(os.Stderr, nil))
+	log, err := logger.New(os.Stdout)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(2)
+	}
 	if err := run(log); err != nil {
 		log.Error("host", "err", err)
 		os.Exit(1)
@@ -61,6 +66,7 @@ func run(log *slog.Logger) error {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
+	log = log.With("host", cfg.Name)
 	drv, err := firecracker.New(fcCfg, log)
 	if err != nil {
 		return fmt.Errorf("firecracker driver: %w", err)

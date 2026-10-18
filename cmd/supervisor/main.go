@@ -9,7 +9,7 @@ package main
 
 import (
 	"flag"
-	"log/slog"
+	"fmt"
 	"net"
 	"net/http"
 	"os"
@@ -18,6 +18,7 @@ import (
 	"time"
 
 	"github.com/galaxy-io/alchemy/api/supervisor/v1/supervisorv1connect"
+	"github.com/galaxy-io/alchemy/cmd/internal/logger"
 	"github.com/galaxy-io/alchemy/internal/supervisor"
 )
 
@@ -29,7 +30,13 @@ func main() {
 	listen := flag.String("listen", "", "address to serve on: unix:///path/to.sock or vsock://PORT (default when PID 1: vsock://1024)")
 	flag.Parse()
 
-	log := slog.New(slog.NewTextHandler(os.Stderr, nil))
+	// The guest has no environment, so this is JSON at INFO on the serial
+	// console.
+	log, err := logger.New(os.Stderr)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(2)
+	}
 
 	if os.Getpid() == 1 {
 		if err := initGuest(); err != nil {

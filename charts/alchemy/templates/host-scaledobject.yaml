@@ -1,0 +1,37 @@
+{{- if .Values.host.autoscaling.enabled }}
+{{- $scaling := .Values.host.autoscaling }}
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata:
+  name: {{ include "alchemy.host.fullname" . }}
+  namespace: {{ include "alchemy.namespace" . }}
+  labels:
+    {{- include "alchemy.host.labels" . | nindent 4 }}
+spec:
+  scaleTargetRef:
+    name: {{ include "alchemy.host.fullname" . }}
+  minReplicaCount: {{ $scaling.minReplicas }}
+  maxReplicaCount: {{ $scaling.maxReplicas }}
+  pollingInterval: {{ $scaling.pollingInterval }}
+  advanced:
+    horizontalPodAutoscalerConfig:
+      behavior:
+        # Add hosts as soon as demand appears. Remove them one at a time once
+        # it has stayed low: each drains its microVMs on the way out.
+        scaleUp:
+          stabilizationWindowSeconds: 0
+        scaleDown:
+          stabilizationWindowSeconds: {{ $scaling.scaleDownStabilizationSeconds }}
+          policies:
+            - type: Pods
+              value: 1
+              periodSeconds: 60
+  triggers:
+    # Hosts = demand / busy slots wanted per host.
+    - type: metrics-api
+      metricType: AverageValue
+      metadata:
+        url: "http://{{ include "alchemy.server.fullname" . }}.{{ include "alchemy.namespace" . }}.svc:{{ .Values.server.service.port }}/scaling"
+        valueLocation: demand
+        targetValue: {{ max 1 (div (mul .Values.host.maxConcurrency $scaling.targetUtilization) 100) | quote }}
+{{- end }}

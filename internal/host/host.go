@@ -128,7 +128,7 @@ func (h *Host) Run(ctx context.Context) error {
 		}
 		subs = append(subs, sub)
 	}
-	h.log.Info("host serving", "name", h.cfg.Name, "slots", h.cfg.MaxConcurrency, "memory_mib", h.cfg.MemoryMiB, "warm_ttl", h.cfg.WarmTTL, "prewarm", h.cfg.Prewarm)
+	h.log.Info("host serving", "slots", h.cfg.MaxConcurrency, "memory_mib", h.cfg.MemoryMiB, "warm_ttl", h.cfg.WarmTTL, "prewarm", h.cfg.Prewarm)
 
 	ticker := time.NewTicker(h.cfg.HeartbeatInterval)
 	defer ticker.Stop()
@@ -186,7 +186,7 @@ func (h *Host) handleBuild(ctx context.Context, data []byte) proto.Message {
 		return buildError("internal", err)
 	}
 	h.prewarm(artifact)
-	h.log.Info("build ready", "artifact", artifact.GetId(), "digest", artifact.GetDigest(), "took", time.Since(start).Round(time.Millisecond))
+	h.log.Info("build ready", "artifact_id", artifact.GetId(), "digest", artifact.GetDigest(), "took", time.Since(start).Round(time.Millisecond))
 	return &hostv1.BuildResponse{Result: &hostv1.BuildResponse_Artifact{Artifact: artifact}}
 }
 
@@ -217,6 +217,7 @@ func (h *Host) handleInvoke(ctx context.Context, data []byte) proto.Message {
 	if err := proto.Unmarshal(data, req); err != nil {
 		return invokeError("invalid_argument", err)
 	}
+	log := h.log.With("invocation_id", req.GetInvocationId(), "artifact_id", req.GetArtifact().GetId())
 	start := time.Now()
 
 	select {
@@ -236,6 +237,7 @@ func (h *Host) handleInvoke(ctx context.Context, data []byte) proto.Message {
 		instance, startKind, err = h.driver.Acquire(ctx, fromProto(req.GetArtifact()))
 		if err != nil {
 			h.untrack(live)
+			log.Warn("acquire instance", "err", err)
 			return invokeError("unavailable", fmt.Errorf("acquire instance: %w", err))
 		}
 	}
@@ -286,8 +288,10 @@ func (h *Host) handleInvoke(ctx context.Context, data []byte) proto.Message {
 		}}
 		resp.RunUs = time.Since(acquired).Microseconds()
 	default:
+		log.Warn("invoke instance", "instance_id", instance.ID(), "err", err)
 		return invokeError("unavailable", fmt.Errorf("invoke instance: %w", err))
 	}
+	log.Debug("invocation finished", "instance_id", instance.ID(), "start_kind", startKind, "acquire_us", acquireUs, "run_us", resp.GetRunUs())
 	return resp
 }
 
@@ -304,7 +308,7 @@ func (h *Host) publishState(invocationID string, status functionsv1.InvocationSt
 		AcquireUs:    acquireUs,
 	})
 	if err != nil {
-		h.log.Warn("publish invocation state", "invocation", invocationID, "err", err)
+		h.log.Warn("publish invocation state", "invocation_id", invocationID, "err", err)
 	}
 }
 
@@ -443,7 +447,7 @@ func (h *Host) boot(live *liveInstance) {
 	if err != nil {
 		h.untrack(live)
 		if h.background.Err() == nil {
-			h.log.Warn("prewarm", "artifact", id, "err", err)
+			h.log.Warn("prewarm", "artifact_id", id, "err", err)
 		}
 		return
 	}

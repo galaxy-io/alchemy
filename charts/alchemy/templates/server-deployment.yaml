@@ -13,6 +13,7 @@ spec:
   template:
     metadata:
       annotations:
+        checksum/config: {{ include (print $.Template.BasePath "/server-configmap.yaml") . | sha256sum }}
         checksum/secret: {{ include (print $.Template.BasePath "/secret.yaml") . | sha256sum }}
       labels:
         {{- include "alchemy.server.selectorLabels" . | nindent 8 }}
@@ -67,6 +68,8 @@ spec:
             periodSeconds: 20
             timeoutSeconds: 3
           envFrom:
+            - configMapRef:
+                name: {{ include "alchemy.server.fullname" . }}
             - secretRef:
                 name: {{ include "alchemy.secretName" . }}
           resources:

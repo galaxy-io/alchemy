@@ -207,7 +207,7 @@ func (s *Service) startBuild(v *sqlcgen.FunctionVersion) {
 func (s *Service) build(v *sqlcgen.FunctionVersion) {
 	ctx, cancel := context.WithTimeout(s.background, s.cfg.BuildTimeout)
 	defer cancel()
-	log := s.log.With("function", v.FunctionID, "version", v.Version)
+	log := s.log.With("function_id", v.FunctionID, "version", v.Version)
 
 	if err := s.store.StartFunctionVersionBuild(ctx, v.ID); err != nil {
 		log.Error("record build start", "err", err)
@@ -239,7 +239,7 @@ func (s *Service) build(v *sqlcgen.FunctionVersion) {
 		finish.RootfsBytes = artifact.GetRootfsBytes()
 		finish.ArtifactID = artifact.GetId()
 		finish.Artifact, _ = protojson.Marshal(artifact)
-		log.Info("build ready", "artifact", artifact.GetId(), "digest", artifact.GetDigest(), "rootfs_bytes", artifact.GetRootfsBytes(), "took", time.Since(start).Round(time.Millisecond))
+		log.Info("build ready", "artifact_id", artifact.GetId(), "digest", artifact.GetDigest(), "rootfs_bytes", artifact.GetRootfsBytes(), "took", time.Since(start).Round(time.Millisecond))
 	}
 	row, err := s.store.FinishFunctionVersionBuild(context.WithoutCancel(ctx), finish)
 	if err != nil {

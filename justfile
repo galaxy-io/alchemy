@@ -4,6 +4,9 @@ set dotenv-load
 export PERSISTENCE_DSN := env("PERSISTENCE_DSN", "postgresql://alchemy:alchemy@localhost:5435/alchemy?sslmode=disable")
 export NATS_URL := env("NATS_URL", "nats://localhost:4223")
 host_nats_url := "nats://host.lima.internal:4223"
+# text logs read better in a terminal; the chart defaults to json
+export LOG_FORMAT := env("LOG_FORMAT", "text")
+export LOG_LEVEL := env("LOG_LEVEL", "info")
 
 default:
     @just --list
@@ -40,7 +43,7 @@ host count="3" memory="512" warm="5m" prewarm="0": build-linux
     limactl shell alchemy -- pkill -f 'bin/linux-arm64/host' || true
     limactl shell alchemy -- bash -c 'cd "{{ justfile_directory() }}" && trap "kill 0" EXIT INT TERM HUP; \
       for i in $(seq 1 {{ count }}); do \
-        bin/linux-arm64/host --nats="{{ host_nats_url }}" --name=host-$i --run-dir=/tmp/alchemy/host-$i \
+        LOG_FORMAT={{ LOG_FORMAT }} LOG_LEVEL={{ LOG_LEVEL }} bin/linux-arm64/host --nats="{{ host_nats_url }}" --name=host-$i --run-dir=/tmp/alchemy/host-$i \
           --memory-mib={{ memory }} --warm-ttl={{ warm }} --prewarm={{ prewarm }} 2>&1 | sed -u "s/^/[host-$i] /" & \
       done; wait'
 

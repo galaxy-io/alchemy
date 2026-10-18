@@ -56,6 +56,11 @@ server:
   # yet shared between replicas.
   replicas: 1
 
+  # -- Server log level: `debug`, `info`, `warn` or `error`.
+  logLevel: info
+  # -- Server log format: `json` or `text`.
+  logFormat: json
+
   service:
     # -- Service type.
     type: ClusterIP
@@ -110,8 +115,25 @@ host:
     annotations: {}
 
   # -- Number of hosts. Each runs on its own node; on an autoscaled cluster,
-  # raising this is what brings up more KVM nodes.
+  # raising this is what brings up more KVM nodes. Ignored when
+  # `host.autoscaling.enabled` is true.
   replicas: 1
+
+  autoscaling:
+    # -- Scale hosts with KEDA on slot demand: busy slots plus invocations
+    # waiting for one, read from the server's `/scaling`. Requires KEDA.
+    enabled: false
+    # -- Fewest hosts. Keep at least 1: a new KVM node takes minutes.
+    minReplicas: 1
+    # -- Most hosts.
+    maxReplicas: 10
+    # -- Percent of each host's `maxConcurrency` slots to keep busy. Lower
+    # leaves more headroom for bursts.
+    targetUtilization: 75
+    # -- Seconds between KEDA's reads of `/scaling`.
+    pollingInterval: 15
+    # -- Seconds demand must stay low before hosts are removed.
+    scaleDownStabilizationSeconds: 300
 
   # -- Nodes that run a host. They must expose `/dev/kvm`: bare
   # metal, or virtual machines with nested virtualization enabled.
@@ -148,6 +170,11 @@ host:
   prewarm: 0
   # -- Keep the guest serial console on (`--console`). Observable, slower boot.
   console: false
+
+  # -- Host log level: `debug`, `info`, `warn` or `error`.
+  logLevel: info
+  # -- Host log format: `json` or `text`.
+  logFormat: json
 
   cache:
     # -- Size limit for the rootfs cache `emptyDir`. Empty means no limit.

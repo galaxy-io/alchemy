@@ -59,7 +59,7 @@ func (s *Service) reconcileOnce() {
 		}
 		cv, err := s.compiled(row)
 		if err != nil {
-			s.log.Warn("reconcile: compile version", "function", row.FunctionID, "version", row.Version, "err", err)
+			s.log.Warn("reconcile: compile version", "function_id", row.FunctionID, "version", row.Version, "err", err)
 			continue
 		}
 		for name, served := range hosts {
@@ -85,7 +85,7 @@ func (s *Service) reconcileOnce() {
 func (s *Service) buildOn(name string, cv *compiledVersion) {
 	ctx, cancel := context.WithTimeout(s.background, s.cfg.BuildTimeout)
 	defer cancel()
-	log := s.log.With("host", name, "function", cv.row.FunctionID, "version", cv.row.Version, "artifact", cv.row.ArtifactID)
+	log := s.log.With("host", name, "function_id", cv.row.FunctionID, "version", cv.row.Version, "artifact_id", cv.row.ArtifactID)
 	start := time.Now()
 	resp := &hostv1.BuildResponse{}
 	if err := s.bus.Request(ctx, bus.HostBuildSubject(name), &hostv1.BuildRequest{TenantId: cv.row.TenantID, Spec: cv.pinnedSpec()}, resp); err != nil {
@@ -98,7 +98,7 @@ func (s *Service) buildOn(name string, cv *compiledVersion) {
 	case resp.GetArtifact().GetId() != cv.row.ArtifactID:
 		// The host serves the artifact it built, which is not the one the
 		// version invokes, so it still takes none of its invocations.
-		log.Warn("reconcile: host built a different artifact", "built", resp.GetArtifact().GetId())
+		log.Warn("reconcile: host built a different artifact", "built_artifact_id", resp.GetArtifact().GetId())
 	default:
 		log.Info("host reconciled", "took", time.Since(start).Round(time.Millisecond))
 	}

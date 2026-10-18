@@ -76,7 +76,7 @@ func (s *Service) onInvocationState(_ context.Context, data []byte) proto.Messag
 		return nil
 	}
 	if err != nil {
-		s.log.Warn("record invocation state", "invocation", ev.GetInvocationId(), "status", ev.GetStatus(), "err", err)
+		s.log.Warn("record invocation state", "invocation_id", ev.GetInvocationId(), "status", ev.GetStatus(), "err", err)
 		return nil
 	}
 	s.events.publish(invocationProto(row))

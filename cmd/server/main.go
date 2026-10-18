@@ -5,8 +5,10 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"flag"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"os"
@@ -16,6 +18,7 @@ import (
 
 	"github.com/galaxy-io/alchemy/api/functions/v1/functionsv1connect"
 	"github.com/galaxy-io/alchemy/api/metrics/v1/metricsv1connect"
+	"github.com/galaxy-io/alchemy/cmd/internal/logger"
 	"github.com/galaxy-io/alchemy/datastore/postgres"
 	"github.com/galaxy-io/alchemy/internal/bus"
 	"github.com/galaxy-io/alchemy/internal/server"
@@ -23,7 +26,11 @@ import (
 )
 
 func main() {
-	log := slog.New(slog.NewTextHandler(os.Stderr, nil))
+	log, err := logger.New(os.Stdout)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(2)
+	}
 	if err := run(log); err != nil {
 		log.Error("server", "err", err)
 		os.Exit(1)
@@ -67,6 +74,11 @@ func run(log *slog.Logger) error {
 	mux.Handle(metricsv1connect.NewMetricsServiceHandler(svc.NewMetricsService()))
 	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusNoContent)
+	})
+	// KEDA scales hosts on this (charts/alchemy, host.autoscaling).
+	mux.HandleFunc("GET /scaling", func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(svc.Scaling())
 	})
 	mux.Handle("/", ui.Handler())
 
