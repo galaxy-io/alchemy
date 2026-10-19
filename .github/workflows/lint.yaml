@@ -120,7 +120,6 @@ jobs:
           helm template alchemy charts/alchemy > /dev/null
           helm template alchemy charts/alchemy --set existingSecret=byo > /dev/null
           helm template alchemy charts/alchemy --set server.ingress.enabled=true --set "server.ingress.hosts[0]=alchemy.example.com" > /dev/null
-          helm template alchemy charts/alchemy --set host.kvm.mode=devicePlugin > /dev/null
           helm template alchemy charts/alchemy --set host.autoscaling.enabled=true > /dev/null
           helm template alchemy charts/alchemy --set postgresql.enabled=true --set postgresql.auth.password=p --set nats.enabled=true > /dev/null
 

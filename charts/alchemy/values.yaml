@@ -149,14 +149,6 @@ host:
   # -- Affinity for hosts, merged with the built-in anti-affinity that keeps one host per node.
   affinity: {}
 
-  kvm:
-    # -- How the host reaches `/dev/kvm`. `privileged` mounts the node's device
-    # into a privileged container and works everywhere. `devicePlugin` requests
-    # `kvm.resourceName` from a KVM device plugin and runs unprivileged.
-    mode: privileged
-    # -- Extended resource the KVM device plugin advertises. Used when `kvm.mode` is `devicePlugin`.
-    resourceName: devices.kubevirt.io/kvm
-
   # -- Invocations allowed to hold an instance at once (`--max-concurrency`).
   maxConcurrency: 8
   # -- Guest memory in MiB the host may commit across busy and warm instances
@@ -176,8 +168,9 @@ host:
   # -- Host log format: `json` or `text`.
   logFormat: json
 
-  cache:
-    # -- Size limit for the rootfs cache `emptyDir`. Empty means no limit.
+  data:
+    # -- Size limit for the `emptyDir` holding the kernel, the rootfs cache
+    # and microVM jails. Empty means no limit.
     sizeLimit: ""
 
   # -- Seconds a host gets to stop its microVMs on shutdown.

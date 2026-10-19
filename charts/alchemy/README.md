@@ -19,10 +19,7 @@ kubectl taint node <node> alchemy.galaxy.io/kvm=true:NoSchedule
 
 Hosts tolerate that taint by default (`host.tolerations`).
 
-`host.kvm.mode` controls how the host reaches the device:
-
-- `privileged` (default) mounts the node's `/dev/kvm` into a privileged container.
-- `devicePlugin` requests `host.kvm.resourceName` (default `devices.kubevirt.io/kvm`) from a KVM device plugin. The container runs unprivileged.
+Hosts run as privileged containers with the node's `/dev/kvm` mounted. Privilege is what isolates the microVMs: each one runs under Firecracker's jailer, chrooted into its own directory, in its own cgroup capped at its vCPUs, and as its own unprivileged uid. The node needs cgroup v2.
 
 Guest memory and vCPUs count against the host pod. Set `host.resources.limits` to cover `host.memoryMiB` and the host process on top of it.
 
