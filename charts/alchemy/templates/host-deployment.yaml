@@ -27,6 +27,7 @@ spec:
         checksum/secret: {{ include (print $.Template.BasePath "/secret.yaml") . | sha256sum }}
       labels:
         {{- include "alchemy.host.selectorLabels" . | nindent 8 }}
+        {{- include "alchemy.podLabels" . | nindent 8 }}
     spec:
       serviceAccountName: {{ include "alchemy.host.serviceAccountName" . }}
       automountServiceAccountToken: false
@@ -69,7 +70,7 @@ spec:
           securityContext:
             privileged: true
           resources:
-            {{- toYaml .Values.host.resources | nindent 12 }}
+            {{- include "alchemy.host.resources" . | nindent 12 }}
           volumeMounts:
             - name: data
               mountPath: /var/lib/alchemy

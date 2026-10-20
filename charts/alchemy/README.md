@@ -3,7 +3,7 @@
 This chart deploys the Alchemy server and one host per KVM-capable node, plus the configuration that connects them to PostgreSQL and NATS.
 
 - **server** is a Deployment. It serves the API on port 8780 and applies migrations when it starts.
-- **host** is a Deployment of `host.replicas` hosts, one per node, on nodes matching `host.nodeSelector` (`alchemy.galaxy.io/kvm: "true"` by default). Each host boots Firecracker microVMs on its node and pulls function images straight from their registries. No container daemon is involved.
+- **host** is a Deployment of `host.replicas` hosts, one per node, on nodes matching `host.nodeSelector` (`alchemy.getgalaxy.io/kvm: "true"` by default). Each host boots Firecracker microVMs on its node and pulls function images straight from their registries. No container daemon is involved.
 
 > [!CAUTION]
 > Keep `server.replicas` at `1`. Invocation state events are not yet shared between replicas.
@@ -13,8 +13,8 @@ This chart deploys the Alchemy server and one host per KVM-capable node, plus th
 Hosts need `/dev/kvm`, so the nodes must be bare metal or VMs with nested virtualization enabled. Label them so hosts schedule there, and taint them so nothing else does:
 
 ```sh
-kubectl label node <node> alchemy.galaxy.io/kvm=true
-kubectl taint node <node> alchemy.galaxy.io/kvm=true:NoSchedule
+kubectl label node <node> alchemy.getgalaxy.io/kvm=true
+kubectl taint node <node> alchemy.getgalaxy.io/kvm=true:NoSchedule
 ```
 
 Hosts tolerate that taint by default (`host.tolerations`).

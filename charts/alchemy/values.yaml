@@ -15,6 +15,9 @@ namespaceOverride: ""
 # -- Labels added to all Alchemy resources.
 commonLabels: {}
 
+# -- Labels added to the server and host pods.
+podLabels: {}
+
 # -- Existing runtime Secret with `PERSISTENCE_DSN` and `NATS_URL`. The server
 # reads both; hosts read only `NATS_URL`.
 existingSecret: ""
@@ -138,11 +141,11 @@ host:
   # -- Nodes that run a host. They must expose `/dev/kvm`: bare
   # metal, or virtual machines with nested virtualization enabled.
   nodeSelector:
-    alchemy.galaxy.io/kvm: "true"
+    alchemy.getgalaxy.io/kvm: "true"
   # -- Tolerations for hosts. The default tolerates the taint that keeps
-  # everything else off KVM nodes: `alchemy.galaxy.io/kvm=true:NoSchedule`.
+  # everything else off KVM nodes: `alchemy.getgalaxy.io/kvm=true:NoSchedule`.
   tolerations:
-    - key: alchemy.galaxy.io/kvm
+    - key: alchemy.getgalaxy.io/kvm
       operator: Equal
       value: "true"
       effect: NoSchedule
@@ -153,7 +156,8 @@ host:
   maxConcurrency: 8
   # -- Guest memory in MiB the host may commit across busy and warm instances
   # (`--memory-mib`). 0 means no limit. Guest memory is charged to the host
-  # pod, so `resources.limits.memory` must leave room for it.
+  # pod, so `resources.limits.memory` must leave room for it. When set and
+  # `resources` names no memory request or limit, it is the pod's memory request.
   memoryMiB: 0
   # -- How long a finished instance stays booted for the next invocation
   # (`--warm-ttl`). `0s` cold boots every invocation.

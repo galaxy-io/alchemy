@@ -24,7 +24,15 @@ helm.sh/chart: {{ include "alchemy.chart" . }}
 {{ include "alchemy.selectorLabels" . }}
 app.kubernetes.io/version: {{ .Chart.AppVersion | quote }}
 app.kubernetes.io/managed-by: {{ .Release.Service }}
+app.kubernetes.io/part-of: alchemy
 {{- with .Values.commonLabels }}
+{{ toYaml . }}
+{{- end }}
+{{- end -}}
+
+{{- define "alchemy.podLabels" -}}
+app.kubernetes.io/part-of: alchemy
+{{- with .Values.podLabels }}
 {{ toYaml . }}
 {{- end }}
 {{- end -}}
@@ -70,6 +78,15 @@ app.kubernetes.io/component: host
 {{- define "alchemy.host.selectorLabels" -}}
 {{ include "alchemy.selectorLabels" . }}
 app.kubernetes.io/component: host
+{{- end -}}
+
+{{- define "alchemy.host.resources" -}}
+{{- $resources := deepCopy .Values.host.resources -}}
+{{- $memoryMiB := int .Values.host.memoryMiB -}}
+{{- if and (gt $memoryMiB 0) (not (dig "requests" "memory" "" $resources)) (not (dig "limits" "memory" "" $resources)) -}}
+{{- $_ := set $resources "requests" (merge (dict "memory" (printf "%dMi" $memoryMiB)) (dig "requests" (dict) $resources)) -}}
+{{- end -}}
+{{- toYaml $resources -}}
 {{- end -}}
 
 {{- define "alchemy.host.serviceAccountName" -}}
