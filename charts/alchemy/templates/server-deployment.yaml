@@ -17,6 +17,7 @@ spec:
         checksum/secret: {{ include (print $.Template.BasePath "/secret.yaml") . | sha256sum }}
       labels:
         {{- include "alchemy.server.selectorLabels" . | nindent 8 }}
+        {{- include "alchemy.podLabels" . | nindent 8 }}
     spec:
       serviceAccountName: {{ include "alchemy.server.serviceAccountName" . }}
       automountServiceAccountToken: false
