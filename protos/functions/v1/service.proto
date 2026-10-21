@@ -34,6 +34,9 @@ service FunctionsService {
   rpc GetInvocation(GetInvocationRequest) returns (GetInvocationResponse);
   rpc ListInvocations(ListInvocationsRequest) returns (ListInvocationsResponse);
 
+  // Logs; an invocation's stderr, live while it runs and kept after.
+  rpc GetInvocationLogs(GetInvocationLogsRequest) returns (stream GetInvocationLogsResponse);
+
   // Live view; server-streams invocation transitions with optional replay.
   rpc TailInvocations(TailInvocationsRequest) returns (stream TailInvocationsResponse);
 

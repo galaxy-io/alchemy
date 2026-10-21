@@ -7,12 +7,12 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"flag"
 	"fmt"
 	"log/slog"
 	"net/http"
 	"os"
 	"os/signal"
+	"strconv"
 	"syscall"
 	"time"
 
@@ -21,6 +21,7 @@ import (
 	"github.com/galaxy-io/alchemy/cmd/internal/logger"
 	"github.com/galaxy-io/alchemy/datastore/postgres"
 	"github.com/galaxy-io/alchemy/internal/bus"
+	"github.com/galaxy-io/alchemy/internal/logs"
 	"github.com/galaxy-io/alchemy/internal/server"
 	"github.com/galaxy-io/alchemy/ui"
 )
@@ -40,15 +41,30 @@ func main() {
 func run(log *slog.Logger) error {
 	cfg := server.DefaultConfig()
 
-	addr := flag.String("addr", ":8780", "address to serve the API on")
-	dsn := flag.String("dsn", envOr("PERSISTENCE_DSN", "postgresql://alchemy:alchemy@localhost:5435/alchemy?sslmode=disable"), "Postgres DSN (env PERSISTENCE_DSN)")
-	natsURL := flag.String("nats", envOr("NATS_URL", "nats://localhost:4223"), "NATS URL (env NATS_URL)")
-	flag.Parse()
+	addr := envOr("ADDR", ":8780")
+	dsn := envOr("PERSISTENCE_DSN", "postgresql://alchemy:alchemy@localhost:5435/alchemy?sslmode=disable")
+	natsURL := envOr("NATS_URL", "nats://localhost:4223")
+	// Empty keeps function logs on NATS only.
+	logsBucket := os.Getenv("FUNCTION_LOGS_BUCKET")
+	if s := os.Getenv("FUNCTION_LOGS_RETENTION"); s != "" {
+		d, err := time.ParseDuration(s)
+		if err != nil {
+			return fmt.Errorf("FUNCTION_LOGS_RETENTION: %w", err)
+		}
+		cfg.LogRetention = d
+	}
+	if s := os.Getenv("FUNCTION_LOGS_MAX_BYTES"); s != "" {
+		n, err := strconv.ParseInt(s, 10, 64)
+		if err != nil {
+			return fmt.Errorf("FUNCTION_LOGS_MAX_BYTES: %w", err)
+		}
+		cfg.LogMaxBytes = n
+	}
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
-	store, err := postgres.Open(ctx, *dsn)
+	store, err := postgres.Open(ctx, dsn)
 	if err != nil {
 		return err
 	}
@@ -57,13 +73,23 @@ func run(log *slog.Logger) error {
 		return err
 	}
 
-	b, err := bus.Connect(*natsURL, "server")
+	b, err := bus.Connect(natsURL, "server")
 	if err != nil {
 		return err
 	}
 	defer b.Close()
 
-	svc, err := server.New(ctx, cfg, store, b, log)
+	bucket, err := logs.OpenBucket(ctx, logsBucket)
+	if err != nil {
+		return fmt.Errorf("function logs bucket: %w", err)
+	}
+	if bucket == nil {
+		log.Warn("no function logs bucket: logs are kept on NATS only, for its retention")
+	} else {
+		defer func() { _ = bucket.Close() }()
+	}
+
+	svc, err := server.New(ctx, cfg, store, b, bucket, log)
 	if err != nil {
 		return err
 	}
@@ -87,7 +113,7 @@ func run(log *slog.Logger) error {
 	protocols.SetHTTP1(true)
 	protocols.SetUnencryptedHTTP2(true)
 	srv := &http.Server{
-		Addr:              *addr,
+		Addr:              addr,
 		Handler:           mux,
 		Protocols:         protocols,
 		ReadHeaderTimeout: 10 * time.Second,
@@ -95,7 +121,7 @@ func run(log *slog.Logger) error {
 
 	serveErr := make(chan error, 1)
 	go func() { serveErr <- srv.ListenAndServe() }()
-	log.Info("server listening", "addr", *addr, "nats", *natsURL)
+	log.Info("server listening", "addr", addr, "nats", natsURL)
 
 	select {
 	case err := <-serveErr:

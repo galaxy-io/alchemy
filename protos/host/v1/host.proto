@@ -99,7 +99,6 @@ message InvokeResponse {
   functions.v1.StartKind start_kind = 5;
   int64 acquire_us = 6;
   int64 run_us = 7;
-  string log_tail = 8;
 }
 
 // InvocationEvent is published as a host moves an invocation along, so the

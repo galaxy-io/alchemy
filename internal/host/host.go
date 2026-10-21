@@ -15,6 +15,7 @@ import (
 	"sync"
 	"time"
 
+	"gocloud.dev/blob"
 	"google.golang.org/protobuf/proto"
 
 	functionsv1 "github.com/galaxy-io/alchemy/api/functions/v1"
@@ -22,6 +23,7 @@ import (
 	supervisorv1 "github.com/galaxy-io/alchemy/api/supervisor/v1"
 	"github.com/galaxy-io/alchemy/internal/bus"
 	"github.com/galaxy-io/alchemy/internal/driver"
+	"github.com/galaxy-io/alchemy/internal/logs"
 )
 
 const (
@@ -29,7 +31,6 @@ const (
 	// for the supervisor to report it before giving up on the instance.
 	supervisorGrace = 5 * time.Second
 	releaseTimeout  = 30 * time.Second
-	logTailBytes    = 4 << 10
 )
 
 // Config tunes one host.
@@ -70,6 +71,7 @@ type Host struct {
 	cfg       Config
 	driver    driver.Driver
 	bus       *bus.Bus
+	logs      *blob.Bucket // nil keeps function logs on the bus only
 	log       *slog.Logger
 	startedAt time.Time
 	slots     chan struct{}
@@ -88,13 +90,15 @@ type Host struct {
 	filling   map[string]int               // prewarm boots in flight, by artifact id
 }
 
-// New returns a host that is not yet serving; Run starts it.
-func New(cfg Config, d driver.Driver, b *bus.Bus, log *slog.Logger) *Host {
+// New returns a host that is not yet serving; Run starts it. Function logs
+// are uploaded to logBucket, when there is one.
+func New(cfg Config, d driver.Driver, b *bus.Bus, logBucket *blob.Bucket, log *slog.Logger) *Host {
 	bg, stop := context.WithCancel(context.Background())
 	return &Host{
 		cfg:        cfg,
 		driver:     d,
 		bus:        b,
+		logs:       logBucket,
 		log:        log,
 		startedAt:  time.Now(),
 		slots:      make(chan struct{}, cfg.MaxConcurrency),
@@ -264,12 +268,14 @@ func (h *Host) handleInvoke(ctx context.Context, data []byte) proto.Message {
 	timeout := time.Duration(req.GetTimeoutMs()) * time.Millisecond
 	runCtx, cancel := context.WithTimeout(ctx, timeout+supervisorGrace)
 	defer cancel()
+	fnLogs := h.functionLogs(req, log)
 	out, err := instance.Invoke(runCtx, &supervisorv1.InvokeRequest{
 		InvocationId: req.GetInvocationId(),
 		Input:        req.GetInput(),
 		TimeoutMs:    timeout.Milliseconds(),
 		HostTimeMs:   time.Now().UnixMilli(),
-	})
+	}, fnLogs)
+	fnLogs.end()
 	switch {
 	case err == nil:
 		reusable = true
@@ -279,7 +285,6 @@ func (h *Host) handleInvoke(ctx context.Context, data []byte) proto.Message {
 			resp.Result = &hostv1.InvokeResponse_Output{Output: out.GetOutput()}
 		}
 		resp.RunUs = cmpNonZero(out.GetRunUs(), time.Since(acquired).Microseconds())
-		resp.LogTail = tail(out.GetLogTail())
 	case errors.Is(runCtx.Err(), context.DeadlineExceeded):
 		// The supervisor never answered; the function is the likeliest cause.
 		resp.Result = &hostv1.InvokeResponse_Failure{Failure: &supervisorv1.Failure{
@@ -293,6 +298,36 @@ func (h *Host) handleInvoke(ctx context.Context, data []byte) proto.Message {
 	}
 	log.Debug("invocation finished", "instance_id", instance.ID(), "start_kind", startKind, "acquire_us", acquireUs, "run_us", resp.GetRunUs())
 	return resp
+}
+
+// functionLog is where one invocation's stderr goes: the bus, and the log
+// bucket.
+type functionLog struct {
+	*logs.Writer
+	h       *Host
+	subject string
+	log     *slog.Logger
+}
+
+func (h *Host) functionLogs(req *hostv1.InvokeRequest, log *slog.Logger) *functionLog {
+	tenantID := req.GetArtifact().GetTenantId()
+	subject := bus.LogSubject(tenantID, req.GetInvocationId())
+	w := logs.NewWriter(h.background, h.logs, logs.Key(tenantID, req.GetInvocationId()),
+		func(p []byte) error { return h.bus.PublishLog(subject, p) }, log)
+	return &functionLog{Writer: w, h: h, subject: subject, log: log}
+}
+
+// end marks the log complete on the bus, then completes the upload without
+// holding up the reply.
+func (l *functionLog) end() {
+	if err := l.h.bus.EndLog(l.subject); err != nil {
+		l.log.Debug("end log", "err", err)
+	}
+	l.h.tasks.Go(func() {
+		if err := l.Close(); err != nil {
+			l.log.Warn("complete log upload", "err", err)
+		}
+	})
 }
 
 func invokeError(code string, err error) *hostv1.InvokeResponse {
@@ -625,11 +660,4 @@ func cmpNonZero(a, b int64) int64 {
 		return a
 	}
 	return b
-}
-
-func tail(s string) string {
-	if len(s) > logTailBytes {
-		return s[len(s)-logTailBytes:]
-	}
-	return s
 }

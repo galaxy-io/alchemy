@@ -4,6 +4,7 @@ package driver
 
 import (
 	"context"
+	"io"
 
 	functionsv1 "github.com/galaxy-io/alchemy/api/functions/v1"
 	supervisorv1 "github.com/galaxy-io/alchemy/api/supervisor/v1"
@@ -40,7 +41,9 @@ type Driver interface {
 type Instance interface {
 	// ID identifies the instance for the life of the host process.
 	ID() string
-	Invoke(ctx context.Context, req *supervisorv1.InvokeRequest) (*supervisorv1.InvokeResponse, error)
+	// Invoke runs one invocation, writing the function's stderr to logs as
+	// it arrives.
+	Invoke(ctx context.Context, req *supervisorv1.InvokeRequest, logs io.Writer) (*supervisorv1.InvokeResult, error)
 	// Release destroys the instance.
 	Release(ctx context.Context)
 }

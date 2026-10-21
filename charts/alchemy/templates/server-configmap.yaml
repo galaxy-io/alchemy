@@ -6,6 +6,12 @@ metadata:
   labels:
     {{- include "alchemy.server.labels" . | nindent 4 }}
 data:
+  # API
+  ADDR: ":{{ .Values.server.service.port }}"
   # Observability
   LOG_LEVEL: {{ .Values.server.logLevel | quote }}
   LOG_FORMAT: {{ .Values.server.logFormat | quote }}
+  # Function logs
+  FUNCTION_LOGS_BUCKET: {{ .Values.functionLogs.bucket | quote }}
+  FUNCTION_LOGS_RETENTION: {{ .Values.functionLogs.retention | quote }}
+  FUNCTION_LOGS_MAX_BYTES: {{ int64 .Values.functionLogs.maxBytes | quote }}

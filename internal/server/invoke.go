@@ -87,7 +87,7 @@ func (s *Service) Invoke(ctx context.Context, req *connect.Request[functionsv1.I
 		},
 	}
 	s.setResult(resp, cv, input, out)
-	inv.finished(resp, out.GetLogTail())
+	inv.finished(resp)
 	return connect.NewResponse(resp), nil
 }
 
@@ -343,13 +343,12 @@ func (i *invocation) publish() {
 	i.s.events.publish(invocationProto(i.row))
 }
 
-func (i *invocation) finished(resp *functionsv1.InvokeResponse, logTail string) {
+func (i *invocation) finished(resp *functionsv1.InvokeResponse) {
 	params := sqlcgen.FinishInvocationParams{
 		ID:      i.row.ID,
 		Status:  sqlcgen.InvocationStatusSucceeded,
 		RunUs:   resp.GetStats().GetRunUs(),
 		TotalUs: resp.GetStats().GetTotalUs(),
-		LogTail: tail(logTail),
 	}
 	if fe := resp.GetError(); fe != nil {
 		params.Status = sqlcgen.InvocationStatusFailed
@@ -377,14 +376,4 @@ func (i *invocation) canceled() {
 		Status:        sqlcgen.InvocationStatusCanceled,
 		PlatformError: "caller went away",
 	}))
-}
-
-// logTailBytes bounds what is kept of a function's stderr.
-const logTailBytes = 4 << 10
-
-func tail(s string) string {
-	if len(s) > logTailBytes {
-		return s[len(s)-logTailBytes:]
-	}
-	return s
 }

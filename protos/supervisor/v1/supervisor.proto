@@ -59,14 +59,22 @@ message Failure {
   int32 exit_code = 4;
 }
 
-// InvokeResponse carries the function's output, not yet validated, or a
+// InvokeResult carries the function's output, not yet validated, or a
 // Failure. run_us is time spent in the function, measured in the guest on a
-// monotonic clock. log_tail is the last few KB of the function's stderr.
-message InvokeResponse {
+// monotonic clock.
+message InvokeResult {
   oneof result {
     bytes output = 1;
     Failure failure = 2;
   }
   int64 run_us = 3;
-  string log_tail = 4;
+}
+
+// InvokeResponse is one message of an invocation's stream: the function's
+// stderr as it is written, then exactly one result, last.
+message InvokeResponse {
+  oneof event {
+    bytes log = 1;
+    InvokeResult result = 2;
+  }
 }

@@ -33,9 +33,23 @@ eventBus:
   nats:
     # -- NATS connection URL stored in the chart-created Secret as `NATS_URL`.
     # Required unless `existingSecret` is set. The server must allow 64MB
-    # payloads (`max_payload`), since messages carry whole function inputs and outputs.
+    # payloads (`max_payload`), since messages carry whole function inputs and
+    # outputs, and have JetStream enabled with memory storage for function logs.
     # @default -- required
     url: ""
+
+functionLogs:
+  # -- Bucket every invocation's full log is uploaded to, as a gzipped object
+  # per invocation: `s3://BUCKET?region=REGION` or `gs://BUCKET`. Hosts need
+  # write access and the server read access, through the service accounts'
+  # cloud identity. Empty keeps logs on NATS only, for `retention`.
+  bucket: ""
+  # -- How long NATS keeps the latest lines of every invocation's log, for
+  # live and recent reads.
+  retention: 1h
+  # -- Memory NATS may use for function logs across all invocations. The
+  # oldest lines go first, and are already in the bucket.
+  maxBytes: 1073741824
 
 server:
   image:
@@ -236,8 +250,18 @@ nats:
   fullnameOverride: alchemy-nats
   config:
     jetstream:
-      # -- Enable JetStream in the vendored NATS chart. Alchemy uses core NATS only.
-      enabled: false
+      # -- Enable JetStream in the vendored NATS chart. Alchemy keeps recent
+      # function logs in a JetStream stream.
+      enabled: true
+      memoryStore:
+        # -- Keep JetStream in memory. Function logs are the only stream, and
+        # the bucket keeps them.
+        enabled: true
+        # -- JetStream memory limit. Covers `functionLogs.maxBytes`.
+        maxSize: 1Gi
+      fileStore:
+        # -- No JetStream file storage, so no volume.
+        enabled: false
     merge:
       # -- Largest message NATS accepts. Payloads carry whole function inputs
       # and outputs, so this matches the server's payload limit.
@@ -252,4 +276,4 @@ nats:
           cpu: 100m
           memory: 256Mi
         limits:
-          memory: 512Mi
+          memory: 2Gi

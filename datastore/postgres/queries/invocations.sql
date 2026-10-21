@@ -18,7 +18,7 @@ RETURNING *;
 -- name: FinishInvocation :one
 UPDATE invocations
 SET status = $2, run_us = $3, total_us = $4, error = $5, platform_error = $6,
-    output_bytes = $7, log_tail = $8, ended_at = now()
+    output_bytes = $7, ended_at = now()
 WHERE id = $1
 RETURNING *;
 

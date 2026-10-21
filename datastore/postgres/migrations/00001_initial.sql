@@ -94,7 +94,6 @@ CREATE TABLE invocations (
   input_bytes        BIGINT            NOT NULL DEFAULT 0,
   output_bytes       BIGINT            NOT NULL DEFAULT 0,
   instance_id         TEXT              NOT NULL DEFAULT '',
-  log_tail           TEXT              NOT NULL DEFAULT '',
   created_by_user_id UUID              REFERENCES users (id) ON DELETE SET NULL,
   created_at         TIMESTAMPTZ       NOT NULL DEFAULT now(),
   started_at         TIMESTAMPTZ,

@@ -14,6 +14,7 @@ import (
 
 	"connectrpc.com/connect"
 	"github.com/jackc/pgx/v5"
+	"gocloud.dev/blob"
 	"google.golang.org/protobuf/encoding/protojson"
 
 	functionsv1 "github.com/galaxy-io/alchemy/api/functions/v1"
@@ -39,6 +40,13 @@ type Config struct {
 	GatherWindow time.Duration
 	// HostTTL is how long a host stays listed after its last heartbeat.
 	HostTTL time.Duration
+	// LogRetention is how long the bus keeps the latest lines of every
+	// invocation's log, for live and recent reads. The log bucket keeps all
+	// of it after that.
+	LogRetention time.Duration
+	// LogMaxBytes bounds what the bus keeps across all invocations; the
+	// oldest lines go first.
+	LogMaxBytes int64
 }
 
 // DefaultConfig returns the defaults server starts with.
@@ -52,6 +60,8 @@ func DefaultConfig() Config {
 		BuildTimeout:    5 * time.Minute,
 		GatherWindow:    500 * time.Millisecond,
 		HostTTL:         10 * time.Second,
+		LogRetention:    time.Hour,
+		LogMaxBytes:     1 << 30,
 	}
 }
 
@@ -64,6 +74,7 @@ type Service struct {
 	cfg    Config
 	store  *postgres.Store
 	bus    *bus.Bus
+	logs   *blob.Bucket // nil when function logs are kept on the bus only
 	log    *slog.Logger
 	tenant string
 	events *eventBus
@@ -90,15 +101,17 @@ type compiledVersion struct {
 	artifact *hostv1.Artifact
 }
 
-// New returns a service backed by store and b. It cancels invocations left
-// active by a previous process, resumes interrupted builds and starts
-// listening to hosts.
-func New(ctx context.Context, cfg Config, store *postgres.Store, b *bus.Bus, log *slog.Logger) (*Service, error) {
+// New returns a service backed by store and b, reading function logs from
+// logBucket when there is one. It sets up the bus's log stream, cancels
+// invocations left active by a previous process, resumes interrupted builds
+// and starts listening to hosts.
+func New(ctx context.Context, cfg Config, store *postgres.Store, b *bus.Bus, logBucket *blob.Bucket, log *slog.Logger) (*Service, error) {
 	bg, stop := context.WithCancel(context.Background())
 	s := &Service{
 		cfg:        cfg,
 		store:      store,
 		bus:        b,
+		logs:       logBucket,
 		log:        log,
 		tenant:     postgres.DefaultTenantID,
 		events:     newEventBus(),
@@ -109,6 +122,10 @@ func New(ctx context.Context, cfg Config, store *postgres.Store, b *bus.Bus, log
 		hostBuilds: make(map[string]time.Time),
 	}
 
+	if err := b.EnsureLogStream(ctx, bus.LogStreamConfig{MaxAge: cfg.LogRetention, MaxBytes: cfg.LogMaxBytes}); err != nil {
+		stop()
+		return nil, fmt.Errorf("%w (NATS must have JetStream enabled)", err)
+	}
 	n, err := store.CancelStaleInvocations(ctx)
 	if err != nil {
 		stop()

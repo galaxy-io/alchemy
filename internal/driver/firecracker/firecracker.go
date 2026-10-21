@@ -13,6 +13,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"io"
 	"log/slog"
 	"net"
 	"net/http"
@@ -267,12 +268,26 @@ func (s *instance) failed(err error) error {
 
 func (s *instance) ID() string { return s.id }
 
-func (s *instance) Invoke(ctx context.Context, req *supervisorv1.InvokeRequest) (*supervisorv1.InvokeResponse, error) {
-	resp, err := s.client.Invoke(ctx, connect.NewRequest(req))
+func (s *instance) Invoke(ctx context.Context, req *supervisorv1.InvokeRequest, logs io.Writer) (*supervisorv1.InvokeResult, error) {
+	stream, err := s.client.Invoke(ctx, connect.NewRequest(req))
 	if err != nil {
 		return nil, err
 	}
-	return resp.Msg, nil
+	defer func() { _ = stream.Close() }()
+	for stream.Receive() {
+		switch ev := stream.Msg().GetEvent().(type) {
+		case *supervisorv1.InvokeResponse_Log:
+			if _, err := logs.Write(ev.Log); err != nil {
+				return nil, fmt.Errorf("write logs: %w", err)
+			}
+		case *supervisorv1.InvokeResponse_Result:
+			return ev.Result, nil
+		}
+	}
+	if err := stream.Err(); err != nil {
+		return nil, err
+	}
+	return nil, errors.New("supervisor ended the invocation without a result")
 }
 
 // Release kills the microVM. The rootfs is read-only and shared, so there is

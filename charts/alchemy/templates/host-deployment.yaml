@@ -44,16 +44,9 @@ spec:
         - name: host
           image: {{ .Values.host.image.repository }}:{{ .Values.host.image.tag | default .Chart.AppVersion }}
           imagePullPolicy: {{ .Values.host.image.pullPolicy }}
-          args:
-            - --name=$(NODE_NAME)
-            - --max-concurrency={{ .Values.host.maxConcurrency }}
-            - --memory-mib={{ .Values.host.memoryMiB }}
-            - --warm-ttl={{ .Values.host.warmTTL }}
-            - --prewarm={{ .Values.host.prewarm }}
-            - --console={{ .Values.host.console }}
-            - --data-dir=/var/lib/alchemy
           env:
-            - name: NODE_NAME
+            # Hosts are named after their node: one host per KVM node.
+            - name: HOST_NAME
               valueFrom:
                 fieldRef:
                   fieldPath: spec.nodeName
