@@ -1,5 +1,5 @@
 import { create } from "@bufbuild/protobuf";
-import type { Transport } from "@connectrpc/connect";
+import { createClient, type Transport } from "@connectrpc/connect";
 import {
   createConnectQueryKey,
   type UseMutationOptions,
@@ -9,10 +9,16 @@ import {
   useSuspenseInfiniteQuery,
   useTransport,
 } from "@connectrpc/connect-query";
-import { useQueryClient } from "@tanstack/react-query";
+import {
+  experimental_streamedQuery as streamedQuery,
+  useQueryClient,
+  useQuery as useStreamedQuery,
+} from "@tanstack/react-query";
 
 import type { Function as AlchemyFunction } from "@/gen/functions/v1/functions_pb";
 import {
+  type GetInvocationLogsRequest,
+  GetInvocationLogsRequestSchema,
   type GetInvocationRequest,
   GetInvocationRequestSchema,
   type GetInvocationResponse,
@@ -23,7 +29,10 @@ import {
 } from "@/gen/functions/v1/invocations_pb";
 import { FunctionsService } from "@/gen/functions/v1/service_pb";
 
-import { ACTIVE_INVOCATIONS_REFETCH_INTERVAL } from "@/api/queries/constants";
+import {
+  ACTIVE_INVOCATIONS_REFETCH_INTERVAL,
+  INVOCATION_LOGS_MAX_LENGTH,
+} from "@/api/queries/constants";
 import { createListInstancesQueryKey } from "@/api/queries/instances";
 import { getNextPageParam, INITIAL_PAGE_PARAM, type InfiniteQueryInput } from "@/api/utils";
 
@@ -121,6 +130,37 @@ export const useGetInvocationQuery = ({
       const invocation = query.state.data?.invocation;
       return getInvocationsRefetchInterval(invocation ? [invocation] : undefined);
     },
+    ...options,
+  });
+};
+
+export const createGetInvocationLogsInput = (id: Invocation["id"]) =>
+  create(GetInvocationLogsRequestSchema, { id, follow: true });
+
+export const useGetInvocationLogsQuery = ({
+  input,
+  options = {},
+}: {
+  input: GetInvocationLogsRequest;
+  options?: { enabled?: boolean };
+}) => {
+  const transport = useTransport();
+  return useStreamedQuery({
+    queryKey: [FunctionsService.method.getInvocationLogs.name, input.id, input.follow],
+    queryFn: streamedQuery({
+      streamFn: async function* ({ signal }) {
+        const decoder = new TextDecoder();
+        const stream = createClient(FunctionsService, transport).getInvocationLogs(input, {
+          signal,
+        });
+        for await (const { data } of stream) {
+          yield decoder.decode(data, { stream: true });
+        }
+      },
+      reducer: (logs: string, chunk: string) => (logs + chunk).slice(-INVOCATION_LOGS_MAX_LENGTH),
+      initialValue: "",
+    }),
+    staleTime: Number.POSITIVE_INFINITY,
     ...options,
   });
 };

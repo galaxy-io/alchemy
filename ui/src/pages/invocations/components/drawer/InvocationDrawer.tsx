@@ -10,9 +10,10 @@ import PendingLayout from "@galaxy-io/dls/layout/PendingLayout";
 
 import type { Invocation } from "@/gen/functions/v1/invocations_pb";
 
+import InvocationLogs from "@/components/invocations/InvocationLogs";
+
 import InvocationDrawerFacts from "@/pages/invocations/components/drawer/InvocationDrawerFacts";
 import InvocationDrawerHeader from "@/pages/invocations/components/drawer/InvocationDrawerHeader";
-import InvocationDrawerLogs from "@/pages/invocations/components/drawer/InvocationDrawerLogs";
 import InvocationDrawerOutcome from "@/pages/invocations/components/drawer/InvocationDrawerOutcome";
 
 import { useAlchemyNavigate } from "@/module/hooks";
@@ -69,7 +70,7 @@ const InvocationDrawer: FC<InvocationDrawerProps> = ({ invocationId, isOpen, onC
       <Flex direction={FlexDirection.COLUMN} gap={16}>
         <InvocationDrawerOutcome invocation={invocation} />
         <InvocationDrawerFacts invocation={invocation} />
-        <InvocationDrawerLogs logTail={invocation.logTail} />
+        <InvocationLogs invocationId={invocation.id} />
       </Flex>
     );
   };

@@ -13,6 +13,7 @@ import type { InvokeResponse } from "@/gen/functions/v1/invocations_pb";
 
 import { FUNCTION_ERROR_KIND_TO_LABEL_MAP } from "@/components/invocations/constants";
 import InvocationError from "@/components/invocations/InvocationError";
+import InvocationLogs from "@/components/invocations/InvocationLogs";
 import InvocationPhaseBar from "@/components/invocations/InvocationPhaseBar";
 import InvocationStatus from "@/components/invocations/InvocationStatus";
 
@@ -91,14 +92,7 @@ const FunctionWorkbenchResult: FC<FunctionWorkbenchResultProps> = ({
           canCopy
         />
       )}
-      {invocation.logTail && (
-        <CodeBlock
-          label="Logs"
-          language={CodeBlockLanguage.PLAIN}
-          content={invocation.logTail}
-          canCopy
-        />
-      )}
+      <InvocationLogs invocationId={invocation.id} />
     </Flex>
   );
 };
