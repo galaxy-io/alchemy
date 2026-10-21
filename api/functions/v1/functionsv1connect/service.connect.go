@@ -65,6 +65,9 @@ const (
 	// FunctionsServiceListInvocationsProcedure is the fully-qualified name of the FunctionsService's
 	// ListInvocations RPC.
 	FunctionsServiceListInvocationsProcedure = "/functions.v1.FunctionsService/ListInvocations"
+	// FunctionsServiceGetInvocationLogsProcedure is the fully-qualified name of the FunctionsService's
+	// GetInvocationLogs RPC.
+	FunctionsServiceGetInvocationLogsProcedure = "/functions.v1.FunctionsService/GetInvocationLogs"
 	// FunctionsServiceTailInvocationsProcedure is the fully-qualified name of the FunctionsService's
 	// TailInvocations RPC.
 	FunctionsServiceTailInvocationsProcedure = "/functions.v1.FunctionsService/TailInvocations"
@@ -102,6 +105,8 @@ type FunctionsServiceClient interface {
 	// Invocations; the persisted record of every Invoke, newest first.
 	GetInvocation(context.Context, *connect.Request[v1.GetInvocationRequest]) (*connect.Response[v1.GetInvocationResponse], error)
 	ListInvocations(context.Context, *connect.Request[v1.ListInvocationsRequest]) (*connect.Response[v1.ListInvocationsResponse], error)
+	// Logs; an invocation's stderr, live while it runs and kept after.
+	GetInvocationLogs(context.Context, *connect.Request[v1.GetInvocationLogsRequest]) (*connect.ServerStreamForClient[v1.GetInvocationLogsResponse], error)
 	// Live view; server-streams invocation transitions with optional replay.
 	TailInvocations(context.Context, *connect.Request[v1.TailInvocationsRequest]) (*connect.ServerStreamForClient[v1.TailInvocationsResponse], error)
 	// Host; what the hosts are running right now.
@@ -187,6 +192,12 @@ func NewFunctionsServiceClient(httpClient connect.HTTPClient, baseURL string, op
 			connect.WithSchema(functionsServiceMethods.ByName("ListInvocations")),
 			connect.WithClientOptions(opts...),
 		),
+		getInvocationLogs: connect.NewClient[v1.GetInvocationLogsRequest, v1.GetInvocationLogsResponse](
+			httpClient,
+			baseURL+FunctionsServiceGetInvocationLogsProcedure,
+			connect.WithSchema(functionsServiceMethods.ByName("GetInvocationLogs")),
+			connect.WithClientOptions(opts...),
+		),
 		tailInvocations: connect.NewClient[v1.TailInvocationsRequest, v1.TailInvocationsResponse](
 			httpClient,
 			baseURL+FunctionsServiceTailInvocationsProcedure,
@@ -227,6 +238,7 @@ type functionsServiceClient struct {
 	invoke                *connect.Client[v1.InvokeRequest, v1.InvokeResponse]
 	getInvocation         *connect.Client[v1.GetInvocationRequest, v1.GetInvocationResponse]
 	listInvocations       *connect.Client[v1.ListInvocationsRequest, v1.ListInvocationsResponse]
+	getInvocationLogs     *connect.Client[v1.GetInvocationLogsRequest, v1.GetInvocationLogsResponse]
 	tailInvocations       *connect.Client[v1.TailInvocationsRequest, v1.TailInvocationsResponse]
 	listInstances         *connect.Client[v1.ListInstancesRequest, v1.ListInstancesResponse]
 	listHosts             *connect.Client[v1.ListHostsRequest, v1.ListHostsResponse]
@@ -288,6 +300,11 @@ func (c *functionsServiceClient) ListInvocations(ctx context.Context, req *conne
 	return c.listInvocations.CallUnary(ctx, req)
 }
 
+// GetInvocationLogs calls functions.v1.FunctionsService.GetInvocationLogs.
+func (c *functionsServiceClient) GetInvocationLogs(ctx context.Context, req *connect.Request[v1.GetInvocationLogsRequest]) (*connect.ServerStreamForClient[v1.GetInvocationLogsResponse], error) {
+	return c.getInvocationLogs.CallServerStream(ctx, req)
+}
+
 // TailInvocations calls functions.v1.FunctionsService.TailInvocations.
 func (c *functionsServiceClient) TailInvocations(ctx context.Context, req *connect.Request[v1.TailInvocationsRequest]) (*connect.ServerStreamForClient[v1.TailInvocationsResponse], error) {
 	return c.tailInvocations.CallServerStream(ctx, req)
@@ -331,6 +348,8 @@ type FunctionsServiceHandler interface {
 	// Invocations; the persisted record of every Invoke, newest first.
 	GetInvocation(context.Context, *connect.Request[v1.GetInvocationRequest]) (*connect.Response[v1.GetInvocationResponse], error)
 	ListInvocations(context.Context, *connect.Request[v1.ListInvocationsRequest]) (*connect.Response[v1.ListInvocationsResponse], error)
+	// Logs; an invocation's stderr, live while it runs and kept after.
+	GetInvocationLogs(context.Context, *connect.Request[v1.GetInvocationLogsRequest], *connect.ServerStream[v1.GetInvocationLogsResponse]) error
 	// Live view; server-streams invocation transitions with optional replay.
 	TailInvocations(context.Context, *connect.Request[v1.TailInvocationsRequest], *connect.ServerStream[v1.TailInvocationsResponse]) error
 	// Host; what the hosts are running right now.
@@ -412,6 +431,12 @@ func NewFunctionsServiceHandler(svc FunctionsServiceHandler, opts ...connect.Han
 		connect.WithSchema(functionsServiceMethods.ByName("ListInvocations")),
 		connect.WithHandlerOptions(opts...),
 	)
+	functionsServiceGetInvocationLogsHandler := connect.NewServerStreamHandler(
+		FunctionsServiceGetInvocationLogsProcedure,
+		svc.GetInvocationLogs,
+		connect.WithSchema(functionsServiceMethods.ByName("GetInvocationLogs")),
+		connect.WithHandlerOptions(opts...),
+	)
 	functionsServiceTailInvocationsHandler := connect.NewServerStreamHandler(
 		FunctionsServiceTailInvocationsProcedure,
 		svc.TailInvocations,
@@ -460,6 +485,8 @@ func NewFunctionsServiceHandler(svc FunctionsServiceHandler, opts ...connect.Han
 			functionsServiceGetInvocationHandler.ServeHTTP(w, r)
 		case FunctionsServiceListInvocationsProcedure:
 			functionsServiceListInvocationsHandler.ServeHTTP(w, r)
+		case FunctionsServiceGetInvocationLogsProcedure:
+			functionsServiceGetInvocationLogsHandler.ServeHTTP(w, r)
 		case FunctionsServiceTailInvocationsProcedure:
 			functionsServiceTailInvocationsHandler.ServeHTTP(w, r)
 		case FunctionsServiceListInstancesProcedure:
@@ -519,6 +546,10 @@ func (UnimplementedFunctionsServiceHandler) GetInvocation(context.Context, *conn
 
 func (UnimplementedFunctionsServiceHandler) ListInvocations(context.Context, *connect.Request[v1.ListInvocationsRequest]) (*connect.Response[v1.ListInvocationsResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("functions.v1.FunctionsService.ListInvocations is not implemented"))
+}
+
+func (UnimplementedFunctionsServiceHandler) GetInvocationLogs(context.Context, *connect.Request[v1.GetInvocationLogsRequest], *connect.ServerStream[v1.GetInvocationLogsResponse]) error {
+	return connect.NewError(connect.CodeUnimplemented, errors.New("functions.v1.FunctionsService.GetInvocationLogs is not implemented"))
 }
 
 func (UnimplementedFunctionsServiceHandler) TailInvocations(context.Context, *connect.Request[v1.TailInvocationsRequest], *connect.ServerStream[v1.TailInvocationsResponse]) error {

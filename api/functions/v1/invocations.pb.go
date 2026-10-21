@@ -549,9 +549,7 @@ type Invocation struct {
 	InputBytes    int64                  `protobuf:"varint,13,opt,name=input_bytes,json=inputBytes,proto3" json:"input_bytes,omitempty"`
 	OutputBytes   int64                  `protobuf:"varint,14,opt,name=output_bytes,json=outputBytes,proto3" json:"output_bytes,omitempty"`
 	// instance_id names the microVM that served it, while it exists.
-	InstanceId string `protobuf:"bytes,15,opt,name=instance_id,json=instanceId,proto3" json:"instance_id,omitempty"`
-	// log_tail is the last few KB of the function's stderr.
-	LogTail         string `protobuf:"bytes,16,opt,name=log_tail,json=logTail,proto3" json:"log_tail,omitempty"`
+	InstanceId      string `protobuf:"bytes,15,opt,name=instance_id,json=instanceId,proto3" json:"instance_id,omitempty"`
 	CreatedByUserId string `protobuf:"bytes,17,opt,name=created_by_user_id,json=createdByUserId,proto3" json:"created_by_user_id,omitempty"`
 	unknownFields   protoimpl.UnknownFields
 	sizeCache       protoimpl.SizeCache
@@ -688,13 +686,6 @@ func (x *Invocation) GetOutputBytes() int64 {
 func (x *Invocation) GetInstanceId() string {
 	if x != nil {
 		return x.InstanceId
-	}
-	return ""
-}
-
-func (x *Invocation) GetLogTail() string {
-	if x != nil {
-		return x.LogTail
 	}
 	return ""
 }
@@ -1060,6 +1051,107 @@ func (x *TailInvocationsResponse) GetEmittedAt() int64 {
 	return 0
 }
 
+// GetInvocationLogs streams what an invocation's function wrote to stderr.
+// With follow, the stream stays open while the invocation runs and ends when
+// it does; without, it ends at what has been written so far.
+type GetInvocationLogsRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	Follow        bool                   `protobuf:"varint,2,opt,name=follow,proto3" json:"follow,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetInvocationLogsRequest) Reset() {
+	*x = GetInvocationLogsRequest{}
+	mi := &file_functions_v1_invocations_proto_msgTypes[11]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetInvocationLogsRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetInvocationLogsRequest) ProtoMessage() {}
+
+func (x *GetInvocationLogsRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_functions_v1_invocations_proto_msgTypes[11]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetInvocationLogsRequest.ProtoReflect.Descriptor instead.
+func (*GetInvocationLogsRequest) Descriptor() ([]byte, []int) {
+	return file_functions_v1_invocations_proto_rawDescGZIP(), []int{11}
+}
+
+func (x *GetInvocationLogsRequest) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
+}
+
+func (x *GetInvocationLogsRequest) GetFollow() bool {
+	if x != nil {
+		return x.Follow
+	}
+	return false
+}
+
+// GetInvocationLogsResponse is the next piece of the log, in order. Pieces
+// are not split on line boundaries.
+type GetInvocationLogsResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Data          []byte                 `protobuf:"bytes,1,opt,name=data,proto3" json:"data,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetInvocationLogsResponse) Reset() {
+	*x = GetInvocationLogsResponse{}
+	mi := &file_functions_v1_invocations_proto_msgTypes[12]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetInvocationLogsResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetInvocationLogsResponse) ProtoMessage() {}
+
+func (x *GetInvocationLogsResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_functions_v1_invocations_proto_msgTypes[12]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetInvocationLogsResponse.ProtoReflect.Descriptor instead.
+func (*GetInvocationLogsResponse) Descriptor() ([]byte, []int) {
+	return file_functions_v1_invocations_proto_rawDescGZIP(), []int{12}
+}
+
+func (x *GetInvocationLogsResponse) GetData() []byte {
+	if x != nil {
+		return x.Data
+	}
+	return nil
+}
+
 var File_functions_v1_invocations_proto protoreflect.FileDescriptor
 
 const file_functions_v1_invocations_proto_rawDesc = "" +
@@ -1090,7 +1182,7 @@ const file_functions_v1_invocations_proto_rawDesc = "" +
 	"\x06output\x18\x03 \x01(\fH\x00R\x06output\x123\n" +
 	"\x05error\x18\x04 \x01(\v2\x1b.functions.v1.FunctionErrorH\x00R\x05error\x123\n" +
 	"\x05stats\x18\x05 \x01(\v2\x1d.functions.v1.InvocationStatsR\x05statsB\b\n" +
-	"\x06result\"\xf9\x04\n" +
+	"\x06result\"\xde\x04\n" +
 	"\n" +
 	"Invocation\x12\x1b\n" +
 	"\ttenant_id\x18\x01 \x01(\tR\btenantId\x12\x0e\n" +
@@ -1114,8 +1206,7 @@ const file_functions_v1_invocations_proto_rawDesc = "" +
 	"inputBytes\x12!\n" +
 	"\foutput_bytes\x18\x0e \x01(\x03R\voutputBytes\x12\x1f\n" +
 	"\vinstance_id\x18\x0f \x01(\tR\n" +
-	"instanceId\x12\x19\n" +
-	"\blog_tail\x18\x10 \x01(\tR\alogTail\x12+\n" +
+	"instanceId\x12+\n" +
 	"\x12created_by_user_id\x18\x11 \x01(\tR\x0fcreatedByUserId\"&\n" +
 	"\x14GetInvocationRequest\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\"Q\n" +
@@ -1150,7 +1241,12 @@ const file_functions_v1_invocations_proto_rawDesc = "" +
 	"event_type\x18\x02 \x01(\tR\teventType\x12\x16\n" +
 	"\x06replay\x18\x03 \x01(\bR\x06replay\x12\x1d\n" +
 	"\n" +
-	"emitted_at\x18\x04 \x01(\x03R\temittedAt*\xc2\x01\n" +
+	"emitted_at\x18\x04 \x01(\x03R\temittedAt\"B\n" +
+	"\x18GetInvocationLogsRequest\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\x12\x16\n" +
+	"\x06follow\x18\x02 \x01(\bR\x06follow\"/\n" +
+	"\x19GetInvocationLogsResponse\x12\x12\n" +
+	"\x04data\x18\x01 \x01(\fR\x04data*\xc2\x01\n" +
 	"\x11FunctionErrorKind\x12#\n" +
 	"\x1fFUNCTION_ERROR_KIND_UNSPECIFIED\x10\x00\x12\x1e\n" +
 	"\x1aFUNCTION_ERROR_KIND_RAISED\x10\x01\x12\x1f\n" +
@@ -1186,29 +1282,31 @@ func file_functions_v1_invocations_proto_rawDescGZIP() []byte {
 }
 
 var file_functions_v1_invocations_proto_enumTypes = make([]protoimpl.EnumInfo, 3)
-var file_functions_v1_invocations_proto_msgTypes = make([]protoimpl.MessageInfo, 11)
+var file_functions_v1_invocations_proto_msgTypes = make([]protoimpl.MessageInfo, 13)
 var file_functions_v1_invocations_proto_goTypes = []any{
-	(FunctionErrorKind)(0),          // 0: functions.v1.FunctionErrorKind
-	(StartKind)(0),                  // 1: functions.v1.StartKind
-	(InvocationStatus)(0),           // 2: functions.v1.InvocationStatus
-	(*FunctionError)(nil),           // 3: functions.v1.FunctionError
-	(*InvocationStats)(nil),         // 4: functions.v1.InvocationStats
-	(*InvokeRequest)(nil),           // 5: functions.v1.InvokeRequest
-	(*InvokeResponse)(nil),          // 6: functions.v1.InvokeResponse
-	(*Invocation)(nil),              // 7: functions.v1.Invocation
-	(*GetInvocationRequest)(nil),    // 8: functions.v1.GetInvocationRequest
-	(*GetInvocationResponse)(nil),   // 9: functions.v1.GetInvocationResponse
-	(*ListInvocationsRequest)(nil),  // 10: functions.v1.ListInvocationsRequest
-	(*ListInvocationsResponse)(nil), // 11: functions.v1.ListInvocationsResponse
-	(*TailInvocationsRequest)(nil),  // 12: functions.v1.TailInvocationsRequest
-	(*TailInvocationsResponse)(nil), // 13: functions.v1.TailInvocationsResponse
-	(*ContractViolation)(nil),       // 14: functions.v1.ContractViolation
-	(*PaginationRequest)(nil),       // 15: functions.v1.PaginationRequest
-	(*PaginationResponse)(nil),      // 16: functions.v1.PaginationResponse
+	(FunctionErrorKind)(0),            // 0: functions.v1.FunctionErrorKind
+	(StartKind)(0),                    // 1: functions.v1.StartKind
+	(InvocationStatus)(0),             // 2: functions.v1.InvocationStatus
+	(*FunctionError)(nil),             // 3: functions.v1.FunctionError
+	(*InvocationStats)(nil),           // 4: functions.v1.InvocationStats
+	(*InvokeRequest)(nil),             // 5: functions.v1.InvokeRequest
+	(*InvokeResponse)(nil),            // 6: functions.v1.InvokeResponse
+	(*Invocation)(nil),                // 7: functions.v1.Invocation
+	(*GetInvocationRequest)(nil),      // 8: functions.v1.GetInvocationRequest
+	(*GetInvocationResponse)(nil),     // 9: functions.v1.GetInvocationResponse
+	(*ListInvocationsRequest)(nil),    // 10: functions.v1.ListInvocationsRequest
+	(*ListInvocationsResponse)(nil),   // 11: functions.v1.ListInvocationsResponse
+	(*TailInvocationsRequest)(nil),    // 12: functions.v1.TailInvocationsRequest
+	(*TailInvocationsResponse)(nil),   // 13: functions.v1.TailInvocationsResponse
+	(*GetInvocationLogsRequest)(nil),  // 14: functions.v1.GetInvocationLogsRequest
+	(*GetInvocationLogsResponse)(nil), // 15: functions.v1.GetInvocationLogsResponse
+	(*ContractViolation)(nil),         // 16: functions.v1.ContractViolation
+	(*PaginationRequest)(nil),         // 17: functions.v1.PaginationRequest
+	(*PaginationResponse)(nil),        // 18: functions.v1.PaginationResponse
 }
 var file_functions_v1_invocations_proto_depIdxs = []int32{
 	0,  // 0: functions.v1.FunctionError.kind:type_name -> functions.v1.FunctionErrorKind
-	14, // 1: functions.v1.FunctionError.violations:type_name -> functions.v1.ContractViolation
+	16, // 1: functions.v1.FunctionError.violations:type_name -> functions.v1.ContractViolation
 	1,  // 2: functions.v1.InvocationStats.start_kind:type_name -> functions.v1.StartKind
 	3,  // 3: functions.v1.InvokeResponse.error:type_name -> functions.v1.FunctionError
 	4,  // 4: functions.v1.InvokeResponse.stats:type_name -> functions.v1.InvocationStats
@@ -1219,9 +1317,9 @@ var file_functions_v1_invocations_proto_depIdxs = []int32{
 	7,  // 9: functions.v1.GetInvocationResponse.invocation:type_name -> functions.v1.Invocation
 	2,  // 10: functions.v1.ListInvocationsRequest.statuses:type_name -> functions.v1.InvocationStatus
 	1,  // 11: functions.v1.ListInvocationsRequest.start_kinds:type_name -> functions.v1.StartKind
-	15, // 12: functions.v1.ListInvocationsRequest.pagination:type_name -> functions.v1.PaginationRequest
+	17, // 12: functions.v1.ListInvocationsRequest.pagination:type_name -> functions.v1.PaginationRequest
 	7,  // 13: functions.v1.ListInvocationsResponse.invocations:type_name -> functions.v1.Invocation
-	16, // 14: functions.v1.ListInvocationsResponse.pagination:type_name -> functions.v1.PaginationResponse
+	18, // 14: functions.v1.ListInvocationsResponse.pagination:type_name -> functions.v1.PaginationResponse
 	7,  // 15: functions.v1.TailInvocationsResponse.invocation:type_name -> functions.v1.Invocation
 	16, // [16:16] is the sub-list for method output_type
 	16, // [16:16] is the sub-list for method input_type
@@ -1247,7 +1345,7 @@ func file_functions_v1_invocations_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_functions_v1_invocations_proto_rawDesc), len(file_functions_v1_invocations_proto_rawDesc)),
 			NumEnums:      3,
-			NumMessages:   11,
+			NumMessages:   13,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

@@ -46,8 +46,11 @@ type SupervisorServiceClient interface {
 	// launches the function process and waits until it asks for its first
 	// invocation. The moment Start returns is where the microVM is snapshotted.
 	Start(context.Context, *connect.Request[v1.StartRequest]) (*connect.Response[v1.StartResponse], error)
-	// Invoke runs one invocation. At most one is in flight per microVM.
-	Invoke(context.Context, *connect.Request[v1.InvokeRequest]) (*connect.Response[v1.InvokeResponse], error)
+	// Invoke runs one invocation, streaming the function's stderr while it
+	// runs and its result last. At most one is in flight per microVM. A host
+	// that stops reading slows the function's writes down rather than losing
+	// them.
+	Invoke(context.Context, *connect.Request[v1.InvokeRequest]) (*connect.ServerStreamForClient[v1.InvokeResponse], error)
 }
 
 // NewSupervisorServiceClient constructs a client for the supervisor.v1.SupervisorService service.
@@ -88,8 +91,8 @@ func (c *supervisorServiceClient) Start(ctx context.Context, req *connect.Reques
 }
 
 // Invoke calls supervisor.v1.SupervisorService.Invoke.
-func (c *supervisorServiceClient) Invoke(ctx context.Context, req *connect.Request[v1.InvokeRequest]) (*connect.Response[v1.InvokeResponse], error) {
-	return c.invoke.CallUnary(ctx, req)
+func (c *supervisorServiceClient) Invoke(ctx context.Context, req *connect.Request[v1.InvokeRequest]) (*connect.ServerStreamForClient[v1.InvokeResponse], error) {
+	return c.invoke.CallServerStream(ctx, req)
 }
 
 // SupervisorServiceHandler is an implementation of the supervisor.v1.SupervisorService service.
@@ -98,8 +101,11 @@ type SupervisorServiceHandler interface {
 	// launches the function process and waits until it asks for its first
 	// invocation. The moment Start returns is where the microVM is snapshotted.
 	Start(context.Context, *connect.Request[v1.StartRequest]) (*connect.Response[v1.StartResponse], error)
-	// Invoke runs one invocation. At most one is in flight per microVM.
-	Invoke(context.Context, *connect.Request[v1.InvokeRequest]) (*connect.Response[v1.InvokeResponse], error)
+	// Invoke runs one invocation, streaming the function's stderr while it
+	// runs and its result last. At most one is in flight per microVM. A host
+	// that stops reading slows the function's writes down rather than losing
+	// them.
+	Invoke(context.Context, *connect.Request[v1.InvokeRequest], *connect.ServerStream[v1.InvokeResponse]) error
 }
 
 // NewSupervisorServiceHandler builds an HTTP handler from the service implementation. It returns
@@ -115,7 +121,7 @@ func NewSupervisorServiceHandler(svc SupervisorServiceHandler, opts ...connect.H
 		connect.WithSchema(supervisorServiceMethods.ByName("Start")),
 		connect.WithHandlerOptions(opts...),
 	)
-	supervisorServiceInvokeHandler := connect.NewUnaryHandler(
+	supervisorServiceInvokeHandler := connect.NewServerStreamHandler(
 		SupervisorServiceInvokeProcedure,
 		svc.Invoke,
 		connect.WithSchema(supervisorServiceMethods.ByName("Invoke")),
@@ -140,6 +146,6 @@ func (UnimplementedSupervisorServiceHandler) Start(context.Context, *connect.Req
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("supervisor.v1.SupervisorService.Start is not implemented"))
 }
 
-func (UnimplementedSupervisorServiceHandler) Invoke(context.Context, *connect.Request[v1.InvokeRequest]) (*connect.Response[v1.InvokeResponse], error) {
-	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("supervisor.v1.SupervisorService.Invoke is not implemented"))
+func (UnimplementedSupervisorServiceHandler) Invoke(context.Context, *connect.Request[v1.InvokeRequest], *connect.ServerStream[v1.InvokeResponse]) error {
+	return connect.NewError(connect.CodeUnimplemented, errors.New("supervisor.v1.SupervisorService.Invoke is not implemented"))
 }

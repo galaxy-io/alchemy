@@ -440,7 +440,6 @@ type InvokeResponse struct {
 	StartKind     v1.StartKind            `protobuf:"varint,5,opt,name=start_kind,json=startKind,proto3,enum=functions.v1.StartKind" json:"start_kind,omitempty"`
 	AcquireUs     int64                   `protobuf:"varint,6,opt,name=acquire_us,json=acquireUs,proto3" json:"acquire_us,omitempty"`
 	RunUs         int64                   `protobuf:"varint,7,opt,name=run_us,json=runUs,proto3" json:"run_us,omitempty"`
-	LogTail       string                  `protobuf:"bytes,8,opt,name=log_tail,json=logTail,proto3" json:"log_tail,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -535,13 +534,6 @@ func (x *InvokeResponse) GetRunUs() int64 {
 		return x.RunUs
 	}
 	return 0
-}
-
-func (x *InvokeResponse) GetLogTail() string {
-	if x != nil {
-		return x.LogTail
-	}
-	return ""
 }
 
 type isInvokeResponse_Result interface {
@@ -899,7 +891,7 @@ const file_host_v1_host_proto_rawDesc = "" +
 	"\bartifact\x18\x02 \x01(\v2\x11.host.v1.ArtifactR\bartifact\x12\x14\n" +
 	"\x05input\x18\x03 \x01(\fR\x05input\x12\x1d\n" +
 	"\n" +
-	"timeout_ms\x18\x04 \x01(\x03R\ttimeoutMs\"\xba\x02\n" +
+	"timeout_ms\x18\x04 \x01(\x03R\ttimeoutMs\"\x9f\x02\n" +
 	"\x0eInvokeResponse\x12\x18\n" +
 	"\x06output\x18\x01 \x01(\fH\x00R\x06output\x122\n" +
 	"\afailure\x18\x02 \x01(\v2\x16.supervisor.v1.FailureH\x00R\afailure\x12&\n" +
@@ -910,8 +902,7 @@ const file_host_v1_host_proto_rawDesc = "" +
 	"start_kind\x18\x05 \x01(\x0e2\x17.functions.v1.StartKindR\tstartKind\x12\x1d\n" +
 	"\n" +
 	"acquire_us\x18\x06 \x01(\x03R\tacquireUs\x12\x15\n" +
-	"\x06run_us\x18\a \x01(\x03R\x05runUs\x12\x19\n" +
-	"\blog_tail\x18\b \x01(\tR\alogTailB\b\n" +
+	"\x06run_us\x18\a \x01(\x03R\x05runUsB\b\n" +
 	"\x06result\"\xe6\x01\n" +
 	"\x0fInvocationEvent\x12#\n" +
 	"\rinvocation_id\x18\x01 \x01(\tR\finvocationId\x126\n" +

@@ -24,10 +24,10 @@ var File_supervisor_v1_service_proto protoreflect.FileDescriptor
 
 const file_supervisor_v1_service_proto_rawDesc = "" +
 	"\n" +
-	"\x1bsupervisor/v1/service.proto\x12\rsupervisor.v1\x1a\x1esupervisor/v1/supervisor.proto2\x9e\x01\n" +
+	"\x1bsupervisor/v1/service.proto\x12\rsupervisor.v1\x1a\x1esupervisor/v1/supervisor.proto2\xa0\x01\n" +
 	"\x11SupervisorService\x12B\n" +
-	"\x05Start\x12\x1b.supervisor.v1.StartRequest\x1a\x1c.supervisor.v1.StartResponse\x12E\n" +
-	"\x06Invoke\x12\x1c.supervisor.v1.InvokeRequest\x1a\x1d.supervisor.v1.InvokeResponseB\xb3\x01\n" +
+	"\x05Start\x12\x1b.supervisor.v1.StartRequest\x1a\x1c.supervisor.v1.StartResponse\x12G\n" +
+	"\x06Invoke\x12\x1c.supervisor.v1.InvokeRequest\x1a\x1d.supervisor.v1.InvokeResponse0\x01B\xb3\x01\n" +
 	"\x11com.supervisor.v1B\fServiceProtoP\x01Z;github.com/galaxy-io/alchemy/api/supervisor/v1;supervisorv1\xa2\x02\x03SXX\xaa\x02\rSupervisor.V1\xca\x02\rSupervisor\\V1\xe2\x02\x19Supervisor\\V1\\GPBMetadata\xea\x02\x0eSupervisor::V1b\x06proto3"
 
 var file_supervisor_v1_service_proto_goTypes = []any{
