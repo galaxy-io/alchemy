@@ -24,3 +24,6 @@ export const formatInvocationOutcome = (invocation: Invocation) =>
   ]
     .filter(Boolean)
     .join(" ");
+
+export const getInvocationLogsShownLines = (lines: string[]) =>
+  lines[lines.length - 1] === "" ? lines.slice(0, -1) : lines;

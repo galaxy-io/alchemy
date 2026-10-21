@@ -19,6 +19,7 @@ import type { Function as AlchemyFunction } from "@/gen/functions/v1/functions_p
 import {
   type GetInvocationLogsRequest,
   GetInvocationLogsRequestSchema,
+  type GetInvocationLogsResponse,
   type GetInvocationRequest,
   GetInvocationRequestSchema,
   type GetInvocationResponse,
@@ -31,10 +32,17 @@ import { FunctionsService } from "@/gen/functions/v1/service_pb";
 
 import {
   ACTIVE_INVOCATIONS_REFETCH_INTERVAL,
-  INVOCATION_LOGS_MAX_LENGTH,
+  INVOCATION_LOGS_FLUSH_INTERVAL,
+  INVOCATION_LOGS_MAX_LINES,
 } from "@/api/queries/constants";
 import { createListInstancesQueryKey } from "@/api/queries/instances";
-import { getNextPageParam, INITIAL_PAGE_PARAM, type InfiniteQueryInput } from "@/api/utils";
+import type { InvocationLogs } from "@/api/queries/types";
+import {
+  batchIterable,
+  getNextPageParam,
+  INITIAL_PAGE_PARAM,
+  type InfiniteQueryInput,
+} from "@/api/utils";
 
 import { ACTIVE_INVOCATION_STATUSES } from "@/constants";
 
@@ -137,32 +145,59 @@ export const useGetInvocationQuery = ({
 export const createGetInvocationLogsInput = (id: Invocation["id"]) =>
   create(GetInvocationLogsRequestSchema, { id, follow: true });
 
-export const useGetInvocationLogsQuery = ({
-  input,
-  options = {},
-}: {
-  input: GetInvocationLogsRequest;
-  options?: { enabled?: boolean };
-}) => {
+const createGetInvocationLogsQueryKey = (input: GetInvocationLogsRequest, transport: Transport) =>
+  [
+    ...createConnectQueryKey({ schema: FunctionsService, transport, cardinality: undefined }),
+    FunctionsService.method.getInvocationLogs.name,
+    input.id,
+  ] as const;
+
+const INITIAL_INVOCATION_LOGS: InvocationLogs = { lines: [], offset: 0 };
+
+async function* decodeInvocationLogs(stream: AsyncIterable<GetInvocationLogsResponse>) {
+  const decoder = new TextDecoder();
+  for await (const { data } of stream) {
+    yield decoder.decode(data, { stream: true });
+  }
+}
+
+const appendInvocationLogs = (logs: InvocationLogs, chunks: string[]): InvocationLogs => {
+  const text = chunks.join("");
+  if (!text) {
+    return logs;
+  }
+  const [head, ...rest] = text.split("\n");
+  const lines = logs.lines.length > 0 ? [...logs.lines] : [""];
+  lines[lines.length - 1] += head;
+  lines.push(...rest);
+  const trimmed = Math.max(0, lines.length - INVOCATION_LOGS_MAX_LINES);
+  return { lines: lines.slice(trimmed), offset: logs.offset + trimmed };
+};
+
+export const useGetInvocationLogsStream = (invocationId: Invocation["id"]) => {
   const transport = useTransport();
-  return useStreamedQuery({
-    queryKey: [FunctionsService.method.getInvocationLogs.name, input.id, input.follow],
+  const input = createGetInvocationLogsInput(invocationId);
+  const { data, isFetching, isError } = useStreamedQuery({
+    queryKey: createGetInvocationLogsQueryKey(input, transport),
     queryFn: streamedQuery({
-      streamFn: async function* ({ signal }) {
-        const decoder = new TextDecoder();
-        const stream = createClient(FunctionsService, transport).getInvocationLogs(input, {
-          signal,
-        });
-        for await (const { data } of stream) {
-          yield decoder.decode(data, { stream: true });
-        }
-      },
-      reducer: (logs: string, chunk: string) => (logs + chunk).slice(-INVOCATION_LOGS_MAX_LENGTH),
-      initialValue: "",
+      streamFn: ({ signal }: { signal: AbortSignal }) =>
+        batchIterable(
+          decodeInvocationLogs(
+            createClient(FunctionsService, transport).getInvocationLogs(input, { signal }),
+          ),
+          INVOCATION_LOGS_FLUSH_INTERVAL,
+        ),
+      reducer: appendInvocationLogs,
+      initialValue: INITIAL_INVOCATION_LOGS,
     }),
-    staleTime: Number.POSITIVE_INFINITY,
-    ...options,
+    gcTime: 0,
   });
+
+  return {
+    logs: data ?? INITIAL_INVOCATION_LOGS,
+    isStreaming: isFetching,
+    isError,
+  };
 };
 
 export const useInvokeMutation = (
