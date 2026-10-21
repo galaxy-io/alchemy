@@ -12,6 +12,7 @@ import (
 	"io"
 	"log/slog"
 	"sync"
+	"time"
 
 	"gocloud.dev/blob"
 	// Bucket URLs: s3://, gs:// and file://.
@@ -36,9 +37,11 @@ func OpenBucket(ctx context.Context, url string) (*blob.Bucket, error) {
 	return blob.OpenBucket(ctx, url)
 }
 
-// Key is where an invocation's log is kept in the bucket.
-func Key(tenantID, invocationID string) string {
-	return tenantID + "/" + invocationID + ".log.gz"
+// Key is where an invocation's log is kept in the bucket: by tenant, function
+// and the UTC day the invocation was created, so one prefix lists a
+// function's logs for a day.
+func Key(tenantID, functionID string, created time.Time, invocationID string) string {
+	return tenantID + "/" + functionID + "/" + created.UTC().Format("2006/01/02") + "/" + invocationID + ".log.gz"
 }
 
 // Writer takes one invocation's log as the function writes it: each piece

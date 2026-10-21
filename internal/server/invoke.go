@@ -19,6 +19,7 @@ import (
 	"github.com/galaxy-io/alchemy/datastore/postgres/sqlcgen"
 	"github.com/galaxy-io/alchemy/internal/bus"
 	"github.com/galaxy-io/alchemy/internal/contract"
+	"github.com/galaxy-io/alchemy/internal/logs"
 )
 
 // errNoHosts is returned when nothing has heartbeated recently.
@@ -62,6 +63,7 @@ func (s *Service) Invoke(ctx context.Context, req *connect.Request[functionsv1.I
 		Artifact:     cv.artifact,
 		Input:        input.Wire,
 		TimeoutMs:    timeout.Milliseconds(),
+		LogKey:       logs.Key(inv.row.TenantID, inv.row.FunctionID, inv.row.CreatedAt.Time, inv.row.ID),
 	}, timeout)
 	if err != nil {
 		if ctx.Err() != nil {

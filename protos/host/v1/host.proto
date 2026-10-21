@@ -83,6 +83,9 @@ message InvokeRequest {
   Artifact artifact = 2;
   bytes input = 3;
   int64 timeout_ms = 4;
+  // log_key is where the host uploads the invocation's log in the log bucket.
+  // The server owns the layout, so it can find the log again.
+  string log_key = 5;
 }
 
 // InvokeResponse is returned whenever an instance ran the input, including

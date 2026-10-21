@@ -25,7 +25,7 @@ func (s *Service) GetInvocationLogs(ctx context.Context, req *connect.Request[fu
 	}
 
 	if row.EndedAt.Valid {
-		found, err := logs.Read(ctx, s.logs, logs.Key(row.TenantID, row.ID), sendWriter(send))
+		found, err := logs.Read(ctx, s.logs, logs.Key(row.TenantID, row.FunctionID, row.CreatedAt.Time, row.ID), sendWriter(send))
 		if found {
 			return err
 		}

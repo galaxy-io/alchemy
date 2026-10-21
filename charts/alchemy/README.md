@@ -63,7 +63,7 @@ The vendored NATS is already set to `max_payload: 64MB` with JetStream in memory
 
 ## Function logs
 
-Everything a function writes to stderr is kept. While an invocation runs, its host sends the log to NATS, which keeps the latest 10 MiB of every invocation for `functionLogs.retention` (1 hour by default) so the UI can follow it live. At the same time the host uploads the whole log to `functionLogs.bucket` as one gzipped object, `<tenant>/<invocation>.log.gz`, which appears when the invocation ends. After that, logs are read from the bucket.
+Everything a function writes to stderr is kept. While an invocation runs, its host sends the log to NATS, which keeps the latest 10 MiB of every invocation for `functionLogs.retention` (1 hour by default) so the UI can follow it live. At the same time the host uploads the whole log to `functionLogs.bucket` as one gzipped object, `<tenant>/<function>/<YYYY>/<MM>/<DD>/<invocation>.log.gz` (the day the invocation was created, in UTC), which appears when the invocation ends. After that, logs are read from the bucket.
 
 Point `functionLogs.bucket` at an S3 or GCS bucket. Hosts need to write to it and the server to read it, through their service accounts' cloud identity (`host.serviceAccount.annotations` and `server.serviceAccount.annotations`). Without a bucket, logs only last as long as NATS keeps them.
 

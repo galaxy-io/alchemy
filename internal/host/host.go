@@ -312,7 +312,7 @@ type functionLog struct {
 func (h *Host) functionLogs(req *hostv1.InvokeRequest, log *slog.Logger) *functionLog {
 	tenantID := req.GetArtifact().GetTenantId()
 	subject := bus.LogSubject(tenantID, req.GetInvocationId())
-	w := logs.NewWriter(h.background, h.logs, logs.Key(tenantID, req.GetInvocationId()),
+	w := logs.NewWriter(h.background, h.logs, req.GetLogKey(),
 		func(p []byte) error { return h.bus.PublishLog(subject, p) }, log)
 	return &functionLog{Writer: w, h: h, subject: subject, log: log}
 }

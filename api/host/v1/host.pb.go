@@ -357,11 +357,14 @@ func (*BuildResponse_Error) isBuildResponse_Result() {}
 // InvokeRequest runs one input, already validated by the server, through an
 // instance of artifact. The host decides how the instance is obtained.
 type InvokeRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	InvocationId  string                 `protobuf:"bytes,1,opt,name=invocation_id,json=invocationId,proto3" json:"invocation_id,omitempty"`
-	Artifact      *Artifact              `protobuf:"bytes,2,opt,name=artifact,proto3" json:"artifact,omitempty"`
-	Input         []byte                 `protobuf:"bytes,3,opt,name=input,proto3" json:"input,omitempty"`
-	TimeoutMs     int64                  `protobuf:"varint,4,opt,name=timeout_ms,json=timeoutMs,proto3" json:"timeout_ms,omitempty"`
+	state        protoimpl.MessageState `protogen:"open.v1"`
+	InvocationId string                 `protobuf:"bytes,1,opt,name=invocation_id,json=invocationId,proto3" json:"invocation_id,omitempty"`
+	Artifact     *Artifact              `protobuf:"bytes,2,opt,name=artifact,proto3" json:"artifact,omitempty"`
+	Input        []byte                 `protobuf:"bytes,3,opt,name=input,proto3" json:"input,omitempty"`
+	TimeoutMs    int64                  `protobuf:"varint,4,opt,name=timeout_ms,json=timeoutMs,proto3" json:"timeout_ms,omitempty"`
+	// log_key is where the host uploads the invocation's log in the log bucket.
+	// The server owns the layout, so it can find the log again.
+	LogKey        string `protobuf:"bytes,5,opt,name=log_key,json=logKey,proto3" json:"log_key,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -422,6 +425,13 @@ func (x *InvokeRequest) GetTimeoutMs() int64 {
 		return x.TimeoutMs
 	}
 	return 0
+}
+
+func (x *InvokeRequest) GetLogKey() string {
+	if x != nil {
+		return x.LogKey
+	}
+	return ""
 }
 
 // InvokeResponse is returned whenever an instance ran the input, including
@@ -885,13 +895,14 @@ const file_host_v1_host_proto_rawDesc = "" +
 	"\bartifact\x18\x01 \x01(\v2\x11.host.v1.ArtifactH\x00R\bartifact\x12&\n" +
 	"\x05error\x18\x02 \x01(\v2\x0e.host.v1.ErrorH\x00R\x05error\x12\x1b\n" +
 	"\tbuild_log\x18\x03 \x01(\tR\bbuildLogB\b\n" +
-	"\x06result\"\x98\x01\n" +
+	"\x06result\"\xb1\x01\n" +
 	"\rInvokeRequest\x12#\n" +
 	"\rinvocation_id\x18\x01 \x01(\tR\finvocationId\x12-\n" +
 	"\bartifact\x18\x02 \x01(\v2\x11.host.v1.ArtifactR\bartifact\x12\x14\n" +
 	"\x05input\x18\x03 \x01(\fR\x05input\x12\x1d\n" +
 	"\n" +
-	"timeout_ms\x18\x04 \x01(\x03R\ttimeoutMs\"\x9f\x02\n" +
+	"timeout_ms\x18\x04 \x01(\x03R\ttimeoutMs\x12\x17\n" +
+	"\alog_key\x18\x05 \x01(\tR\x06logKey\"\x9f\x02\n" +
 	"\x0eInvokeResponse\x12\x18\n" +
 	"\x06output\x18\x01 \x01(\fH\x00R\x06output\x122\n" +
 	"\afailure\x18\x02 \x01(\v2\x16.supervisor.v1.FailureH\x00R\afailure\x12&\n" +
