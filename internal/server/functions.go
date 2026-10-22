@@ -222,7 +222,7 @@ func (s *Service) build(v *sqlcgen.FunctionVersion) {
 	var buildLog string
 	start := time.Now()
 	if err == nil {
-		artifact, buildLog, err = s.requestBuildWithLog(ctx, v.TenantID, spec)
+		artifact, buildLog, err = s.requestBuildWithLog(ctx, v.TenantID, spec, nil)
 	}
 
 	finish := sqlcgen.FinishFunctionVersionBuildParams{ID: v.ID, BuildLog: buildLog}
@@ -254,19 +254,20 @@ func (s *Service) build(v *sqlcgen.FunctionVersion) {
 	}
 }
 
-// requestBuild asks any host to build spec and returns the artifact. Hosts
-// cache by image digest, so a rebuild of a known image is a cache hit.
-func (s *Service) requestBuild(ctx context.Context, tenantID string, spec *functionsv1.FunctionSpec) (*hostv1.Artifact, error) {
-	artifact, _, err := s.requestBuildWithLog(ctx, tenantID, spec)
+// requestBuild asks any host to build spec with layers and returns the
+// artifact. Hosts cache by image and layer digests, so a rebuild of a known
+// image is a cache hit.
+func (s *Service) requestBuild(ctx context.Context, tenantID string, spec *functionsv1.FunctionSpec, layers []*hostv1.Layer) (*hostv1.Artifact, error) {
+	artifact, _, err := s.requestBuildWithLog(ctx, tenantID, spec, layers)
 	return artifact, err
 }
 
-func (s *Service) requestBuildWithLog(ctx context.Context, tenantID string, spec *functionsv1.FunctionSpec) (*hostv1.Artifact, string, error) {
+func (s *Service) requestBuildWithLog(ctx context.Context, tenantID string, spec *functionsv1.FunctionSpec, layers []*hostv1.Layer) (*hostv1.Artifact, string, error) {
 	ctx, cancel := context.WithTimeout(ctx, s.cfg.BuildTimeout)
 	defer cancel()
 	// Every host builds, so every host can take the function's invocations;
 	// the first host to finish answers for all of them.
-	reply, err := s.bus.First(ctx, bus.BuildSubject, &hostv1.BuildRequest{TenantId: tenantID, Spec: spec}, len(s.liveHosts()),
+	reply, err := s.bus.First(ctx, bus.BuildSubject, &hostv1.BuildRequest{TenantId: tenantID, Spec: spec, Layers: layers}, len(s.liveHosts()),
 		func() proto.Message { return &hostv1.BuildResponse{} },
 		func(m proto.Message) bool { return m.(*hostv1.BuildResponse).GetArtifact() != nil }) //nolint:errcheck // newResp makes BuildResponses
 	switch {

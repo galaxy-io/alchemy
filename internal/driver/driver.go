@@ -17,6 +17,8 @@ type Artifact struct {
 	Image string
 	// Digest is reported as FunctionVersion.image_digest.
 	Digest string
+	// Layers are the digests of the layers extracted over the image, in order.
+	Layers []string
 	// RootfsBytes is the size of the built root filesystem, when there is one.
 	RootfsBytes int64
 	Argv        []string
@@ -29,12 +31,22 @@ type Artifact struct {
 
 // Driver turns function versions into runnable instances on one host.
 type Driver interface {
-	// Build prepares everything needed to start a instance for spec.
-	Build(ctx context.Context, spec *functionsv1.FunctionSpec) (*Artifact, error)
+	// Build prepares everything needed to start a instance for spec, with
+	// layers extracted over its image in order.
+	Build(ctx context.Context, spec *functionsv1.FunctionSpec, layers []Layer) (*Artifact, error)
 	// Acquire returns a started instance ready to take one invocation.
 	Acquire(ctx context.Context, a *Artifact) (Instance, functionsv1.StartKind, error)
 	// Info describes the host-side pieces the driver runs with.
 	Info(ctx context.Context) HostInfo
+}
+
+// Layer is a tar archive, plain or gzipped, extracted over an image.
+type Layer struct {
+	// SHA256 is the archive's content digest, in hex.
+	SHA256 string
+	// Open reads the archive. Build only calls it when it has no root
+	// filesystem for the image and layers yet.
+	Open func(ctx context.Context) (io.ReadCloser, error)
 }
 
 // Instance is one running instance of a function version.

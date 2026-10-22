@@ -80,15 +80,15 @@ func (s *Service) reconcileOnce() {
 	}
 }
 
-// buildOn asks host name alone to build cv. Hosts cache by image digest, so
-// a host that has built the image before only resolves it.
+// buildOn asks host name alone to build cv. Hosts cache by image and layer
+// digests, so a host that has built the version before only resolves it.
 func (s *Service) buildOn(name string, cv *compiledVersion) {
 	ctx, cancel := context.WithTimeout(s.background, s.cfg.BuildTimeout)
 	defer cancel()
 	log := s.log.With("host", name, "function_id", cv.row.FunctionID, "version", cv.row.Version, "artifact_id", cv.row.ArtifactID)
 	start := time.Now()
 	resp := &hostv1.BuildResponse{}
-	if err := s.bus.Request(ctx, bus.HostBuildSubject(name), &hostv1.BuildRequest{TenantId: cv.row.TenantID, Spec: cv.pinnedSpec()}, resp); err != nil {
+	if err := s.bus.Request(ctx, bus.HostBuildSubject(name), &hostv1.BuildRequest{TenantId: cv.row.TenantID, Spec: cv.pinnedSpec(), Layers: cv.artifact.GetLayers()}, resp); err != nil {
 		log.Warn("reconcile: build", "err", err)
 		return
 	}
