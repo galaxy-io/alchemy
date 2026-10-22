@@ -108,7 +108,6 @@ func (w *Writer) Close() error {
 // abortLocked gives up on the upload; nothing appears in the bucket.
 func (w *Writer) abortLocked(msg string, err error) {
 	w.fail(msg, err)
-	w.cancel()
 	_ = w.upload.Close()
 	w.gz, w.upload = nil, nil
 }

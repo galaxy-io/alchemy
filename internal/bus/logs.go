@@ -22,12 +22,17 @@ const (
 	logWindow = 320
 	// logEndHeader marks the message that ends an invocation's log.
 	logEndHeader = "Alchemy-Log-End"
+	// logPrefix starts every log subject.
+	logPrefix = "logs."
 )
 
 // LogSubject carries the log of one invocation.
 func LogSubject(tenantID, invocationID string) string {
-	return "logs." + tenantID + "." + invocationID
+	return logPrefix + tenantID + "." + invocationID
 }
+
+// LogWildcard matches the log of every invocation.
+const LogWildcard = logPrefix + ">"
 
 // LogStreamConfig sizes the stream of recent log pieces.
 type LogStreamConfig struct {
@@ -47,7 +52,7 @@ func (b *Bus) EnsureLogStream(ctx context.Context, cfg LogStreamConfig) error {
 	}
 	_, err = js.CreateOrUpdateStream(ctx, jetstream.StreamConfig{
 		Name:              LogStream,
-		Subjects:          []string{"logs.>"},
+		Subjects:          []string{LogWildcard},
 		Storage:           jetstream.MemoryStorage,
 		MaxAge:            cfg.MaxAge,
 		MaxBytes:          cfg.MaxBytes,
