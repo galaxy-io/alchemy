@@ -17,3 +17,5 @@ data:
   LOG_FORMAT: {{ .Values.host.logFormat | quote }}
   # Function logs
   FUNCTION_LOGS_BUCKET: {{ .Values.functionLogs.bucket | quote }}
+  # Build layers
+  ARTIFACTS_BUCKET: {{ .Values.artifacts.bucket | quote }}

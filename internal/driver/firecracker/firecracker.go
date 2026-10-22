@@ -152,7 +152,7 @@ func (d *Driver) Acquire(ctx context.Context, a *driver.Artifact) (driver.Instan
 		return nil, none, err
 	}
 	sb := &instance{driver: d, id: hex.EncodeToString(raw), uid: uid}
-	if sb.jail, err = d.newJail(sb.id, uid, d.rootfsPath(a.Digest)); err != nil {
+	if sb.jail, err = d.newJail(sb.id, uid, d.rootfsPath(a.Digest, a.Layers)); err != nil {
 		sb.Release(context.WithoutCancel(ctx))
 		return nil, none, err
 	}

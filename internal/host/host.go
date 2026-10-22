@@ -10,6 +10,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"io"
 	"log/slog"
 	"sort"
 	"sync"
@@ -72,6 +73,7 @@ type Host struct {
 	driver    driver.Driver
 	bus       *bus.Bus
 	logs      *blob.Bucket // nil keeps function logs on the bus only
+	layers    *blob.Bucket // nil means builds with layers fail
 	log       *slog.Logger
 	startedAt time.Time
 	slots     chan struct{}
@@ -91,14 +93,16 @@ type Host struct {
 }
 
 // New returns a host that is not yet serving; Run starts it. Function logs
-// are uploaded to logBucket, when there is one.
-func New(cfg Config, d driver.Driver, b *bus.Bus, logBucket *blob.Bucket, log *slog.Logger) *Host {
+// are uploaded to logBucket, when there is one. Builds read their layers
+// from artifactBucket.
+func New(cfg Config, d driver.Driver, b *bus.Bus, logBucket, artifactBucket *blob.Bucket, log *slog.Logger) *Host {
 	bg, stop := context.WithCancel(context.Background())
 	return &Host{
 		cfg:        cfg,
 		driver:     d,
 		bus:        b,
 		logs:       logBucket,
+		layers:     artifactBucket,
 		log:        log,
 		startedAt:  time.Now(),
 		slots:      make(chan struct{}, cfg.MaxConcurrency),
@@ -180,18 +184,39 @@ func (h *Host) handleBuild(ctx context.Context, data []byte) proto.Message {
 	ctx, cancel := context.WithTimeout(ctx, h.cfg.BuildTimeout)
 	defer cancel()
 	start := time.Now()
-	built, err := h.driver.Build(ctx, req.GetSpec())
+	layers, err := h.driverLayers(req.GetLayers())
+	if err != nil {
+		return buildError("failed_precondition", err)
+	}
+	built, err := h.driver.Build(ctx, req.GetSpec(), layers)
 	if err != nil {
 		h.log.Warn("build failed", "image", req.GetSpec().GetImage(), "err", err)
 		return &hostv1.BuildResponse{Result: &hostv1.BuildResponse_Error{Error: &hostv1.Error{Code: "internal", Message: err.Error()}}, BuildLog: err.Error()}
 	}
-	artifact := toProto(req.GetTenantId(), built)
+	artifact := toProto(req.GetTenantId(), built, req.GetLayers())
 	if err := h.serve(artifact); err != nil {
 		return buildError("internal", err)
 	}
 	h.prewarm(artifact)
 	h.log.Info("build ready", "artifact_id", artifact.GetId(), "digest", artifact.GetDigest(), "took", time.Since(start).Round(time.Millisecond))
 	return &hostv1.BuildResponse{Result: &hostv1.BuildResponse_Artifact{Artifact: artifact}}
+}
+
+// driverLayers reads layers from the artifact bucket.
+func (h *Host) driverLayers(layers []*hostv1.Layer) ([]driver.Layer, error) {
+	if len(layers) > 0 && h.layers == nil {
+		return nil, errors.New("the build has layers and this host has no artifact bucket")
+	}
+	out := make([]driver.Layer, len(layers))
+	for i, l := range layers {
+		out[i] = driver.Layer{
+			SHA256: l.GetSha256(),
+			Open: func(ctx context.Context) (io.ReadCloser, error) {
+				return h.layers.NewReader(ctx, l.GetKey(), nil)
+			},
+		}
+	}
+	return out, nil
 }
 
 func buildError(code string, err error) *hostv1.BuildResponse {
