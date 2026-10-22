@@ -51,6 +51,14 @@ functionLogs:
   # oldest lines go first, and are already in the bucket.
   maxBytes: 1073741824
 
+artifacts:
+  # -- Bucket of the layers builds extract over an image, such as a function
+  # built from source: `s3://BUCKET?region=REGION` or `gs://BUCKET`. Hosts
+  # need read access through their service account's cloud identity. Layers
+  # must outlive every version that uses them, so give it no expiry rule.
+  # Empty means only image functions can be built.
+  bucket: ""
+
 server:
   image:
     # -- Server image repository.

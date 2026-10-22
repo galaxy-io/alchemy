@@ -15,6 +15,8 @@ import (
 	"syscall"
 	"time"
 
+	"gocloud.dev/blob"
+
 	"github.com/galaxy-io/alchemy/cmd/internal/logger"
 	"github.com/galaxy-io/alchemy/internal/bus"
 	"github.com/galaxy-io/alchemy/internal/driver/firecracker"
@@ -40,6 +42,8 @@ func run(log *slog.Logger) error {
 	natsURL := envOr("NATS_URL", "nats://localhost:4223")
 	// Empty keeps function logs on NATS only.
 	logsBucket := os.Getenv("FUNCTION_LOGS_BUCKET")
+	// Empty means builds with layers fail.
+	artifactsBucket := os.Getenv("ARTIFACTS_BUCKET")
 	cfg := host.DefaultConfig()
 	cfg.Name = envOr("HOST_NAME", hostname)
 	fcCfg := firecracker.Config{
@@ -91,7 +95,15 @@ func run(log *slog.Logger) error {
 		defer func() { _ = bucket.Close() }()
 	}
 
-	return host.New(cfg, drv, b, bucket, log).Run(ctx)
+	var artifacts *blob.Bucket
+	if artifactsBucket != "" {
+		if artifacts, err = blob.OpenBucket(ctx, artifactsBucket); err != nil {
+			return fmt.Errorf("artifacts bucket: %w", err)
+		}
+		defer func() { _ = artifacts.Close() }()
+	}
+
+	return host.New(cfg, drv, b, bucket, artifacts, log).Run(ctx)
 }
 
 func envOr(key, fallback string) string {

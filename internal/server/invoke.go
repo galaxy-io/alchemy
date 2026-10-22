@@ -111,7 +111,7 @@ func (s *Service) invokeOnHost(ctx context.Context, log *slog.Logger, cv *compil
 	}
 	log.Info("no host has the artifact; building")
 	spec := cv.pinnedSpec()
-	built, err := s.requestBuild(ctx, cv.row.TenantID, spec)
+	built, err := s.requestBuild(ctx, cv.row.TenantID, spec, cv.artifact.GetLayers())
 	if err != nil {
 		return nil, connect.NewError(connect.CodeFailedPrecondition,
 			fmt.Errorf("version %d can no longer be built from %s: %w; create a new version", cv.row.Version, spec.GetImage(), err))

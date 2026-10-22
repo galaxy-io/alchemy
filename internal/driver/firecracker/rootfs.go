@@ -1,10 +1,15 @@
 package firecracker
 
 import (
+	"bufio"
 	"bytes"
+	"compress/gzip"
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"errors"
 	"fmt"
+	"hash"
 	"io"
 	"maps"
 	"os"
@@ -26,10 +31,11 @@ import (
 // kernel is told to start it as init.
 const supervisorPath = "/sbin/supervisor"
 
-// Build resolves the image in its registry, flattens it into a read-only
-// ext4 root filesystem with the supervisor inside, and caches that by digest.
-// No container daemon is involved; Firecracker only sees the ext4 file.
-func (d *Driver) Build(ctx context.Context, spec *functionsv1.FunctionSpec) (*driver.Artifact, error) {
+// Build resolves the image in its registry, flattens it and the layers into
+// a read-only ext4 root filesystem with the supervisor inside, and caches
+// that by the image digest and the layers' digests. No container daemon is
+// involved; Firecracker only sees the ext4 file.
+func (d *Driver) Build(ctx context.Context, spec *functionsv1.FunctionSpec, layers []driver.Layer) (*driver.Artifact, error) {
 	ref, err := name.ParseReference(spec.GetImage())
 	if err != nil {
 		return nil, fmt.Errorf("image %q: %w", spec.GetImage(), err)
@@ -71,9 +77,13 @@ func (d *Driver) Build(ctx context.Context, spec *functionsv1.FunctionSpec) (*dr
 	// image): pulling repo@digest later gets the same image back.
 	digest := desc.Digest.String()
 
-	rootfs := d.rootfsPath(digest)
+	layerDigests := make([]string, len(layers))
+	for i, l := range layers {
+		layerDigests[i] = l.SHA256
+	}
+	rootfs := d.rootfsPath(digest, layerDigests)
 	if _, err := os.Stat(rootfs); err != nil {
-		if err := d.buildRootfs(ctx, img, rootfs); err != nil {
+		if err := d.buildRootfs(ctx, img, layers, rootfs); err != nil {
 			return nil, fmt.Errorf("build rootfs: %w", err)
 		}
 	}
@@ -85,6 +95,7 @@ func (d *Driver) Build(ctx context.Context, spec *functionsv1.FunctionSpec) (*dr
 	return &driver.Artifact{
 		Image:       rootfs,
 		Digest:      digest,
+		Layers:      layerDigests,
 		RootfsBytes: rootfsBytes,
 		Argv:        argv,
 		Env:         env,
@@ -95,19 +106,30 @@ func (d *Driver) Build(ctx context.Context, spec *functionsv1.FunctionSpec) (*dr
 	}, nil
 }
 
-// rootfsPath is where the rootfs for an image digest is cached on this host.
+// rootfsPath is where the rootfs for an image digest with layers is cached
+// on this host.
 // Acquire finds the rootfs here rather than through Artifact.Image: the
 // artifact is stored by the server and handed to every host, so a path one
 // host wrote means nothing on another, or on the same host after its data
 // dir moves.
-func (d *Driver) rootfsPath(digest string) string {
-	return filepath.Join(d.rootfsDir(), strings.ReplaceAll(digest, ":", "-")+".ext4")
+func (d *Driver) rootfsPath(digest string, layers []string) string {
+	key := digest
+	if len(layers) > 0 {
+		h := sha256.New()
+		h.Write([]byte(digest))
+		for _, l := range layers {
+			h.Write([]byte{0})
+			h.Write([]byte(l))
+		}
+		key = "layered:" + hex.EncodeToString(h.Sum(nil))
+	}
+	return filepath.Join(d.rootfsDir(), strings.ReplaceAll(key, ":", "-")+".ext4")
 }
 
-// buildRootfs flattens the image's layers into a directory, adds the
-// supervisor and the mount points init needs, and packs it into an ext4 image
-// with mke2fs -d, which needs neither root nor a loop device.
-func (d *Driver) buildRootfs(ctx context.Context, img v1.Image, out string) error {
+// buildRootfs flattens the image's layers and then layers into a directory,
+// adds the supervisor and the mount points init needs, and packs it into an
+// ext4 image with mke2fs -d, which needs neither root nor a loop device.
+func (d *Driver) buildRootfs(ctx context.Context, img v1.Image, layers []driver.Layer, out string) error {
 	if err := os.MkdirAll(filepath.Dir(out), 0o750); err != nil {
 		return err
 	}
@@ -121,13 +143,28 @@ func (d *Driver) buildRootfs(ctx context.Context, img v1.Image, out string) erro
 		return err
 	}
 
-	// Extract applies the layers in order, whiteouts included, as one tar
-	// stream of the final filesystem.
-	layers := mutate.Extract(img)
-	defer func() { _ = layers.Close() }()
-	untar := exec.CommandContext(ctx, "tar", "--extract", "--directory", root, //nolint:gosec // root is a fresh temp dir
+	// Extract applies the image's layers in order, whiteouts included, as one
+	// tar stream of the final filesystem. The extra layers follow in the same
+	// stream, so one tar process extracts everything: tar defers creating
+	// symlinks until the end, which keeps a symlink in the image from steering
+	// a layer's files outside root. --ignore-zeros reads past the end of each
+	// archive into the next.
+	image := mutate.Extract(img)
+	defer func() { _ = image.Close() }()
+	streams := []io.Reader{image}
+	readers := make([]*layerReader, len(layers))
+	for i, l := range layers {
+		readers[i] = &layerReader{ctx: ctx, layer: l}
+		streams = append(streams, readers[i])
+	}
+	defer func() {
+		for _, r := range readers {
+			r.close()
+		}
+	}()
+	untar := exec.CommandContext(ctx, "tar", "--extract", "--ignore-zeros", "--directory", root, //nolint:gosec // root is a fresh temp dir
 		"--exclude=dev/*", "--no-same-owner")
-	untar.Stdin = layers
+	untar.Stdin = io.MultiReader(streams...)
 	var tarErr bytes.Buffer
 	untar.Stderr = &tarErr
 	if err := untar.Run(); err != nil {
@@ -234,4 +271,66 @@ func dirSizeMiB(dir string) (int64, error) {
 		return nil
 	})
 	return total>>20 + 1, err
+}
+
+// layerReader reads a layer's archive, opened on first read, decompressed
+// when it is gzipped. At the end of the archive it fails unless the bytes it
+// read match the layer's digest, which fails the build.
+type layerReader struct {
+	ctx   context.Context
+	layer driver.Layer
+	raw   io.ReadCloser
+	sum   hash.Hash
+	body  *bufio.Reader // raw, through sum
+	tar   io.Reader     // body, decompressed when gzipped
+}
+
+func (r *layerReader) Read(p []byte) (int, error) {
+	if r.tar == nil {
+		if err := r.open(); err != nil {
+			return 0, err
+		}
+	}
+	n, err := r.tar.Read(p)
+	if errors.Is(err, io.EOF) {
+		err = r.verify()
+	}
+	return n, err
+}
+
+func (r *layerReader) open() error {
+	raw, err := r.layer.Open(r.ctx)
+	if err != nil {
+		return fmt.Errorf("open layer %s: %w", r.layer.SHA256, err)
+	}
+	r.raw, r.sum = raw, sha256.New()
+	r.body = bufio.NewReader(io.TeeReader(raw, r.sum))
+	r.tar = r.body
+	if magic, _ := r.body.Peek(2); len(magic) == 2 && magic[0] == 0x1f && magic[1] == 0x8b {
+		gz, err := gzip.NewReader(r.body)
+		if err != nil {
+			return fmt.Errorf("layer %s: %w", r.layer.SHA256, err)
+		}
+		r.tar = gz
+	}
+	return nil
+}
+
+// verify reads what decompression left of the archive and checks its
+// digest. It returns io.EOF when the digest matches.
+func (r *layerReader) verify() error {
+	if _, err := io.Copy(io.Discard, r.body); err != nil {
+		return fmt.Errorf("read layer %s: %w", r.layer.SHA256, err)
+	}
+	if got := hex.EncodeToString(r.sum.Sum(nil)); got != r.layer.SHA256 {
+		return fmt.Errorf("layer %s: content has digest %s", r.layer.SHA256, got)
+	}
+	return io.EOF
+}
+
+// close releases the archive, read to the end or not.
+func (r *layerReader) close() {
+	if r.raw != nil {
+		_ = r.raw.Close()
+	}
 }

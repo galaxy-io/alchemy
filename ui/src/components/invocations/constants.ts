@@ -1,4 +1,5 @@
 import { ChartPalette } from "@galaxy-io/dls/charts/types";
+import type { Space } from "@galaxy-io/dls/theme/enums";
 import type { PaletteColor, RoleColor } from "@galaxy-io/dls/theme/tokens/types";
 
 import { FunctionErrorKind, InvocationStatus, StartKind } from "@/gen/functions/v1/invocations_pb";
@@ -174,3 +175,8 @@ export const INVOCATION_PHASE_TO_HUE_MAP: Record<InvocationPhase, PaletteColor |
 };
 
 export const INVOCATION_STATUS_REASON_ICON_SIZE = 14;
+
+export const INVOCATION_LOGS_HEADER_HEIGHT = 32;
+export const INVOCATION_LOGS_MAX_HEIGHT = 320;
+export const INVOCATION_LOGS_ESTIMATED_LINE_HEIGHT = 18;
+export const INVOCATION_LOGS_LINE_GAP: Space = 2;
