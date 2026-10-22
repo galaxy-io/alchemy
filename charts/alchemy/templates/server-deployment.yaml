@@ -35,8 +35,6 @@ spec:
         - name: server
           image: {{ .Values.server.image.repository }}:{{ .Values.server.image.tag | default .Chart.AppVersion }}
           imagePullPolicy: {{ .Values.server.image.pullPolicy }}
-          args:
-            - --addr=:{{ .Values.server.service.port }}
           securityContext:
             allowPrivilegeEscalation: false
             readOnlyRootFilesystem: true

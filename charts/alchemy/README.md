@@ -35,7 +35,7 @@ A new host only runs once it has a KVM node. Run a node autoscaler such as Karpe
 
 ## Runtime configuration
 
-Alchemy needs a PostgreSQL DSN and a NATS URL. NATS must accept 64MB messages (`max_payload: 64MB`). You can supply both through an existing Secret:
+Alchemy needs a PostgreSQL DSN and a NATS URL. NATS must accept 64MB messages (`max_payload: 64MB`) and have JetStream enabled with memory storage, which holds recent function logs. You can supply both through an existing Secret:
 
 ```sh
 kubectl create secret generic alchemy-runtime \
@@ -59,7 +59,24 @@ helm upgrade --install alchemy charts/alchemy \
   --set-string eventBus.nats.url='nats://alchemy-nats:4222'
 ```
 
-The vendored NATS is already set to `max_payload: 64MB`. Every value is documented in [values.yaml](values.yaml).
+The vendored NATS is already set to `max_payload: 64MB` with JetStream in memory. Every value is documented in [values.yaml](values.yaml).
+
+## Function logs
+
+Everything a function writes to stderr is kept. While an invocation runs, its host sends the log to NATS, which keeps the latest 10 MiB of every invocation for `functionLogs.retention` (1 hour by default) so the UI can follow it live. At the same time the host uploads the whole log to `functionLogs.bucket` as one gzipped object, `<tenant>/<function>/<YYYY>/<MM>/<DD>/<invocation>.log.gz` (the day the invocation was created, in UTC), which appears when the invocation ends. After that, logs are read from the bucket.
+
+Point `functionLogs.bucket` at an S3 or GCS bucket. Hosts need to write to it and the server to read it, through their service accounts' cloud identity (`host.serviceAccount.annotations` and `server.serviceAccount.annotations`). Without a bucket, logs only last as long as NATS keeps them.
+
+Older logs move to colder storage through the bucket's own lifecycle rules, not Alchemy. Add two:
+
+- Transition objects to Glacier (S3) or Archive (GCS) after as long as you want logs to stay quick to read.
+- Abort incomplete multipart uploads after a day. A host that dies mid-invocation leaves its upload incomplete, and S3 charges for the parts until it is aborted.
+
+## Artifacts
+
+A build can extract layers over a function's image: tar archives kept in `artifacts.bucket`, each checked against its digest. They are how a function built from source reaches its root filesystem. Hosts need to read the bucket through their service account's cloud identity (`host.serviceAccount.annotations`).
+
+A version uses its layers for as long as it exists, so the bucket must not expire them. Keep it separate from `functionLogs.bucket`, whose lifecycle rules do.
 
 ## Images
 

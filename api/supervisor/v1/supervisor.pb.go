@@ -389,25 +389,115 @@ func (x *Failure) GetExitCode() int32 {
 	return 0
 }
 
-// InvokeResponse carries the function's output, not yet validated, or a
+// InvokeResult carries the function's output, not yet validated, or a
 // Failure. run_us is time spent in the function, measured in the guest on a
-// monotonic clock. log_tail is the last few KB of the function's stderr.
-type InvokeResponse struct {
+// monotonic clock.
+type InvokeResult struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// Types that are valid to be assigned to Result:
 	//
-	//	*InvokeResponse_Output
-	//	*InvokeResponse_Failure
-	Result        isInvokeResponse_Result `protobuf_oneof:"result"`
-	RunUs         int64                   `protobuf:"varint,3,opt,name=run_us,json=runUs,proto3" json:"run_us,omitempty"`
-	LogTail       string                  `protobuf:"bytes,4,opt,name=log_tail,json=logTail,proto3" json:"log_tail,omitempty"`
+	//	*InvokeResult_Output
+	//	*InvokeResult_Failure
+	Result        isInvokeResult_Result `protobuf_oneof:"result"`
+	RunUs         int64                 `protobuf:"varint,3,opt,name=run_us,json=runUs,proto3" json:"run_us,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *InvokeResult) Reset() {
+	*x = InvokeResult{}
+	mi := &file_supervisor_v1_supervisor_proto_msgTypes[4]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *InvokeResult) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*InvokeResult) ProtoMessage() {}
+
+func (x *InvokeResult) ProtoReflect() protoreflect.Message {
+	mi := &file_supervisor_v1_supervisor_proto_msgTypes[4]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use InvokeResult.ProtoReflect.Descriptor instead.
+func (*InvokeResult) Descriptor() ([]byte, []int) {
+	return file_supervisor_v1_supervisor_proto_rawDescGZIP(), []int{4}
+}
+
+func (x *InvokeResult) GetResult() isInvokeResult_Result {
+	if x != nil {
+		return x.Result
+	}
+	return nil
+}
+
+func (x *InvokeResult) GetOutput() []byte {
+	if x != nil {
+		if x, ok := x.Result.(*InvokeResult_Output); ok {
+			return x.Output
+		}
+	}
+	return nil
+}
+
+func (x *InvokeResult) GetFailure() *Failure {
+	if x != nil {
+		if x, ok := x.Result.(*InvokeResult_Failure); ok {
+			return x.Failure
+		}
+	}
+	return nil
+}
+
+func (x *InvokeResult) GetRunUs() int64 {
+	if x != nil {
+		return x.RunUs
+	}
+	return 0
+}
+
+type isInvokeResult_Result interface {
+	isInvokeResult_Result()
+}
+
+type InvokeResult_Output struct {
+	Output []byte `protobuf:"bytes,1,opt,name=output,proto3,oneof"`
+}
+
+type InvokeResult_Failure struct {
+	Failure *Failure `protobuf:"bytes,2,opt,name=failure,proto3,oneof"`
+}
+
+func (*InvokeResult_Output) isInvokeResult_Result() {}
+
+func (*InvokeResult_Failure) isInvokeResult_Result() {}
+
+// InvokeResponse is one message of an invocation's stream: the function's
+// stderr as it is written, then exactly one result, last.
+type InvokeResponse struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Types that are valid to be assigned to Event:
+	//
+	//	*InvokeResponse_Log
+	//	*InvokeResponse_Result
+	Event         isInvokeResponse_Event `protobuf_oneof:"event"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
 func (x *InvokeResponse) Reset() {
 	*x = InvokeResponse{}
-	mi := &file_supervisor_v1_supervisor_proto_msgTypes[4]
+	mi := &file_supervisor_v1_supervisor_proto_msgTypes[5]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -419,7 +509,7 @@ func (x *InvokeResponse) String() string {
 func (*InvokeResponse) ProtoMessage() {}
 
 func (x *InvokeResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_supervisor_v1_supervisor_proto_msgTypes[4]
+	mi := &file_supervisor_v1_supervisor_proto_msgTypes[5]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -432,63 +522,49 @@ func (x *InvokeResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use InvokeResponse.ProtoReflect.Descriptor instead.
 func (*InvokeResponse) Descriptor() ([]byte, []int) {
-	return file_supervisor_v1_supervisor_proto_rawDescGZIP(), []int{4}
+	return file_supervisor_v1_supervisor_proto_rawDescGZIP(), []int{5}
 }
 
-func (x *InvokeResponse) GetResult() isInvokeResponse_Result {
+func (x *InvokeResponse) GetEvent() isInvokeResponse_Event {
 	if x != nil {
-		return x.Result
+		return x.Event
 	}
 	return nil
 }
 
-func (x *InvokeResponse) GetOutput() []byte {
+func (x *InvokeResponse) GetLog() []byte {
 	if x != nil {
-		if x, ok := x.Result.(*InvokeResponse_Output); ok {
-			return x.Output
+		if x, ok := x.Event.(*InvokeResponse_Log); ok {
+			return x.Log
 		}
 	}
 	return nil
 }
 
-func (x *InvokeResponse) GetFailure() *Failure {
+func (x *InvokeResponse) GetResult() *InvokeResult {
 	if x != nil {
-		if x, ok := x.Result.(*InvokeResponse_Failure); ok {
-			return x.Failure
+		if x, ok := x.Event.(*InvokeResponse_Result); ok {
+			return x.Result
 		}
 	}
 	return nil
 }
 
-func (x *InvokeResponse) GetRunUs() int64 {
-	if x != nil {
-		return x.RunUs
-	}
-	return 0
+type isInvokeResponse_Event interface {
+	isInvokeResponse_Event()
 }
 
-func (x *InvokeResponse) GetLogTail() string {
-	if x != nil {
-		return x.LogTail
-	}
-	return ""
+type InvokeResponse_Log struct {
+	Log []byte `protobuf:"bytes,1,opt,name=log,proto3,oneof"`
 }
 
-type isInvokeResponse_Result interface {
-	isInvokeResponse_Result()
+type InvokeResponse_Result struct {
+	Result *InvokeResult `protobuf:"bytes,2,opt,name=result,proto3,oneof"`
 }
 
-type InvokeResponse_Output struct {
-	Output []byte `protobuf:"bytes,1,opt,name=output,proto3,oneof"`
-}
+func (*InvokeResponse_Log) isInvokeResponse_Event() {}
 
-type InvokeResponse_Failure struct {
-	Failure *Failure `protobuf:"bytes,2,opt,name=failure,proto3,oneof"`
-}
-
-func (*InvokeResponse_Output) isInvokeResponse_Result() {}
-
-func (*InvokeResponse_Failure) isInvokeResponse_Result() {}
+func (*InvokeResponse_Result) isInvokeResponse_Event() {}
 
 var File_supervisor_v1_supervisor_proto protoreflect.FileDescriptor
 
@@ -517,13 +593,16 @@ const file_supervisor_v1_supervisor_proto_rawDesc = "" +
 	"\x04kind\x18\x01 \x01(\x0e2\x1a.supervisor.v1.FailureKindR\x04kind\x12\x18\n" +
 	"\amessage\x18\x02 \x01(\tR\amessage\x12\x12\n" +
 	"\x04type\x18\x03 \x01(\tR\x04type\x12\x1b\n" +
-	"\texit_code\x18\x04 \x01(\x05R\bexitCode\"\x9a\x01\n" +
-	"\x0eInvokeResponse\x12\x18\n" +
+	"\texit_code\x18\x04 \x01(\x05R\bexitCode\"}\n" +
+	"\fInvokeResult\x12\x18\n" +
 	"\x06output\x18\x01 \x01(\fH\x00R\x06output\x122\n" +
 	"\afailure\x18\x02 \x01(\v2\x16.supervisor.v1.FailureH\x00R\afailure\x12\x15\n" +
-	"\x06run_us\x18\x03 \x01(\x03R\x05runUs\x12\x19\n" +
-	"\blog_tail\x18\x04 \x01(\tR\alogTailB\b\n" +
-	"\x06result*Q\n" +
+	"\x06run_us\x18\x03 \x01(\x03R\x05runUsB\b\n" +
+	"\x06result\"d\n" +
+	"\x0eInvokeResponse\x12\x12\n" +
+	"\x03log\x18\x01 \x01(\fH\x00R\x03log\x125\n" +
+	"\x06result\x18\x02 \x01(\v2\x1b.supervisor.v1.InvokeResultH\x00R\x06resultB\a\n" +
+	"\x05event*Q\n" +
 	"\bProtocol\x12\x18\n" +
 	"\x14PROTOCOL_UNSPECIFIED\x10\x00\x12\x11\n" +
 	"\rPROTOCOL_EXEC\x10\x01\x12\x18\n" +
@@ -548,7 +627,7 @@ func file_supervisor_v1_supervisor_proto_rawDescGZIP() []byte {
 }
 
 var file_supervisor_v1_supervisor_proto_enumTypes = make([]protoimpl.EnumInfo, 2)
-var file_supervisor_v1_supervisor_proto_msgTypes = make([]protoimpl.MessageInfo, 6)
+var file_supervisor_v1_supervisor_proto_msgTypes = make([]protoimpl.MessageInfo, 7)
 var file_supervisor_v1_supervisor_proto_goTypes = []any{
 	(Protocol)(0),          // 0: supervisor.v1.Protocol
 	(FailureKind)(0),       // 1: supervisor.v1.FailureKind
@@ -556,19 +635,21 @@ var file_supervisor_v1_supervisor_proto_goTypes = []any{
 	(*StartResponse)(nil),  // 3: supervisor.v1.StartResponse
 	(*InvokeRequest)(nil),  // 4: supervisor.v1.InvokeRequest
 	(*Failure)(nil),        // 5: supervisor.v1.Failure
-	(*InvokeResponse)(nil), // 6: supervisor.v1.InvokeResponse
-	nil,                    // 7: supervisor.v1.StartRequest.EnvEntry
+	(*InvokeResult)(nil),   // 6: supervisor.v1.InvokeResult
+	(*InvokeResponse)(nil), // 7: supervisor.v1.InvokeResponse
+	nil,                    // 8: supervisor.v1.StartRequest.EnvEntry
 }
 var file_supervisor_v1_supervisor_proto_depIdxs = []int32{
-	7, // 0: supervisor.v1.StartRequest.env:type_name -> supervisor.v1.StartRequest.EnvEntry
+	8, // 0: supervisor.v1.StartRequest.env:type_name -> supervisor.v1.StartRequest.EnvEntry
 	0, // 1: supervisor.v1.StartRequest.protocol:type_name -> supervisor.v1.Protocol
 	1, // 2: supervisor.v1.Failure.kind:type_name -> supervisor.v1.FailureKind
-	5, // 3: supervisor.v1.InvokeResponse.failure:type_name -> supervisor.v1.Failure
-	4, // [4:4] is the sub-list for method output_type
-	4, // [4:4] is the sub-list for method input_type
-	4, // [4:4] is the sub-list for extension type_name
-	4, // [4:4] is the sub-list for extension extendee
-	0, // [0:4] is the sub-list for field type_name
+	5, // 3: supervisor.v1.InvokeResult.failure:type_name -> supervisor.v1.Failure
+	6, // 4: supervisor.v1.InvokeResponse.result:type_name -> supervisor.v1.InvokeResult
+	5, // [5:5] is the sub-list for method output_type
+	5, // [5:5] is the sub-list for method input_type
+	5, // [5:5] is the sub-list for extension type_name
+	5, // [5:5] is the sub-list for extension extendee
+	0, // [0:5] is the sub-list for field type_name
 }
 
 func init() { file_supervisor_v1_supervisor_proto_init() }
@@ -577,8 +658,12 @@ func file_supervisor_v1_supervisor_proto_init() {
 		return
 	}
 	file_supervisor_v1_supervisor_proto_msgTypes[4].OneofWrappers = []any{
-		(*InvokeResponse_Output)(nil),
-		(*InvokeResponse_Failure)(nil),
+		(*InvokeResult_Output)(nil),
+		(*InvokeResult_Failure)(nil),
+	}
+	file_supervisor_v1_supervisor_proto_msgTypes[5].OneofWrappers = []any{
+		(*InvokeResponse_Log)(nil),
+		(*InvokeResponse_Result)(nil),
 	}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
@@ -586,7 +671,7 @@ func file_supervisor_v1_supervisor_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_supervisor_v1_supervisor_proto_rawDesc), len(file_supervisor_v1_supervisor_proto_rawDesc)),
 			NumEnums:      2,
-			NumMessages:   6,
+			NumMessages:   7,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

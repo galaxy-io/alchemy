@@ -61,7 +61,7 @@ func (q *Queries) CountInvocations(ctx context.Context, arg CountInvocationsPara
 const createInvocation = `-- name: CreateInvocation :one
 INSERT INTO invocations (tenant_id, function_id, version, input_bytes, created_by_user_id)
 VALUES ($1, $2, $3, $4, $5)
-RETURNING id, tenant_id, function_id, version, status, start_kind, acquire_us, run_us, total_us, error, platform_error, input_bytes, output_bytes, instance_id, log_tail, created_by_user_id, created_at, started_at, ended_at
+RETURNING id, tenant_id, function_id, version, status, start_kind, acquire_us, run_us, total_us, error, platform_error, input_bytes, output_bytes, instance_id, created_by_user_id, created_at, started_at, ended_at
 `
 
 type CreateInvocationParams struct {
@@ -96,7 +96,6 @@ func (q *Queries) CreateInvocation(ctx context.Context, arg CreateInvocationPara
 		&i.InputBytes,
 		&i.OutputBytes,
 		&i.InstanceID,
-		&i.LogTail,
 		&i.CreatedByUserID,
 		&i.CreatedAt,
 		&i.StartedAt,
@@ -108,9 +107,9 @@ func (q *Queries) CreateInvocation(ctx context.Context, arg CreateInvocationPara
 const finishInvocation = `-- name: FinishInvocation :one
 UPDATE invocations
 SET status = $2, run_us = $3, total_us = $4, error = $5, platform_error = $6,
-    output_bytes = $7, log_tail = $8, ended_at = now()
+    output_bytes = $7, ended_at = now()
 WHERE id = $1
-RETURNING id, tenant_id, function_id, version, status, start_kind, acquire_us, run_us, total_us, error, platform_error, input_bytes, output_bytes, instance_id, log_tail, created_by_user_id, created_at, started_at, ended_at
+RETURNING id, tenant_id, function_id, version, status, start_kind, acquire_us, run_us, total_us, error, platform_error, input_bytes, output_bytes, instance_id, created_by_user_id, created_at, started_at, ended_at
 `
 
 type FinishInvocationParams struct {
@@ -121,7 +120,6 @@ type FinishInvocationParams struct {
 	Error         []byte
 	PlatformError string
 	OutputBytes   int64
-	LogTail       string
 }
 
 func (q *Queries) FinishInvocation(ctx context.Context, arg FinishInvocationParams) (*Invocation, error) {
@@ -133,7 +131,6 @@ func (q *Queries) FinishInvocation(ctx context.Context, arg FinishInvocationPara
 		arg.Error,
 		arg.PlatformError,
 		arg.OutputBytes,
-		arg.LogTail,
 	)
 	var i Invocation
 	err := row.Scan(
@@ -151,7 +148,6 @@ func (q *Queries) FinishInvocation(ctx context.Context, arg FinishInvocationPara
 		&i.InputBytes,
 		&i.OutputBytes,
 		&i.InstanceID,
-		&i.LogTail,
 		&i.CreatedByUserID,
 		&i.CreatedAt,
 		&i.StartedAt,
@@ -161,7 +157,7 @@ func (q *Queries) FinishInvocation(ctx context.Context, arg FinishInvocationPara
 }
 
 const getInvocation = `-- name: GetInvocation :one
-SELECT id, tenant_id, function_id, version, status, start_kind, acquire_us, run_us, total_us, error, platform_error, input_bytes, output_bytes, instance_id, log_tail, created_by_user_id, created_at, started_at, ended_at FROM invocations WHERE tenant_id = $1 AND id = $2
+SELECT id, tenant_id, function_id, version, status, start_kind, acquire_us, run_us, total_us, error, platform_error, input_bytes, output_bytes, instance_id, created_by_user_id, created_at, started_at, ended_at FROM invocations WHERE tenant_id = $1 AND id = $2
 `
 
 type GetInvocationParams struct {
@@ -187,7 +183,6 @@ func (q *Queries) GetInvocation(ctx context.Context, arg GetInvocationParams) (*
 		&i.InputBytes,
 		&i.OutputBytes,
 		&i.InstanceID,
-		&i.LogTail,
 		&i.CreatedByUserID,
 		&i.CreatedAt,
 		&i.StartedAt,
@@ -197,7 +192,7 @@ func (q *Queries) GetInvocation(ctx context.Context, arg GetInvocationParams) (*
 }
 
 const listActiveInvocations = `-- name: ListActiveInvocations :many
-SELECT id, tenant_id, function_id, version, status, start_kind, acquire_us, run_us, total_us, error, platform_error, input_bytes, output_bytes, instance_id, log_tail, created_by_user_id, created_at, started_at, ended_at FROM invocations
+SELECT id, tenant_id, function_id, version, status, start_kind, acquire_us, run_us, total_us, error, platform_error, input_bytes, output_bytes, instance_id, created_by_user_id, created_at, started_at, ended_at FROM invocations
 WHERE tenant_id = $1
   AND ($2::uuid IS NULL OR function_id = $2)
   AND status IN ('pending', 'starting', 'running')
@@ -233,7 +228,6 @@ func (q *Queries) ListActiveInvocations(ctx context.Context, arg ListActiveInvoc
 			&i.InputBytes,
 			&i.OutputBytes,
 			&i.InstanceID,
-			&i.LogTail,
 			&i.CreatedByUserID,
 			&i.CreatedAt,
 			&i.StartedAt,
@@ -250,7 +244,7 @@ func (q *Queries) ListActiveInvocations(ctx context.Context, arg ListActiveInvoc
 }
 
 const listInvocations = `-- name: ListInvocations :many
-SELECT id, tenant_id, function_id, version, status, start_kind, acquire_us, run_us, total_us, error, platform_error, input_bytes, output_bytes, instance_id, log_tail, created_by_user_id, created_at, started_at, ended_at FROM invocations
+SELECT id, tenant_id, function_id, version, status, start_kind, acquire_us, run_us, total_us, error, platform_error, input_bytes, output_bytes, instance_id, created_by_user_id, created_at, started_at, ended_at FROM invocations
 WHERE tenant_id = $1
   AND (cardinality($2::uuid[]) = 0 OR function_id = ANY($2::uuid[]))
   AND (cardinality($3::text[]) = 0 OR status::text = ANY($3::text[]))
@@ -305,7 +299,6 @@ func (q *Queries) ListInvocations(ctx context.Context, arg ListInvocationsParams
 			&i.InputBytes,
 			&i.OutputBytes,
 			&i.InstanceID,
-			&i.LogTail,
 			&i.CreatedByUserID,
 			&i.CreatedAt,
 			&i.StartedAt,
@@ -325,7 +318,7 @@ const setInvocationRunning = `-- name: SetInvocationRunning :one
 UPDATE invocations
 SET status = 'running', start_kind = $2, instance_id = $3, acquire_us = $4, started_at = now()
 WHERE id = $1
-RETURNING id, tenant_id, function_id, version, status, start_kind, acquire_us, run_us, total_us, error, platform_error, input_bytes, output_bytes, instance_id, log_tail, created_by_user_id, created_at, started_at, ended_at
+RETURNING id, tenant_id, function_id, version, status, start_kind, acquire_us, run_us, total_us, error, platform_error, input_bytes, output_bytes, instance_id, created_by_user_id, created_at, started_at, ended_at
 `
 
 type SetInvocationRunningParams struct {
@@ -358,7 +351,6 @@ func (q *Queries) SetInvocationRunning(ctx context.Context, arg SetInvocationRun
 		&i.InputBytes,
 		&i.OutputBytes,
 		&i.InstanceID,
-		&i.LogTail,
 		&i.CreatedByUserID,
 		&i.CreatedAt,
 		&i.StartedAt,
@@ -368,7 +360,7 @@ func (q *Queries) SetInvocationRunning(ctx context.Context, arg SetInvocationRun
 }
 
 const setInvocationStarting = `-- name: SetInvocationStarting :one
-UPDATE invocations SET status = 'starting' WHERE id = $1 RETURNING id, tenant_id, function_id, version, status, start_kind, acquire_us, run_us, total_us, error, platform_error, input_bytes, output_bytes, instance_id, log_tail, created_by_user_id, created_at, started_at, ended_at
+UPDATE invocations SET status = 'starting' WHERE id = $1 RETURNING id, tenant_id, function_id, version, status, start_kind, acquire_us, run_us, total_us, error, platform_error, input_bytes, output_bytes, instance_id, created_by_user_id, created_at, started_at, ended_at
 `
 
 func (q *Queries) SetInvocationStarting(ctx context.Context, id string) (*Invocation, error) {
@@ -389,7 +381,6 @@ func (q *Queries) SetInvocationStarting(ctx context.Context, id string) (*Invoca
 		&i.InputBytes,
 		&i.OutputBytes,
 		&i.InstanceID,
-		&i.LogTail,
 		&i.CreatedByUserID,
 		&i.CreatedAt,
 		&i.StartedAt,

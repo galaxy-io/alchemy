@@ -189,7 +189,6 @@ type Invocation struct {
 	InputBytes      int64
 	OutputBytes     int64
 	InstanceID      string
-	LogTail         string
 	CreatedByUserID pgtype.Text
 	CreatedAt       pgtype.Timestamptz
 	StartedAt       pgtype.Timestamptz

@@ -4,6 +4,8 @@ set dotenv-load
 export PERSISTENCE_DSN := env("PERSISTENCE_DSN", "postgresql://alchemy:alchemy@localhost:5435/alchemy?sslmode=disable")
 export NATS_URL := env("NATS_URL", "nats://localhost:4223")
 host_nats_url := "nats://host.lima.internal:4223"
+# function logs go to a directory the Mac and the VM share; no_tmp_dir keeps an upload's temp file on the same mount
+export FUNCTION_LOGS_BUCKET := env("FUNCTION_LOGS_BUCKET", "file://" + justfile_directory() + "/bin/function-logs?create_dir=1&no_tmp_dir=1")
 # text logs read better in a terminal; the chart defaults to json
 export LOG_FORMAT := env("LOG_FORMAT", "text")
 export LOG_LEVEL := env("LOG_LEVEL", "info")
@@ -45,13 +47,13 @@ host count="3" memory="512" warm="5m" prewarm="0": build-linux
     limactl shell alchemy -- bash -c 'cd "{{ justfile_directory() }}" && trap "kill 0" EXIT INT TERM HUP; \
       for i in $(seq 1 {{ count }}); do \
         sudo systemd-run --scope --quiet -p Delegate=yes -- env LOG_FORMAT={{ LOG_FORMAT }} LOG_LEVEL={{ LOG_LEVEL }} \
-          bin/linux-arm64/host --nats="{{ host_nats_url }}" --name=host-$i --data-dir=/var/lib/alchemy/host-$i --uid-base=$((100000 * i)) \
-          --memory-mib={{ memory }} --warm-ttl={{ warm }} --prewarm={{ prewarm }} 2>&1 | sed -u "s/^/[host-$i] /" & \
+          NATS_URL="{{ host_nats_url }}" FUNCTION_LOGS_BUCKET="{{ FUNCTION_LOGS_BUCKET }}" HOST_NAME=host-$i DATA_DIR=/var/lib/alchemy/host-$i UID_BASE=$((100000 * i)) \
+          MEMORY_MIB={{ memory }} WARM_TTL={{ warm }} PREWARM={{ prewarm }} bin/linux-arm64/host 2>&1 | sed -u "s/^/[host-$i] /" & \
       done; wait'
 
 # run server on the Mac on :8780 (Ctrl-C stops it); it applies migrations on start
 server:
-    go run ./cmd/server --addr=:8780 --dsn="{{ PERSISTENCE_DSN }}" --nats="{{ NATS_URL }}"
+    go run ./cmd/server
 
 # run the UI dev server on :5173, proxying the API to server on :8780
 ui:

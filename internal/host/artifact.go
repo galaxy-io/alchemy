@@ -30,12 +30,18 @@ func artifactID(a *hostv1.Artifact) string {
 	for _, k := range slices.Sorted(maps.Keys(a.GetEnv())) {
 		fmt.Fprintf(&sb, "%s=%s\x00", k, a.GetEnv()[k])
 	}
+	sb.WriteByte(1)
+	for _, l := range a.GetLayers() {
+		sb.WriteString(l.GetSha256())
+		sb.WriteByte(0)
+	}
 	sum := sha256.Sum256([]byte(sb.String()))
 	return hex.EncodeToString(sum[:16])
 }
 
 // toProto turns a built artifact into its wire form and assigns its id.
-func toProto(tenantID string, a *driver.Artifact) *hostv1.Artifact {
+// layers are what it was built with.
+func toProto(tenantID string, a *driver.Artifact, layers []*hostv1.Layer) *hostv1.Artifact {
 	p := &hostv1.Artifact{
 		TenantId:    tenantID,
 		Image:       a.Image,
@@ -47,6 +53,7 @@ func toProto(tenantID string, a *driver.Artifact) *hostv1.Artifact {
 		Protocol:    protocolProto(a.Protocol),
 		Vcpus:       a.VCPUs,
 		MemoryMib:   a.MemoryMiB,
+		Layers:      layers,
 	}
 	p.Id = artifactID(p)
 	return p
@@ -57,6 +64,7 @@ func fromProto(p *hostv1.Artifact) *driver.Artifact {
 	return &driver.Artifact{
 		Image:       p.GetImage(),
 		Digest:      p.GetDigest(),
+		Layers:      layerDigests(p.GetLayers()),
 		RootfsBytes: p.GetRootfsBytes(),
 		Argv:        p.GetArgv(),
 		Env:         p.GetEnv(),
@@ -76,4 +84,12 @@ func protocolProto(p supervisorv1.Protocol) functionsv1.InvocationProtocol {
 	default:
 		return functionsv1.InvocationProtocol_INVOCATION_PROTOCOL_UNSPECIFIED
 	}
+}
+
+func layerDigests(layers []*hostv1.Layer) []string {
+	out := make([]string, len(layers))
+	for i, l := range layers {
+		out[i] = l.GetSha256()
+	}
+	return out
 }

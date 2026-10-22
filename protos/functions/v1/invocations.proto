@@ -116,8 +116,6 @@ message Invocation {
   int64 output_bytes = 14;
   // instance_id names the microVM that served it, while it exists.
   string instance_id = 15;
-  // log_tail is the last few KB of the function's stderr.
-  string log_tail = 16;
   string created_by_user_id = 17;
 }
 
@@ -163,4 +161,18 @@ message TailInvocationsResponse {
   string event_type = 2;
   bool replay = 3;
   int64 emitted_at = 4;
+}
+
+// GetInvocationLogs streams what an invocation's function wrote to stderr.
+// With follow, the stream stays open while the invocation runs and ends when
+// it does; without, it ends at what has been written so far.
+message GetInvocationLogsRequest {
+  string id = 1;
+  bool follow = 2;
+}
+
+// GetInvocationLogsResponse is the next piece of the log, in order. Pieces
+// are not split on line boundaries.
+message GetInvocationLogsResponse {
+  bytes data = 1;
 }

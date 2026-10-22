@@ -55,6 +55,8 @@ A function is an OCI image plus a contract. The contract describes the function'
 
 The server accepts functions and invocations over its API, stores durable state in PostgreSQL, and dispatches work to hosts over NATS. Each host owns one KVM machine: it flattens a function's image into a read-only root filesystem once, cached by digest, then boots a Firecracker microVM per invocation. Inside the guest, the supervisor runs as init, receives the input over vsock, runs the function and returns its output.
 
+Everything a function writes to stderr is kept. The UI follows it live while the function runs, and each invocation's full log goes to an S3 or GCS bucket when it ends.
+
 Finished microVMs stay booted for a while so the next invocation of the same function starts warm, and hosts can keep instances booted before any invocation arrives.
 
 Every microVM runs under Firecracker's jailer. It is chrooted into a directory holding only its kernel and root filesystem, placed in a cgroup capped at its vCPUs, and run as a uid no other microVM shares. A guest that escapes the VM lands in a process that can reach nothing else on the host. The host itself runs as root to set this up.

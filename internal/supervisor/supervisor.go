@@ -27,7 +27,8 @@ import (
 const (
 	// maxOutputBytes caps what a function may write to stdout.
 	maxOutputBytes = 64 << 20
-	// stderrTailBytes is how much of stderr is kept for failure messages.
+	// stderrTailBytes is how much of stderr goes into a crash's failure
+	// message.
 	stderrTailBytes = 4 << 10
 )
 
@@ -72,16 +73,17 @@ func (s *Service) Start(_ context.Context, req *connect.Request[supervisorv1.Sta
 	return connect.NewResponse(&supervisorv1.StartResponse{}), nil
 }
 
-// Invoke runs one invocation; at most one is in flight at a time.
-func (s *Service) Invoke(ctx context.Context, req *connect.Request[supervisorv1.InvokeRequest]) (*connect.Response[supervisorv1.InvokeResponse], error) {
+// Invoke runs one invocation; at most one is in flight at a time. The
+// function's stderr is sent as it is written, and the result last.
+func (s *Service) Invoke(ctx context.Context, req *connect.Request[supervisorv1.InvokeRequest], stream *connect.ServerStream[supervisorv1.InvokeResponse]) error {
 	s.mu.Lock()
 	switch {
 	case !s.started:
 		s.mu.Unlock()
-		return nil, connect.NewError(connect.CodeFailedPrecondition, errors.New("not started"))
+		return connect.NewError(connect.CodeFailedPrecondition, errors.New("not started"))
 	case s.busy:
 		s.mu.Unlock()
-		return nil, connect.NewError(connect.CodeFailedPrecondition, errors.New("an invocation is already in flight"))
+		return connect.NewError(connect.CodeFailedPrecondition, errors.New("an invocation is already in flight"))
 	}
 	s.busy = true
 	s.mu.Unlock()
@@ -91,15 +93,16 @@ func (s *Service) Invoke(ctx context.Context, req *connect.Request[supervisorv1.
 		s.mu.Unlock()
 	}()
 
-	resp, err := s.exec(ctx, req.Msg)
+	result, err := s.exec(ctx, req.Msg, logStream{stream})
 	if err != nil {
-		return nil, err
+		return err
 	}
-	return connect.NewResponse(resp), nil
+	return stream.Send(&supervisorv1.InvokeResponse{Event: &supervisorv1.InvokeResponse_Result{Result: result}})
 }
 
-// exec runs the function as one process: input on stdin, output on stdout.
-func (s *Service) exec(ctx context.Context, req *supervisorv1.InvokeRequest) (*supervisorv1.InvokeResponse, error) {
+// exec runs the function as one process: input on stdin, output on stdout,
+// stderr to logs.
+func (s *Service) exec(ctx context.Context, req *supervisorv1.InvokeRequest, logs io.Writer) (*supervisorv1.InvokeResult, error) {
 	runCtx := ctx
 	if ms := req.GetTimeoutMs(); ms > 0 {
 		var cancel context.CancelFunc
@@ -117,9 +120,9 @@ func (s *Service) exec(ctx context.Context, req *supervisorv1.InvokeRequest) (*s
 	cmd.Dir = s.dir
 	cmd.Stdin = bytes.NewReader(req.GetInput())
 	cmd.Stdout = stdout
-	cmd.Stderr = stderr
+	cmd.Stderr = io.MultiWriter(stderr, logs)
 	if s.Logs != nil {
-		cmd.Stderr = io.MultiWriter(stderr, s.Logs)
+		cmd.Stderr = io.MultiWriter(stderr, logs, s.Logs)
 	}
 	// The function gets its own process group so a timeout takes its
 	// children down with it.
@@ -129,7 +132,7 @@ func (s *Service) exec(ctx context.Context, req *supervisorv1.InvokeRequest) (*s
 
 	start := time.Now()
 	err := cmd.Run()
-	resp := &supervisorv1.InvokeResponse{RunUs: time.Since(start).Microseconds(), LogTail: stderr.String()}
+	result := &supervisorv1.InvokeResult{RunUs: time.Since(start).Microseconds()}
 
 	var exitErr *exec.ExitError
 	switch {
@@ -137,21 +140,34 @@ func (s *Service) exec(ctx context.Context, req *supervisorv1.InvokeRequest) (*s
 		// The host went away or gave up; nobody is waiting for a result.
 		return nil, connect.NewError(connect.CodeCanceled, ctx.Err())
 	case errors.Is(runCtx.Err(), context.DeadlineExceeded):
-		resp.Result = failure(supervisorv1.FailureKind_FAILURE_KIND_TIMEOUT,
+		result.Result = failure(supervisorv1.FailureKind_FAILURE_KIND_TIMEOUT,
 			fmt.Sprintf("function exceeded its %dms timeout", req.GetTimeoutMs()), 0)
 	case errors.As(err, &exitErr):
-		resp.Result = failure(supervisorv1.FailureKind_FAILURE_KIND_CRASHED,
+		result.Result = failure(supervisorv1.FailureKind_FAILURE_KIND_CRASHED,
 			fmt.Sprintf("function exited with status %d: %s", exitErr.ExitCode(), stderr.String()), int32(min(exitErr.ExitCode(), math.MaxInt32))) //nolint:gosec // clamped
 	case err != nil:
-		resp.Result = failure(supervisorv1.FailureKind_FAILURE_KIND_CRASHED,
+		result.Result = failure(supervisorv1.FailureKind_FAILURE_KIND_CRASHED,
 			fmt.Sprintf("function could not be run: %v", err), -1)
 	case stdout.overflow:
-		resp.Result = failure(supervisorv1.FailureKind_FAILURE_KIND_CRASHED,
+		result.Result = failure(supervisorv1.FailureKind_FAILURE_KIND_CRASHED,
 			fmt.Sprintf("function output exceeds %d bytes", maxOutputBytes), 0)
 	default:
-		resp.Result = &supervisorv1.InvokeResponse_Output{Output: stdout.Bytes()}
+		result.Result = &supervisorv1.InvokeResult_Output{Output: stdout.Bytes()}
 	}
-	return resp, nil
+	return result, nil
+}
+
+// logStream sends each write as one log event. A send blocks while the host
+// is not reading, and with it the function's write.
+type logStream struct {
+	stream *connect.ServerStream[supervisorv1.InvokeResponse]
+}
+
+func (l logStream) Write(p []byte) (int, error) {
+	if err := l.stream.Send(&supervisorv1.InvokeResponse{Event: &supervisorv1.InvokeResponse_Log{Log: p}}); err != nil {
+		return 0, err
+	}
+	return len(p), nil
 }
 
 // lookPath finds name in the PATH entry of env. It returns name unchanged if
@@ -175,8 +191,8 @@ func lookPath(name string, env []string) string {
 	return name
 }
 
-func failure(kind supervisorv1.FailureKind, message string, exitCode int32) *supervisorv1.InvokeResponse_Failure {
-	return &supervisorv1.InvokeResponse_Failure{Failure: &supervisorv1.Failure{
+func failure(kind supervisorv1.FailureKind, message string, exitCode int32) *supervisorv1.InvokeResult_Failure {
+	return &supervisorv1.InvokeResult_Failure{Failure: &supervisorv1.Failure{
 		Kind:     kind,
 		Message:  message,
 		ExitCode: exitCode,

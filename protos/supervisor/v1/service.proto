@@ -16,6 +16,9 @@ service SupervisorService {
   // invocation. The moment Start returns is where the microVM is snapshotted.
   rpc Start(StartRequest) returns (StartResponse);
 
-  // Invoke runs one invocation. At most one is in flight per microVM.
-  rpc Invoke(InvokeRequest) returns (InvokeResponse);
+  // Invoke runs one invocation, streaming the function's stderr while it
+  // runs and its result last. At most one is in flight per microVM. A host
+  // that stops reading slows the function's writes down rather than losing
+  // them.
+  rpc Invoke(InvokeRequest) returns (stream InvokeResponse);
 }
