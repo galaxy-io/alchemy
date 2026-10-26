@@ -17,9 +17,11 @@ ORDER BY version DESC
 LIMIT 1;
 
 -- name: ListCurrentFunctionVersions :many
-SELECT DISTINCT ON (function_id) * FROM function_versions
-WHERE status = 'ready'
-ORDER BY function_id, version DESC;
+-- The current version of every live function: what hosts should serve.
+SELECT DISTINCT ON (v.function_id) v.* FROM function_versions v
+JOIN functions f ON f.id = v.function_id AND NOT f.is_deleted
+WHERE v.status = 'ready'
+ORDER BY v.function_id, v.version DESC;
 
 -- name: ListFunctionVersions :many
 SELECT * FROM function_versions
@@ -37,6 +39,16 @@ SELECT count(*) FROM function_versions WHERE function_id = $1;
 UPDATE function_versions SET build_started_at = now()
 WHERE id = $1 AND status = 'building' AND build_started_at IS NULL
 RETURNING *;
+
+-- name: ClaimStaleFunctionVersionBuilds :many
+-- Takes over builds whose server is gone: never claimed, or claimed longer
+-- ago than a build may run. The new build_started_at fences the old
+-- builder's result.
+UPDATE function_versions v SET build_started_at = now()
+FROM functions f
+WHERE f.id = v.function_id AND NOT f.is_deleted
+  AND v.status = 'building' AND coalesce(v.build_started_at, v.created_at) < now() - sqlc.arg('stale')::interval
+RETURNING v.*;
 
 -- name: FinishFunctionVersionBuild :one
 UPDATE function_versions
