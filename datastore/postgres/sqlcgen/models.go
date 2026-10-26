@@ -150,6 +150,9 @@ type Function struct {
 	TenantID        string
 	Name            string
 	Description     string
+	IsDeleted       bool
+	DeletedAt       pgtype.Timestamptz
+	DeletedByUserID pgtype.Text
 	CreatedByUserID pgtype.Text
 	UpdatedByUserID pgtype.Text
 	CreatedAt       pgtype.Timestamptz

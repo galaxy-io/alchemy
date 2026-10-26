@@ -13,7 +13,7 @@ import (
 
 const countFunctions = `-- name: CountFunctions :one
 SELECT count(*) FROM functions
-WHERE tenant_id = $1 AND ($2::text = '' OR name ILIKE '%' || $2 || '%')
+WHERE tenant_id = $1 AND NOT is_deleted AND ($2::text = '' OR name ILIKE '%' || $2 || '%')
 `
 
 type CountFunctionsParams struct {
@@ -31,7 +31,7 @@ func (q *Queries) CountFunctions(ctx context.Context, arg CountFunctionsParams) 
 const createFunction = `-- name: CreateFunction :one
 INSERT INTO functions (tenant_id, name, description, created_by_user_id, updated_by_user_id)
 VALUES ($1, $2, $3, $4, $4)
-RETURNING id, tenant_id, name, description, created_by_user_id, updated_by_user_id, created_at, updated_at
+RETURNING id, tenant_id, name, description, is_deleted, deleted_at, deleted_by_user_id, created_by_user_id, updated_by_user_id, created_at, updated_at
 `
 
 type CreateFunctionParams struct {
@@ -54,6 +54,9 @@ func (q *Queries) CreateFunction(ctx context.Context, arg CreateFunctionParams) 
 		&i.TenantID,
 		&i.Name,
 		&i.Description,
+		&i.IsDeleted,
+		&i.DeletedAt,
+		&i.DeletedByUserID,
 		&i.CreatedByUserID,
 		&i.UpdatedByUserID,
 		&i.CreatedAt,
@@ -63,16 +66,22 @@ func (q *Queries) CreateFunction(ctx context.Context, arg CreateFunctionParams) 
 }
 
 const deleteFunction = `-- name: DeleteFunction :execrows
-DELETE FROM functions WHERE tenant_id = $1 AND id = $2
+UPDATE functions
+SET is_deleted = true, deleted_at = now(), deleted_by_user_id = $3, updated_at = now(),
+    name = name || '__deleted__' || to_char(now() AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"')
+WHERE tenant_id = $1 AND id = $2 AND NOT is_deleted
 `
 
 type DeleteFunctionParams struct {
-	TenantID string
-	ID       string
+	TenantID        string
+	ID              string
+	DeletedByUserID pgtype.Text
 }
 
+// Flags the function and moves its name out of the way, so the name is
+// free again while the row keeps its versions and invocations.
 func (q *Queries) DeleteFunction(ctx context.Context, arg DeleteFunctionParams) (int64, error) {
-	result, err := q.db.Exec(ctx, deleteFunction, arg.TenantID, arg.ID)
+	result, err := q.db.Exec(ctx, deleteFunction, arg.TenantID, arg.ID, arg.DeletedByUserID)
 	if err != nil {
 		return 0, err
 	}
@@ -80,7 +89,7 @@ func (q *Queries) DeleteFunction(ctx context.Context, arg DeleteFunctionParams) 
 }
 
 const getFunction = `-- name: GetFunction :one
-SELECT id, tenant_id, name, description, created_by_user_id, updated_by_user_id, created_at, updated_at FROM functions WHERE tenant_id = $1 AND id = $2
+SELECT id, tenant_id, name, description, is_deleted, deleted_at, deleted_by_user_id, created_by_user_id, updated_by_user_id, created_at, updated_at FROM functions WHERE tenant_id = $1 AND id = $2 AND NOT is_deleted
 `
 
 type GetFunctionParams struct {
@@ -96,6 +105,9 @@ func (q *Queries) GetFunction(ctx context.Context, arg GetFunctionParams) (*Func
 		&i.TenantID,
 		&i.Name,
 		&i.Description,
+		&i.IsDeleted,
+		&i.DeletedAt,
+		&i.DeletedByUserID,
 		&i.CreatedByUserID,
 		&i.UpdatedByUserID,
 		&i.CreatedAt,
@@ -105,8 +117,8 @@ func (q *Queries) GetFunction(ctx context.Context, arg GetFunctionParams) (*Func
 }
 
 const listFunctions = `-- name: ListFunctions :many
-SELECT id, tenant_id, name, description, created_by_user_id, updated_by_user_id, created_at, updated_at FROM functions
-WHERE tenant_id = $1 AND ($2::text = '' OR name ILIKE '%' || $2 || '%')
+SELECT id, tenant_id, name, description, is_deleted, deleted_at, deleted_by_user_id, created_by_user_id, updated_by_user_id, created_at, updated_at FROM functions
+WHERE tenant_id = $1 AND NOT is_deleted AND ($2::text = '' OR name ILIKE '%' || $2 || '%')
 ORDER BY created_at, id
 LIMIT $4 OFFSET $3
 `
@@ -137,6 +149,9 @@ func (q *Queries) ListFunctions(ctx context.Context, arg ListFunctionsParams) ([
 			&i.TenantID,
 			&i.Name,
 			&i.Description,
+			&i.IsDeleted,
+			&i.DeletedAt,
+			&i.DeletedByUserID,
 			&i.CreatedByUserID,
 			&i.UpdatedByUserID,
 			&i.CreatedAt,
@@ -164,8 +179,8 @@ func (q *Queries) TouchFunction(ctx context.Context, id string) error {
 const updateFunction = `-- name: UpdateFunction :one
 UPDATE functions
 SET name = $3, description = $4, updated_by_user_id = $5, updated_at = now()
-WHERE tenant_id = $1 AND id = $2
-RETURNING id, tenant_id, name, description, created_by_user_id, updated_by_user_id, created_at, updated_at
+WHERE tenant_id = $1 AND id = $2 AND NOT is_deleted
+RETURNING id, tenant_id, name, description, is_deleted, deleted_at, deleted_by_user_id, created_by_user_id, updated_by_user_id, created_at, updated_at
 `
 
 type UpdateFunctionParams struct {
@@ -190,6 +205,9 @@ func (q *Queries) UpdateFunction(ctx context.Context, arg UpdateFunctionParams) 
 		&i.TenantID,
 		&i.Name,
 		&i.Description,
+		&i.IsDeleted,
+		&i.DeletedAt,
+		&i.DeletedByUserID,
 		&i.CreatedByUserID,
 		&i.UpdatedByUserID,
 		&i.CreatedAt,

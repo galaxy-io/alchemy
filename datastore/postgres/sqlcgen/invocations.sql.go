@@ -110,8 +110,9 @@ INSERT INTO invocations (id, tenant_id, function_id, version, status, start_kind
                          created_at, started_at, ended_at)
 SELECT id, tenant_id, function_id, version, status::invocation_status, nullif(start_kind, '')::start_kind,
        acquire_us, run_us, total_us, nullif(error, '')::jsonb, platform_error, input_bytes, output_bytes, instance_id, idempotency_key, host,
-       nullif(created_by_user_id, '')::uuid, created_at, started_at, ended_at
+       u.id, created_at, started_at, ended_at
 FROM r
+LEFT JOIN users u ON u.id = nullif(r.created_by_user_id, '')::uuid
 ON CONFLICT (id) DO UPDATE SET
   status = excluded.status, start_kind = excluded.start_kind, acquire_us = excluded.acquire_us,
   run_us = excluded.run_us, total_us = excluded.total_us, error = excluded.error,
@@ -146,7 +147,9 @@ type InsertInvocationsParams struct {
 
 // One row per element of the arrays, which all have the same length. A
 // record of an invocation already written changes it only when override is
-// set: a host's record over a server's, since the host knows what ran.
+// set: a host's record over a server's, since the host knows what ran. A
+// user deleted since the invocation ran is left null, so a late record
+// never fails on the reference. Functions are never deleted, only flagged.
 func (q *Queries) InsertInvocations(ctx context.Context, arg InsertInvocationsParams) error {
 	_, err := q.db.Exec(ctx, insertInvocations,
 		arg.Override,
