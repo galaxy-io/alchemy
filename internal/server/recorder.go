@@ -2,8 +2,10 @@ package server
 
 import (
 	"context"
+	"errors"
 	"time"
 
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgtype"
 	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/proto"
@@ -61,12 +63,48 @@ func (s *Service) writeRecords(ctx context.Context, recs []bus.Message) error {
 		if len(batch.invs) == 0 {
 			continue
 		}
-		if err := s.store.InsertInvocations(ctx, s.insertParams(batch.invs, batch.override)); err != nil {
-			s.log.Warn("write invocation records", "count", len(batch.invs), "err", err)
+		if err := s.writeBatch(ctx, batch.invs, batch.override); err != nil {
 			return err
 		}
 	}
 	return nil
+}
+
+// writeBatch writes invs in one statement. When the database refuses the
+// statement on its content, it writes them one at a time, so the record
+// at fault is logged and left behind instead of holding every record after
+// it on the stream. Any other failure, such as the database being away, is
+// returned so the batch is redelivered.
+func (s *Service) writeBatch(ctx context.Context, invs []*functionsv1.Invocation, override bool) error {
+	err := s.store.InsertInvocations(ctx, s.insertParams(invs, override))
+	switch {
+	case err == nil:
+		return nil
+	case !refused(err):
+		s.log.Warn("write invocation records", "count", len(invs), "err", err)
+		return err
+	case len(invs) == 1:
+		s.log.Error("invocation record was refused and is dropped", "invocation_id", invs[0].GetId(), "err", err)
+		return nil
+	}
+	s.log.Warn("write invocation records; retrying one at a time", "count", len(invs), "err", err)
+	for _, inv := range invs {
+		if err := s.writeBatch(ctx, []*functionsv1.Invocation{inv}, override); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// refused reports whether err is the database rejecting a statement for
+// what it says, not for when it was said: a data or constraint error.
+func refused(err error) bool {
+	var pgErr *pgconn.PgError
+	if !errors.As(err, &pgErr) {
+		return false
+	}
+	class := pgErr.Code[:2]
+	return class == "22" || class == "23"
 }
 
 // insertParams lays invocations out as the columns InsertInvocations takes.

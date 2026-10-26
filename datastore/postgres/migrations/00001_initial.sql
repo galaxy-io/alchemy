@@ -37,6 +37,11 @@ CREATE TABLE functions (
   tenant_id          UUID        NOT NULL REFERENCES tenants (id),
   name               TEXT        NOT NULL,
   description        TEXT        NOT NULL DEFAULT '',
+  -- A deleted function stays, flagged and renamed out of the way, so its
+  -- versions and invocations keep their history.
+  is_deleted         BOOLEAN     NOT NULL DEFAULT false,
+  deleted_at         TIMESTAMPTZ,
+  deleted_by_user_id UUID        REFERENCES users (id) ON DELETE SET NULL,
   created_by_user_id UUID        REFERENCES users (id) ON DELETE SET NULL,
   updated_by_user_id UUID        REFERENCES users (id) ON DELETE SET NULL,
   created_at         TIMESTAMPTZ NOT NULL DEFAULT now(),

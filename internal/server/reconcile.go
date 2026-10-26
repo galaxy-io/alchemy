@@ -2,6 +2,8 @@ package server
 
 import (
 	"time"
+
+	"github.com/jackc/pgx/v5/pgtype"
 )
 
 const (
@@ -17,7 +19,8 @@ const (
 // reconcileHosts keeps the hosts each function lives on serving its current
 // version. A build only reaches the hosts alive when it runs, and placement
 // moves as hosts come and go, so without this a host that starts later, or
-// restarts, never takes its functions' invocations.
+// restarts, never takes its functions' invocations. It also takes over
+// builds whose server died.
 func (s *Service) reconcileHosts() {
 	ticker := time.NewTicker(reconcileInterval)
 	defer ticker.Stop()
@@ -26,8 +29,26 @@ func (s *Service) reconcileHosts() {
 		case <-s.background.Done():
 			return
 		case <-ticker.C:
+			s.resumeStaleBuilds()
 			s.reconcileOnce()
 		}
+	}
+}
+
+// resumeStaleBuilds claims and runs builds that are past what a build may
+// take with no result: their server died, or stopped before they ended.
+// Every server sweeps; the claim moves build_started_at, so each build is
+// taken by one.
+func (s *Service) resumeStaleBuilds() {
+	stale := s.cfg.BuildTimeout + reconcileRetry
+	rows, err := s.store.ClaimStaleFunctionVersionBuilds(s.background, pgtype.Interval{Microseconds: stale.Microseconds(), Valid: true})
+	if err != nil {
+		s.log.Warn("reconcile: claim stale builds", "err", err)
+		return
+	}
+	for _, v := range rows {
+		s.log.Warn("resuming a build its server left behind", "function_id", v.FunctionID, "version", v.Version)
+		s.tasks.Go(func() { s.build(v) })
 	}
 }
 
