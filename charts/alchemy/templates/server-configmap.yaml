@@ -8,6 +8,8 @@ metadata:
 data:
   # API
   ADDR: ":{{ .Values.server.service.port }}"
+  # Placement
+  HOSTS_PER_FUNCTION: {{ .Values.server.hostsPerFunction | quote }}
   # Observability
   LOG_LEVEL: {{ .Values.server.logLevel | quote }}
   LOG_FORMAT: {{ .Values.server.logFormat | quote }}

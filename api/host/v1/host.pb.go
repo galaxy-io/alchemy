@@ -920,10 +920,9 @@ func (x *ListInstancesResponse) GetInstances() []*v1.Instance {
 type Heartbeat struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	Host  *v1.Host               `protobuf:"bytes,1,opt,name=host,proto3" json:"host,omitempty"`
-	// artifact_ids are the artifacts the host is taking invocations for. The
-	// server builds the current version of every function on any host that
-	// lacks it.
-	ArtifactIds   []string `protobuf:"bytes,2,rep,name=artifact_ids,json=artifactIds,proto3" json:"artifact_ids,omitempty"`
+	// artifacts are those the host has built and takes invocations for, with
+	// what it holds of each. The server places invocations from this.
+	Artifacts     []*ArtifactState `protobuf:"bytes,2,rep,name=artifacts,proto3" json:"artifacts,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -965,11 +964,74 @@ func (x *Heartbeat) GetHost() *v1.Host {
 	return nil
 }
 
-func (x *Heartbeat) GetArtifactIds() []string {
+func (x *Heartbeat) GetArtifacts() []*ArtifactState {
 	if x != nil {
-		return x.ArtifactIds
+		return x.Artifacts
 	}
 	return nil
+}
+
+// ArtifactState is what a host holds of one artifact.
+type ArtifactState struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	Id    string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	// idle is how many warm instances are waiting for an invocation.
+	Idle int32 `protobuf:"varint,2,opt,name=idle,proto3" json:"idle,omitempty"`
+	// busy is how many instances are booting or running one.
+	Busy          int32 `protobuf:"varint,3,opt,name=busy,proto3" json:"busy,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ArtifactState) Reset() {
+	*x = ArtifactState{}
+	mi := &file_host_v1_host_proto_msgTypes[13]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ArtifactState) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ArtifactState) ProtoMessage() {}
+
+func (x *ArtifactState) ProtoReflect() protoreflect.Message {
+	mi := &file_host_v1_host_proto_msgTypes[13]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ArtifactState.ProtoReflect.Descriptor instead.
+func (*ArtifactState) Descriptor() ([]byte, []int) {
+	return file_host_v1_host_proto_rawDescGZIP(), []int{13}
+}
+
+func (x *ArtifactState) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
+}
+
+func (x *ArtifactState) GetIdle() int32 {
+	if x != nil {
+		return x.Idle
+	}
+	return 0
+}
+
+func (x *ArtifactState) GetBusy() int32 {
+	if x != nil {
+		return x.Busy
+	}
+	return 0
 }
 
 // ServerHeartbeat is published by every server on its own subject, so any
@@ -986,7 +1048,7 @@ type ServerHeartbeat struct {
 
 func (x *ServerHeartbeat) Reset() {
 	*x = ServerHeartbeat{}
-	mi := &file_host_v1_host_proto_msgTypes[13]
+	mi := &file_host_v1_host_proto_msgTypes[14]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -998,7 +1060,7 @@ func (x *ServerHeartbeat) String() string {
 func (*ServerHeartbeat) ProtoMessage() {}
 
 func (x *ServerHeartbeat) ProtoReflect() protoreflect.Message {
-	mi := &file_host_v1_host_proto_msgTypes[13]
+	mi := &file_host_v1_host_proto_msgTypes[14]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1011,7 +1073,7 @@ func (x *ServerHeartbeat) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ServerHeartbeat.ProtoReflect.Descriptor instead.
 func (*ServerHeartbeat) Descriptor() ([]byte, []int) {
-	return file_host_v1_host_proto_rawDescGZIP(), []int{13}
+	return file_host_v1_host_proto_rawDescGZIP(), []int{14}
 }
 
 func (x *ServerHeartbeat) GetName() string {
@@ -1037,7 +1099,7 @@ type ActiveInvocationsRequest struct {
 
 func (x *ActiveInvocationsRequest) Reset() {
 	*x = ActiveInvocationsRequest{}
-	mi := &file_host_v1_host_proto_msgTypes[14]
+	mi := &file_host_v1_host_proto_msgTypes[15]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1049,7 +1111,7 @@ func (x *ActiveInvocationsRequest) String() string {
 func (*ActiveInvocationsRequest) ProtoMessage() {}
 
 func (x *ActiveInvocationsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_host_v1_host_proto_msgTypes[14]
+	mi := &file_host_v1_host_proto_msgTypes[15]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1062,7 +1124,7 @@ func (x *ActiveInvocationsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ActiveInvocationsRequest.ProtoReflect.Descriptor instead.
 func (*ActiveInvocationsRequest) Descriptor() ([]byte, []int) {
-	return file_host_v1_host_proto_rawDescGZIP(), []int{14}
+	return file_host_v1_host_proto_rawDescGZIP(), []int{15}
 }
 
 type ActiveInvocationsResponse struct {
@@ -1076,7 +1138,7 @@ type ActiveInvocationsResponse struct {
 
 func (x *ActiveInvocationsResponse) Reset() {
 	*x = ActiveInvocationsResponse{}
-	mi := &file_host_v1_host_proto_msgTypes[15]
+	mi := &file_host_v1_host_proto_msgTypes[16]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1088,7 +1150,7 @@ func (x *ActiveInvocationsResponse) String() string {
 func (*ActiveInvocationsResponse) ProtoMessage() {}
 
 func (x *ActiveInvocationsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_host_v1_host_proto_msgTypes[15]
+	mi := &file_host_v1_host_proto_msgTypes[16]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1101,7 +1163,7 @@ func (x *ActiveInvocationsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ActiveInvocationsResponse.ProtoReflect.Descriptor instead.
 func (*ActiveInvocationsResponse) Descriptor() ([]byte, []int) {
-	return file_host_v1_host_proto_rawDescGZIP(), []int{15}
+	return file_host_v1_host_proto_rawDescGZIP(), []int{16}
 }
 
 func (x *ActiveInvocationsResponse) GetInvocations() []*v1.Invocation {
@@ -1123,7 +1185,7 @@ type InvocationRecords struct {
 
 func (x *InvocationRecords) Reset() {
 	*x = InvocationRecords{}
-	mi := &file_host_v1_host_proto_msgTypes[16]
+	mi := &file_host_v1_host_proto_msgTypes[17]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1135,7 +1197,7 @@ func (x *InvocationRecords) String() string {
 func (*InvocationRecords) ProtoMessage() {}
 
 func (x *InvocationRecords) ProtoReflect() protoreflect.Message {
-	mi := &file_host_v1_host_proto_msgTypes[16]
+	mi := &file_host_v1_host_proto_msgTypes[17]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1148,7 +1210,7 @@ func (x *InvocationRecords) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use InvocationRecords.ProtoReflect.Descriptor instead.
 func (*InvocationRecords) Descriptor() ([]byte, []int) {
-	return file_host_v1_host_proto_rawDescGZIP(), []int{16}
+	return file_host_v1_host_proto_rawDescGZIP(), []int{17}
 }
 
 func (x *InvocationRecords) GetInvocations() []*v1.Invocation {
@@ -1235,10 +1297,14 @@ const file_host_v1_host_proto_rawDesc = "" +
 	"\x04host\x18\x01 \x01(\v2\x12.functions.v1.HostR\x04host\"\x16\n" +
 	"\x14ListInstancesRequest\"M\n" +
 	"\x15ListInstancesResponse\x124\n" +
-	"\tinstances\x18\x01 \x03(\v2\x16.functions.v1.InstanceR\tinstances\"V\n" +
+	"\tinstances\x18\x01 \x03(\v2\x16.functions.v1.InstanceR\tinstances\"i\n" +
 	"\tHeartbeat\x12&\n" +
-	"\x04host\x18\x01 \x01(\v2\x12.functions.v1.HostR\x04host\x12!\n" +
-	"\fartifact_ids\x18\x02 \x03(\tR\vartifactIds\"?\n" +
+	"\x04host\x18\x01 \x01(\v2\x12.functions.v1.HostR\x04host\x124\n" +
+	"\tartifacts\x18\x02 \x03(\v2\x16.host.v1.ArtifactStateR\tartifacts\"G\n" +
+	"\rArtifactState\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\x12\x12\n" +
+	"\x04idle\x18\x02 \x01(\x05R\x04idle\x12\x12\n" +
+	"\x04busy\x18\x03 \x01(\x05R\x04busy\"?\n" +
 	"\x0fServerHeartbeat\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12\x18\n" +
 	"\apending\x18\x02 \x01(\x05R\apending\"\x1a\n" +
@@ -1261,7 +1327,7 @@ func file_host_v1_host_proto_rawDescGZIP() []byte {
 	return file_host_v1_host_proto_rawDescData
 }
 
-var file_host_v1_host_proto_msgTypes = make([]protoimpl.MessageInfo, 18)
+var file_host_v1_host_proto_msgTypes = make([]protoimpl.MessageInfo, 19)
 var file_host_v1_host_proto_goTypes = []any{
 	(*Artifact)(nil),                  // 0: host.v1.Artifact
 	(*Layer)(nil),                     // 1: host.v1.Layer
@@ -1276,47 +1342,49 @@ var file_host_v1_host_proto_goTypes = []any{
 	(*ListInstancesRequest)(nil),      // 10: host.v1.ListInstancesRequest
 	(*ListInstancesResponse)(nil),     // 11: host.v1.ListInstancesResponse
 	(*Heartbeat)(nil),                 // 12: host.v1.Heartbeat
-	(*ServerHeartbeat)(nil),           // 13: host.v1.ServerHeartbeat
-	(*ActiveInvocationsRequest)(nil),  // 14: host.v1.ActiveInvocationsRequest
-	(*ActiveInvocationsResponse)(nil), // 15: host.v1.ActiveInvocationsResponse
-	(*InvocationRecords)(nil),         // 16: host.v1.InvocationRecords
-	nil,                               // 17: host.v1.Artifact.EnvEntry
-	(v1.InvocationProtocol)(0),        // 18: functions.v1.InvocationProtocol
-	(*v1.Contract)(nil),               // 19: functions.v1.Contract
-	(*v1.FunctionSpec)(nil),           // 20: functions.v1.FunctionSpec
-	(*v1.Invocation)(nil),             // 21: functions.v1.Invocation
-	(*v1.FunctionError)(nil),          // 22: functions.v1.FunctionError
-	(v1.StartKind)(0),                 // 23: functions.v1.StartKind
-	(v1.InvocationStatus)(0),          // 24: functions.v1.InvocationStatus
-	(*v1.Host)(nil),                   // 25: functions.v1.Host
-	(*v1.Instance)(nil),               // 26: functions.v1.Instance
+	(*ArtifactState)(nil),             // 13: host.v1.ArtifactState
+	(*ServerHeartbeat)(nil),           // 14: host.v1.ServerHeartbeat
+	(*ActiveInvocationsRequest)(nil),  // 15: host.v1.ActiveInvocationsRequest
+	(*ActiveInvocationsResponse)(nil), // 16: host.v1.ActiveInvocationsResponse
+	(*InvocationRecords)(nil),         // 17: host.v1.InvocationRecords
+	nil,                               // 18: host.v1.Artifact.EnvEntry
+	(v1.InvocationProtocol)(0),        // 19: functions.v1.InvocationProtocol
+	(*v1.Contract)(nil),               // 20: functions.v1.Contract
+	(*v1.FunctionSpec)(nil),           // 21: functions.v1.FunctionSpec
+	(*v1.Invocation)(nil),             // 22: functions.v1.Invocation
+	(*v1.FunctionError)(nil),          // 23: functions.v1.FunctionError
+	(v1.StartKind)(0),                 // 24: functions.v1.StartKind
+	(v1.InvocationStatus)(0),          // 25: functions.v1.InvocationStatus
+	(*v1.Host)(nil),                   // 26: functions.v1.Host
+	(*v1.Instance)(nil),               // 27: functions.v1.Instance
 }
 var file_host_v1_host_proto_depIdxs = []int32{
-	17, // 0: host.v1.Artifact.env:type_name -> host.v1.Artifact.EnvEntry
-	18, // 1: host.v1.Artifact.protocol:type_name -> functions.v1.InvocationProtocol
+	18, // 0: host.v1.Artifact.env:type_name -> host.v1.Artifact.EnvEntry
+	19, // 1: host.v1.Artifact.protocol:type_name -> functions.v1.InvocationProtocol
 	1,  // 2: host.v1.Artifact.layers:type_name -> host.v1.Layer
-	19, // 3: host.v1.Artifact.contract:type_name -> functions.v1.Contract
-	20, // 4: host.v1.BuildRequest.spec:type_name -> functions.v1.FunctionSpec
+	20, // 3: host.v1.Artifact.contract:type_name -> functions.v1.Contract
+	21, // 4: host.v1.BuildRequest.spec:type_name -> functions.v1.FunctionSpec
 	1,  // 5: host.v1.BuildRequest.layers:type_name -> host.v1.Layer
 	0,  // 6: host.v1.BuildResponse.artifact:type_name -> host.v1.Artifact
 	2,  // 7: host.v1.BuildResponse.error:type_name -> host.v1.Error
-	21, // 8: host.v1.InvokeRequest.invocation:type_name -> functions.v1.Invocation
+	22, // 8: host.v1.InvokeRequest.invocation:type_name -> functions.v1.Invocation
 	0,  // 9: host.v1.InvokeRequest.artifact:type_name -> host.v1.Artifact
-	22, // 10: host.v1.InvokeResponse.function_error:type_name -> functions.v1.FunctionError
+	23, // 10: host.v1.InvokeResponse.function_error:type_name -> functions.v1.FunctionError
 	2,  // 11: host.v1.InvokeResponse.error:type_name -> host.v1.Error
-	23, // 12: host.v1.InvokeResponse.start_kind:type_name -> functions.v1.StartKind
-	24, // 13: host.v1.InvocationEvent.status:type_name -> functions.v1.InvocationStatus
-	23, // 14: host.v1.InvocationEvent.start_kind:type_name -> functions.v1.StartKind
-	25, // 15: host.v1.DescribeResponse.host:type_name -> functions.v1.Host
-	26, // 16: host.v1.ListInstancesResponse.instances:type_name -> functions.v1.Instance
-	25, // 17: host.v1.Heartbeat.host:type_name -> functions.v1.Host
-	21, // 18: host.v1.ActiveInvocationsResponse.invocations:type_name -> functions.v1.Invocation
-	21, // 19: host.v1.InvocationRecords.invocations:type_name -> functions.v1.Invocation
-	20, // [20:20] is the sub-list for method output_type
-	20, // [20:20] is the sub-list for method input_type
-	20, // [20:20] is the sub-list for extension type_name
-	20, // [20:20] is the sub-list for extension extendee
-	0,  // [0:20] is the sub-list for field type_name
+	24, // 12: host.v1.InvokeResponse.start_kind:type_name -> functions.v1.StartKind
+	25, // 13: host.v1.InvocationEvent.status:type_name -> functions.v1.InvocationStatus
+	24, // 14: host.v1.InvocationEvent.start_kind:type_name -> functions.v1.StartKind
+	26, // 15: host.v1.DescribeResponse.host:type_name -> functions.v1.Host
+	27, // 16: host.v1.ListInstancesResponse.instances:type_name -> functions.v1.Instance
+	26, // 17: host.v1.Heartbeat.host:type_name -> functions.v1.Host
+	13, // 18: host.v1.Heartbeat.artifacts:type_name -> host.v1.ArtifactState
+	22, // 19: host.v1.ActiveInvocationsResponse.invocations:type_name -> functions.v1.Invocation
+	22, // 20: host.v1.InvocationRecords.invocations:type_name -> functions.v1.Invocation
+	21, // [21:21] is the sub-list for method output_type
+	21, // [21:21] is the sub-list for method input_type
+	21, // [21:21] is the sub-list for extension type_name
+	21, // [21:21] is the sub-list for extension extendee
+	0,  // [0:21] is the sub-list for field type_name
 }
 
 func init() { file_host_v1_host_proto_init() }
@@ -1339,7 +1407,7 @@ func file_host_v1_host_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_host_v1_host_proto_rawDesc), len(file_host_v1_host_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   18,
+			NumMessages:   19,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

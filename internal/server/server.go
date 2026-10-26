@@ -38,6 +38,9 @@ type Config struct {
 	GatherWindow time.Duration
 	// HostTTL is how long a host stays listed after its last heartbeat.
 	HostTTL time.Duration
+	// HostsPerFunction is how many hosts each function is built on and
+	// takes invocations from, when that many are live.
+	HostsPerFunction int
 	// LogRetention is how long the bus keeps the latest lines of every
 	// invocation's log, for live and recent reads. The log bucket keeps all
 	// of it after that.
@@ -65,6 +68,7 @@ func DefaultConfig() Config {
 		BuildTimeout:        5 * time.Minute,
 		GatherWindow:        500 * time.Millisecond,
 		HostTTL:             10 * time.Second,
+		HostsPerFunction:    3,
 		LogRetention:        time.Hour,
 		LogMaxBytes:         1 << 30,
 		InvocationRetention: 24 * time.Hour,

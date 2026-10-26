@@ -86,36 +86,82 @@ func (s *Service) Invoke(ctx context.Context, req *connect.Request[functionsv1.I
 	return connect.NewResponse(resp), nil
 }
 
-// invokeOnHost sends the request to whichever host has the artifact ready.
-// No responders means nobody has built it, which happens after every host
-// restarts: one build request later, a host subscribes and the invoke is
-// retried once.
+// invokeOnHost sends the invocation to the host the placement picks, and
+// to the next one when that host turns out to be full, gone or unable to
+// build. When no placed host has the artifact, which happens after they all
+// restart, the first of them builds it before the invocation is sent. When
+// every placed host is full, the invocation waits up to capacityWait for a
+// slot, trying them all again with backoff.
 func (s *Service) invokeOnHost(ctx context.Context, inv *invocation, cv *compiledVersion, req *hostv1.InvokeRequest, timeout time.Duration) (*hostv1.InvokeResponse, error) {
-	// The host enforces the function timeout and its own acquire; this
-	// bound only guards against a host that vanished mid-call.
-	reqCtx, cancel := context.WithTimeout(ctx, invokeBudget(timeout))
-	defer cancel()
-	out, err := s.requestInvoke(reqCtx, cv, req)
-	if !errors.Is(err, bus.ErrNoResponders) {
-		return out, err
+	wait := capacityBackoff
+	deadline := time.Now().Add(capacityWait)
+	skip := map[string]bool{}
+	var full *hostv1.InvokeResponse
+	var unbuilt error
+	for {
+		c, ok := s.chooseHost(cv, skip)
+		switch {
+		case !ok && full == nil && unbuilt != nil:
+			return nil, connect.NewError(connect.CodeFailedPrecondition, unbuilt)
+		case !ok && full == nil:
+			return nil, errNoHosts
+		case !ok:
+			if time.Now().Add(wait).After(deadline) {
+				return full, nil
+			}
+			select {
+			case <-ctx.Done():
+				return full, nil
+			case <-time.After(wait):
+			}
+			wait = min(wait*2, capacityBackoffMax)
+			clear(skip)
+			continue
+		}
+		if !c.built {
+			err := s.buildFor(ctx, inv, cv, c.host)
+			switch {
+			case errors.Is(err, bus.ErrNoResponders):
+				// Gone since its last heartbeat.
+				s.forgetHost(c.host)
+				skip[c.host] = true
+				continue
+			case err != nil:
+				// A build fails for reasons of the host's own as often as the
+				// version's, so every placed host gets a try. The call fails
+				// as unbuildable only once they all have.
+				inv.log.Warn("build on placed host failed", "host", c.host, "err", err)
+				skip[c.host] = true
+				unbuilt = err
+				continue
+			}
+		}
+		out, err := s.requestInvoke(ctx, c.host, req, timeout)
+		switch {
+		case errors.Is(err, bus.ErrNoResponders):
+			// Gone since its last heartbeat.
+			s.forgetHost(c.host)
+			skip[c.host] = true
+			continue
+		case err != nil:
+			return nil, err
+		}
+		switch out.GetError().GetCode() {
+		case "resource_exhausted":
+			skip[c.host] = true
+			full = out
+			continue
+		case "not_found":
+			// Restarted since its last heartbeat: it builds on the next pass.
+			if c.built {
+				s.noteArtifact(c.host, cv.artifact.GetId(), "", false)
+				continue
+			}
+			return out, nil
+		}
+		s.noteArtifact(c.host, cv.artifact.GetId(), out.GetInstanceId(), true)
+		return out, nil
 	}
-	if len(s.liveHosts()) == 0 {
-		return nil, errNoHosts
-	}
-	inv.log.Info("no host has the artifact; building")
-	spec := cv.pinnedSpec()
-	built, err := s.requestBuild(ctx, cv.row.TenantID, spec, cv.artifact.GetLayers())
-	if err != nil {
-		return nil, connect.NewError(connect.CodeFailedPrecondition,
-			fmt.Errorf("version %d can no longer be built from %s: %w; create a new version", cv.row.Version, spec.GetImage(), err))
-	}
-	if built.GetId() != cv.artifact.GetId() {
-		return nil, connect.NewError(connect.CodeFailedPrecondition,
-			fmt.Errorf("version %d rebuilt as a different artifact (%s); create a new version", cv.row.Version, spec.GetImage()))
-	}
-	retryCtx, cancelRetry := context.WithTimeout(ctx, invokeBudget(timeout))
-	defer cancelRetry()
-	return s.requestInvoke(retryCtx, cv, req)
 }
 
 // pinnedSpec is the version's spec with the image pinned to the digest it
@@ -131,28 +177,16 @@ func (cv *compiledVersion) pinnedSpec() *functionsv1.FunctionSpec {
 	return spec
 }
 
-// requestInvoke sends one invocation to the hosts serving the artifact. A
-// host at capacity says so straight away; the queue group hands the retry to
-// a random member, so retries spread across hosts and, when every host is
-// full, wait for a slot instead of failing the call.
-func (s *Service) requestInvoke(ctx context.Context, cv *compiledVersion, req *hostv1.InvokeRequest) (*hostv1.InvokeResponse, error) {
-	wait := capacityBackoff
-	deadline := time.Now().Add(capacityWait)
-	for {
-		out := &hostv1.InvokeResponse{}
-		if err := s.bus.Request(ctx, bus.InvokeSubject(cv.artifact.GetId()), req, out); err != nil {
-			return nil, err
-		}
-		if out.GetError().GetCode() != "resource_exhausted" || time.Now().Add(wait).After(deadline) {
-			return out, nil
-		}
-		select {
-		case <-ctx.Done():
-			return out, nil
-		case <-time.After(wait):
-		}
-		wait = min(wait*2, capacityBackoffMax)
-	}
+// requestInvoke sends req to host on a fresh budget, so a build that
+// ran first takes nothing from it. The host enforces the function timeout
+// and its own acquire; the budget only guards against a host that vanished
+// mid-call.
+func (s *Service) requestInvoke(ctx context.Context, host string, req *hostv1.InvokeRequest, timeout time.Duration) (*hostv1.InvokeResponse, error) {
+	ctx, cancel := context.WithTimeout(ctx, invokeBudget(timeout))
+	defer cancel()
+	out := &hostv1.InvokeResponse{}
+	err := s.bus.Request(ctx, bus.HostInvokeSubject(host), req, out)
+	return out, err
 }
 
 // When every host serving an artifact is full, an invocation waits up to
@@ -182,6 +216,10 @@ func hostCode(code string) connect.Code {
 		return connect.CodeInvalidArgument
 	case "unavailable":
 		return connect.CodeUnavailable
+	case "not_found":
+		return connect.CodeNotFound
+	case "failed_precondition":
+		return connect.CodeFailedPrecondition
 	default:
 		return connect.CodeInternal
 	}

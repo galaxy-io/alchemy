@@ -1,16 +1,12 @@
 package server
 
 import (
-	"context"
 	"time"
-
-	hostv1 "github.com/galaxy-io/alchemy/api/host/v1"
-	"github.com/galaxy-io/alchemy/internal/bus"
 )
 
 const (
 	// reconcileInterval is how often the server compares what hosts serve with
-	// the current version of every function.
+	// the current version of every function placed on them.
 	reconcileInterval = 5 * time.Second
 	// reconcileRetry is how long a build sent to one host for one artifact
 	// stands before it is sent again: long enough for a slow build to finish
@@ -18,10 +14,10 @@ const (
 	reconcileRetry = time.Minute
 )
 
-// reconcileHosts keeps every live host serving the current version of every
-// function. A build only reaches the hosts alive when it runs, so without
-// this a host that starts later, or restarts, never takes those functions'
-// invocations while another host still does.
+// reconcileHosts keeps the hosts each function lives on serving its current
+// version. A build only reaches the hosts alive when it runs, and placement
+// moves as hosts come and go, so without this a host that starts later, or
+// restarts, never takes its functions' invocations.
 func (s *Service) reconcileHosts() {
 	ticker := time.NewTicker(reconcileInterval)
 	defer ticker.Stop()
@@ -62,8 +58,8 @@ func (s *Service) reconcileOnce() {
 			s.log.Warn("reconcile: compile version", "function_id", row.FunctionID, "version", row.Version, "err", err)
 			continue
 		}
-		for name, served := range hosts {
-			if served[row.ArtifactID] {
+		for _, name := range s.placedHosts(row.FunctionID) {
+			if hosts[name][row.ArtifactID] {
 				continue
 			}
 			key := name + "/" + row.ArtifactID
@@ -80,39 +76,39 @@ func (s *Service) reconcileOnce() {
 	}
 }
 
-// buildOn asks host name alone to build cv. Hosts cache by image and layer
-// digests, so a host that has built the version before only resolves it.
+// buildOn builds cv on host name, one of the hosts its function lives on.
 func (s *Service) buildOn(name string, cv *compiledVersion) {
-	ctx, cancel := context.WithTimeout(s.background, s.cfg.BuildTimeout)
-	defer cancel()
 	log := s.log.With("host", name, "function_id", cv.row.FunctionID, "version", cv.row.Version, "artifact_id", cv.row.ArtifactID)
 	start := time.Now()
-	resp := &hostv1.BuildResponse{}
-	if err := s.bus.Request(ctx, bus.HostBuildSubject(name), &hostv1.BuildRequest{TenantId: cv.row.TenantID, Spec: cv.pinnedSpec(), Layers: cv.artifact.GetLayers()}, resp); err != nil {
-		log.Warn("reconcile: build", "err", err)
-		return
-	}
+	built, err := s.buildOnHost(s.background, name, cv)
 	switch {
-	case resp.GetError() != nil:
-		log.Warn("reconcile: build", "err", resp.GetError().GetMessage())
-	case resp.GetArtifact().GetId() != cv.row.ArtifactID:
+	case err != nil:
+		log.Warn("reconcile: build", "err", err)
+	case built.GetId() != cv.row.ArtifactID:
 		// The host serves the artifact it built, which is not the one the
 		// version invokes, so it still takes none of its invocations.
-		log.Warn("reconcile: host built a different artifact", "built_artifact_id", resp.GetArtifact().GetId())
+		log.Warn("reconcile: host built a different artifact", "built_artifact_id", built.GetId())
 	default:
+		s.noteArtifact(name, cv.row.ArtifactID, "", true)
 		log.Info("host reconciled", "took", time.Since(start).Round(time.Millisecond))
 	}
 }
 
-// hostArtifacts returns what every live host serves, by host name.
+// hostArtifacts returns the artifact ids every live host serves, by host
+// name, copied so the caller reads them without the lock.
 func (s *Service) hostArtifacts() map[string]map[string]bool {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	out := make(map[string]map[string]bool, len(s.hosts))
 	for name, k := range s.hosts {
-		if time.Since(k.seen) <= s.cfg.HostTTL {
-			out[name] = k.artifacts
+		if time.Since(k.seen) > s.cfg.HostTTL {
+			continue
 		}
+		ids := make(map[string]bool, len(k.artifacts))
+		for id := range k.artifacts {
+			ids[id] = true
+		}
+		out[name] = ids
 	}
 	return out
 }
