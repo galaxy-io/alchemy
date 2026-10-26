@@ -12,16 +12,16 @@ import HostsInstancesTable from "@/pages/hosts/components/table/HostsInstancesTa
 import { HOSTS_CARD_WIDTH, HOSTS_SECTION_HEADER_HEIGHT } from "@/pages/hosts/constants";
 import { getHostsInstances } from "@/pages/hosts/utils";
 
-import { useSuspenseGetHostQuery } from "@/api/queries/hosts";
+import { useSuspenseListHostsQuery } from "@/api/queries/hosts";
 import { useSuspenseListInstancesQuery } from "@/api/queries/instances";
 
 import { formatCount } from "@/utils/format";
 
 const HostsPage: FC = () => {
-  const { data: hostData } = useSuspenseGetHostQuery();
+  const { data: hostsData } = useSuspenseListHostsQuery();
   const { data: instancesData } = useSuspenseListInstancesQuery();
 
-  const hosts = hostData.host ? [hostData.host] : [];
+  const hosts = hostsData.hosts;
   const instances = instancesData.instances;
 
   return (
