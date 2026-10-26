@@ -30,17 +30,19 @@ LIMIT sqlc.arg('row_limit') OFFSET sqlc.arg('row_offset');
 -- name: CountFunctionVersions :one
 SELECT count(*) FROM function_versions WHERE function_id = $1;
 
--- name: ListBuildingFunctionVersions :many
-SELECT * FROM function_versions WHERE status = 'building' ORDER BY created_at;
+-- A server claims a build by stamping build_started_at, and only the claim
+-- it holds can finish it.
 
--- name: StartFunctionVersionBuild :exec
-UPDATE function_versions SET build_started_at = now() WHERE id = $1;
+-- name: ClaimFunctionVersionBuild :one
+UPDATE function_versions SET build_started_at = now()
+WHERE id = $1 AND status = 'building' AND build_started_at IS NULL
+RETURNING *;
 
 -- name: FinishFunctionVersionBuild :one
 UPDATE function_versions
-SET status = $2, status_message = $3, image_digest = $4, rootfs_bytes = $5, build_log = $6,
-    artifact_id = $7, artifact = $8, build_ended_at = now()
-WHERE id = $1
+SET status = $3, status_message = $4, image_digest = $5, rootfs_bytes = $6, build_log = $7,
+    artifact_id = $8, artifact = $9, build_ended_at = now()
+WHERE id = $1 AND status = 'building' AND build_started_at = $2
 RETURNING *;
 
 -- name: GetFunctionVersionByArtifact :one

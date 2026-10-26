@@ -2,11 +2,10 @@
 
 This chart deploys the Alchemy server and one host per KVM-capable node, plus the configuration that connects them to PostgreSQL and NATS.
 
-- **server** is a Deployment. It serves the API on port 8780 and applies migrations when it starts.
-- **host** is a Deployment of `host.replicas` hosts, one per node, on nodes matching `host.nodeSelector` (`alchemy.getgalaxy.io/kvm: "true"` by default). Each host boots Firecracker microVMs on its node and pulls function images straight from their registries. No container daemon is involved.
+- **server** is a Deployment behind one Service, sized by `server.replicas` or, with `server.autoscaling.enabled`, by a HorizontalPodAutoscaler on CPU. Any replica serves any request. Each applies migrations when it starts, one at a time under a PostgreSQL lock.
 
-> [!CAUTION]
-> Keep `server.replicas` at `1`. Invocation state events are not yet shared between replicas.
+Invocations are not written to PostgreSQL while they run. The host that ran one publishes its record to a JetStream stream when it ends, and the servers write records in batches, so the database is never on the invocation path.
+- **host** is a Deployment of `host.replicas` hosts, one per node, on nodes matching `host.nodeSelector` (`alchemy.getgalaxy.io/kvm: "true"` by default). Each host boots Firecracker microVMs on its node and pulls function images straight from their registries. No container daemon is involved.
 
 ## Host nodes
 

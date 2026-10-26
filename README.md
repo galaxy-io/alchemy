@@ -53,7 +53,7 @@ Hosts pull function images straight from their registries, with no container dae
 
 A function is an OCI image plus a contract. The contract describes the function's input and output as a JSON Schema or an Arrow schema, and Alchemy checks every invocation against it on the way in and on the way out.
 
-The server accepts functions and invocations over its API, stores durable state in PostgreSQL, and dispatches work to hosts over NATS. Each host owns one KVM machine: it flattens a function's image into a read-only root filesystem once, cached by digest, then boots a Firecracker microVM per invocation. Inside the guest, the supervisor runs as init, receives the input over vsock, runs the function and returns its output.
+The server accepts functions and invocations over its API, stores functions and versions in PostgreSQL, and dispatches work to hosts over NATS. Any number of servers run side by side. Nothing is written about an invocation while it runs: the host that ran it publishes its record when it ends, and the servers write records to PostgreSQL in batches, so the database is never on the invocation path. Each host owns one KVM machine: it flattens a function's image into a read-only root filesystem once, cached by digest, then boots a Firecracker microVM per invocation. Inside the guest, the supervisor runs as init, receives the input over vsock, runs the function and returns its output.
 
 Everything a function writes to stderr is kept. The UI follows it live while the function runs, and each invocation's full log goes to an S3 or GCS bucket when it ends.
 

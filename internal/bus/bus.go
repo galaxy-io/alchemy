@@ -22,6 +22,9 @@ const (
 	// HostsQueue is the queue group hosts join on an artifact's invoke
 	// subject, so exactly one host takes each invocation.
 	HostsQueue = "hosts"
+	// ServerInvocationsSubject is where every server answers with the
+	// invocations it holds.
+	ServerInvocationsSubject = "server.invocations"
 )
 
 // InvokeSubject is where hosts that have artifactID ready take invocations.
@@ -36,13 +39,22 @@ func HeartbeatSubject(name string) string { return "host." + name + ".heartbeat"
 // HeartbeatWildcard matches every host's heartbeat.
 const HeartbeatWildcard = "host.*.heartbeat"
 
-// InvocationStateSubject carries a host's progress on one invocation.
-func InvocationStateSubject(invocationID string) string {
-	return "invocation." + invocationID + ".state"
-}
+// ServerStateSubject is where hosts report progress on server name's
+// invocations.
+func ServerStateSubject(name string) string { return "server." + name + ".state" }
 
-// InvocationStateWildcard matches every invocation's progress.
-const InvocationStateWildcard = "invocation.*.state"
+// ServerHeartbeatSubject is where server name announces itself.
+func ServerHeartbeatSubject(name string) string { return "server." + name + ".heartbeat" }
+
+// ServerHeartbeatWildcard matches every server's heartbeat.
+const ServerHeartbeatWildcard = "server.*.heartbeat"
+
+// InvocationSubject carries a function's invocations each time a server
+// sees one change, for live streams on every server.
+func InvocationSubject(functionID string) string { return "invocation." + functionID }
+
+// InvocationWildcard matches every function's invocations.
+const InvocationWildcard = "invocation.*"
 
 // ErrNoResponders is returned by Request when nothing is subscribed to the
 // subject: for an invoke subject, no host has the artifact ready.

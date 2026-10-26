@@ -46,19 +46,8 @@ func run(log *slog.Logger) error {
 	natsURL := envOr("NATS_URL", "nats://localhost:4223")
 	// Empty keeps function logs on NATS only.
 	logsBucket := os.Getenv("FUNCTION_LOGS_BUCKET")
-	if s := os.Getenv("FUNCTION_LOGS_RETENTION"); s != "" {
-		d, err := time.ParseDuration(s)
-		if err != nil {
-			return fmt.Errorf("FUNCTION_LOGS_RETENTION: %w", err)
-		}
-		cfg.LogRetention = d
-	}
-	if s := os.Getenv("FUNCTION_LOGS_MAX_BYTES"); s != "" {
-		n, err := strconv.ParseInt(s, 10, 64)
-		if err != nil {
-			return fmt.Errorf("FUNCTION_LOGS_MAX_BYTES: %w", err)
-		}
-		cfg.LogMaxBytes = n
+	if err := configure(&cfg); err != nil {
+		return err
 	}
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
@@ -142,4 +131,39 @@ func envOr(key, fallback string) string {
 		return v
 	}
 	return fallback
+}
+
+// configure sets cfg from the environment.
+func configure(cfg *server.Config) error {
+	if s := os.Getenv("FUNCTION_LOGS_RETENTION"); s != "" {
+		d, err := time.ParseDuration(s)
+		if err != nil {
+			return fmt.Errorf("FUNCTION_LOGS_RETENTION: %w", err)
+		}
+		cfg.LogRetention = d
+	}
+	if s := os.Getenv("FUNCTION_LOGS_MAX_BYTES"); s != "" {
+		n, err := strconv.ParseInt(s, 10, 64)
+		if err != nil {
+			return fmt.Errorf("FUNCTION_LOGS_MAX_BYTES: %w", err)
+		}
+		cfg.LogMaxBytes = n
+	}
+	hostname, _ := os.Hostname()
+	cfg.Name = envOr("SERVER_NAME", hostname)
+	if s := os.Getenv("INVOCATION_STREAM_RETENTION"); s != "" {
+		d, err := time.ParseDuration(s)
+		if err != nil {
+			return fmt.Errorf("INVOCATION_STREAM_RETENTION: %w", err)
+		}
+		cfg.InvocationRetention = d
+	}
+	if s := os.Getenv("INVOCATION_STREAM_REPLICAS"); s != "" {
+		n, err := strconv.Atoi(s)
+		if err != nil {
+			return fmt.Errorf("INVOCATION_STREAM_REPLICAS: %w", err)
+		}
+		cfg.InvocationReplicas = n
+	}
+	return nil
 }

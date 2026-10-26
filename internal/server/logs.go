@@ -2,11 +2,11 @@ package server
 
 import (
 	"context"
+	"time"
 
 	"connectrpc.com/connect"
 
 	functionsv1 "github.com/galaxy-io/alchemy/api/functions/v1"
-	"github.com/galaxy-io/alchemy/datastore/postgres/sqlcgen"
 	"github.com/galaxy-io/alchemy/internal/bus"
 	"github.com/galaxy-io/alchemy/internal/logs"
 )
@@ -15,30 +15,29 @@ import (
 // log comes from the log bucket. One still running, or whose upload has not
 // completed, comes from the bus, which holds only its latest lines.
 func (s *Service) GetInvocationLogs(ctx context.Context, req *connect.Request[functionsv1.GetInvocationLogsRequest], stream *connect.ServerStream[functionsv1.GetInvocationLogsResponse]) error {
-	params := sqlcgen.GetInvocationParams{TenantID: s.tenant, ID: req.Msg.GetId()}
-	row, err := s.store.GetInvocation(ctx, params)
+	inv, err := s.invocation(ctx, req.Msg.GetId())
 	if err != nil {
-		return notFound(err, "invocation %q not found", req.Msg.GetId())
+		return err
 	}
 	send := func(p []byte) error {
 		return stream.Send(&functionsv1.GetInvocationLogsResponse{Data: p})
 	}
 
-	if row.EndedAt.Valid {
-		found, err := logs.Read(ctx, s.logs, logs.Key(row.TenantID, row.FunctionID, row.CreatedAt.Time, row.ID), sendWriter(send))
+	if inv.GetEndedAt() != 0 {
+		found, err := logs.Read(ctx, s.logs, logs.Key(inv.GetTenantId(), inv.GetFunctionId(), time.UnixMilli(inv.GetCreatedAt()), inv.GetId()), sendWriter(send))
 		if found {
 			return err
 		}
 		if err != nil {
-			s.log.Warn("read log from bucket", "invocation_id", row.ID, "err", err)
+			s.log.Warn("read log from bucket", "invocation_id", inv.GetId(), "err", err)
 		}
 	}
 
 	ended := func() bool {
-		row, err := s.store.GetInvocation(ctx, params)
-		return err != nil || row.EndedAt.Valid
+		inv, err := s.invocation(ctx, inv.GetId())
+		return err != nil || inv.GetEndedAt() != 0
 	}
-	return s.bus.ReadLog(ctx, bus.LogSubject(row.TenantID, row.ID), req.Msg.GetFollow() && !row.EndedAt.Valid, ended, send)
+	return s.bus.ReadLog(ctx, bus.LogSubject(inv.GetTenantId(), inv.GetId()), req.Msg.GetFollow() && inv.GetEndedAt() == 0, ended, send)
 }
 
 // sendWriter sends each write as one message.

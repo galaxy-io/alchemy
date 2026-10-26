@@ -1,0 +1,14 @@
+{{- if and .Values.server.podDisruptionBudget.enabled (or .Values.server.autoscaling.enabled (gt (int .Values.server.replicas) 1)) }}
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: {{ include "alchemy.server.fullname" . }}
+  namespace: {{ include "alchemy.namespace" . }}
+  labels:
+    {{- include "alchemy.server.labels" . | nindent 4 }}
+spec:
+  minAvailable: {{ .Values.server.podDisruptionBudget.minAvailable }}
+  selector:
+    matchLabels:
+      {{- include "alchemy.server.selectorLabels" . | nindent 6 }}
+{{- end }}

@@ -157,10 +157,6 @@ func stamp(t pgtype.Timestamptz) int64 {
 	return t.Time.UnixMilli()
 }
 
-func nullUUID(id string) pgtype.Text {
-	return pgtype.Text{String: id, Valid: id != ""}
-}
-
 func nullMillis(ms int64) pgtype.Timestamptz {
 	if ms <= 0 {
 		return pgtype.Timestamptz{}

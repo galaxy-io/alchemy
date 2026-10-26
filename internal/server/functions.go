@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"connectrpc.com/connect"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/proto"
@@ -199,20 +200,28 @@ func (s *Service) addVersion(ctx context.Context, functionID string, spec *funct
 	return v, nil
 }
 
+// startBuild claims a new version's build and runs it. The claim fails only
+// when the version was claimed already.
 func (s *Service) startBuild(v *sqlcgen.FunctionVersion) {
-	s.tasks.Go(func() { s.build(v) })
+	s.tasks.Go(func() {
+		claimed, err := s.store.ClaimFunctionVersionBuild(s.background, v.ID)
+		if err != nil {
+			if !errors.Is(err, pgx.ErrNoRows) {
+				s.log.Error("claim build", "function_id", v.FunctionID, "version", v.Version, "err", err)
+			}
+			return
+		}
+		s.build(claimed)
+	})
 }
 
-// build turns a version's spec into an artifact and records the outcome.
+// build turns a claimed version's spec into an artifact and records the
+// outcome, unless another server has taken the build over since.
 func (s *Service) build(v *sqlcgen.FunctionVersion) {
 	ctx, cancel := context.WithTimeout(s.background, s.cfg.BuildTimeout)
 	defer cancel()
 	log := s.log.With("function_id", v.FunctionID, "version", v.Version)
 
-	if err := s.store.StartFunctionVersionBuild(ctx, v.ID); err != nil {
-		log.Error("record build start", "err", err)
-		return
-	}
 	spec, err := decodeSpec(v.Spec)
 	var c contract.Contract
 	if err == nil {
@@ -225,7 +234,7 @@ func (s *Service) build(v *sqlcgen.FunctionVersion) {
 		artifact, buildLog, err = s.requestBuildWithLog(ctx, v.TenantID, spec, nil)
 	}
 
-	finish := sqlcgen.FinishFunctionVersionBuildParams{ID: v.ID, BuildLog: buildLog}
+	finish := sqlcgen.FinishFunctionVersionBuildParams{ID: v.ID, BuildStartedAt: v.BuildStartedAt, BuildLog: buildLog}
 	if err != nil {
 		finish.Status = sqlcgen.FunctionVersionStatusFailed
 		finish.StatusMessage = err.Error()
@@ -242,7 +251,11 @@ func (s *Service) build(v *sqlcgen.FunctionVersion) {
 		log.Info("build ready", "artifact_id", artifact.GetId(), "digest", artifact.GetDigest(), "rootfs_bytes", artifact.GetRootfsBytes(), "took", time.Since(start).Round(time.Millisecond))
 	}
 	row, err := s.store.FinishFunctionVersionBuild(context.WithoutCancel(ctx), finish)
-	if err != nil {
+	switch {
+	case errors.Is(err, pgx.ErrNoRows):
+		log.Warn("build was taken over by another server; dropping its result")
+		return
+	case err != nil:
 		log.Error("record build result", "err", err)
 		return
 	}

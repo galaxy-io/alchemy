@@ -6,7 +6,9 @@ metadata:
   labels:
     {{- include "alchemy.server.labels" . | nindent 4 }}
 spec:
+  {{- if not .Values.server.autoscaling.enabled }}
   replicas: {{ .Values.server.replicas }}
+  {{- end }}
   selector:
     matchLabels:
       {{- include "alchemy.server.selectorLabels" . | nindent 6 }}

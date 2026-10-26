@@ -77,8 +77,9 @@ CREATE INDEX function_versions_ready_idx ON function_versions (function_id, vers
 CREATE TYPE invocation_status AS ENUM ('pending', 'starting', 'running', 'succeeded', 'failed', 'errored', 'canceled');
 CREATE TYPE start_kind AS ENUM ('cold_boot', 'snapshot_restore', 'warm');
 
--- One row per Invoke call. error is a FunctionError as proto JSON. Rows are
--- written at acceptance and updated on each transition.
+-- One row per ended invocation, written once, in batches, from the records
+-- hosts and servers publish; nothing is written while an invocation runs.
+-- error is a FunctionError as proto JSON.
 CREATE TABLE invocations (
   id                 UUID              PRIMARY KEY DEFAULT gen_random_uuid(),
   tenant_id          UUID              NOT NULL REFERENCES tenants (id),
@@ -102,7 +103,6 @@ CREATE TABLE invocations (
 
 CREATE INDEX invocations_function_created_idx ON invocations (function_id, created_at DESC);
 CREATE INDEX invocations_tenant_created_idx ON invocations (tenant_id, created_at DESC);
-CREATE INDEX invocations_active_idx ON invocations (tenant_id, status) WHERE status IN ('pending', 'starting', 'running');
 
 -- +goose Down
 DROP TABLE invocations;

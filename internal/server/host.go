@@ -21,20 +21,94 @@ type knownHost struct {
 	seen      time.Time
 }
 
-// listen subscribes to what hosts publish: heartbeats, and the progress
-// of invocations the server has handed them.
+// knownServer is what another server last said about itself.
+type knownServer struct {
+	pending int32
+	seen    time.Time
+}
+
+// serverHeartbeatInterval is how often a server announces itself.
+const serverHeartbeatInterval = 2 * time.Second
+
+// listen subscribes to what hosts and other servers publish: every host's
+// and server's heartbeats, the progress hosts report on this server's
+// invocations, and other servers' requests for the invocations it holds.
 func (s *Service) listen() error {
-	hb, err := s.bus.Subscribe(s.background, bus.HeartbeatWildcard, "", s.onHeartbeat)
-	if err != nil {
-		return err
+	subs := []struct {
+		subject string
+		handler bus.Handler
+		serve   bool
+	}{
+		{bus.HeartbeatWildcard, s.onHeartbeat, false},
+		{bus.ServerHeartbeatWildcard, s.onServerHeartbeat, false},
+		{bus.ServerStateSubject(s.cfg.Name), s.onInvocationState, false},
+		{bus.ServerInvocationsSubject, s.handleActiveInvocations, true},
 	}
-	st, err := s.bus.Subscribe(s.background, bus.InvocationStateWildcard, "", s.onInvocationState)
-	if err != nil {
-		hb.Unsubscribe()
-		return err
+	for _, sb := range subs {
+		var sub *bus.Subscription
+		var err error
+		if sb.serve {
+			sub, err = s.bus.Serve(s.background, sb.subject, "", sb.handler)
+		} else {
+			sub, err = s.bus.Subscribe(s.background, sb.subject, "", sb.handler)
+		}
+		if err != nil {
+			for _, sub := range s.subs {
+				sub.Unsubscribe()
+			}
+			s.subs = nil
+			return err
+		}
+		s.subs = append(s.subs, sub)
 	}
-	s.subs = append(s.subs, hb, st)
 	return nil
+}
+
+// heartbeat announces this server until the service stops, and lets go of
+// invocations that ended a while ago.
+func (s *Service) heartbeat() {
+	ticker := time.NewTicker(serverHeartbeatInterval)
+	defer ticker.Stop()
+	for {
+		s.tracker.forget(time.Now())
+		hb := &hostv1.ServerHeartbeat{Name: s.cfg.Name, Pending: int32(s.tracker.pending())} //nolint:gosec // small
+		if err := s.bus.Publish(bus.ServerHeartbeatSubject(s.cfg.Name), hb); err != nil {
+			s.log.Warn("heartbeat", "err", err)
+		}
+		select {
+		case <-s.background.Done():
+			return
+		case <-ticker.C:
+		}
+	}
+}
+
+func (s *Service) onServerHeartbeat(_ context.Context, data []byte) proto.Message {
+	msg := &hostv1.ServerHeartbeat{}
+	if err := proto.Unmarshal(data, msg); err != nil || msg.GetName() == "" {
+		return nil
+	}
+	s.mu.Lock()
+	s.servers[msg.GetName()] = &knownServer{pending: msg.GetPending(), seen: time.Now()}
+	s.mu.Unlock()
+	return nil
+}
+
+// liveServers returns the other servers heard from within HostTTL.
+func (s *Service) liveServers() []string {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	var out []string
+	for name, k := range s.servers {
+		if time.Since(k.seen) > s.cfg.HostTTL {
+			delete(s.servers, name)
+			continue
+		}
+		if name != s.cfg.Name {
+			out = append(out, name)
+		}
+	}
+	return out
 }
 
 func (s *Service) onHeartbeat(_ context.Context, data []byte) proto.Message {
@@ -52,34 +126,35 @@ func (s *Service) onHeartbeat(_ context.Context, data []byte) proto.Message {
 	return nil
 }
 
-// onInvocationState records STARTING and RUNNING as a host reports them;
-// the terminal state comes with the invoke reply.
+// onInvocationState moves one of this server's invocations to STARTING or
+// RUNNING as the host reports it, for the live streams; the terminal state
+// comes with the invoke reply. A report for an invocation that has already
+// ended is dropped.
 func (s *Service) onInvocationState(_ context.Context, data []byte) proto.Message {
 	ev := &hostv1.InvocationEvent{}
 	if err := proto.Unmarshal(data, ev); err != nil {
 		return nil
 	}
-	ctx := s.background
-	var row *sqlcgen.Invocation
-	var err error
-	switch ev.GetStatus() {
-	case functionsv1.InvocationStatus_INVOCATION_STATUS_STARTING:
-		row, err = s.store.SetInvocationStarting(ctx, ev.GetInvocationId())
-	case functionsv1.InvocationStatus_INVOCATION_STATUS_RUNNING:
-		row, err = s.store.SetInvocationRunning(ctx, sqlcgen.SetInvocationRunningParams{
-			ID:         ev.GetInvocationId(),
-			StartKind:  startKindRow(ev.GetStartKind()),
-			InstanceID: ev.GetInstanceId(),
-			AcquireUs:  ev.GetAcquireUs(),
-		})
-	default:
-		return nil
+	inv := s.tracker.update(ev.GetInvocationId(), func(inv *functionsv1.Invocation) {
+		if terminal(inv.GetStatus()) {
+			return
+		}
+		switch ev.GetStatus() {
+		case functionsv1.InvocationStatus_INVOCATION_STATUS_STARTING:
+			if inv.GetStatus() == functionsv1.InvocationStatus_INVOCATION_STATUS_PENDING {
+				inv.Status = ev.GetStatus()
+			}
+		case functionsv1.InvocationStatus_INVOCATION_STATUS_RUNNING:
+			inv.Status = ev.GetStatus()
+			inv.StartKind = ev.GetStartKind()
+			inv.InstanceId = ev.GetInstanceId()
+			inv.StartedAt = time.Now().UnixMilli()
+			inv.Stats = &functionsv1.InvocationStats{StartKind: ev.GetStartKind(), AcquireUs: ev.GetAcquireUs()}
+		}
+	})
+	if inv != nil {
+		s.publishInvocation(inv)
 	}
-	if err != nil {
-		s.log.Warn("record invocation state", "invocation_id", ev.GetInvocationId(), "status", ev.GetStatus(), "err", err)
-		return nil
-	}
-	s.events.publish(invocationProto(row))
 	return nil
 }
 

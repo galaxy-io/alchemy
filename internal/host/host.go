@@ -1,7 +1,8 @@
 // Package host is the per-machine process: it builds artifacts, runs
-// instances and serves invocations over the bus. It holds nothing durable;
-// if it dies, its instances die with it and the server records the
-// invocations it was serving as errored.
+// instances and serves invocations over the bus. It holds nothing durable
+// beyond the records of invocations it has not published yet; if it dies,
+// its instances die with it and the server records the invocations it was
+// serving as errored.
 package host
 
 import (
@@ -84,6 +85,8 @@ type Host struct {
 	stop       context.CancelFunc
 	tasks      sync.WaitGroup
 
+	records *recordQueue
+
 	mu        sync.Mutex
 	artifacts map[string]*bus.Subscription // invoke subscriptions, by artifact id
 	instances map[string]*liveInstance     // every instance, by key
@@ -106,6 +109,7 @@ func New(cfg Config, d driver.Driver, b *bus.Bus, logBucket, artifactBucket *blo
 		log:        log,
 		startedAt:  time.Now(),
 		slots:      make(chan struct{}, cfg.MaxConcurrency),
+		records:    newRecordQueue(b, log),
 		background: bg,
 		stop:       stop,
 		artifacts:  make(map[string]*bus.Subscription),
@@ -136,6 +140,7 @@ func (h *Host) Run(ctx context.Context) error {
 		}
 		subs = append(subs, sub)
 	}
+	h.tasks.Go(func() { h.records.run(h.background) })
 	h.log.Info("host serving", "slots", h.cfg.MaxConcurrency, "memory_mib", h.cfg.MemoryMiB, "warm_ttl", h.cfg.WarmTTL, "prewarm", h.cfg.Prewarm)
 
 	ticker := time.NewTicker(h.cfg.HeartbeatInterval)
@@ -240,13 +245,16 @@ func (h *Host) serve(a *hostv1.Artifact) error {
 }
 
 // handleInvoke runs one input through an instance. Every reply is an
-// InvokeResponse; an Error result means no instance ran the input.
+// InvokeResponse; an Error result means no instance ran the input. When an
+// instance ran it, the host publishes the invocation's record as well: the
+// reply tells the caller, the record tells the database.
 func (h *Host) handleInvoke(ctx context.Context, data []byte) proto.Message {
 	req := &hostv1.InvokeRequest{}
 	if err := proto.Unmarshal(data, req); err != nil {
 		return invokeError("invalid_argument", err)
 	}
-	log := h.log.With("invocation_id", req.GetInvocationId(), "artifact_id", req.GetArtifact().GetId())
+	id := req.GetInvocation().GetId()
+	log := h.log.With("invocation_id", id, "artifact_id", req.GetArtifact().GetId())
 	start := time.Now()
 
 	select {
@@ -256,7 +264,7 @@ func (h *Host) handleInvoke(ctx context.Context, data []byte) proto.Message {
 		return invokeError("resource_exhausted", errors.New("host is at capacity"))
 	}
 
-	h.publishState(req.GetInvocationId(), functionsv1.InvocationStatus_INVOCATION_STATUS_STARTING, "", functionsv1.StartKind_START_KIND_UNSPECIFIED, 0)
+	h.publishState(req, functionsv1.InvocationStatus_INVOCATION_STATUS_STARTING, "", functionsv1.StartKind_START_KIND_UNSPECIFIED, 0)
 	live, err := h.admit(req.GetArtifact())
 	if err != nil {
 		return invokeError("resource_exhausted", err)
@@ -270,7 +278,7 @@ func (h *Host) handleInvoke(ctx context.Context, data []byte) proto.Message {
 			return invokeError("unavailable", fmt.Errorf("acquire instance: %w", err))
 		}
 	}
-	live.ready(instance, startKind, req.GetInvocationId())
+	live.ready(instance, startKind, id)
 	// An instance whose supervisor answered can take the next invocation;
 	// one that stopped answering, or any instance when warm reuse is off, is
 	// released. Neither must delay the reply.
@@ -283,7 +291,7 @@ func (h *Host) handleInvoke(ctx context.Context, data []byte) proto.Message {
 	}()
 	acquired := time.Now()
 	acquireUs := acquired.Sub(start).Microseconds()
-	h.publishState(req.GetInvocationId(), functionsv1.InvocationStatus_INVOCATION_STATUS_RUNNING, instance.ID(), startKind, acquireUs)
+	h.publishState(req, functionsv1.InvocationStatus_INVOCATION_STATUS_RUNNING, instance.ID(), startKind, acquireUs)
 
 	resp := &hostv1.InvokeResponse{
 		InstanceId: instance.ID(),
@@ -295,7 +303,7 @@ func (h *Host) handleInvoke(ctx context.Context, data []byte) proto.Message {
 	defer cancel()
 	fnLogs := h.functionLogs(req, log)
 	out, err := instance.Invoke(runCtx, &supervisorv1.InvokeRequest{
-		InvocationId: req.GetInvocationId(),
+		InvocationId: id,
 		Input:        req.GetInput(),
 		TimeoutMs:    timeout.Milliseconds(),
 		HostTimeMs:   time.Now().UnixMilli(),
@@ -305,15 +313,15 @@ func (h *Host) handleInvoke(ctx context.Context, data []byte) proto.Message {
 	case err == nil:
 		reusable = true
 		if f := out.GetFailure(); f != nil {
-			resp.Result = &hostv1.InvokeResponse_Failure{Failure: f}
+			resp.Result = &hostv1.InvokeResponse_FunctionError{FunctionError: functionError(f)}
 		} else {
 			resp.Result = &hostv1.InvokeResponse_Output{Output: out.GetOutput()}
 		}
 		resp.RunUs = cmpNonZero(out.GetRunUs(), time.Since(acquired).Microseconds())
 	case errors.Is(runCtx.Err(), context.DeadlineExceeded):
 		// The supervisor never answered; the function is the likeliest cause.
-		resp.Result = &hostv1.InvokeResponse_Failure{Failure: &supervisorv1.Failure{
-			Kind:    supervisorv1.FailureKind_FAILURE_KIND_TIMEOUT,
+		resp.Result = &hostv1.InvokeResponse_FunctionError{FunctionError: &functionsv1.FunctionError{
+			Kind:    functionsv1.FunctionErrorKind_FUNCTION_ERROR_KIND_TIMEOUT,
 			Message: fmt.Sprintf("function exceeded its %dms timeout and the instance stopped responding", timeout.Milliseconds()),
 		}}
 		resp.RunUs = time.Since(acquired).Microseconds()
@@ -322,7 +330,22 @@ func (h *Host) handleInvoke(ctx context.Context, data []byte) proto.Message {
 		return invokeError("unavailable", fmt.Errorf("invoke instance: %w", err))
 	}
 	log.Debug("invocation finished", "instance_id", instance.ID(), "start_kind", startKind, "acquire_us", acquireUs, "run_us", resp.GetRunUs())
+	h.records.add(record(req.GetInvocation(), resp, start, acquired))
 	return resp
+}
+
+// functionError is a supervisor failure as the caller sees it.
+func functionError(f *supervisorv1.Failure) *functionsv1.FunctionError {
+	fe := &functionsv1.FunctionError{Message: f.GetMessage(), Type: f.GetType()}
+	switch f.GetKind() {
+	case supervisorv1.FailureKind_FAILURE_KIND_RAISED:
+		fe.Kind = functionsv1.FunctionErrorKind_FUNCTION_ERROR_KIND_RAISED
+	case supervisorv1.FailureKind_FAILURE_KIND_TIMEOUT:
+		fe.Kind = functionsv1.FunctionErrorKind_FUNCTION_ERROR_KIND_TIMEOUT
+	default:
+		fe.Kind = functionsv1.FunctionErrorKind_FUNCTION_ERROR_KIND_CRASHED
+	}
+	return fe
 }
 
 // functionLog is where one invocation's stderr goes: the bus, and the log
@@ -336,7 +359,7 @@ type functionLog struct {
 
 func (h *Host) functionLogs(req *hostv1.InvokeRequest, log *slog.Logger) *functionLog {
 	tenantID := req.GetArtifact().GetTenantId()
-	subject := bus.LogSubject(tenantID, req.GetInvocationId())
+	subject := bus.LogSubject(tenantID, req.GetInvocation().GetId())
 	w := logs.NewWriter(h.background, h.logs, req.GetLogKey(),
 		func(p []byte) error { return h.bus.PublishLog(subject, p) }, log)
 	return &functionLog{Writer: w, h: h, subject: subject, log: log}
@@ -359,16 +382,20 @@ func invokeError(code string, err error) *hostv1.InvokeResponse {
 	return &hostv1.InvokeResponse{Result: &hostv1.InvokeResponse_Error{Error: &hostv1.Error{Code: code, Message: err.Error()}}}
 }
 
-func (h *Host) publishState(invocationID string, status functionsv1.InvocationStatus, instanceID string, kind functionsv1.StartKind, acquireUs int64) {
-	err := h.bus.Publish(bus.InvocationStateSubject(invocationID), &hostv1.InvocationEvent{
-		InvocationId: invocationID,
+// publishState tells the server that sent req how its invocation is doing.
+func (h *Host) publishState(req *hostv1.InvokeRequest, status functionsv1.InvocationStatus, instanceID string, kind functionsv1.StartKind, acquireUs int64) {
+	if req.GetStateSubject() == "" {
+		return
+	}
+	err := h.bus.Publish(req.GetStateSubject(), &hostv1.InvocationEvent{
+		InvocationId: req.GetInvocation().GetId(),
 		Status:       status,
 		InstanceId:   instanceID,
 		StartKind:    kind,
 		AcquireUs:    acquireUs,
 	})
 	if err != nil {
-		h.log.Warn("publish invocation state", "invocation_id", invocationID, "err", err)
+		h.log.Warn("publish invocation state", "invocation_id", req.GetInvocation().GetId(), "err", err)
 	}
 }
 

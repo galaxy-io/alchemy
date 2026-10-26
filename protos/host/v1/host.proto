@@ -6,12 +6,12 @@ import "functions/v1/common.proto";
 import "functions/v1/functions.proto";
 import "functions/v1/host.proto";
 import "functions/v1/invocations.proto";
-import "supervisor/v1/supervisor.proto";
 
-// host.v1 is the contract between the server and the hosts. It rides on
-// NATS rather than a Connect service: a host subscribes to the subjects for
-// the artifacts it has ready, so placement is a subscription and the server
-// keeps no host state beyond what heartbeats last said.
+// host.v1 is the contract between the servers and the hosts, and between
+// servers. It rides on NATS rather than a Connect service: a host subscribes
+// to the subjects for the artifacts it has ready, so placement is a
+// subscription and the server keeps no host state beyond what heartbeats
+// last said.
 //
 //   host.build.*                 request/reply, queue group: any host builds,
 //                                replies with the Artifact
@@ -24,9 +24,22 @@ import "supervisor/v1/supervisor.proto";
 //                                with its instances
 //   host.<name>.build            request/reply: that host builds, replies
 //                                with the Artifact; reconciles a host
-//   host.<name>.heartbeat        publish: a Host, periodically
-//   invocation.<id>.state        publish: InvocationEvent as an invocation
-//                                moves through a host
+//   host.<name>.heartbeat        publish: a Heartbeat, periodically
+//   server.<name>.state          publish: InvocationEvent, from a host to
+//                                the server whose invocation moved
+//   server.<name>.heartbeat      publish: a ServerHeartbeat, periodically
+//   server.invocations           request, scatter/gather: every server
+//                                replies with the invocations it holds
+//   invocation.<function_id>     publish: an Invocation each time a server
+//                                sees it change, for live streams
+//   invocations.host, .server    publish, JetStream: InvocationRecords,
+//                                kept until a server has written them
+//
+// Invocations are not written as they run. The host that ran one publishes
+// its record when it ends; the server publishes a record only when it has
+// something the host could not know (no host ran it, or the output failed
+// the contract), and that record wins. Servers share one consumer that
+// writes records to the database in batches.
 //
 // Payloads are protobuf-encoded messages from this file. Request/reply
 // errors are an Error message in the reply, never a NATS-level error.
@@ -95,13 +108,19 @@ message BuildResponse {
 // InvokeRequest runs one input, already validated by the server, through an
 // instance of artifact. The host decides how the instance is obtained.
 message InvokeRequest {
-  string invocation_id = 1;
+  // invocation is the accepted invocation as the server knows it: its id,
+  // function, version and when it was created. The host completes it into
+  // the record it publishes when the invocation ends.
+  functions.v1.Invocation invocation = 1;
   Artifact artifact = 2;
   bytes input = 3;
   int64 timeout_ms = 4;
   // log_key is where the host uploads the invocation's log in the log bucket.
   // The server owns the layout, so it can find the log again.
   string log_key = 5;
+  // state_subject is where the host publishes InvocationEvents for this
+  // invocation: the requesting server's own subject.
+  string state_subject = 6;
 }
 
 // InvokeResponse is returned whenever an instance ran the input, including
@@ -111,7 +130,7 @@ message InvokeRequest {
 message InvokeResponse {
   oneof result {
     bytes output = 1;
-    supervisor.v1.Failure failure = 2;
+    functions.v1.FunctionError function_error = 2;
     Error error = 3;
   }
   string instance_id = 4;
@@ -121,7 +140,7 @@ message InvokeResponse {
 }
 
 // InvocationEvent is published as a host moves an invocation along, so the
-// server can record STARTING and RUNNING before the reply arrives.
+// server can show STARTING and RUNNING before the reply arrives.
 message InvocationEvent {
   string invocation_id = 1;
   functions.v1.InvocationStatus status = 2;
@@ -149,4 +168,29 @@ message Heartbeat {
   // server builds the current version of every function on any host that
   // lacks it.
   repeated string artifact_ids = 2;
+}
+
+// ServerHeartbeat is published by every server on its own subject, so any
+// of them can answer for all of them.
+message ServerHeartbeat {
+  string name = 1;
+  // pending is how many invocations the server has accepted that no host
+  // has started: demand no host has room for yet.
+  int32 pending = 2;
+}
+
+// ActiveInvocationsRequest asks every server for the invocations it holds.
+message ActiveInvocationsRequest {}
+
+message ActiveInvocationsResponse {
+  // invocations are those in flight on the server, and those that ended
+  // moments ago and may not have been written yet.
+  repeated functions.v1.Invocation invocations = 1;
+}
+
+// InvocationRecords is a batch of ended invocations for the database. Hosts
+// publish one per flush; a server publishes one for an invocation whose
+// outcome it alone knows.
+message InvocationRecords {
+  repeated functions.v1.Invocation invocations = 1;
 }

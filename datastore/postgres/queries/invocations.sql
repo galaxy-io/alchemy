@@ -1,26 +1,44 @@
--- name: CreateInvocation :one
-INSERT INTO invocations (tenant_id, function_id, version, input_bytes, created_by_user_id)
-VALUES ($1, $2, $3, $4, $5)
-RETURNING *;
-
 -- name: GetInvocation :one
 SELECT * FROM invocations WHERE tenant_id = $1 AND id = $2;
 
--- name: SetInvocationStarting :one
-UPDATE invocations SET status = 'starting' WHERE id = $1 RETURNING *;
-
--- name: SetInvocationRunning :one
-UPDATE invocations
-SET status = 'running', start_kind = $2, instance_id = $3, acquire_us = $4, started_at = now()
-WHERE id = $1
-RETURNING *;
-
--- name: FinishInvocation :one
-UPDATE invocations
-SET status = $2, run_us = $3, total_us = $4, error = $5, platform_error = $6,
-    output_bytes = $7, ended_at = now()
-WHERE id = $1
-RETURNING *;
+-- name: InsertInvocations :exec
+-- One row per element of the arrays, which all have the same length. A
+-- record of an invocation already written changes it only when override is
+-- set: a server's record over a host's.
+WITH r AS (
+  SELECT
+    unnest(sqlc.arg('ids')::uuid[]) AS id,
+    unnest(sqlc.arg('tenant_ids')::uuid[]) AS tenant_id,
+    unnest(sqlc.arg('function_ids')::uuid[]) AS function_id,
+    unnest(sqlc.arg('versions')::bigint[]) AS version,
+    unnest(sqlc.arg('statuses')::text[]) AS status,
+    unnest(sqlc.arg('start_kinds')::text[]) AS start_kind,
+    unnest(sqlc.arg('acquire_us')::bigint[]) AS acquire_us,
+    unnest(sqlc.arg('run_us')::bigint[]) AS run_us,
+    unnest(sqlc.arg('total_us')::bigint[]) AS total_us,
+    unnest(sqlc.arg('errors')::text[]) AS error,
+    unnest(sqlc.arg('platform_errors')::text[]) AS platform_error,
+    unnest(sqlc.arg('input_bytes')::bigint[]) AS input_bytes,
+    unnest(sqlc.arg('output_bytes')::bigint[]) AS output_bytes,
+    unnest(sqlc.arg('instance_ids')::text[]) AS instance_id,
+    unnest(sqlc.arg('created_by_user_ids')::text[]) AS created_by_user_id,
+    unnest(sqlc.arg('created_ats')::timestamptz[]) AS created_at,
+    unnest(sqlc.arg('started_ats')::timestamptz[]) AS started_at,
+    unnest(sqlc.arg('ended_ats')::timestamptz[]) AS ended_at
+)
+INSERT INTO invocations (id, tenant_id, function_id, version, status, start_kind, acquire_us, run_us, total_us,
+                         error, platform_error, input_bytes, output_bytes, instance_id, created_by_user_id,
+                         created_at, started_at, ended_at)
+SELECT id, tenant_id, function_id, version, status::invocation_status, nullif(start_kind, '')::start_kind,
+       acquire_us, run_us, total_us, nullif(error, '')::jsonb, platform_error, input_bytes, output_bytes, instance_id,
+       nullif(created_by_user_id, '')::uuid, created_at, started_at, ended_at
+FROM r
+ON CONFLICT (id) DO UPDATE SET
+  status = excluded.status, start_kind = excluded.start_kind, acquire_us = excluded.acquire_us,
+  run_us = excluded.run_us, total_us = excluded.total_us, error = excluded.error,
+  platform_error = excluded.platform_error, output_bytes = excluded.output_bytes,
+  instance_id = excluded.instance_id, started_at = excluded.started_at, ended_at = excluded.ended_at
+WHERE sqlc.arg('override')::boolean;
 
 -- name: ListInvocations :many
 SELECT * FROM invocations
@@ -41,15 +59,3 @@ WHERE tenant_id = $1
   AND (cardinality(sqlc.arg('start_kinds')::text[]) = 0 OR start_kind::text = ANY(sqlc.arg('start_kinds')::text[]))
   AND (sqlc.narg('since')::timestamptz IS NULL OR created_at >= sqlc.narg('since'))
   AND (sqlc.narg('until')::timestamptz IS NULL OR created_at < sqlc.narg('until'));
-
--- name: ListActiveInvocations :many
-SELECT * FROM invocations
-WHERE tenant_id = $1
-  AND (sqlc.narg('function_id')::uuid IS NULL OR function_id = sqlc.narg('function_id'))
-  AND status IN ('pending', 'starting', 'running')
-ORDER BY created_at;
-
--- name: CancelStaleInvocations :execrows
-UPDATE invocations
-SET status = 'canceled', platform_error = 'server restarted', ended_at = now()
-WHERE status IN ('pending', 'starting', 'running');

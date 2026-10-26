@@ -3,20 +3,37 @@ package server
 import (
 	"context"
 	"errors"
+	"time"
 
 	"connectrpc.com/connect"
+	"github.com/jackc/pgx/v5"
 
 	functionsv1 "github.com/galaxy-io/alchemy/api/functions/v1"
 	"github.com/galaxy-io/alchemy/datastore/postgres/sqlcgen"
 )
 
-// GetInvocation returns one invocation record.
+// GetInvocation returns one invocation.
 func (s *Service) GetInvocation(ctx context.Context, req *connect.Request[functionsv1.GetInvocationRequest]) (*connect.Response[functionsv1.GetInvocationResponse], error) {
-	row, err := s.store.GetInvocation(ctx, sqlcgen.GetInvocationParams{TenantID: s.tenant, ID: req.Msg.GetId()})
+	inv, err := s.invocation(ctx, req.Msg.GetId())
 	if err != nil {
-		return nil, notFound(err, "invocation %q not found", req.Msg.GetId())
+		return nil, err
 	}
-	return connect.NewResponse(&functionsv1.GetInvocationResponse{Invocation: invocationProto(row)}), nil
+	return connect.NewResponse(&functionsv1.GetInvocationResponse{Invocation: inv}), nil
+}
+
+// invocation finds one invocation: in the database, or on the server
+// holding it while it runs or until its record is written.
+func (s *Service) invocation(ctx context.Context, id string) (*functionsv1.Invocation, error) {
+	row, err := s.store.GetInvocation(ctx, sqlcgen.GetInvocationParams{TenantID: s.tenant, ID: id})
+	if errors.Is(err, pgx.ErrNoRows) {
+		if inv := s.trackedBy(ctx, id); inv != nil && inv.GetTenantId() == s.tenant {
+			return inv, nil
+		}
+	}
+	if err != nil {
+		return nil, notFound(err, "invocation %q not found", id)
+	}
+	return invocationProto(row), nil
 }
 
 // ListInvocations pages through invocations, newest first, optionally
@@ -69,21 +86,19 @@ func (s *Service) ListInvocations(ctx context.Context, req *connect.Request[func
 	return connect.NewResponse(resp), nil
 }
 
-// TailInvocations streams invocation transitions until the client goes
-// away. With should_replay, every active invocation is sent first.
+// TailInvocations streams invocation transitions, from every server, until
+// the client goes away. With should_replay, every active invocation is sent
+// first.
 func (s *Service) TailInvocations(ctx context.Context, req *connect.Request[functionsv1.TailInvocationsRequest], stream *connect.ServerStream[functionsv1.TailInvocationsResponse]) error {
-	sub := s.events.subscribe(req.Msg.GetFunctionId())
-	defer s.events.unsubscribe(sub)
-
 	if req.Msg.GetShouldReplay() {
-		active, err := s.store.ListActiveInvocations(ctx, sqlcgen.ListActiveInvocationsParams{
-			TenantID: s.tenant, FunctionID: nullUUID(req.Msg.GetFunctionId()),
-		})
+		active, err := s.trackedAnywhere(ctx, req.Msg.GetFunctionId())
 		if err != nil {
-			return connect.NewError(connect.CodeInternal, err)
+			return connect.NewError(connect.CodeUnavailable, err)
 		}
-		for _, row := range active {
-			inv := invocationProto(row)
+		for _, inv := range active {
+			if terminal(inv.GetStatus()) || inv.GetTenantId() != s.tenant {
+				continue
+			}
 			if err := stream.Send(&functionsv1.TailInvocationsResponse{
 				Invocation: inv, EventType: eventType(inv.GetStatus()), Replay: true, EmittedAt: inv.GetCreatedAt(),
 			}); err != nil {
@@ -91,15 +106,12 @@ func (s *Service) TailInvocations(ctx context.Context, req *connect.Request[func
 			}
 		}
 	}
-
-	for {
-		select {
-		case <-ctx.Done():
+	return s.tail(ctx, req.Msg.GetFunctionId(), func(inv *functionsv1.Invocation) error {
+		if inv.GetTenantId() != s.tenant {
 			return nil
-		case ev := <-sub.ch:
-			if err := stream.Send(ev); err != nil {
-				return err
-			}
 		}
-	}
+		return stream.Send(&functionsv1.TailInvocationsResponse{
+			Invocation: inv, EventType: eventType(inv.GetStatus()), EmittedAt: time.Now().UnixMilli(),
+		})
+	})
 }
