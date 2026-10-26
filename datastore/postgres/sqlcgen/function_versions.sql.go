@@ -44,6 +44,54 @@ func (q *Queries) ClaimFunctionVersionBuild(ctx context.Context, id string) (*Fu
 	return &i, err
 }
 
+const claimStaleFunctionVersionBuilds = `-- name: ClaimStaleFunctionVersionBuilds :many
+UPDATE function_versions v SET build_started_at = now()
+FROM functions f
+WHERE f.id = v.function_id AND NOT f.is_deleted
+  AND v.status = 'building' AND coalesce(v.build_started_at, v.created_at) < now() - $1::interval
+RETURNING v.id, v.tenant_id, v.function_id, v.version, v.spec, v.status, v.status_message, v.image_digest, v.rootfs_bytes, v.artifact_id, v.artifact, v.build_log, v.build_started_at, v.build_ended_at, v.created_by_user_id, v.created_at
+`
+
+// Takes over builds whose server is gone: never claimed, or claimed longer
+// ago than a build may run. The new build_started_at fences the old
+// builder's result.
+func (q *Queries) ClaimStaleFunctionVersionBuilds(ctx context.Context, stale pgtype.Interval) ([]*FunctionVersion, error) {
+	rows, err := q.db.Query(ctx, claimStaleFunctionVersionBuilds, stale)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []*FunctionVersion
+	for rows.Next() {
+		var i FunctionVersion
+		if err := rows.Scan(
+			&i.ID,
+			&i.TenantID,
+			&i.FunctionID,
+			&i.Version,
+			&i.Spec,
+			&i.Status,
+			&i.StatusMessage,
+			&i.ImageDigest,
+			&i.RootfsBytes,
+			&i.ArtifactID,
+			&i.Artifact,
+			&i.BuildLog,
+			&i.BuildStartedAt,
+			&i.BuildEndedAt,
+			&i.CreatedByUserID,
+			&i.CreatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, &i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const countFunctionVersions = `-- name: CountFunctionVersions :one
 SELECT count(*) FROM function_versions WHERE function_id = $1
 `
@@ -253,11 +301,13 @@ func (q *Queries) GetFunctionVersionByArtifact(ctx context.Context, arg GetFunct
 }
 
 const listCurrentFunctionVersions = `-- name: ListCurrentFunctionVersions :many
-SELECT DISTINCT ON (function_id) id, tenant_id, function_id, version, spec, status, status_message, image_digest, rootfs_bytes, artifact_id, artifact, build_log, build_started_at, build_ended_at, created_by_user_id, created_at FROM function_versions
-WHERE status = 'ready'
-ORDER BY function_id, version DESC
+SELECT DISTINCT ON (v.function_id) v.id, v.tenant_id, v.function_id, v.version, v.spec, v.status, v.status_message, v.image_digest, v.rootfs_bytes, v.artifact_id, v.artifact, v.build_log, v.build_started_at, v.build_ended_at, v.created_by_user_id, v.created_at FROM function_versions v
+JOIN functions f ON f.id = v.function_id AND NOT f.is_deleted
+WHERE v.status = 'ready'
+ORDER BY v.function_id, v.version DESC
 `
 
+// The current version of every live function: what hosts should serve.
 func (q *Queries) ListCurrentFunctionVersions(ctx context.Context) ([]*FunctionVersion, error) {
 	rows, err := q.db.Query(ctx, listCurrentFunctionVersions)
 	if err != nil {
