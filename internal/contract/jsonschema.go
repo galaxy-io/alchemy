@@ -45,7 +45,7 @@ func compileSchema(doc *structpb.Struct) (*jsonschema.Schema, error) {
 func (c *jsonSchemaContract) EncodeInput(in []byte) (*Input, []*functionsv1.ContractViolation, error) {
 	var v any
 	if err := json.Unmarshal(in, &v); err != nil {
-		return nil, nil, fmt.Errorf("input is not JSON: %w", err)
+		return nil, []*functionsv1.ContractViolation{{Message: fmt.Sprintf("input is not a JSON value: %v", err)}}, nil
 	}
 	if violations := validate(c.input, v); violations != nil {
 		return nil, violations, nil

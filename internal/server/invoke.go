@@ -15,7 +15,6 @@ import (
 	hostv1 "github.com/galaxy-io/alchemy/api/host/v1"
 	"github.com/galaxy-io/alchemy/datastore/postgres/sqlcgen"
 	"github.com/galaxy-io/alchemy/internal/bus"
-	"github.com/galaxy-io/alchemy/internal/contract"
 	"github.com/galaxy-io/alchemy/internal/logs"
 )
 
@@ -23,12 +22,13 @@ import (
 var errNoHosts = errors.New("no host is available")
 
 // Invoke runs one version against one input and returns its result. Every
-// accepted call becomes an Invocation this server holds while it moves
-// through PENDING, STARTING, RUNNING and one terminal status; STARTING and
-// RUNNING arrive from the host as events, the terminal state with its
-// reply. Nothing is written while it runs: the host publishes its record
-// when it ends, and this server publishes one only when its verdict differs
-// from the host's, or no host ran it.
+// call becomes an Invocation this server holds while it moves through
+// PENDING, STARTING, RUNNING and one terminal status; STARTING and RUNNING
+// arrive from the host as events, the terminal state with its reply. The
+// payload is opaque here: the host checks it against the contract, before
+// it spends a slot on the input and after the function wrote the output.
+// Nothing is written while it runs: the host publishes its record when it
+// ends, and this server publishes one only when no host took it.
 func (s *Service) Invoke(ctx context.Context, req *connect.Request[functionsv1.InvokeRequest]) (*connect.Response[functionsv1.InvokeResponse], error) {
 	start := time.Now()
 
@@ -36,32 +36,23 @@ func (s *Service) Invoke(ctx context.Context, req *connect.Request[functionsv1.I
 	if err != nil {
 		return nil, err
 	}
-
-	// Validate before spending any compute, and before there is a record:
-	// a rejected call is the caller's mistake, not an invocation.
 	raw := req.Msg.GetInput()
 	if len(raw) > s.cfg.MaxPayloadBytes {
 		return nil, connect.NewError(connect.CodeInvalidArgument,
 			fmt.Errorf("input is %d bytes; the limit is %d", len(raw), s.cfg.MaxPayloadBytes))
-	}
-	input, violations, err := cv.contract.EncodeInput(raw)
-	if err != nil {
-		return nil, connect.NewError(connect.CodeInternal, fmt.Errorf("encode input: %w", err))
-	}
-	if len(violations) > 0 {
-		return nil, inputViolation(violations)
 	}
 
 	timeout := time.Duration(cv.spec.GetTimeoutMs()) * time.Millisecond
 	inv := s.newInvocation(cv, int64(len(raw)))
 	accepted := inv.accepted
 	out, err := s.invokeOnHost(ctx, inv, cv, &hostv1.InvokeRequest{
-		Invocation:   accepted,
-		Artifact:     cv.artifact,
-		Input:        input.Wire,
-		TimeoutMs:    timeout.Milliseconds(),
-		LogKey:       logs.Key(accepted.GetTenantId(), accepted.GetFunctionId(), time.UnixMilli(accepted.GetCreatedAt()), accepted.GetId()),
-		StateSubject: bus.ServerStateSubject(s.cfg.Name),
+		Invocation:     accepted,
+		Artifact:       cv.artifact,
+		Input:          raw,
+		TimeoutMs:      timeout.Milliseconds(),
+		LogKey:         logs.Key(accepted.GetTenantId(), accepted.GetFunctionId(), time.UnixMilli(accepted.GetCreatedAt()), accepted.GetId()),
+		StateSubject:   bus.ServerStateSubject(s.cfg.Name),
+		MaxOutputBytes: int64(s.cfg.MaxPayloadBytes),
 	}, timeout)
 	if err != nil {
 		if ctx.Err() != nil {
@@ -75,6 +66,10 @@ func (s *Service) Invoke(ctx context.Context, req *connect.Request[functionsv1.I
 		inv.errored(e.GetMessage())
 		return nil, connect.NewError(hostCode(e.GetCode()), errors.New(e.GetMessage()))
 	}
+	if fe := out.GetFunctionError(); fe.GetKind() == functionsv1.FunctionErrorKind_FUNCTION_ERROR_KIND_INPUT_INVALID {
+		inv.rejected(fe)
+		return nil, inputViolation(fe.GetViolations())
+	}
 
 	resp := &functionsv1.InvokeResponse{
 		InvocationId: accepted.GetId(),
@@ -86,7 +81,7 @@ func (s *Service) Invoke(ctx context.Context, req *connect.Request[functionsv1.I
 			TotalUs:   time.Since(start).Microseconds(),
 		},
 	}
-	s.setResult(resp, cv, input, out)
+	setResult(resp, out)
 	inv.finished(resp, out)
 	return connect.NewResponse(resp), nil
 }
@@ -223,39 +218,14 @@ func (s *Service) resolve(ctx context.Context, functionID string, n int64) (*com
 	return cv, nil
 }
 
-// setResult maps the supervisor's answer onto the response, enforcing the
-// output side of the contract.
-func (s *Service) setResult(resp *functionsv1.InvokeResponse, cv *compiledVersion, input *contract.Input, out *hostv1.InvokeResponse) {
+// setResult maps the host's answer, already checked against the contract,
+// onto the response.
+func setResult(resp *functionsv1.InvokeResponse, out *hostv1.InvokeResponse) {
 	if fe := out.GetFunctionError(); fe != nil {
 		resp.Result = &functionsv1.InvokeResponse_Error{Error: fe}
 		return
 	}
-
-	raw := out.GetOutput()
-	invalid := functionsv1.FunctionErrorKind_FUNCTION_ERROR_KIND_OUTPUT_INVALID
-	if len(raw) > s.cfg.MaxPayloadBytes {
-		resp.Result = functionError(invalid,
-			fmt.Sprintf("output is %d bytes; the limit is %d", len(raw), s.cfg.MaxPayloadBytes))
-		return
-	}
-	checked, violations, err := cv.contract.DecodeOutput(input, raw)
-	switch {
-	case err != nil:
-		resp.Result = functionError(invalid, fmt.Sprintf("output could not be decoded: %v", err))
-		return
-	case len(violations) > 0:
-		resp.Result = &functionsv1.InvokeResponse_Error{Error: &functionsv1.FunctionError{
-			Kind:       invalid,
-			Message:    "output violates the version's contract",
-			Violations: violations,
-		}}
-		return
-	}
-	resp.Result = &functionsv1.InvokeResponse_Output{Output: checked}
-}
-
-func functionError(kind functionsv1.FunctionErrorKind, message string) *functionsv1.InvokeResponse_Error {
-	return &functionsv1.InvokeResponse_Error{Error: &functionsv1.FunctionError{Kind: kind, Message: message}}
+	resp.Result = &functionsv1.InvokeResponse_Output{Output: out.GetOutput()}
 }
 
 // inputViolation is INVALID_ARGUMENT carrying one detail per violation.
@@ -336,8 +306,7 @@ func (i *invocation) end(fn func(*functionsv1.Invocation)) *functionsv1.Invocati
 }
 
 // finished records the caller's view of a reply from a host. The host
-// publishes its own record; this server publishes one over it only when
-// it failed the output the host returned.
+// publishes the record.
 func (i *invocation) finished(resp *functionsv1.InvokeResponse, out *hostv1.InvokeResponse) {
 	inv := i.end(func(inv *functionsv1.Invocation) {
 		inv.Stats = resp.GetStats()
@@ -352,9 +321,16 @@ func (i *invocation) finished(resp *functionsv1.InvokeResponse, out *hostv1.Invo
 		}
 	})
 	i.log.Debug("invocation finished", "status", inv.GetStatus(), "run_us", resp.GetStats().GetRunUs(), "total_us", resp.GetStats().GetTotalUs())
-	if inv != nil && resp.GetError() != nil && out.GetFunctionError() == nil {
-		i.s.publishRecord(inv)
-	}
+}
+
+// rejected records that the host turned the input away before anything
+// ran. The host publishes the record.
+func (i *invocation) rejected(fe *functionsv1.FunctionError) {
+	i.log.Debug("invocation rejected", "violations", len(fe.GetViolations()))
+	i.end(func(inv *functionsv1.Invocation) {
+		inv.Status = functionsv1.InvocationStatus_INVOCATION_STATUS_REJECTED
+		inv.Error = fe
+	})
 }
 
 // errored records a platform failure: no host produced a result, so this

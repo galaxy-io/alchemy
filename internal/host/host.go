@@ -24,6 +24,7 @@ import (
 	hostv1 "github.com/galaxy-io/alchemy/api/host/v1"
 	supervisorv1 "github.com/galaxy-io/alchemy/api/supervisor/v1"
 	"github.com/galaxy-io/alchemy/internal/bus"
+	"github.com/galaxy-io/alchemy/internal/contract"
 	"github.com/galaxy-io/alchemy/internal/driver"
 	"github.com/galaxy-io/alchemy/internal/logs"
 )
@@ -85,7 +86,8 @@ type Host struct {
 	stop       context.CancelFunc
 	tasks      sync.WaitGroup
 
-	records *recordQueue
+	records   *recordQueue
+	contracts *contractCache
 
 	mu        sync.Mutex
 	artifacts map[string]*bus.Subscription // invoke subscriptions, by artifact id
@@ -110,6 +112,7 @@ func New(cfg Config, d driver.Driver, b *bus.Bus, logBucket, artifactBucket *blo
 		startedAt:  time.Now(),
 		slots:      make(chan struct{}, cfg.MaxConcurrency),
 		records:    newRecordQueue(b, log),
+		contracts:  newContractCache(),
 		background: bg,
 		stop:       stop,
 		artifacts:  make(map[string]*bus.Subscription),
@@ -198,7 +201,7 @@ func (h *Host) handleBuild(ctx context.Context, data []byte) proto.Message {
 		h.log.Warn("build failed", "image", req.GetSpec().GetImage(), "err", err)
 		return &hostv1.BuildResponse{Result: &hostv1.BuildResponse_Error{Error: &hostv1.Error{Code: "internal", Message: err.Error()}}, BuildLog: err.Error()}
 	}
-	artifact := toProto(req.GetTenantId(), built, req.GetLayers())
+	artifact := toProto(req.GetTenantId(), built, req.GetLayers(), req.GetSpec().GetContract())
 	if err := h.serve(artifact); err != nil {
 		return buildError("internal", err)
 	}
@@ -257,6 +260,13 @@ func (h *Host) handleInvoke(ctx context.Context, data []byte) proto.Message {
 	log := h.log.With("invocation_id", id, "artifact_id", req.GetArtifact().GetId())
 	start := time.Now()
 
+	// Check the input before taking a slot: a rejected input costs no
+	// capacity, and it is the caller's mistake, so it ends here.
+	c, input, rejected := h.checkInput(req, start)
+	if rejected != nil {
+		return rejected
+	}
+
 	select {
 	case h.slots <- struct{}{}:
 		defer func() { <-h.slots }()
@@ -304,7 +314,7 @@ func (h *Host) handleInvoke(ctx context.Context, data []byte) proto.Message {
 	fnLogs := h.functionLogs(req, log)
 	out, err := instance.Invoke(runCtx, &supervisorv1.InvokeRequest{
 		InvocationId: id,
-		Input:        req.GetInput(),
+		Input:        input.Wire,
 		TimeoutMs:    timeout.Milliseconds(),
 		HostTimeMs:   time.Now().UnixMilli(),
 	}, fnLogs)
@@ -315,7 +325,7 @@ func (h *Host) handleInvoke(ctx context.Context, data []byte) proto.Message {
 		if f := out.GetFailure(); f != nil {
 			resp.Result = &hostv1.InvokeResponse_FunctionError{FunctionError: functionError(f)}
 		} else {
-			resp.Result = &hostv1.InvokeResponse_Output{Output: out.GetOutput()}
+			checkOutput(resp, c, input, out.GetOutput(), req.GetMaxOutputBytes())
 		}
 		resp.RunUs = cmpNonZero(out.GetRunUs(), time.Since(acquired).Microseconds())
 	case errors.Is(runCtx.Err(), context.DeadlineExceeded):
@@ -332,6 +342,55 @@ func (h *Host) handleInvoke(ctx context.Context, data []byte) proto.Message {
 	log.Debug("invocation finished", "instance_id", instance.ID(), "start_kind", startKind, "acquire_us", acquireUs, "run_us", resp.GetRunUs())
 	h.records.add(record(req.GetInvocation(), resp, start, acquired))
 	return resp
+}
+
+// checkInput compiles the artifact's contract and checks the input against
+// it. A rejection is the reply to send, already recorded; nothing ran.
+func (h *Host) checkInput(req *hostv1.InvokeRequest, start time.Time) (contract.Contract, *contract.Input, proto.Message) {
+	c, err := h.contracts.get(req.GetArtifact().GetContract())
+	if err != nil {
+		return nil, nil, invokeError("failed_precondition", fmt.Errorf("compile contract: %w", err))
+	}
+	input, violations, err := c.EncodeInput(req.GetInput())
+	if err != nil {
+		return nil, nil, invokeError("internal", fmt.Errorf("encode input: %w", err))
+	}
+	if len(violations) == 0 {
+		return c, input, nil
+	}
+	resp := &hostv1.InvokeResponse{Result: &hostv1.InvokeResponse_FunctionError{FunctionError: &functionsv1.FunctionError{
+		Kind:       functionsv1.FunctionErrorKind_FUNCTION_ERROR_KIND_INPUT_INVALID,
+		Message:    "input violates the version's input schema",
+		Violations: violations,
+	}}}
+	h.records.add(record(req.GetInvocation(), resp, start, time.Time{}))
+	return nil, nil, resp
+}
+
+// checkOutput sets resp's result from raw, enforcing the output side of the
+// contract and the size limit (0: unbounded). What it sets is what the
+// caller receives.
+func checkOutput(resp *hostv1.InvokeResponse, c contract.Contract, input *contract.Input, raw []byte, maxBytes int64) {
+	fail := func(message string, violations []*functionsv1.ContractViolation) {
+		resp.Result = &hostv1.InvokeResponse_FunctionError{FunctionError: &functionsv1.FunctionError{
+			Kind:       functionsv1.FunctionErrorKind_FUNCTION_ERROR_KIND_OUTPUT_INVALID,
+			Message:    message,
+			Violations: violations,
+		}}
+	}
+	if maxBytes > 0 && int64(len(raw)) > maxBytes {
+		fail(fmt.Sprintf("output is %d bytes; the limit is %d", len(raw), maxBytes), nil)
+		return
+	}
+	checked, violations, err := c.DecodeOutput(input, raw)
+	switch {
+	case err != nil:
+		fail(fmt.Sprintf("output could not be decoded: %v", err), nil)
+	case len(violations) > 0:
+		fail("output violates the version's contract", violations)
+	default:
+		resp.Result = &hostv1.InvokeResponse_Output{Output: checked}
+	}
 }
 
 // functionError is a supervisor failure as the caller sees it.
@@ -598,7 +657,9 @@ func (h *Host) handleInstances(context.Context, []byte) proto.Message {
 	h.mu.Unlock()
 	resp := &hostv1.ListInstancesResponse{}
 	for _, live := range all {
-		resp.Instances = append(resp.Instances, live.proto())
+		in := live.proto()
+		in.Host = h.cfg.Name
+		resp.Instances = append(resp.Instances, in)
 	}
 	sort.Slice(resp.Instances, func(i, j int) bool { return resp.Instances[i].GetStartedAt() < resp.Instances[j].GetStartedAt() })
 	return resp

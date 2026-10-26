@@ -223,9 +223,8 @@ func (s *Service) build(v *sqlcgen.FunctionVersion) {
 	log := s.log.With("function_id", v.FunctionID, "version", v.Version)
 
 	spec, err := decodeSpec(v.Spec)
-	var c contract.Contract
 	if err == nil {
-		c, err = contract.Compile(spec.GetContract())
+		_, err = contract.Compile(spec.GetContract())
 	}
 	var artifact *hostv1.Artifact
 	var buildLog string
@@ -262,7 +261,7 @@ func (s *Service) build(v *sqlcgen.FunctionVersion) {
 	_ = s.store.TouchFunction(context.WithoutCancel(ctx), v.FunctionID)
 	if artifact != nil {
 		s.mu.Lock()
-		s.versions[v.ID] = &compiledVersion{row: row, spec: spec, contract: c, artifact: artifact}
+		s.versions[v.ID] = &compiledVersion{row: row, spec: spec, artifact: artifact}
 		s.mu.Unlock()
 	}
 }

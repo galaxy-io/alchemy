@@ -22,15 +22,16 @@ const (
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
 
-// Artifact is everything a host needs to start an instance, resolved at
+// Artifact is everything a host needs to run an invocation, resolved at
 // build time so the spec is never consulted again. The server stores it on
 // the version and sends it back verbatim with every invoke.
 //
 // id keys instances and the invoke subject: it hashes everything that makes
 // two instances interchangeable, including the tenant, so two functions with
-// the same image but different env never share a warm instance. The rootfs
-// cache is keyed by the image digest and the layers' digests alone, since
-// those are content-addressed.
+// the same image but different env never share a warm instance. The contract
+// is not in it: an instance can run any input. The rootfs cache is keyed by
+// the image digest and the layers' digests alone, since those are
+// content-addressed.
 type Artifact struct {
 	state    protoimpl.MessageState `protogen:"open.v1"`
 	Id       string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
@@ -47,7 +48,9 @@ type Artifact struct {
 	Vcpus       uint32                `protobuf:"varint,10,opt,name=vcpus,proto3" json:"vcpus,omitempty"`
 	MemoryMib   uint32                `protobuf:"varint,11,opt,name=memory_mib,json=memoryMib,proto3" json:"memory_mib,omitempty"`
 	// layers were extracted over the image, in order.
-	Layers        []*Layer `protobuf:"bytes,12,rep,name=layers,proto3" json:"layers,omitempty"`
+	Layers []*Layer `protobuf:"bytes,12,rep,name=layers,proto3" json:"layers,omitempty"`
+	// contract is what the host checks every input and output against.
+	Contract      *v1.Contract `protobuf:"bytes,13,opt,name=contract,proto3" json:"contract,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -162,6 +165,13 @@ func (x *Artifact) GetMemoryMib() uint32 {
 func (x *Artifact) GetLayers() []*Layer {
 	if x != nil {
 		return x.Layers
+	}
+	return nil
+}
+
+func (x *Artifact) GetContract() *v1.Contract {
+	if x != nil {
+		return x.Contract
 	}
 	return nil
 }
@@ -430,8 +440,9 @@ func (*BuildResponse_Artifact) isBuildResponse_Result() {}
 
 func (*BuildResponse_Error) isBuildResponse_Result() {}
 
-// InvokeRequest runs one input, already validated by the server, through an
-// instance of artifact. The host decides how the instance is obtained.
+// InvokeRequest runs one input through an instance of artifact. The host
+// checks the input against the artifact's contract before it takes a slot,
+// and the output after the run. It decides how the instance is obtained.
 type InvokeRequest struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// invocation is the accepted invocation as the server knows it: its id,
@@ -446,9 +457,12 @@ type InvokeRequest struct {
 	LogKey string `protobuf:"bytes,5,opt,name=log_key,json=logKey,proto3" json:"log_key,omitempty"`
 	// state_subject is where the host publishes InvocationEvents for this
 	// invocation: the requesting server's own subject.
-	StateSubject  string `protobuf:"bytes,6,opt,name=state_subject,json=stateSubject,proto3" json:"state_subject,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	StateSubject string `protobuf:"bytes,6,opt,name=state_subject,json=stateSubject,proto3" json:"state_subject,omitempty"`
+	// max_output_bytes bounds the function's output; past it the output is
+	// invalid.
+	MaxOutputBytes int64 `protobuf:"varint,7,opt,name=max_output_bytes,json=maxOutputBytes,proto3" json:"max_output_bytes,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
 }
 
 func (x *InvokeRequest) Reset() {
@@ -523,10 +537,17 @@ func (x *InvokeRequest) GetStateSubject() string {
 	return ""
 }
 
-// InvokeResponse is returned whenever an instance ran the input, including
-// when the function failed. output is raw: the server validates it against
-// the contract. error means no instance ran it (host at capacity, boot
-// failed) and carries nothing else.
+func (x *InvokeRequest) GetMaxOutputBytes() int64 {
+	if x != nil {
+		return x.MaxOutputBytes
+	}
+	return 0
+}
+
+// InvokeResponse is returned whenever the host took the input, including
+// when it rejected it or the function failed. output has been checked
+// against the contract. error means the host could not take it (at
+// capacity, boot failed) and carries nothing else.
 type InvokeResponse struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// Types that are valid to be assigned to Result:
@@ -1141,7 +1162,7 @@ var File_host_v1_host_proto protoreflect.FileDescriptor
 
 const file_host_v1_host_proto_rawDesc = "" +
 	"\n" +
-	"\x12host/v1/host.proto\x12\ahost.v1\x1a\x19functions/v1/common.proto\x1a\x1cfunctions/v1/functions.proto\x1a\x17functions/v1/host.proto\x1a\x1efunctions/v1/invocations.proto\"\xbe\x03\n" +
+	"\x12host/v1/host.proto\x12\ahost.v1\x1a\x19functions/v1/common.proto\x1a\x1cfunctions/v1/functions.proto\x1a\x17functions/v1/host.proto\x1a\x1efunctions/v1/invocations.proto\"\xf2\x03\n" +
 	"\bArtifact\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x1b\n" +
 	"\ttenant_id\x18\x02 \x01(\tR\btenantId\x12\x14\n" +
@@ -1157,7 +1178,8 @@ const file_host_v1_host_proto_rawDesc = "" +
 	" \x01(\rR\x05vcpus\x12\x1d\n" +
 	"\n" +
 	"memory_mib\x18\v \x01(\rR\tmemoryMib\x12&\n" +
-	"\x06layers\x18\f \x03(\v2\x0e.host.v1.LayerR\x06layers\x1a6\n" +
+	"\x06layers\x18\f \x03(\v2\x0e.host.v1.LayerR\x06layers\x122\n" +
+	"\bcontract\x18\r \x01(\v2\x16.functions.v1.ContractR\bcontract\x1a6\n" +
 	"\bEnvEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
 	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"1\n" +
@@ -1175,7 +1197,7 @@ const file_host_v1_host_proto_rawDesc = "" +
 	"\bartifact\x18\x01 \x01(\v2\x11.host.v1.ArtifactH\x00R\bartifact\x12&\n" +
 	"\x05error\x18\x02 \x01(\v2\x0e.host.v1.ErrorH\x00R\x05error\x12\x1b\n" +
 	"\tbuild_log\x18\x03 \x01(\tR\bbuildLogB\b\n" +
-	"\x06result\"\xeb\x01\n" +
+	"\x06result\"\x95\x02\n" +
 	"\rInvokeRequest\x128\n" +
 	"\n" +
 	"invocation\x18\x01 \x01(\v2\x18.functions.v1.InvocationR\n" +
@@ -1185,7 +1207,8 @@ const file_host_v1_host_proto_rawDesc = "" +
 	"\n" +
 	"timeout_ms\x18\x04 \x01(\x03R\ttimeoutMs\x12\x17\n" +
 	"\alog_key\x18\x05 \x01(\tR\x06logKey\x12#\n" +
-	"\rstate_subject\x18\x06 \x01(\tR\fstateSubject\"\xb1\x02\n" +
+	"\rstate_subject\x18\x06 \x01(\tR\fstateSubject\x12(\n" +
+	"\x10max_output_bytes\x18\a \x01(\x03R\x0emaxOutputBytes\"\xb1\x02\n" +
 	"\x0eInvokeResponse\x12\x18\n" +
 	"\x06output\x18\x01 \x01(\fH\x00R\x06output\x12D\n" +
 	"\x0efunction_error\x18\x02 \x01(\v2\x1b.functions.v1.FunctionErrorH\x00R\rfunctionError\x12&\n" +
@@ -1259,39 +1282,41 @@ var file_host_v1_host_proto_goTypes = []any{
 	(*InvocationRecords)(nil),         // 16: host.v1.InvocationRecords
 	nil,                               // 17: host.v1.Artifact.EnvEntry
 	(v1.InvocationProtocol)(0),        // 18: functions.v1.InvocationProtocol
-	(*v1.FunctionSpec)(nil),           // 19: functions.v1.FunctionSpec
-	(*v1.Invocation)(nil),             // 20: functions.v1.Invocation
-	(*v1.FunctionError)(nil),          // 21: functions.v1.FunctionError
-	(v1.StartKind)(0),                 // 22: functions.v1.StartKind
-	(v1.InvocationStatus)(0),          // 23: functions.v1.InvocationStatus
-	(*v1.Host)(nil),                   // 24: functions.v1.Host
-	(*v1.Instance)(nil),               // 25: functions.v1.Instance
+	(*v1.Contract)(nil),               // 19: functions.v1.Contract
+	(*v1.FunctionSpec)(nil),           // 20: functions.v1.FunctionSpec
+	(*v1.Invocation)(nil),             // 21: functions.v1.Invocation
+	(*v1.FunctionError)(nil),          // 22: functions.v1.FunctionError
+	(v1.StartKind)(0),                 // 23: functions.v1.StartKind
+	(v1.InvocationStatus)(0),          // 24: functions.v1.InvocationStatus
+	(*v1.Host)(nil),                   // 25: functions.v1.Host
+	(*v1.Instance)(nil),               // 26: functions.v1.Instance
 }
 var file_host_v1_host_proto_depIdxs = []int32{
 	17, // 0: host.v1.Artifact.env:type_name -> host.v1.Artifact.EnvEntry
 	18, // 1: host.v1.Artifact.protocol:type_name -> functions.v1.InvocationProtocol
 	1,  // 2: host.v1.Artifact.layers:type_name -> host.v1.Layer
-	19, // 3: host.v1.BuildRequest.spec:type_name -> functions.v1.FunctionSpec
-	1,  // 4: host.v1.BuildRequest.layers:type_name -> host.v1.Layer
-	0,  // 5: host.v1.BuildResponse.artifact:type_name -> host.v1.Artifact
-	2,  // 6: host.v1.BuildResponse.error:type_name -> host.v1.Error
-	20, // 7: host.v1.InvokeRequest.invocation:type_name -> functions.v1.Invocation
-	0,  // 8: host.v1.InvokeRequest.artifact:type_name -> host.v1.Artifact
-	21, // 9: host.v1.InvokeResponse.function_error:type_name -> functions.v1.FunctionError
-	2,  // 10: host.v1.InvokeResponse.error:type_name -> host.v1.Error
-	22, // 11: host.v1.InvokeResponse.start_kind:type_name -> functions.v1.StartKind
-	23, // 12: host.v1.InvocationEvent.status:type_name -> functions.v1.InvocationStatus
-	22, // 13: host.v1.InvocationEvent.start_kind:type_name -> functions.v1.StartKind
-	24, // 14: host.v1.DescribeResponse.host:type_name -> functions.v1.Host
-	25, // 15: host.v1.ListInstancesResponse.instances:type_name -> functions.v1.Instance
-	24, // 16: host.v1.Heartbeat.host:type_name -> functions.v1.Host
-	20, // 17: host.v1.ActiveInvocationsResponse.invocations:type_name -> functions.v1.Invocation
-	20, // 18: host.v1.InvocationRecords.invocations:type_name -> functions.v1.Invocation
-	19, // [19:19] is the sub-list for method output_type
-	19, // [19:19] is the sub-list for method input_type
-	19, // [19:19] is the sub-list for extension type_name
-	19, // [19:19] is the sub-list for extension extendee
-	0,  // [0:19] is the sub-list for field type_name
+	19, // 3: host.v1.Artifact.contract:type_name -> functions.v1.Contract
+	20, // 4: host.v1.BuildRequest.spec:type_name -> functions.v1.FunctionSpec
+	1,  // 5: host.v1.BuildRequest.layers:type_name -> host.v1.Layer
+	0,  // 6: host.v1.BuildResponse.artifact:type_name -> host.v1.Artifact
+	2,  // 7: host.v1.BuildResponse.error:type_name -> host.v1.Error
+	21, // 8: host.v1.InvokeRequest.invocation:type_name -> functions.v1.Invocation
+	0,  // 9: host.v1.InvokeRequest.artifact:type_name -> host.v1.Artifact
+	22, // 10: host.v1.InvokeResponse.function_error:type_name -> functions.v1.FunctionError
+	2,  // 11: host.v1.InvokeResponse.error:type_name -> host.v1.Error
+	23, // 12: host.v1.InvokeResponse.start_kind:type_name -> functions.v1.StartKind
+	24, // 13: host.v1.InvocationEvent.status:type_name -> functions.v1.InvocationStatus
+	23, // 14: host.v1.InvocationEvent.start_kind:type_name -> functions.v1.StartKind
+	25, // 15: host.v1.DescribeResponse.host:type_name -> functions.v1.Host
+	26, // 16: host.v1.ListInstancesResponse.instances:type_name -> functions.v1.Instance
+	25, // 17: host.v1.Heartbeat.host:type_name -> functions.v1.Host
+	21, // 18: host.v1.ActiveInvocationsResponse.invocations:type_name -> functions.v1.Invocation
+	21, // 19: host.v1.InvocationRecords.invocations:type_name -> functions.v1.Invocation
+	20, // [20:20] is the sub-list for method output_type
+	20, // [20:20] is the sub-list for method input_type
+	20, // [20:20] is the sub-list for extension type_name
+	20, // [20:20] is the sub-list for extension extendee
+	0,  // [0:20] is the sub-list for field type_name
 }
 
 func init() { file_host_v1_host_proto_init() }

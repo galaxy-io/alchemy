@@ -55,6 +55,7 @@ export const INVOCATION_STATUS_TO_LABEL_MAP: Record<InvocationStatus, string> = 
   [InvocationStatus.FAILED]: "Failed",
   [InvocationStatus.ERRORED]: "Errored",
   [InvocationStatus.CANCELED]: "Canceled",
+  [InvocationStatus.REJECTED]: "Rejected",
 };
 
 export const INVOCATION_STATUS_TO_HUE_MAP: Record<InvocationStatus, RoleColor | undefined> = {
@@ -66,6 +67,7 @@ export const INVOCATION_STATUS_TO_HUE_MAP: Record<InvocationStatus, RoleColor | 
   [InvocationStatus.FAILED]: "error",
   [InvocationStatus.ERRORED]: "warning",
   [InvocationStatus.CANCELED]: undefined,
+  [InvocationStatus.REJECTED]: "warning",
 };
 
 export const INVOCATION_STATUS_TO_CHART_PALETTE_MAP: Record<InvocationStatus, ChartPalette> = {
@@ -77,6 +79,7 @@ export const INVOCATION_STATUS_TO_CHART_PALETTE_MAP: Record<InvocationStatus, Ch
   [InvocationStatus.FAILED]: ChartPalette.ERROR,
   [InvocationStatus.ERRORED]: ChartPalette.WARNING,
   [InvocationStatus.CANCELED]: ChartPalette.SECONDARY,
+  [InvocationStatus.REJECTED]: ChartPalette.ORANGE,
 };
 
 export const INVOCATION_STATUS_TO_WIRE_TOKEN_MAP: Record<InvocationStatus, string> = {
@@ -88,6 +91,7 @@ export const INVOCATION_STATUS_TO_WIRE_TOKEN_MAP: Record<InvocationStatus, strin
   [InvocationStatus.FAILED]: "failed",
   [InvocationStatus.ERRORED]: "errored",
   [InvocationStatus.CANCELED]: "canceled",
+  [InvocationStatus.REJECTED]: "rejected",
 };
 
 export const LIVE_INVOCATION_STATUSES = new Set<InvocationStatus>([
@@ -136,6 +140,7 @@ export const FUNCTION_ERROR_KIND_TO_LABEL_MAP: Record<FunctionErrorKind, string>
   [FunctionErrorKind.CRASHED]: "Crashed",
   [FunctionErrorKind.TIMEOUT]: "Timed out",
   [FunctionErrorKind.OUTPUT_INVALID]: "Output invalid",
+  [FunctionErrorKind.INPUT_INVALID]: "Input invalid",
 };
 
 export const INVOCATIONS_TABLE_COLUMN_WIDTH_STATUS = 140;

@@ -36,6 +36,9 @@ const (
 	// OUTPUT_INVALID: the function returned a value that violates its own
 	// output schema.
 	FunctionErrorKind_FUNCTION_ERROR_KIND_OUTPUT_INVALID FunctionErrorKind = 4
+	// INPUT_INVALID: the caller's input violates the input schema; the
+	// function never ran.
+	FunctionErrorKind_FUNCTION_ERROR_KIND_INPUT_INVALID FunctionErrorKind = 5
 )
 
 // Enum value maps for FunctionErrorKind.
@@ -46,6 +49,7 @@ var (
 		2: "FUNCTION_ERROR_KIND_CRASHED",
 		3: "FUNCTION_ERROR_KIND_TIMEOUT",
 		4: "FUNCTION_ERROR_KIND_OUTPUT_INVALID",
+		5: "FUNCTION_ERROR_KIND_INPUT_INVALID",
 	}
 	FunctionErrorKind_value = map[string]int32{
 		"FUNCTION_ERROR_KIND_UNSPECIFIED":    0,
@@ -53,6 +57,7 @@ var (
 		"FUNCTION_ERROR_KIND_CRASHED":        2,
 		"FUNCTION_ERROR_KIND_TIMEOUT":        3,
 		"FUNCTION_ERROR_KIND_OUTPUT_INVALID": 4,
+		"FUNCTION_ERROR_KIND_INPUT_INVALID":  5,
 	}
 )
 
@@ -144,7 +149,7 @@ type InvocationStatus int32
 
 const (
 	InvocationStatus_INVOCATION_STATUS_UNSPECIFIED InvocationStatus = 0
-	// PENDING: accepted and validated, waiting for a instance slot.
+	// PENDING: accepted, waiting for a host to take it.
 	InvocationStatus_INVOCATION_STATUS_PENDING InvocationStatus = 1
 	// STARTING: a instance is booting or being restored for it.
 	InvocationStatus_INVOCATION_STATUS_STARTING InvocationStatus = 2
@@ -157,6 +162,9 @@ const (
 	InvocationStatus_INVOCATION_STATUS_ERRORED InvocationStatus = 6
 	// CANCELED: the caller went away before a result.
 	InvocationStatus_INVOCATION_STATUS_CANCELED InvocationStatus = 7
+	// REJECTED: the input violated the version's contract, so nothing ran;
+	// error is set.
+	InvocationStatus_INVOCATION_STATUS_REJECTED InvocationStatus = 8
 )
 
 // Enum value maps for InvocationStatus.
@@ -170,6 +178,7 @@ var (
 		5: "INVOCATION_STATUS_FAILED",
 		6: "INVOCATION_STATUS_ERRORED",
 		7: "INVOCATION_STATUS_CANCELED",
+		8: "INVOCATION_STATUS_REJECTED",
 	}
 	InvocationStatus_value = map[string]int32{
 		"INVOCATION_STATUS_UNSPECIFIED": 0,
@@ -180,6 +189,7 @@ var (
 		"INVOCATION_STATUS_FAILED":      5,
 		"INVOCATION_STATUS_ERRORED":     6,
 		"INVOCATION_STATUS_CANCELED":    7,
+		"INVOCATION_STATUS_REJECTED":    8,
 	}
 )
 
@@ -1246,18 +1256,19 @@ const file_functions_v1_invocations_proto_rawDesc = "" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x16\n" +
 	"\x06follow\x18\x02 \x01(\bR\x06follow\"/\n" +
 	"\x19GetInvocationLogsResponse\x12\x12\n" +
-	"\x04data\x18\x01 \x01(\fR\x04data*\xc2\x01\n" +
+	"\x04data\x18\x01 \x01(\fR\x04data*\xe9\x01\n" +
 	"\x11FunctionErrorKind\x12#\n" +
 	"\x1fFUNCTION_ERROR_KIND_UNSPECIFIED\x10\x00\x12\x1e\n" +
 	"\x1aFUNCTION_ERROR_KIND_RAISED\x10\x01\x12\x1f\n" +
 	"\x1bFUNCTION_ERROR_KIND_CRASHED\x10\x02\x12\x1f\n" +
 	"\x1bFUNCTION_ERROR_KIND_TIMEOUT\x10\x03\x12&\n" +
-	"\"FUNCTION_ERROR_KIND_OUTPUT_INVALID\x10\x04*w\n" +
+	"\"FUNCTION_ERROR_KIND_OUTPUT_INVALID\x10\x04\x12%\n" +
+	"!FUNCTION_ERROR_KIND_INPUT_INVALID\x10\x05*w\n" +
 	"\tStartKind\x12\x1a\n" +
 	"\x16START_KIND_UNSPECIFIED\x10\x00\x12\x18\n" +
 	"\x14START_KIND_COLD_BOOT\x10\x01\x12\x1f\n" +
 	"\x1bSTART_KIND_SNAPSHOT_RESTORE\x10\x02\x12\x13\n" +
-	"\x0fSTART_KIND_WARM\x10\x03*\x91\x02\n" +
+	"\x0fSTART_KIND_WARM\x10\x03*\xb1\x02\n" +
 	"\x10InvocationStatus\x12!\n" +
 	"\x1dINVOCATION_STATUS_UNSPECIFIED\x10\x00\x12\x1d\n" +
 	"\x19INVOCATION_STATUS_PENDING\x10\x01\x12\x1e\n" +
@@ -1266,7 +1277,8 @@ const file_functions_v1_invocations_proto_rawDesc = "" +
 	"\x1bINVOCATION_STATUS_SUCCEEDED\x10\x04\x12\x1c\n" +
 	"\x18INVOCATION_STATUS_FAILED\x10\x05\x12\x1d\n" +
 	"\x19INVOCATION_STATUS_ERRORED\x10\x06\x12\x1e\n" +
-	"\x1aINVOCATION_STATUS_CANCELED\x10\aB\xb0\x01\n" +
+	"\x1aINVOCATION_STATUS_CANCELED\x10\a\x12\x1e\n" +
+	"\x1aINVOCATION_STATUS_REJECTED\x10\bB\xb0\x01\n" +
 	"\x10com.functions.v1B\x10InvocationsProtoP\x01Z9github.com/galaxy-io/alchemy/api/functions/v1;functionsv1\xa2\x02\x03FXX\xaa\x02\fFunctions.V1\xca\x02\fFunctions\\V1\xe2\x02\x18Functions\\V1\\GPBMetadata\xea\x02\rFunctions::V1b\x06proto3"
 
 var (

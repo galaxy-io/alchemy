@@ -22,7 +22,6 @@ import (
 	"github.com/galaxy-io/alchemy/datastore/postgres"
 	"github.com/galaxy-io/alchemy/datastore/postgres/sqlcgen"
 	"github.com/galaxy-io/alchemy/internal/bus"
-	"github.com/galaxy-io/alchemy/internal/contract"
 )
 
 // Config tunes the service's limits and defaults.
@@ -108,7 +107,6 @@ type Service struct {
 type compiledVersion struct {
 	row      *sqlcgen.FunctionVersion
 	spec     *functionsv1.FunctionSpec
-	contract contract.Contract
 	artifact *hostv1.Artifact
 }
 
@@ -177,15 +175,11 @@ func (s *Service) compiled(row *sqlcgen.FunctionVersion) (*compiledVersion, erro
 	if err != nil {
 		return nil, err
 	}
-	c, err := contract.Compile(spec.GetContract())
-	if err != nil {
-		return nil, err
-	}
 	artifact := &hostv1.Artifact{}
 	if err := protojson.Unmarshal(row.Artifact, artifact); err != nil {
 		return nil, fmt.Errorf("stored artifact: %w", err)
 	}
-	cv = &compiledVersion{row: row, spec: spec, contract: c, artifact: artifact}
+	cv = &compiledVersion{row: row, spec: spec, artifact: artifact}
 	s.mu.Lock()
 	s.versions[row.ID] = cv
 	s.mu.Unlock()

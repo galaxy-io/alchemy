@@ -27,13 +27,15 @@ const (
 )
 
 // record is the invocation as it ended: the server's half from the request,
-// completed with what the host saw.
+// completed with what the host saw. acquired is zero when nothing ran.
 func record(accepted *functionsv1.Invocation, resp *hostv1.InvokeResponse, start, acquired time.Time) *functionsv1.Invocation {
 	inv := proto.Clone(accepted).(*functionsv1.Invocation) //nolint:errcheck // Clone preserves the type
 	now := time.Now()
 	inv.InstanceId = resp.GetInstanceId()
 	inv.StartKind = resp.GetStartKind()
-	inv.StartedAt = acquired.UnixMilli()
+	if !acquired.IsZero() {
+		inv.StartedAt = acquired.UnixMilli()
+	}
 	inv.EndedAt = now.UnixMilli()
 	inv.Stats = &functionsv1.InvocationStats{
 		StartKind: resp.GetStartKind(),
@@ -41,12 +43,16 @@ func record(accepted *functionsv1.Invocation, resp *hostv1.InvokeResponse, start
 		RunUs:     resp.GetRunUs(),
 		TotalUs:   now.Sub(start).Microseconds(),
 	}
-	if fe := resp.GetFunctionError(); fe != nil {
-		inv.Status = functionsv1.InvocationStatus_INVOCATION_STATUS_FAILED
-		inv.Error = fe
-	} else {
+	switch fe := resp.GetFunctionError(); {
+	case fe == nil:
 		inv.Status = functionsv1.InvocationStatus_INVOCATION_STATUS_SUCCEEDED
 		inv.OutputBytes = int64(len(resp.GetOutput()))
+	case fe.GetKind() == functionsv1.FunctionErrorKind_FUNCTION_ERROR_KIND_INPUT_INVALID:
+		inv.Status = functionsv1.InvocationStatus_INVOCATION_STATUS_REJECTED
+		inv.Error = fe
+	default:
+		inv.Status = functionsv1.InvocationStatus_INVOCATION_STATUS_FAILED
+		inv.Error = fe
 	}
 	return inv
 }

@@ -18,6 +18,9 @@ enum FunctionErrorKind {
   // OUTPUT_INVALID: the function returned a value that violates its own
   // output schema.
   FUNCTION_ERROR_KIND_OUTPUT_INVALID = 4;
+  // INPUT_INVALID: the caller's input violates the input schema; the
+  // function never ran.
+  FUNCTION_ERROR_KIND_INPUT_INVALID = 5;
 }
 
 // StartKind is how the microVM that served an invocation came to exist.
@@ -81,7 +84,7 @@ message InvokeResponse {
 // InvocationStatus is the persisted lifecycle state of an invocation.
 enum InvocationStatus {
   INVOCATION_STATUS_UNSPECIFIED = 0;
-  // PENDING: accepted and validated, waiting for a instance slot.
+  // PENDING: accepted, waiting for a host to take it.
   INVOCATION_STATUS_PENDING = 1;
   // STARTING: a instance is booting or being restored for it.
   INVOCATION_STATUS_STARTING = 2;
@@ -94,6 +97,9 @@ enum InvocationStatus {
   INVOCATION_STATUS_ERRORED = 6;
   // CANCELED: the caller went away before a result.
   INVOCATION_STATUS_CANCELED = 7;
+  // REJECTED: the input violated the version's contract, so nothing ran;
+  // error is set.
+  INVOCATION_STATUS_REJECTED = 8;
 }
 
 // Invocation is the persisted record of one Invoke call. Lifecycle stamps

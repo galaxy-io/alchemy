@@ -74,7 +74,7 @@ CREATE TABLE function_versions (
 -- The current version of a function is its newest ready one.
 CREATE INDEX function_versions_ready_idx ON function_versions (function_id, version DESC) WHERE status = 'ready';
 
-CREATE TYPE invocation_status AS ENUM ('pending', 'starting', 'running', 'succeeded', 'failed', 'errored', 'canceled');
+CREATE TYPE invocation_status AS ENUM ('pending', 'starting', 'running', 'succeeded', 'failed', 'errored', 'canceled', 'rejected');
 CREATE TYPE start_kind AS ENUM ('cold_boot', 'snapshot_restore', 'warm');
 
 -- One row per ended invocation, written once, in batches, from the records

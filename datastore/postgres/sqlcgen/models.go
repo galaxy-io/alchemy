@@ -64,6 +64,7 @@ const (
 	InvocationStatusFailed    InvocationStatus = "failed"
 	InvocationStatusErrored   InvocationStatus = "errored"
 	InvocationStatusCanceled  InvocationStatus = "canceled"
+	InvocationStatusRejected  InvocationStatus = "rejected"
 )
 
 func (e *InvocationStatus) Scan(src interface{}) error {
