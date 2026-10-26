@@ -41,6 +41,9 @@ type Config struct {
 	// HostsPerFunction is how many hosts each function is built on and
 	// takes invocations from, when that many are live.
 	HostsPerFunction int
+	// IdempotencyWindow is how long a call's idempotency key keeps later
+	// calls with the same key from running again.
+	IdempotencyWindow time.Duration
 	// LogRetention is how long the bus keeps the latest lines of every
 	// invocation's log, for live and recent reads. The log bucket keeps all
 	// of it after that.
@@ -69,6 +72,7 @@ func DefaultConfig() Config {
 		GatherWindow:        500 * time.Millisecond,
 		HostTTL:             10 * time.Second,
 		HostsPerFunction:    3,
+		IdempotencyWindow:   24 * time.Hour,
 		LogRetention:        time.Hour,
 		LogMaxBytes:         1 << 30,
 		InvocationRetention: 24 * time.Hour,
@@ -151,6 +155,7 @@ func New(ctx context.Context, cfg Config, store *postgres.Store, b *bus.Bus, log
 	s.tasks.Go(s.heartbeat)
 	s.tasks.Go(s.record)
 	s.tasks.Go(s.reconcileHosts)
+	s.tasks.Go(s.expireKeys)
 	return s, nil
 }
 

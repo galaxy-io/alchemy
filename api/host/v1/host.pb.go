@@ -461,8 +461,11 @@ type InvokeRequest struct {
 	// max_output_bytes bounds the function's output; past it the output is
 	// invalid.
 	MaxOutputBytes int64 `protobuf:"varint,7,opt,name=max_output_bytes,json=maxOutputBytes,proto3" json:"max_output_bytes,omitempty"`
-	unknownFields  protoimpl.UnknownFields
-	sizeCache      protoimpl.SizeCache
+	// output_key, when set, is where the host keeps the checked output in the
+	// bucket, so a server can replay it for a retried call.
+	OutputKey     string `protobuf:"bytes,8,opt,name=output_key,json=outputKey,proto3" json:"output_key,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *InvokeRequest) Reset() {
@@ -542,6 +545,13 @@ func (x *InvokeRequest) GetMaxOutputBytes() int64 {
 		return x.MaxOutputBytes
 	}
 	return 0
+}
+
+func (x *InvokeRequest) GetOutputKey() string {
+	if x != nil {
+		return x.OutputKey
+	}
+	return ""
 }
 
 // InvokeResponse is returned whenever the host took the input, including
@@ -1259,7 +1269,7 @@ const file_host_v1_host_proto_rawDesc = "" +
 	"\bartifact\x18\x01 \x01(\v2\x11.host.v1.ArtifactH\x00R\bartifact\x12&\n" +
 	"\x05error\x18\x02 \x01(\v2\x0e.host.v1.ErrorH\x00R\x05error\x12\x1b\n" +
 	"\tbuild_log\x18\x03 \x01(\tR\bbuildLogB\b\n" +
-	"\x06result\"\x95\x02\n" +
+	"\x06result\"\xb4\x02\n" +
 	"\rInvokeRequest\x128\n" +
 	"\n" +
 	"invocation\x18\x01 \x01(\v2\x18.functions.v1.InvocationR\n" +
@@ -1270,7 +1280,9 @@ const file_host_v1_host_proto_rawDesc = "" +
 	"timeout_ms\x18\x04 \x01(\x03R\ttimeoutMs\x12\x17\n" +
 	"\alog_key\x18\x05 \x01(\tR\x06logKey\x12#\n" +
 	"\rstate_subject\x18\x06 \x01(\tR\fstateSubject\x12(\n" +
-	"\x10max_output_bytes\x18\a \x01(\x03R\x0emaxOutputBytes\"\xb1\x02\n" +
+	"\x10max_output_bytes\x18\a \x01(\x03R\x0emaxOutputBytes\x12\x1d\n" +
+	"\n" +
+	"output_key\x18\b \x01(\tR\toutputKey\"\xb1\x02\n" +
 	"\x0eInvokeResponse\x12\x18\n" +
 	"\x06output\x18\x01 \x01(\fH\x00R\x06output\x12D\n" +
 	"\x0efunction_error\x18\x02 \x01(\v2\x1b.functions.v1.FunctionErrorH\x00R\rfunctionError\x12&\n" +

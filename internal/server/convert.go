@@ -66,6 +66,8 @@ func invocationProto(i *sqlcgen.Invocation) *functionsv1.Invocation {
 		InputBytes:      i.InputBytes,
 		OutputBytes:     i.OutputBytes,
 		InstanceId:      i.InstanceID,
+		IdempotencyKey:  i.IdempotencyKey,
+		Host:            i.Host,
 		CreatedByUserId: i.CreatedByUserID.String,
 	}
 	if i.AcquireUs != 0 || i.RunUs != 0 || i.TotalUs != 0 {

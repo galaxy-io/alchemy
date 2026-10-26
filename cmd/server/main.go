@@ -151,6 +151,13 @@ func configure(cfg *server.Config) error {
 	}
 	hostname, _ := os.Hostname()
 	cfg.Name = envOr("SERVER_NAME", hostname)
+	if s := os.Getenv("IDEMPOTENCY_WINDOW"); s != "" {
+		d, err := time.ParseDuration(s)
+		if err != nil {
+			return fmt.Errorf("IDEMPOTENCY_WINDOW: %w", err)
+		}
+		cfg.IdempotencyWindow = d
+	}
 	if s := os.Getenv("HOSTS_PER_FUNCTION"); s != "" {
 		n, err := strconv.Atoi(s)
 		if err != nil || n < 1 {

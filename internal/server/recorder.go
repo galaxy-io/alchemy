@@ -38,8 +38,9 @@ func (s *Service) record() {
 	}
 }
 
-// writeRecords writes one fetch of records: the hosts' as new rows, then
-// the servers' over them.
+// writeRecords writes one fetch of records: the servers' first, then the
+// hosts' over them. A server records what the caller saw; a host records
+// what ran, which is the truth about the invocation when both exist.
 func (s *Service) writeRecords(ctx context.Context, recs []bus.Message) error {
 	var fromHosts, fromServers []*functionsv1.Invocation
 	for _, r := range recs {
@@ -57,7 +58,7 @@ func (s *Service) writeRecords(ctx context.Context, recs []bus.Message) error {
 	for _, batch := range []struct {
 		invs     []*functionsv1.Invocation
 		override bool
-	}{{fromHosts, false}, {fromServers, true}} {
+	}{{fromServers, false}, {fromHosts, true}} {
 		if len(batch.invs) == 0 {
 			continue
 		}
@@ -98,6 +99,8 @@ func (s *Service) insertParams(invs []*functionsv1.Invocation, override bool) sq
 		p.InputBytes = append(p.InputBytes, inv.GetInputBytes())
 		p.OutputBytes = append(p.OutputBytes, inv.GetOutputBytes())
 		p.InstanceIds = append(p.InstanceIds, inv.GetInstanceId())
+		p.IdempotencyKeys = append(p.IdempotencyKeys, inv.GetIdempotencyKey())
+		p.Hosts = append(p.Hosts, inv.GetHost())
 		p.CreatedByUserIds = append(p.CreatedByUserIds, inv.GetCreatedByUserId())
 		p.CreatedAts = append(p.CreatedAts, millis(inv.GetCreatedAt()))
 		p.StartedAts = append(p.StartedAts, millis(inv.GetStartedAt()))

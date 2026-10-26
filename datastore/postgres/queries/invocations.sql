@@ -4,7 +4,7 @@ SELECT * FROM invocations WHERE tenant_id = $1 AND id = $2;
 -- name: InsertInvocations :exec
 -- One row per element of the arrays, which all have the same length. A
 -- record of an invocation already written changes it only when override is
--- set: a server's record over a host's.
+-- set: a host's record over a server's, since the host knows what ran.
 WITH r AS (
   SELECT
     unnest(sqlc.arg('ids')::uuid[]) AS id,
@@ -21,23 +21,25 @@ WITH r AS (
     unnest(sqlc.arg('input_bytes')::bigint[]) AS input_bytes,
     unnest(sqlc.arg('output_bytes')::bigint[]) AS output_bytes,
     unnest(sqlc.arg('instance_ids')::text[]) AS instance_id,
+    unnest(sqlc.arg('idempotency_keys')::text[]) AS idempotency_key,
+    unnest(sqlc.arg('hosts')::text[]) AS host,
     unnest(sqlc.arg('created_by_user_ids')::text[]) AS created_by_user_id,
     unnest(sqlc.arg('created_ats')::timestamptz[]) AS created_at,
     unnest(sqlc.arg('started_ats')::timestamptz[]) AS started_at,
     unnest(sqlc.arg('ended_ats')::timestamptz[]) AS ended_at
 )
 INSERT INTO invocations (id, tenant_id, function_id, version, status, start_kind, acquire_us, run_us, total_us,
-                         error, platform_error, input_bytes, output_bytes, instance_id, created_by_user_id,
+                         error, platform_error, input_bytes, output_bytes, instance_id, idempotency_key, host, created_by_user_id,
                          created_at, started_at, ended_at)
 SELECT id, tenant_id, function_id, version, status::invocation_status, nullif(start_kind, '')::start_kind,
-       acquire_us, run_us, total_us, nullif(error, '')::jsonb, platform_error, input_bytes, output_bytes, instance_id,
+       acquire_us, run_us, total_us, nullif(error, '')::jsonb, platform_error, input_bytes, output_bytes, instance_id, idempotency_key, host,
        nullif(created_by_user_id, '')::uuid, created_at, started_at, ended_at
 FROM r
 ON CONFLICT (id) DO UPDATE SET
   status = excluded.status, start_kind = excluded.start_kind, acquire_us = excluded.acquire_us,
   run_us = excluded.run_us, total_us = excluded.total_us, error = excluded.error,
   platform_error = excluded.platform_error, output_bytes = excluded.output_bytes,
-  instance_id = excluded.instance_id, started_at = excluded.started_at, ended_at = excluded.ended_at
+  instance_id = excluded.instance_id, host = excluded.host, started_at = excluded.started_at, ended_at = excluded.ended_at
 WHERE sqlc.arg('override')::boolean;
 
 -- name: ListInvocations :many

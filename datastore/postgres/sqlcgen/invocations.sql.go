@@ -45,7 +45,7 @@ func (q *Queries) CountInvocations(ctx context.Context, arg CountInvocationsPara
 }
 
 const getInvocation = `-- name: GetInvocation :one
-SELECT id, tenant_id, function_id, version, status, start_kind, acquire_us, run_us, total_us, error, platform_error, input_bytes, output_bytes, instance_id, created_by_user_id, created_at, started_at, ended_at FROM invocations WHERE tenant_id = $1 AND id = $2
+SELECT id, tenant_id, function_id, version, status, start_kind, acquire_us, run_us, total_us, error, platform_error, input_bytes, output_bytes, instance_id, idempotency_key, host, created_by_user_id, created_at, started_at, ended_at FROM invocations WHERE tenant_id = $1 AND id = $2
 `
 
 type GetInvocationParams struct {
@@ -71,6 +71,8 @@ func (q *Queries) GetInvocation(ctx context.Context, arg GetInvocationParams) (*
 		&i.InputBytes,
 		&i.OutputBytes,
 		&i.InstanceID,
+		&i.IdempotencyKey,
+		&i.Host,
 		&i.CreatedByUserID,
 		&i.CreatedAt,
 		&i.StartedAt,
@@ -96,23 +98,25 @@ WITH r AS (
     unnest($13::bigint[]) AS input_bytes,
     unnest($14::bigint[]) AS output_bytes,
     unnest($15::text[]) AS instance_id,
-    unnest($16::text[]) AS created_by_user_id,
-    unnest($17::timestamptz[]) AS created_at,
-    unnest($18::timestamptz[]) AS started_at,
-    unnest($19::timestamptz[]) AS ended_at
+    unnest($16::text[]) AS idempotency_key,
+    unnest($17::text[]) AS host,
+    unnest($18::text[]) AS created_by_user_id,
+    unnest($19::timestamptz[]) AS created_at,
+    unnest($20::timestamptz[]) AS started_at,
+    unnest($21::timestamptz[]) AS ended_at
 )
 INSERT INTO invocations (id, tenant_id, function_id, version, status, start_kind, acquire_us, run_us, total_us,
-                         error, platform_error, input_bytes, output_bytes, instance_id, created_by_user_id,
+                         error, platform_error, input_bytes, output_bytes, instance_id, idempotency_key, host, created_by_user_id,
                          created_at, started_at, ended_at)
 SELECT id, tenant_id, function_id, version, status::invocation_status, nullif(start_kind, '')::start_kind,
-       acquire_us, run_us, total_us, nullif(error, '')::jsonb, platform_error, input_bytes, output_bytes, instance_id,
+       acquire_us, run_us, total_us, nullif(error, '')::jsonb, platform_error, input_bytes, output_bytes, instance_id, idempotency_key, host,
        nullif(created_by_user_id, '')::uuid, created_at, started_at, ended_at
 FROM r
 ON CONFLICT (id) DO UPDATE SET
   status = excluded.status, start_kind = excluded.start_kind, acquire_us = excluded.acquire_us,
   run_us = excluded.run_us, total_us = excluded.total_us, error = excluded.error,
   platform_error = excluded.platform_error, output_bytes = excluded.output_bytes,
-  instance_id = excluded.instance_id, started_at = excluded.started_at, ended_at = excluded.ended_at
+  instance_id = excluded.instance_id, host = excluded.host, started_at = excluded.started_at, ended_at = excluded.ended_at
 WHERE $1::boolean
 `
 
@@ -132,6 +136,8 @@ type InsertInvocationsParams struct {
 	InputBytes       []int64
 	OutputBytes      []int64
 	InstanceIds      []string
+	IdempotencyKeys  []string
+	Hosts            []string
 	CreatedByUserIds []string
 	CreatedAts       []pgtype.Timestamptz
 	StartedAts       []pgtype.Timestamptz
@@ -140,7 +146,7 @@ type InsertInvocationsParams struct {
 
 // One row per element of the arrays, which all have the same length. A
 // record of an invocation already written changes it only when override is
-// set: a server's record over a host's.
+// set: a host's record over a server's, since the host knows what ran.
 func (q *Queries) InsertInvocations(ctx context.Context, arg InsertInvocationsParams) error {
 	_, err := q.db.Exec(ctx, insertInvocations,
 		arg.Override,
@@ -158,6 +164,8 @@ func (q *Queries) InsertInvocations(ctx context.Context, arg InsertInvocationsPa
 		arg.InputBytes,
 		arg.OutputBytes,
 		arg.InstanceIds,
+		arg.IdempotencyKeys,
+		arg.Hosts,
 		arg.CreatedByUserIds,
 		arg.CreatedAts,
 		arg.StartedAts,
@@ -167,7 +175,7 @@ func (q *Queries) InsertInvocations(ctx context.Context, arg InsertInvocationsPa
 }
 
 const listInvocations = `-- name: ListInvocations :many
-SELECT id, tenant_id, function_id, version, status, start_kind, acquire_us, run_us, total_us, error, platform_error, input_bytes, output_bytes, instance_id, created_by_user_id, created_at, started_at, ended_at FROM invocations
+SELECT id, tenant_id, function_id, version, status, start_kind, acquire_us, run_us, total_us, error, platform_error, input_bytes, output_bytes, instance_id, idempotency_key, host, created_by_user_id, created_at, started_at, ended_at FROM invocations
 WHERE tenant_id = $1
   AND (cardinality($2::uuid[]) = 0 OR function_id = ANY($2::uuid[]))
   AND (cardinality($3::text[]) = 0 OR status::text = ANY($3::text[]))
@@ -222,6 +230,8 @@ func (q *Queries) ListInvocations(ctx context.Context, arg ListInvocationsParams
 			&i.InputBytes,
 			&i.OutputBytes,
 			&i.InstanceID,
+			&i.IdempotencyKey,
+			&i.Host,
 			&i.CreatedByUserID,
 			&i.CreatedAt,
 			&i.StartedAt,

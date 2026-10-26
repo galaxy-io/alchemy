@@ -175,6 +175,17 @@ type FunctionVersion struct {
 	CreatedAt       pgtype.Timestamptz
 }
 
+type IdempotencyKey struct {
+	TenantID     string
+	FunctionID   string
+	Key          string
+	InvocationID string
+	Server       string
+	Host         string
+	SentAt       pgtype.Timestamptz
+	CreatedAt    pgtype.Timestamptz
+}
+
 type Invocation struct {
 	ID              string
 	TenantID        string
@@ -190,6 +201,8 @@ type Invocation struct {
 	InputBytes      int64
 	OutputBytes     int64
 	InstanceID      string
+	IdempotencyKey  string
+	Host            string
 	CreatedByUserID pgtype.Text
 	CreatedAt       pgtype.Timestamptz
 	StartedAt       pgtype.Timestamptz

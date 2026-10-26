@@ -27,12 +27,13 @@ const (
 )
 
 // record is the invocation as it ended: the server's half from the request,
-// completed with what the host saw. acquired is zero when nothing ran.
-func record(accepted *functionsv1.Invocation, resp *hostv1.InvokeResponse, start, acquired time.Time) *functionsv1.Invocation {
+// completed with what host saw. acquired is zero when nothing ran.
+func record(host string, accepted *functionsv1.Invocation, resp *hostv1.InvokeResponse, start, acquired time.Time) *functionsv1.Invocation {
 	inv := proto.Clone(accepted).(*functionsv1.Invocation) //nolint:errcheck // Clone preserves the type
 	now := time.Now()
 	inv.InstanceId = resp.GetInstanceId()
 	inv.StartKind = resp.GetStartKind()
+	inv.Host = host
 	if !acquired.IsZero() {
 		inv.StartedAt = acquired.UnixMilli()
 	}
