@@ -38,6 +38,12 @@ type Config struct {
 	GatherWindow time.Duration
 	// HostTTL is how long a host stays listed after its last heartbeat.
 	HostTTL time.Duration
+	// HostsPerFunction is how many hosts each function is built on and
+	// takes invocations from, when that many are live.
+	HostsPerFunction int
+	// IdempotencyWindow is how long a call's idempotency key keeps later
+	// calls with the same key from running again.
+	IdempotencyWindow time.Duration
 	// LogRetention is how long the bus keeps the latest lines of every
 	// invocation's log, for live and recent reads. The log bucket keeps all
 	// of it after that.
@@ -65,6 +71,8 @@ func DefaultConfig() Config {
 		BuildTimeout:        5 * time.Minute,
 		GatherWindow:        500 * time.Millisecond,
 		HostTTL:             10 * time.Second,
+		HostsPerFunction:    3,
+		IdempotencyWindow:   24 * time.Hour,
 		LogRetention:        time.Hour,
 		LogMaxBytes:         1 << 30,
 		InvocationRetention: 24 * time.Hour,
@@ -140,6 +148,16 @@ func New(ctx context.Context, cfg Config, store *postgres.Store, b *bus.Bus, log
 		stop()
 		return nil, err
 	}
+	// A starting server has nothing in flight, so claims in its name that
+	// were never marked with a host are a previous process's, lost between
+	// claiming and sending. They are released before this name is live
+	// again, or a retry would wait on them for the whole window.
+	if n, err := store.ReleaseServerIdempotencyKeys(ctx, cfg.Name); err != nil {
+		stop()
+		return nil, fmt.Errorf("release idempotency keys: %w", err)
+	} else if n > 0 {
+		log.Info("released idempotency keys a previous process never sent", "count", n)
+	}
 	if err := s.listen(); err != nil {
 		stop()
 		return nil, err
@@ -147,6 +165,7 @@ func New(ctx context.Context, cfg Config, store *postgres.Store, b *bus.Bus, log
 	s.tasks.Go(s.heartbeat)
 	s.tasks.Go(s.record)
 	s.tasks.Go(s.reconcileHosts)
+	s.tasks.Go(s.expireKeys)
 	return s, nil
 }
 

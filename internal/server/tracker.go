@@ -61,6 +61,14 @@ func (t *invocationTracker) update(id string, fn func(*functionsv1.Invocation)) 
 	return proto.Clone(inv).(*functionsv1.Invocation) //nolint:errcheck // Clone preserves the type
 }
 
+// drop forgets an invocation that was tracked but never announced: a keyed
+// call that found its key taken.
+func (t *invocationTracker) drop(id string) {
+	t.mu.Lock()
+	delete(t.active, id)
+	t.mu.Unlock()
+}
+
 // get returns a copy of the invocation with id, in flight or recent.
 func (t *invocationTracker) get(id string) *functionsv1.Invocation {
 	t.mu.Lock()

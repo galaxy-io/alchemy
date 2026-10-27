@@ -90,11 +90,11 @@ type Host struct {
 	contracts *contractCache
 
 	mu        sync.Mutex
-	artifacts map[string]*bus.Subscription // invoke subscriptions, by artifact id
-	instances map[string]*liveInstance     // every instance, by key
-	warm      map[string][]*liveInstance   // idle instances by artifact id, most recently used last
-	draining  bool                         // shutting down: nothing more is parked
-	filling   map[string]int               // prewarm boots in flight, by artifact id
+	artifacts map[string]*hostv1.Artifact // built and ready to run, by id
+	instances map[string]*liveInstance    // every instance, by key
+	warm      map[string][]*liveInstance  // idle instances by artifact id, most recently used last
+	draining  bool                        // shutting down: nothing more is parked
+	filling   map[string]int              // prewarm boots in flight, by artifact id
 }
 
 // New returns a host that is not yet serving; Run starts it. Function logs
@@ -115,7 +115,7 @@ func New(cfg Config, d driver.Driver, b *bus.Bus, logBucket, artifactBucket *blo
 		contracts:  newContractCache(),
 		background: bg,
 		stop:       stop,
-		artifacts:  make(map[string]*bus.Subscription),
+		artifacts:  make(map[string]*hostv1.Artifact),
 		instances:  make(map[string]*liveInstance),
 		warm:       make(map[string][]*liveInstance),
 		filling:    make(map[string]int),
@@ -130,10 +130,10 @@ func (h *Host) Run(ctx context.Context) error {
 		subject, queue string
 		handler        bus.Handler
 	}{
-		// Every host builds every artifact, so any of them can serve it.
-		{bus.BuildSubject, "", h.handleBuild},
-		// The server sends builds here for artifacts this host should serve but lacks.
+		// The server places functions on hosts: it sends this host the builds
+		// and the invocations it chose it for.
 		{bus.HostBuildSubject(h.cfg.Name), "", h.handleBuild},
+		{bus.HostInvokeSubject(h.cfg.Name), "", h.handleInvoke},
 		{bus.DescribeSubject, "", h.handleDescribe},
 		{bus.InstancesSubject, "", h.handleInstances},
 	} {
@@ -158,11 +158,6 @@ func (h *Host) Run(ctx context.Context) error {
 			for _, s := range subs {
 				s.Unsubscribe()
 			}
-			h.mu.Lock()
-			for _, s := range h.artifacts {
-				s.Unsubscribe()
-			}
-			h.mu.Unlock()
 			h.drainWarm()
 			h.stop()
 			h.tasks.Wait()
@@ -172,15 +167,37 @@ func (h *Host) Run(ctx context.Context) error {
 }
 
 func (h *Host) heartbeat() {
-	h.mu.Lock()
-	ids := make([]string, 0, len(h.artifacts))
-	for id := range h.artifacts {
-		ids = append(ids, id)
-	}
-	h.mu.Unlock()
-	if err := h.bus.Publish(bus.HeartbeatSubject(h.cfg.Name), &hostv1.Heartbeat{Host: h.describe(), ArtifactIds: ids}); err != nil {
+	if err := h.bus.Publish(bus.HeartbeatSubject(h.cfg.Name), &hostv1.Heartbeat{Host: h.describe(), Artifacts: h.artifactStates()}); err != nil {
 		h.log.Warn("heartbeat", "err", err)
 	}
+}
+
+// artifactStates is what this host holds of every artifact it has built:
+// the instances waiting for an invocation and those busy with one.
+func (h *Host) artifactStates() []*hostv1.ArtifactState {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	states := make(map[string]*hostv1.ArtifactState, len(h.artifacts))
+	out := make([]*hostv1.ArtifactState, 0, len(h.artifacts))
+	for id := range h.artifacts {
+		st := &hostv1.ArtifactState{Id: id}
+		states[id] = st
+		out = append(out, st)
+	}
+	for _, live := range h.instances {
+		st, ok := states[live.artifact.GetId()]
+		if !ok {
+			continue
+		}
+		switch live.statusNow() {
+		case functionsv1.InstanceStatus_INSTANCE_STATUS_READY:
+			st.Idle++
+		case functionsv1.InstanceStatus_INSTANCE_STATUS_BOOTING, functionsv1.InstanceStatus_INSTANCE_STATUS_BUSY:
+			st.Busy++
+		default:
+		}
+	}
+	return out
 }
 
 // handleBuild builds an artifact and starts taking invocations for it.
@@ -202,9 +219,7 @@ func (h *Host) handleBuild(ctx context.Context, data []byte) proto.Message {
 		return &hostv1.BuildResponse{Result: &hostv1.BuildResponse_Error{Error: &hostv1.Error{Code: "internal", Message: err.Error()}}, BuildLog: err.Error()}
 	}
 	artifact := toProto(req.GetTenantId(), built, req.GetLayers(), req.GetSpec().GetContract())
-	if err := h.serve(artifact); err != nil {
-		return buildError("internal", err)
-	}
+	h.serve(artifact)
 	h.prewarm(artifact)
 	h.log.Info("build ready", "artifact_id", artifact.GetId(), "digest", artifact.GetDigest(), "took", time.Since(start).Round(time.Millisecond))
 	return &hostv1.BuildResponse{Result: &hostv1.BuildResponse_Artifact{Artifact: artifact}}
@@ -231,21 +246,29 @@ func buildError(code string, err error) *hostv1.BuildResponse {
 	return &hostv1.BuildResponse{Result: &hostv1.BuildResponse_Error{Error: &hostv1.Error{Code: code, Message: err.Error()}}}
 }
 
-// serve subscribes to the invoke subject for an artifact this host has
-// ready. Placement is this subscription: the server never picks a host.
-func (h *Host) serve(a *hostv1.Artifact) error {
+// serve marks an artifact ready: this host takes its invocations and
+// reports it in heartbeats, which is how the servers learn to send them.
+func (h *Host) serve(a *hostv1.Artifact) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
-	if _, ok := h.artifacts[a.GetId()]; ok {
-		return nil
-	}
-	sub, err := h.bus.Serve(h.background, bus.InvokeSubject(a.GetId()), bus.HostsQueue, h.handleInvoke)
-	if err != nil {
-		return err
-	}
-	h.artifacts[a.GetId()] = sub
-	return nil
+	h.artifacts[a.GetId()] = a
 }
+
+// serving reports whether this host has built artifact id.
+func (h *Host) serving(id string) bool {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	_, ok := h.artifacts[id]
+	return ok
+}
+
+// Keeping one output in the bucket is on the reply path, so its attempts
+// stay inside the grace the server gives a host.
+const (
+	outputUploadTimeout  = 10 * time.Second
+	outputUploadAttempts = 3
+	outputUploadBackoff  = 500 * time.Millisecond
+)
 
 // handleInvoke runs one input through an instance. Every reply is an
 // InvokeResponse; an Error result means no instance ran the input. When an
@@ -259,6 +282,10 @@ func (h *Host) handleInvoke(ctx context.Context, data []byte) proto.Message {
 	id := req.GetInvocation().GetId()
 	log := h.log.With("invocation_id", id, "artifact_id", req.GetArtifact().GetId())
 	start := time.Now()
+	if !h.serving(req.GetArtifact().GetId()) {
+		// The server's view of this host is stale; it builds here and retries.
+		return invokeError("not_found", errors.New("artifact is not built on this host"))
+	}
 
 	// Check the input before taking a slot: a rejected input costs no
 	// capacity, and it is the caller's mistake, so it ends here.
@@ -326,6 +353,7 @@ func (h *Host) handleInvoke(ctx context.Context, data []byte) proto.Message {
 			resp.Result = &hostv1.InvokeResponse_FunctionError{FunctionError: functionError(f)}
 		} else {
 			checkOutput(resp, c, input, out.GetOutput(), req.GetMaxOutputBytes())
+			h.keepOutput(req.GetOutputKey(), resp.GetOutput(), log)
 		}
 		resp.RunUs = cmpNonZero(out.GetRunUs(), time.Since(acquired).Microseconds())
 	case errors.Is(runCtx.Err(), context.DeadlineExceeded):
@@ -336,11 +364,14 @@ func (h *Host) handleInvoke(ctx context.Context, data []byte) proto.Message {
 		}}
 		resp.RunUs = time.Since(acquired).Microseconds()
 	default:
+		// The instance stopped answering after it took the input, so the
+		// function may have run: aborted, not unavailable, tells the server
+		// the outcome is unknown rather than that nothing happened.
 		log.Warn("invoke instance", "instance_id", instance.ID(), "err", err)
-		return invokeError("unavailable", fmt.Errorf("invoke instance: %w", err))
+		return invokeError("aborted", fmt.Errorf("invoke instance: %w", err))
 	}
 	log.Debug("invocation finished", "instance_id", instance.ID(), "start_kind", startKind, "acquire_us", acquireUs, "run_us", resp.GetRunUs())
-	h.records.add(record(req.GetInvocation(), resp, start, acquired))
+	h.records.add(record(h.cfg.Name, req.GetInvocation(), resp, start, acquired))
 	return resp
 }
 
@@ -363,7 +394,7 @@ func (h *Host) checkInput(req *hostv1.InvokeRequest, start time.Time) (contract.
 		Message:    "input violates the version's input schema",
 		Violations: violations,
 	}}}
-	h.records.add(record(req.GetInvocation(), resp, start, time.Time{}))
+	h.records.add(record(h.cfg.Name, req.GetInvocation(), resp, start, time.Time{}))
 	return nil, nil, resp
 }
 
@@ -391,6 +422,30 @@ func checkOutput(resp *hostv1.InvokeResponse, c contract.Contract, input *contra
 	default:
 		resp.Result = &hostv1.InvokeResponse_Output{Output: checked}
 	}
+}
+
+// keepOutput stores a checked output in the bucket at key before the host
+// replies, so that a reply means the output is there for a server to
+// replay. Only keyed calls ask for it and pay the upload. An upload that
+// keeps failing is given up on: the caller still gets its result, and a
+// retry finds no output and learns the key is held.
+func (h *Host) keepOutput(key string, out []byte, log *slog.Logger) {
+	if key == "" || h.logs == nil {
+		return
+	}
+	ctx, cancel := context.WithTimeout(h.background, outputUploadTimeout)
+	defer cancel()
+	var err error
+	for attempt := 0; attempt < outputUploadAttempts && ctx.Err() == nil; attempt++ {
+		if err = logs.WriteOutput(ctx, h.logs, key, out); err == nil {
+			return
+		}
+		select {
+		case <-ctx.Done():
+		case <-time.After(outputUploadBackoff):
+		}
+	}
+	log.Error("output was not kept; a retry of its idempotency key cannot replay it", "key", key, "err", err)
 }
 
 // functionError is a supervisor failure as the caller sees it.
@@ -751,6 +806,12 @@ func (live *liveInstance) releasing() {
 	live.mu.Lock()
 	live.status = functionsv1.InstanceStatus_INSTANCE_STATUS_RELEASING
 	live.mu.Unlock()
+}
+
+func (live *liveInstance) statusNow() functionsv1.InstanceStatus {
+	live.mu.Lock()
+	defer live.mu.Unlock()
+	return live.status
 }
 
 func (live *liveInstance) proto() *functionsv1.Instance {

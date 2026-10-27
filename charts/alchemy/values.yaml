@@ -81,6 +81,15 @@ server:
   # Any replica serves any request.
   replicas: 1
 
+  # -- How many hosts each function is built on and takes invocations from,
+  # when that many are live. Builds, root filesystems and warm instances
+  # scale with functions times this, not functions times hosts.
+  hostsPerFunction: 3
+
+  # -- How long an invoke's idempotency key keeps a retry with the same key
+  # from running the function again.
+  idempotencyWindow: 24h
+
   autoscaling:
     # -- Scale servers with a HorizontalPodAutoscaler on CPU. Needs
     # `server.resources.requests.cpu`.

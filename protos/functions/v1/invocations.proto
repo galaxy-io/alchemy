@@ -65,6 +65,14 @@ message InvokeRequest {
   string function_id = 1;
   int64 version = 2;
   bytes input = 3;
+  // idempotency_key makes the call safe to retry. Within the server's
+  // idempotency window, every call to the same function with the same key
+  // returns the invocation the first call started, with its output or
+  // error, instead of running again. The key is released, so that a retry
+  // runs, only when the platform never sent the invocation to a host. A
+  // call a host took but never reported on has an unknown outcome and holds
+  // the key: a retry gets ABORTED, and a new key runs again.
+  string idempotency_key = 4;
 }
 
 // InvokeResponse is returned whenever the function ran. output is the
@@ -79,6 +87,9 @@ message InvokeResponse {
     FunctionError error = 4;
   }
   InvocationStats stats = 5;
+  // replayed is set when the result is an earlier invocation's, found by
+  // the request's idempotency_key, and nothing ran for this call.
+  bool replayed = 6;
 }
 
 // InvocationStatus is the persisted lifecycle state of an invocation.
@@ -123,6 +134,11 @@ message Invocation {
   // instance_id names the microVM that served it, while it exists.
   string instance_id = 15;
   string created_by_user_id = 17;
+  // idempotency_key is the caller's key, when the call carried one.
+  string idempotency_key = 18;
+  // host is the host the invocation was sent to, empty when none took
+  // it. Set by the server when it sends it and by the host in its record.
+  string host = 19;
 }
 
 message GetInvocationRequest {

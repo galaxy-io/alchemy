@@ -41,19 +41,57 @@ func (s *Service) Invoke(ctx context.Context, req *connect.Request[functionsv1.I
 		return nil, connect.NewError(connect.CodeInvalidArgument,
 			fmt.Errorf("input is %d bytes; the limit is %d", len(raw), s.cfg.MaxPayloadBytes))
 	}
+	key := req.Msg.GetIdempotencyKey()
+	if len(key) > maxIdempotencyKeyLen {
+		return nil, connect.NewError(connect.CodeInvalidArgument,
+			fmt.Errorf("idempotency_key is %d bytes; the limit is %d", len(key), maxIdempotencyKeyLen))
+	}
 
+	// The invocation is tracked before its key is claimed, so a retry that
+	// sees the claim always finds it on this server.
+	inv := s.newInvocation(cv, key, int64(len(raw)))
+	if key != "" {
+		if s.logs == nil {
+			inv.discard()
+			return nil, connect.NewError(connect.CodeFailedPrecondition,
+				errors.New("idempotency keys need a function logs bucket to keep outputs in"))
+		}
+		// A keyed call runs only if it is the first with its key: the claim
+		// is the one database write on the invocation path, and only keyed
+		// calls pay for it.
+		held, err := s.claimKey(ctx, cv, key, inv.accepted.GetId())
+		if err != nil {
+			inv.discard()
+			return nil, err
+		}
+		if held != nil {
+			return s.replay(ctx, start, inv, cv, raw, held)
+		}
+	}
+	return s.run(ctx, start, inv, cv, raw)
+}
+
+// run announces one tracked invocation, sends it to a host and returns its
+// result.
+func (s *Service) run(ctx context.Context, start time.Time, inv *invocation, cv *compiledVersion, raw []byte) (*connect.Response[functionsv1.InvokeResponse], error) {
+	inv.announce()
 	timeout := time.Duration(cv.spec.GetTimeoutMs()) * time.Millisecond
-	inv := s.newInvocation(cv, int64(len(raw)))
 	accepted := inv.accepted
-	out, err := s.invokeOnHost(ctx, inv, cv, &hostv1.InvokeRequest{
+	key := accepted.GetIdempotencyKey()
+	created := time.UnixMilli(accepted.GetCreatedAt())
+	hostReq := &hostv1.InvokeRequest{
 		Invocation:     accepted,
 		Artifact:       cv.artifact,
 		Input:          raw,
 		TimeoutMs:      timeout.Milliseconds(),
-		LogKey:         logs.Key(accepted.GetTenantId(), accepted.GetFunctionId(), time.UnixMilli(accepted.GetCreatedAt()), accepted.GetId()),
+		LogKey:         logs.Key(accepted.GetTenantId(), accepted.GetFunctionId(), created, accepted.GetId()),
 		StateSubject:   bus.ServerStateSubject(s.cfg.Name),
 		MaxOutputBytes: int64(s.cfg.MaxPayloadBytes),
-	}, timeout)
+	}
+	if key != "" {
+		hostReq.OutputKey = logs.OutputKey(accepted.GetTenantId(), accepted.GetFunctionId(), created, accepted.GetId())
+	}
+	out, err := s.invokeOnHost(ctx, inv, cv, hostReq, timeout)
 	if err != nil {
 		if ctx.Err() != nil {
 			inv.canceled()
@@ -86,36 +124,91 @@ func (s *Service) Invoke(ctx context.Context, req *connect.Request[functionsv1.I
 	return connect.NewResponse(resp), nil
 }
 
-// invokeOnHost sends the request to whichever host has the artifact ready.
-// No responders means nobody has built it, which happens after every host
-// restarts: one build request later, a host subscribes and the invoke is
-// retried once.
+// invokeOnHost sends the invocation to the host the placement picks, and
+// to the next one when that host turns out to be full, gone or unable to
+// build. When no placed host has the artifact, which happens after they all
+// restart, the first of them builds it before the invocation is sent. When
+// every placed host is full, the invocation waits up to capacityWait for a
+// slot, trying them all again with backoff.
 func (s *Service) invokeOnHost(ctx context.Context, inv *invocation, cv *compiledVersion, req *hostv1.InvokeRequest, timeout time.Duration) (*hostv1.InvokeResponse, error) {
-	// The host enforces the function timeout and its own acquire; this
-	// bound only guards against a host that vanished mid-call.
-	reqCtx, cancel := context.WithTimeout(ctx, invokeBudget(timeout))
-	defer cancel()
-	out, err := s.requestInvoke(reqCtx, cv, req)
-	if !errors.Is(err, bus.ErrNoResponders) {
-		return out, err
+	wait := capacityBackoff
+	deadline := time.Now().Add(capacityWait)
+	skip := map[string]bool{}
+	var full *hostv1.InvokeResponse
+	var unbuilt error
+	for {
+		c, ok := s.chooseHost(cv, skip)
+		switch {
+		case !ok && full == nil && unbuilt != nil:
+			return nil, connect.NewError(connect.CodeFailedPrecondition, unbuilt)
+		case !ok && full == nil:
+			return nil, errNoHosts
+		case !ok:
+			if time.Now().Add(wait).After(deadline) {
+				return full, nil
+			}
+			select {
+			case <-ctx.Done():
+				return full, nil
+			case <-time.After(wait):
+			}
+			wait = min(wait*2, capacityBackoffMax)
+			clear(skip)
+			continue
+		}
+		if !c.built {
+			err := s.buildFor(ctx, inv, cv, c.host)
+			switch {
+			case errors.Is(err, bus.ErrNoResponders):
+				// Gone since its last heartbeat.
+				s.forgetHost(c.host)
+				skip[c.host] = true
+				continue
+			case err != nil:
+				// A build fails for reasons of the host's own as often as the
+				// version's, so every placed host gets a try. The call fails
+				// as unbuildable only once they all have.
+				inv.log.Warn("build on placed host failed", "host", c.host, "err", err)
+				skip[c.host] = true
+				unbuilt = err
+				continue
+			}
+		}
+		// From here the host may run the function, and the record says so
+		// until the host answers that it did not.
+		if err := inv.sentTo(ctx, c.host); err != nil {
+			return nil, err
+		}
+		out, err := s.requestInvoke(ctx, c.host, req, timeout)
+		switch {
+		case errors.Is(err, bus.ErrNoResponders):
+			// Gone since its last heartbeat.
+			inv.notSent()
+			s.forgetHost(c.host)
+			skip[c.host] = true
+			continue
+		case err != nil:
+			return nil, err
+		}
+		if e := out.GetError(); e != nil && e.GetCode() != "aborted" {
+			inv.notSent()
+		}
+		switch out.GetError().GetCode() {
+		case "resource_exhausted":
+			skip[c.host] = true
+			full = out
+			continue
+		case "not_found":
+			// Restarted since its last heartbeat: it builds on the next pass.
+			if c.built {
+				s.noteArtifact(c.host, cv.artifact.GetId(), "", false)
+				continue
+			}
+			return out, nil
+		}
+		s.noteArtifact(c.host, cv.artifact.GetId(), out.GetInstanceId(), true)
+		return out, nil
 	}
-	if len(s.liveHosts()) == 0 {
-		return nil, errNoHosts
-	}
-	inv.log.Info("no host has the artifact; building")
-	spec := cv.pinnedSpec()
-	built, err := s.requestBuild(ctx, cv.row.TenantID, spec, cv.artifact.GetLayers())
-	if err != nil {
-		return nil, connect.NewError(connect.CodeFailedPrecondition,
-			fmt.Errorf("version %d can no longer be built from %s: %w; create a new version", cv.row.Version, spec.GetImage(), err))
-	}
-	if built.GetId() != cv.artifact.GetId() {
-		return nil, connect.NewError(connect.CodeFailedPrecondition,
-			fmt.Errorf("version %d rebuilt as a different artifact (%s); create a new version", cv.row.Version, spec.GetImage()))
-	}
-	retryCtx, cancelRetry := context.WithTimeout(ctx, invokeBudget(timeout))
-	defer cancelRetry()
-	return s.requestInvoke(retryCtx, cv, req)
 }
 
 // pinnedSpec is the version's spec with the image pinned to the digest it
@@ -131,28 +224,16 @@ func (cv *compiledVersion) pinnedSpec() *functionsv1.FunctionSpec {
 	return spec
 }
 
-// requestInvoke sends one invocation to the hosts serving the artifact. A
-// host at capacity says so straight away; the queue group hands the retry to
-// a random member, so retries spread across hosts and, when every host is
-// full, wait for a slot instead of failing the call.
-func (s *Service) requestInvoke(ctx context.Context, cv *compiledVersion, req *hostv1.InvokeRequest) (*hostv1.InvokeResponse, error) {
-	wait := capacityBackoff
-	deadline := time.Now().Add(capacityWait)
-	for {
-		out := &hostv1.InvokeResponse{}
-		if err := s.bus.Request(ctx, bus.InvokeSubject(cv.artifact.GetId()), req, out); err != nil {
-			return nil, err
-		}
-		if out.GetError().GetCode() != "resource_exhausted" || time.Now().Add(wait).After(deadline) {
-			return out, nil
-		}
-		select {
-		case <-ctx.Done():
-			return out, nil
-		case <-time.After(wait):
-		}
-		wait = min(wait*2, capacityBackoffMax)
-	}
+// requestInvoke sends req to host on a fresh budget, so a build that
+// ran first takes nothing from it. The host enforces the function timeout
+// and its own acquire; the budget only guards against a host that vanished
+// mid-call.
+func (s *Service) requestInvoke(ctx context.Context, host string, req *hostv1.InvokeRequest, timeout time.Duration) (*hostv1.InvokeResponse, error) {
+	ctx, cancel := context.WithTimeout(ctx, invokeBudget(timeout))
+	defer cancel()
+	out := &hostv1.InvokeResponse{}
+	err := s.bus.Request(ctx, bus.HostInvokeSubject(host), req, out)
+	return out, err
 }
 
 // When every host serving an artifact is full, an invocation waits up to
@@ -182,6 +263,12 @@ func hostCode(code string) connect.Code {
 		return connect.CodeInvalidArgument
 	case "unavailable":
 		return connect.CodeUnavailable
+	case "not_found":
+		return connect.CodeNotFound
+	case "failed_precondition":
+		return connect.CodeFailedPrecondition
+	case "aborted":
+		return connect.CodeAborted
 	default:
 		return connect.CodeInternal
 	}
@@ -269,24 +356,65 @@ type invocation struct {
 	accepted *functionsv1.Invocation
 }
 
-func (s *Service) newInvocation(cv *compiledVersion, inputBytes int64) *invocation {
+// newInvocation starts tracking a new invocation of cv. It is announced on
+// the function's live stream when it runs, and discarded if it never does.
+func (s *Service) newInvocation(cv *compiledVersion, key string, inputBytes int64) *invocation {
 	inv := &functionsv1.Invocation{
-		TenantId:   s.tenant,
-		Id:         newID(),
-		FunctionId: cv.row.FunctionID,
-		Version:    cv.row.Version,
-		Status:     functionsv1.InvocationStatus_INVOCATION_STATUS_PENDING,
-		CreatedAt:  time.Now().UnixMilli(),
-		InputBytes: inputBytes,
+		TenantId:       s.tenant,
+		Id:             newID(),
+		FunctionId:     cv.row.FunctionID,
+		Version:        cv.row.Version,
+		Status:         functionsv1.InvocationStatus_INVOCATION_STATUS_PENDING,
+		CreatedAt:      time.Now().UnixMilli(),
+		InputBytes:     inputBytes,
+		IdempotencyKey: key,
 	}
 	s.tracker.put(inv)
-	accepted := proto.Clone(inv).(*functionsv1.Invocation) //nolint:errcheck // Clone preserves the type
-	s.publishInvocation(accepted)
 	return &invocation{
 		s:        s,
 		log:      s.log.With("function_id", cv.row.FunctionID, "version", cv.row.Version, "artifact_id", cv.artifact.GetId(), "invocation_id", inv.GetId()),
-		accepted: accepted,
+		accepted: proto.Clone(inv).(*functionsv1.Invocation), //nolint:errcheck // Clone preserves the type
 	}
+}
+
+// announce publishes the invocation as accepted, for the live streams.
+func (i *invocation) announce() {
+	i.s.publishInvocation(i.accepted)
+}
+
+// discard forgets an invocation that will not run.
+func (i *invocation) discard() {
+	i.s.tracker.drop(i.accepted.GetId())
+}
+
+// sentTo records the host the invocation is about to go to: on the tracked
+// invocation, and for a keyed call on its claim, durably, so that a claim
+// with no host is known never to have run even when this server dies.
+func (i *invocation) sentTo(ctx context.Context, host string) error {
+	i.s.tracker.update(i.accepted.GetId(), func(inv *functionsv1.Invocation) { inv.Host = host })
+	if i.accepted.GetIdempotencyKey() == "" {
+		return nil
+	}
+	n, err := i.s.store.MarkIdempotencyKeySent(ctx, sqlcgen.MarkIdempotencyKeySentParams{
+		TenantID: i.accepted.GetTenantId(), FunctionID: i.accepted.GetFunctionId(),
+		Key: i.accepted.GetIdempotencyKey(), InvocationID: i.accepted.GetId(), Host: host,
+	})
+	if err != nil {
+		return connect.NewError(connect.CodeUnavailable, fmt.Errorf("mark idempotency key sent: %w", err))
+	}
+	if n == 0 {
+		// A retry took the key over while this call was waiting to send,
+		// having found no sign of it. That retry runs; this one must not.
+		return connect.NewError(connect.CodeAborted, errors.New("idempotency key changed hands; retry"))
+	}
+	return nil
+}
+
+// notSent records that the host answered without running the function.
+// The claim keeps its mark; the record this leaves, ended with no host, is
+// what lets a retry take the key over.
+func (i *invocation) notSent() {
+	i.s.tracker.update(i.accepted.GetId(), func(inv *functionsv1.Invocation) { inv.Host = "" })
 }
 
 // end applies fn to the tracked invocation, publishes the result and
@@ -346,7 +474,7 @@ func (i *invocation) errored(msg string) {
 }
 
 // canceled records that the caller went away. A host may still run and
-// record the invocation; this record wins.
+// record the invocation, and its record wins.
 func (i *invocation) canceled() {
 	i.log.Debug("invocation canceled")
 	if inv := i.end(func(inv *functionsv1.Invocation) {

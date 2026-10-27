@@ -8,23 +8,20 @@ import "functions/v1/host.proto";
 import "functions/v1/invocations.proto";
 
 // host.v1 is the contract between the servers and the hosts, and between
-// servers. It rides on NATS rather than a Connect service: a host subscribes
-// to the subjects for the artifacts it has ready, so placement is a
-// subscription and the server keeps no host state beyond what heartbeats
-// last said.
+// servers. It rides on NATS rather than a Connect service. Hosts keep no
+// state the servers rely on beyond what their heartbeats last said, and
+// the servers keep no state about hosts beyond those heartbeats.
 //
-//   host.build.*                 request/reply, queue group: any host builds,
-//                                replies with the Artifact
-//   host.invoke.<artifact_id>    request/reply, queue group: hosts that have
-//                                the artifact ready; no responders means
-//                                nobody has built it yet
+//   host.<name>.invoke           request/reply: that host runs the
+//                                invocation, or answers not_found when it
+//                                has not built the artifact
+//   host.<name>.build            request/reply: that host builds, replies
+//                                with the Artifact
+//   host.<name>.heartbeat        publish: a Heartbeat, periodically
 //   host.describe                request, scatter/gather: every host replies
 //                                with its Host
 //   host.instances               request, scatter/gather: every host replies
 //                                with its instances
-//   host.<name>.build            request/reply: that host builds, replies
-//                                with the Artifact; reconciles a host
-//   host.<name>.heartbeat        publish: a Heartbeat, periodically
 //   server.<name>.state          publish: InvocationEvent, from a host to
 //                                the server whose invocation moved
 //   server.<name>.heartbeat      publish: a ServerHeartbeat, periodically
@@ -34,6 +31,14 @@ import "functions/v1/invocations.proto";
 //                                sees it change, for live streams
 //   invocations.host, .server    publish, JetStream: InvocationRecords,
 //                                kept until a server has written them
+//
+// Placement is the server's choice. A function lives on a few hosts, picked
+// by rendezvous hashing of its id over the live hosts, so every server picks
+// the same ones from the same heartbeats and a host joining or leaving
+// moves only the functions that hashed to it. A server builds a function's
+// versions on those hosts and sends each invocation to the one holding a
+// warm instance, else the least loaded one that has the artifact, else it
+// builds the artifact there first.
 //
 // Invocations are not written as they run. The host that took one publishes
 // its record when it ends; the server publishes a record only when no host
@@ -127,6 +132,9 @@ message InvokeRequest {
   // max_output_bytes bounds the function's output; past it the output is
   // invalid.
   int64 max_output_bytes = 7;
+  // output_key, when set, is where the host keeps the checked output in the
+  // bucket, so a server can replay it for a retried call.
+  string output_key = 8;
 }
 
 // InvokeResponse is returned whenever the host took the input, including
@@ -170,10 +178,18 @@ message ListInstancesResponse {
 // Heartbeat is published by every host on its own subject.
 message Heartbeat {
   functions.v1.Host host = 1;
-  // artifact_ids are the artifacts the host is taking invocations for. The
-  // server builds the current version of every function on any host that
-  // lacks it.
-  repeated string artifact_ids = 2;
+  // artifacts are those the host has built and takes invocations for, with
+  // what it holds of each. The server places invocations from this.
+  repeated ArtifactState artifacts = 2;
+}
+
+// ArtifactState is what a host holds of one artifact.
+message ArtifactState {
+  string id = 1;
+  // idle is how many warm instances are waiting for an invocation.
+  int32 idle = 2;
+  // busy is how many instances are booting or running one.
+  int32 busy = 3;
 }
 
 // ServerHeartbeat is published by every server on its own subject, so any
