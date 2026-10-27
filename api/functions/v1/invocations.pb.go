@@ -370,12 +370,20 @@ func (x *InvocationStats) GetTotalUs() int64 {
 // JSON Schema contract, an Arrow IPC stream for an Arrow contract) and
 // checks it before anything runs.
 type InvokeRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	FunctionId    string                 `protobuf:"bytes,1,opt,name=function_id,json=functionId,proto3" json:"function_id,omitempty"`
-	Version       int64                  `protobuf:"varint,2,opt,name=version,proto3" json:"version,omitempty"`
-	Input         []byte                 `protobuf:"bytes,3,opt,name=input,proto3" json:"input,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state      protoimpl.MessageState `protogen:"open.v1"`
+	FunctionId string                 `protobuf:"bytes,1,opt,name=function_id,json=functionId,proto3" json:"function_id,omitempty"`
+	Version    int64                  `protobuf:"varint,2,opt,name=version,proto3" json:"version,omitempty"`
+	Input      []byte                 `protobuf:"bytes,3,opt,name=input,proto3" json:"input,omitempty"`
+	// idempotency_key makes the call safe to retry. Within the server's
+	// idempotency window, every call to the same function with the same key
+	// returns the invocation the first call started, with its output or
+	// error, instead of running again. The key is released, so that a retry
+	// runs, only when the platform never sent the invocation to a host. A
+	// call a host took but never reported on has an unknown outcome and holds
+	// the key: a retry gets ABORTED, and a new key runs again.
+	IdempotencyKey string `protobuf:"bytes,4,opt,name=idempotency_key,json=idempotencyKey,proto3" json:"idempotency_key,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
 }
 
 func (x *InvokeRequest) Reset() {
@@ -429,6 +437,13 @@ func (x *InvokeRequest) GetInput() []byte {
 	return nil
 }
 
+func (x *InvokeRequest) GetIdempotencyKey() string {
+	if x != nil {
+		return x.IdempotencyKey
+	}
+	return ""
+}
+
 // InvokeResponse is returned whenever the function ran. output is the
 // function's result in the encoding the contract defines, already checked
 // against the output schema; error means the function ran and failed.
@@ -441,8 +456,11 @@ type InvokeResponse struct {
 	//
 	//	*InvokeResponse_Output
 	//	*InvokeResponse_Error
-	Result        isInvokeResponse_Result `protobuf_oneof:"result"`
-	Stats         *InvocationStats        `protobuf:"bytes,5,opt,name=stats,proto3" json:"stats,omitempty"`
+	Result isInvokeResponse_Result `protobuf_oneof:"result"`
+	Stats  *InvocationStats        `protobuf:"bytes,5,opt,name=stats,proto3" json:"stats,omitempty"`
+	// replayed is set when the result is an earlier invocation's, found by
+	// the request's idempotency_key, and nothing ran for this call.
+	Replayed      bool `protobuf:"varint,6,opt,name=replayed,proto3" json:"replayed,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -523,6 +541,13 @@ func (x *InvokeResponse) GetStats() *InvocationStats {
 	return nil
 }
 
+func (x *InvokeResponse) GetReplayed() bool {
+	if x != nil {
+		return x.Replayed
+	}
+	return false
+}
+
 type isInvokeResponse_Result interface {
 	isInvokeResponse_Result()
 }
@@ -561,8 +586,13 @@ type Invocation struct {
 	// instance_id names the microVM that served it, while it exists.
 	InstanceId      string `protobuf:"bytes,15,opt,name=instance_id,json=instanceId,proto3" json:"instance_id,omitempty"`
 	CreatedByUserId string `protobuf:"bytes,17,opt,name=created_by_user_id,json=createdByUserId,proto3" json:"created_by_user_id,omitempty"`
-	unknownFields   protoimpl.UnknownFields
-	sizeCache       protoimpl.SizeCache
+	// idempotency_key is the caller's key, when the call carried one.
+	IdempotencyKey string `protobuf:"bytes,18,opt,name=idempotency_key,json=idempotencyKey,proto3" json:"idempotency_key,omitempty"`
+	// host is the host the invocation was sent to, empty when none took
+	// it. Set by the server when it sends it and by the host in its record.
+	Host          string `protobuf:"bytes,19,opt,name=host,proto3" json:"host,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *Invocation) Reset() {
@@ -703,6 +733,20 @@ func (x *Invocation) GetInstanceId() string {
 func (x *Invocation) GetCreatedByUserId() string {
 	if x != nil {
 		return x.CreatedByUserId
+	}
+	return ""
+}
+
+func (x *Invocation) GetIdempotencyKey() string {
+	if x != nil {
+		return x.IdempotencyKey
+	}
+	return ""
+}
+
+func (x *Invocation) GetHost() string {
+	if x != nil {
+		return x.Host
 	}
 	return ""
 }
@@ -1180,19 +1224,21 @@ const file_functions_v1_invocations_proto_rawDesc = "" +
 	"\n" +
 	"acquire_us\x18\x02 \x01(\x03R\tacquireUs\x12\x15\n" +
 	"\x06run_us\x18\x03 \x01(\x03R\x05runUs\x12\x19\n" +
-	"\btotal_us\x18\x04 \x01(\x03R\atotalUs\"`\n" +
+	"\btotal_us\x18\x04 \x01(\x03R\atotalUs\"\x89\x01\n" +
 	"\rInvokeRequest\x12\x1f\n" +
 	"\vfunction_id\x18\x01 \x01(\tR\n" +
 	"functionId\x12\x18\n" +
 	"\aversion\x18\x02 \x01(\x03R\aversion\x12\x14\n" +
-	"\x05input\x18\x03 \x01(\fR\x05input\"\xdd\x01\n" +
+	"\x05input\x18\x03 \x01(\fR\x05input\x12'\n" +
+	"\x0fidempotency_key\x18\x04 \x01(\tR\x0eidempotencyKey\"\xf9\x01\n" +
 	"\x0eInvokeResponse\x12#\n" +
 	"\rinvocation_id\x18\x01 \x01(\tR\finvocationId\x12\x18\n" +
 	"\aversion\x18\x02 \x01(\x03R\aversion\x12\x18\n" +
 	"\x06output\x18\x03 \x01(\fH\x00R\x06output\x123\n" +
 	"\x05error\x18\x04 \x01(\v2\x1b.functions.v1.FunctionErrorH\x00R\x05error\x123\n" +
-	"\x05stats\x18\x05 \x01(\v2\x1d.functions.v1.InvocationStatsR\x05statsB\b\n" +
-	"\x06result\"\xde\x04\n" +
+	"\x05stats\x18\x05 \x01(\v2\x1d.functions.v1.InvocationStatsR\x05stats\x12\x1a\n" +
+	"\breplayed\x18\x06 \x01(\bR\breplayedB\b\n" +
+	"\x06result\"\x9b\x05\n" +
 	"\n" +
 	"Invocation\x12\x1b\n" +
 	"\ttenant_id\x18\x01 \x01(\tR\btenantId\x12\x0e\n" +
@@ -1217,7 +1263,9 @@ const file_functions_v1_invocations_proto_rawDesc = "" +
 	"\foutput_bytes\x18\x0e \x01(\x03R\voutputBytes\x12\x1f\n" +
 	"\vinstance_id\x18\x0f \x01(\tR\n" +
 	"instanceId\x12+\n" +
-	"\x12created_by_user_id\x18\x11 \x01(\tR\x0fcreatedByUserId\"&\n" +
+	"\x12created_by_user_id\x18\x11 \x01(\tR\x0fcreatedByUserId\x12'\n" +
+	"\x0fidempotency_key\x18\x12 \x01(\tR\x0eidempotencyKey\x12\x12\n" +
+	"\x04host\x18\x13 \x01(\tR\x04host\"&\n" +
 	"\x14GetInvocationRequest\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\"Q\n" +
 	"\x15GetInvocationResponse\x128\n" +

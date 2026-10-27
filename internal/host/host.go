@@ -262,6 +262,14 @@ func (h *Host) serving(id string) bool {
 	return ok
 }
 
+// Keeping one output in the bucket is on the reply path, so its attempts
+// stay inside the grace the server gives a host.
+const (
+	outputUploadTimeout  = 10 * time.Second
+	outputUploadAttempts = 3
+	outputUploadBackoff  = 500 * time.Millisecond
+)
+
 // handleInvoke runs one input through an instance. Every reply is an
 // InvokeResponse; an Error result means no instance ran the input. When an
 // instance ran it, the host publishes the invocation's record as well: the
@@ -345,6 +353,7 @@ func (h *Host) handleInvoke(ctx context.Context, data []byte) proto.Message {
 			resp.Result = &hostv1.InvokeResponse_FunctionError{FunctionError: functionError(f)}
 		} else {
 			checkOutput(resp, c, input, out.GetOutput(), req.GetMaxOutputBytes())
+			h.keepOutput(req.GetOutputKey(), resp.GetOutput(), log)
 		}
 		resp.RunUs = cmpNonZero(out.GetRunUs(), time.Since(acquired).Microseconds())
 	case errors.Is(runCtx.Err(), context.DeadlineExceeded):
@@ -355,11 +364,14 @@ func (h *Host) handleInvoke(ctx context.Context, data []byte) proto.Message {
 		}}
 		resp.RunUs = time.Since(acquired).Microseconds()
 	default:
+		// The instance stopped answering after it took the input, so the
+		// function may have run: aborted, not unavailable, tells the server
+		// the outcome is unknown rather than that nothing happened.
 		log.Warn("invoke instance", "instance_id", instance.ID(), "err", err)
-		return invokeError("unavailable", fmt.Errorf("invoke instance: %w", err))
+		return invokeError("aborted", fmt.Errorf("invoke instance: %w", err))
 	}
 	log.Debug("invocation finished", "instance_id", instance.ID(), "start_kind", startKind, "acquire_us", acquireUs, "run_us", resp.GetRunUs())
-	h.records.add(record(req.GetInvocation(), resp, start, acquired))
+	h.records.add(record(h.cfg.Name, req.GetInvocation(), resp, start, acquired))
 	return resp
 }
 
@@ -382,7 +394,7 @@ func (h *Host) checkInput(req *hostv1.InvokeRequest, start time.Time) (contract.
 		Message:    "input violates the version's input schema",
 		Violations: violations,
 	}}}
-	h.records.add(record(req.GetInvocation(), resp, start, time.Time{}))
+	h.records.add(record(h.cfg.Name, req.GetInvocation(), resp, start, time.Time{}))
 	return nil, nil, resp
 }
 
@@ -410,6 +422,30 @@ func checkOutput(resp *hostv1.InvokeResponse, c contract.Contract, input *contra
 	default:
 		resp.Result = &hostv1.InvokeResponse_Output{Output: checked}
 	}
+}
+
+// keepOutput stores a checked output in the bucket at key before the host
+// replies, so that a reply means the output is there for a server to
+// replay. Only keyed calls ask for it and pay the upload. An upload that
+// keeps failing is given up on: the caller still gets its result, and a
+// retry finds no output and learns the key is held.
+func (h *Host) keepOutput(key string, out []byte, log *slog.Logger) {
+	if key == "" || h.logs == nil {
+		return
+	}
+	ctx, cancel := context.WithTimeout(h.background, outputUploadTimeout)
+	defer cancel()
+	var err error
+	for attempt := 0; attempt < outputUploadAttempts && ctx.Err() == nil; attempt++ {
+		if err = logs.WriteOutput(ctx, h.logs, key, out); err == nil {
+			return
+		}
+		select {
+		case <-ctx.Done():
+		case <-time.After(outputUploadBackoff):
+		}
+	}
+	log.Error("output was not kept; a retry of its idempotency key cannot replay it", "key", key, "err", err)
 }
 
 // functionError is a supervisor failure as the caller sees it.
