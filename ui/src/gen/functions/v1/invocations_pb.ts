@@ -14,7 +14,7 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file functions/v1/invocations.proto.
  */
 export const file_functions_v1_invocations: GenFile = /*@__PURE__*/
-  fileDesc("Ch5mdW5jdGlvbnMvdjEvaW52b2NhdGlvbnMucHJvdG8SDGZ1bmN0aW9ucy52MSKSAQoNRnVuY3Rpb25FcnJvchItCgRraW5kGAEgASgOMh8uZnVuY3Rpb25zLnYxLkZ1bmN0aW9uRXJyb3JLaW5kEg8KB21lc3NhZ2UYAiABKAkSDAoEdHlwZRgDIAEoCRIzCgp2aW9sYXRpb25zGAQgAygLMh8uZnVuY3Rpb25zLnYxLkNvbnRyYWN0VmlvbGF0aW9uInQKD0ludm9jYXRpb25TdGF0cxIrCgpzdGFydF9raW5kGAEgASgOMhcuZnVuY3Rpb25zLnYxLlN0YXJ0S2luZBISCgphY3F1aXJlX3VzGAIgASgDEg4KBnJ1bl91cxgDIAEoAxIQCgh0b3RhbF91cxgEIAEoAyJECg1JbnZva2VSZXF1ZXN0EhMKC2Z1bmN0aW9uX2lkGAEgASgJEg8KB3ZlcnNpb24YAiABKAMSDQoFaW5wdXQYAyABKAwisAEKDkludm9rZVJlc3BvbnNlEhUKDWludm9jYXRpb25faWQYASABKAkSDwoHdmVyc2lvbhgCIAEoAxIQCgZvdXRwdXQYAyABKAxIABIsCgVlcnJvchgEIAEoCzIbLmZ1bmN0aW9ucy52MS5GdW5jdGlvbkVycm9ySAASLAoFc3RhdHMYBSABKAsyHS5mdW5jdGlvbnMudjEuSW52b2NhdGlvblN0YXRzQggKBnJlc3VsdCK2AwoKSW52b2NhdGlvbhIRCgl0ZW5hbnRfaWQYASABKAkSCgoCaWQYAiABKAkSEwoLZnVuY3Rpb25faWQYAyABKAkSDwoHdmVyc2lvbhgEIAEoAxIuCgZzdGF0dXMYBSABKA4yHi5mdW5jdGlvbnMudjEuSW52b2NhdGlvblN0YXR1cxIrCgpzdGFydF9raW5kGAYgASgOMhcuZnVuY3Rpb25zLnYxLlN0YXJ0S2luZBISCgpjcmVhdGVkX2F0GAcgASgDEhIKCnN0YXJ0ZWRfYXQYCCABKAMSEAoIZW5kZWRfYXQYCSABKAMSLAoFc3RhdHMYCiABKAsyHS5mdW5jdGlvbnMudjEuSW52b2NhdGlvblN0YXRzEioKBWVycm9yGAsgASgLMhsuZnVuY3Rpb25zLnYxLkZ1bmN0aW9uRXJyb3ISFgoOcGxhdGZvcm1fZXJyb3IYDCABKAkSEwoLaW5wdXRfYnl0ZXMYDSABKAMSFAoMb3V0cHV0X2J5dGVzGA4gASgDEhMKC2luc3RhbmNlX2lkGA8gASgJEhoKEmNyZWF0ZWRfYnlfdXNlcl9pZBgRIAEoCSIiChRHZXRJbnZvY2F0aW9uUmVxdWVzdBIKCgJpZBgBIAEoCSJFChVHZXRJbnZvY2F0aW9uUmVzcG9uc2USLAoKaW52b2NhdGlvbhgBIAEoCzIYLmZ1bmN0aW9ucy52MS5JbnZvY2F0aW9uIucBChZMaXN0SW52b2NhdGlvbnNSZXF1ZXN0EhQKDGZ1bmN0aW9uX2lkcxgBIAMoCRIwCghzdGF0dXNlcxgCIAMoDjIeLmZ1bmN0aW9ucy52MS5JbnZvY2F0aW9uU3RhdHVzEiwKC3N0YXJ0X2tpbmRzGAYgAygOMhcuZnVuY3Rpb25zLnYxLlN0YXJ0S2luZBIzCgpwYWdpbmF0aW9uGAMgASgLMh8uZnVuY3Rpb25zLnYxLlBhZ2luYXRpb25SZXF1ZXN0EhAKCHNpbmNlX21zGAQgASgDEhAKCHVudGlsX21zGAUgASgDIn4KF0xpc3RJbnZvY2F0aW9uc1Jlc3BvbnNlEi0KC2ludm9jYXRpb25zGAEgAygLMhguZnVuY3Rpb25zLnYxLkludm9jYXRpb24SNAoKcGFnaW5hdGlvbhgCIAEoCzIgLmZ1bmN0aW9ucy52MS5QYWdpbmF0aW9uUmVzcG9uc2UiRAoWVGFpbEludm9jYXRpb25zUmVxdWVzdBITCgtmdW5jdGlvbl9pZBgBIAEoCRIVCg1zaG91bGRfcmVwbGF5GAIgASgIIn8KF1RhaWxJbnZvY2F0aW9uc1Jlc3BvbnNlEiwKCmludm9jYXRpb24YASABKAsyGC5mdW5jdGlvbnMudjEuSW52b2NhdGlvbhISCgpldmVudF90eXBlGAIgASgJEg4KBnJlcGxheRgDIAEoCBISCgplbWl0dGVkX2F0GAQgASgDIjYKGEdldEludm9jYXRpb25Mb2dzUmVxdWVzdBIKCgJpZBgBIAEoCRIOCgZmb2xsb3cYAiABKAgiKQoZR2V0SW52b2NhdGlvbkxvZ3NSZXNwb25zZRIMCgRkYXRhGAEgASgMKsIBChFGdW5jdGlvbkVycm9yS2luZBIjCh9GVU5DVElPTl9FUlJPUl9LSU5EX1VOU1BFQ0lGSUVEEAASHgoaRlVOQ1RJT05fRVJST1JfS0lORF9SQUlTRUQQARIfChtGVU5DVElPTl9FUlJPUl9LSU5EX0NSQVNIRUQQAhIfChtGVU5DVElPTl9FUlJPUl9LSU5EX1RJTUVPVVQQAxImCiJGVU5DVElPTl9FUlJPUl9LSU5EX09VVFBVVF9JTlZBTElEEAQqdwoJU3RhcnRLaW5kEhoKFlNUQVJUX0tJTkRfVU5TUEVDSUZJRUQQABIYChRTVEFSVF9LSU5EX0NPTERfQk9PVBABEh8KG1NUQVJUX0tJTkRfU05BUFNIT1RfUkVTVE9SRRACEhMKD1NUQVJUX0tJTkRfV0FSTRADKpECChBJbnZvY2F0aW9uU3RhdHVzEiEKHUlOVk9DQVRJT05fU1RBVFVTX1VOU1BFQ0lGSUVEEAASHQoZSU5WT0NBVElPTl9TVEFUVVNfUEVORElORxABEh4KGklOVk9DQVRJT05fU1RBVFVTX1NUQVJUSU5HEAISHQoZSU5WT0NBVElPTl9TVEFUVVNfUlVOTklORxADEh8KG0lOVk9DQVRJT05fU1RBVFVTX1NVQ0NFRURFRBAEEhwKGElOVk9DQVRJT05fU1RBVFVTX0ZBSUxFRBAFEh0KGUlOVk9DQVRJT05fU1RBVFVTX0VSUk9SRUQQBhIeChpJTlZPQ0FUSU9OX1NUQVRVU19DQU5DRUxFRBAHYgZwcm90bzM", [file_functions_v1_common, file_functions_v1_pagination]);
+  fileDesc("Ch5mdW5jdGlvbnMvdjEvaW52b2NhdGlvbnMucHJvdG8SDGZ1bmN0aW9ucy52MSKSAQoNRnVuY3Rpb25FcnJvchItCgRraW5kGAEgASgOMh8uZnVuY3Rpb25zLnYxLkZ1bmN0aW9uRXJyb3JLaW5kEg8KB21lc3NhZ2UYAiABKAkSDAoEdHlwZRgDIAEoCRIzCgp2aW9sYXRpb25zGAQgAygLMh8uZnVuY3Rpb25zLnYxLkNvbnRyYWN0VmlvbGF0aW9uInQKD0ludm9jYXRpb25TdGF0cxIrCgpzdGFydF9raW5kGAEgASgOMhcuZnVuY3Rpb25zLnYxLlN0YXJ0S2luZBISCgphY3F1aXJlX3VzGAIgASgDEg4KBnJ1bl91cxgDIAEoAxIQCgh0b3RhbF91cxgEIAEoAyJdCg1JbnZva2VSZXF1ZXN0EhMKC2Z1bmN0aW9uX2lkGAEgASgJEg8KB3ZlcnNpb24YAiABKAMSDQoFaW5wdXQYAyABKAwSFwoPaWRlbXBvdGVuY3lfa2V5GAQgASgJIsIBCg5JbnZva2VSZXNwb25zZRIVCg1pbnZvY2F0aW9uX2lkGAEgASgJEg8KB3ZlcnNpb24YAiABKAMSEAoGb3V0cHV0GAMgASgMSAASLAoFZXJyb3IYBCABKAsyGy5mdW5jdGlvbnMudjEuRnVuY3Rpb25FcnJvckgAEiwKBXN0YXRzGAUgASgLMh0uZnVuY3Rpb25zLnYxLkludm9jYXRpb25TdGF0cxIQCghyZXBsYXllZBgGIAEoCEIICgZyZXN1bHQi3QMKCkludm9jYXRpb24SEQoJdGVuYW50X2lkGAEgASgJEgoKAmlkGAIgASgJEhMKC2Z1bmN0aW9uX2lkGAMgASgJEg8KB3ZlcnNpb24YBCABKAMSLgoGc3RhdHVzGAUgASgOMh4uZnVuY3Rpb25zLnYxLkludm9jYXRpb25TdGF0dXMSKwoKc3RhcnRfa2luZBgGIAEoDjIXLmZ1bmN0aW9ucy52MS5TdGFydEtpbmQSEgoKY3JlYXRlZF9hdBgHIAEoAxISCgpzdGFydGVkX2F0GAggASgDEhAKCGVuZGVkX2F0GAkgASgDEiwKBXN0YXRzGAogASgLMh0uZnVuY3Rpb25zLnYxLkludm9jYXRpb25TdGF0cxIqCgVlcnJvchgLIAEoCzIbLmZ1bmN0aW9ucy52MS5GdW5jdGlvbkVycm9yEhYKDnBsYXRmb3JtX2Vycm9yGAwgASgJEhMKC2lucHV0X2J5dGVzGA0gASgDEhQKDG91dHB1dF9ieXRlcxgOIAEoAxITCgtpbnN0YW5jZV9pZBgPIAEoCRIaChJjcmVhdGVkX2J5X3VzZXJfaWQYESABKAkSFwoPaWRlbXBvdGVuY3lfa2V5GBIgASgJEgwKBGhvc3QYEyABKAkiIgoUR2V0SW52b2NhdGlvblJlcXVlc3QSCgoCaWQYASABKAkiRQoVR2V0SW52b2NhdGlvblJlc3BvbnNlEiwKCmludm9jYXRpb24YASABKAsyGC5mdW5jdGlvbnMudjEuSW52b2NhdGlvbiLnAQoWTGlzdEludm9jYXRpb25zUmVxdWVzdBIUCgxmdW5jdGlvbl9pZHMYASADKAkSMAoIc3RhdHVzZXMYAiADKA4yHi5mdW5jdGlvbnMudjEuSW52b2NhdGlvblN0YXR1cxIsCgtzdGFydF9raW5kcxgGIAMoDjIXLmZ1bmN0aW9ucy52MS5TdGFydEtpbmQSMwoKcGFnaW5hdGlvbhgDIAEoCzIfLmZ1bmN0aW9ucy52MS5QYWdpbmF0aW9uUmVxdWVzdBIQCghzaW5jZV9tcxgEIAEoAxIQCgh1bnRpbF9tcxgFIAEoAyJ+ChdMaXN0SW52b2NhdGlvbnNSZXNwb25zZRItCgtpbnZvY2F0aW9ucxgBIAMoCzIYLmZ1bmN0aW9ucy52MS5JbnZvY2F0aW9uEjQKCnBhZ2luYXRpb24YAiABKAsyIC5mdW5jdGlvbnMudjEuUGFnaW5hdGlvblJlc3BvbnNlIkQKFlRhaWxJbnZvY2F0aW9uc1JlcXVlc3QSEwoLZnVuY3Rpb25faWQYASABKAkSFQoNc2hvdWxkX3JlcGxheRgCIAEoCCJ/ChdUYWlsSW52b2NhdGlvbnNSZXNwb25zZRIsCgppbnZvY2F0aW9uGAEgASgLMhguZnVuY3Rpb25zLnYxLkludm9jYXRpb24SEgoKZXZlbnRfdHlwZRgCIAEoCRIOCgZyZXBsYXkYAyABKAgSEgoKZW1pdHRlZF9hdBgEIAEoAyI2ChhHZXRJbnZvY2F0aW9uTG9nc1JlcXVlc3QSCgoCaWQYASABKAkSDgoGZm9sbG93GAIgASgIIikKGUdldEludm9jYXRpb25Mb2dzUmVzcG9uc2USDAoEZGF0YRgBIAEoDCrpAQoRRnVuY3Rpb25FcnJvcktpbmQSIwofRlVOQ1RJT05fRVJST1JfS0lORF9VTlNQRUNJRklFRBAAEh4KGkZVTkNUSU9OX0VSUk9SX0tJTkRfUkFJU0VEEAESHwobRlVOQ1RJT05fRVJST1JfS0lORF9DUkFTSEVEEAISHwobRlVOQ1RJT05fRVJST1JfS0lORF9USU1FT1VUEAMSJgoiRlVOQ1RJT05fRVJST1JfS0lORF9PVVRQVVRfSU5WQUxJRBAEEiUKIUZVTkNUSU9OX0VSUk9SX0tJTkRfSU5QVVRfSU5WQUxJRBAFKncKCVN0YXJ0S2luZBIaChZTVEFSVF9LSU5EX1VOU1BFQ0lGSUVEEAASGAoUU1RBUlRfS0lORF9DT0xEX0JPT1QQARIfChtTVEFSVF9LSU5EX1NOQVBTSE9UX1JFU1RPUkUQAhITCg9TVEFSVF9LSU5EX1dBUk0QAyqxAgoQSW52b2NhdGlvblN0YXR1cxIhCh1JTlZPQ0FUSU9OX1NUQVRVU19VTlNQRUNJRklFRBAAEh0KGUlOVk9DQVRJT05fU1RBVFVTX1BFTkRJTkcQARIeChpJTlZPQ0FUSU9OX1NUQVRVU19TVEFSVElORxACEh0KGUlOVk9DQVRJT05fU1RBVFVTX1JVTk5JTkcQAxIfChtJTlZPQ0FUSU9OX1NUQVRVU19TVUNDRUVERUQQBBIcChhJTlZPQ0FUSU9OX1NUQVRVU19GQUlMRUQQBRIdChlJTlZPQ0FUSU9OX1NUQVRVU19FUlJPUkVEEAYSHgoaSU5WT0NBVElPTl9TVEFUVVNfQ0FOQ0VMRUQQBxIeChpJTlZPQ0FUSU9OX1NUQVRVU19SRUpFQ1RFRBAIYgZwcm90bzM", [file_functions_v1_common, file_functions_v1_pagination]);
 
 /**
  * FunctionError describes a function that ran and failed. type is the
@@ -114,6 +114,19 @@ export type InvokeRequest = Message<"functions.v1.InvokeRequest"> & {
    * @generated from field: bytes input = 3;
    */
   input: Uint8Array;
+
+  /**
+   * idempotency_key makes the call safe to retry. Within the server's
+   * idempotency window, every call to the same function with the same key
+   * returns the invocation the first call started, with its output or
+   * error, instead of running again. The key is released, so that a retry
+   * runs, only when the platform never sent the invocation to a host. A
+   * call a host took but never reported on has an unknown outcome and holds
+   * the key: a retry gets ABORTED, and a new key runs again.
+   *
+   * @generated from field: string idempotency_key = 4;
+   */
+  idempotencyKey: string;
 };
 
 /**
@@ -163,6 +176,14 @@ export type InvokeResponse = Message<"functions.v1.InvokeResponse"> & {
    * @generated from field: functions.v1.InvocationStats stats = 5;
    */
   stats?: InvocationStats | undefined;
+
+  /**
+   * replayed is set when the result is an earlier invocation's, found by
+   * the request's idempotency_key, and nothing ran for this call.
+   *
+   * @generated from field: bool replayed = 6;
+   */
+  replayed: boolean;
 };
 
 /**
@@ -261,6 +282,21 @@ export type Invocation = Message<"functions.v1.Invocation"> & {
    * @generated from field: string created_by_user_id = 17;
    */
   createdByUserId: string;
+
+  /**
+   * idempotency_key is the caller's key, when the call carried one.
+   *
+   * @generated from field: string idempotency_key = 18;
+   */
+  idempotencyKey: string;
+
+  /**
+   * host is the host the invocation was sent to, empty when none took
+   * it. Set by the server when it sends it and by the host in its record.
+   *
+   * @generated from field: string host = 19;
+   */
+  host: string;
 };
 
 /**
@@ -522,6 +558,14 @@ export enum FunctionErrorKind {
    * @generated from enum value: FUNCTION_ERROR_KIND_OUTPUT_INVALID = 4;
    */
   OUTPUT_INVALID = 4,
+
+  /**
+   * INPUT_INVALID: the caller's input violates the input schema; the
+   * function never ran.
+   *
+   * @generated from enum value: FUNCTION_ERROR_KIND_INPUT_INVALID = 5;
+   */
+  INPUT_INVALID = 5,
 }
 
 /**
@@ -581,7 +625,7 @@ export enum InvocationStatus {
   UNSPECIFIED = 0,
 
   /**
-   * PENDING: accepted and validated, waiting for a instance slot.
+   * PENDING: accepted, waiting for a host to take it.
    *
    * @generated from enum value: INVOCATION_STATUS_PENDING = 1;
    */
@@ -626,6 +670,14 @@ export enum InvocationStatus {
    * @generated from enum value: INVOCATION_STATUS_CANCELED = 7;
    */
   CANCELED = 7,
+
+  /**
+   * REJECTED: the input violated the version's contract, so nothing ran;
+   * error is set.
+   *
+   * @generated from enum value: INVOCATION_STATUS_REJECTED = 8;
+   */
+  REJECTED = 8,
 }
 
 /**

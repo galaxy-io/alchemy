@@ -1,7 +1,8 @@
 // Package host is the per-machine process: it builds artifacts, runs
-// instances and serves invocations over the bus. It holds nothing durable;
-// if it dies, its instances die with it and the server records the
-// invocations it was serving as errored.
+// instances and serves invocations over the bus. It holds nothing durable
+// beyond the records of invocations it has not published yet; if it dies,
+// its instances die with it and the server records the invocations it was
+// serving as errored.
 package host
 
 import (
@@ -23,6 +24,7 @@ import (
 	hostv1 "github.com/galaxy-io/alchemy/api/host/v1"
 	supervisorv1 "github.com/galaxy-io/alchemy/api/supervisor/v1"
 	"github.com/galaxy-io/alchemy/internal/bus"
+	"github.com/galaxy-io/alchemy/internal/contract"
 	"github.com/galaxy-io/alchemy/internal/driver"
 	"github.com/galaxy-io/alchemy/internal/logs"
 )
@@ -84,12 +86,15 @@ type Host struct {
 	stop       context.CancelFunc
 	tasks      sync.WaitGroup
 
+	records   *recordQueue
+	contracts *contractCache
+
 	mu        sync.Mutex
-	artifacts map[string]*bus.Subscription // invoke subscriptions, by artifact id
-	instances map[string]*liveInstance     // every instance, by key
-	warm      map[string][]*liveInstance   // idle instances by artifact id, most recently used last
-	draining  bool                         // shutting down: nothing more is parked
-	filling   map[string]int               // prewarm boots in flight, by artifact id
+	artifacts map[string]*hostv1.Artifact // built and ready to run, by id
+	instances map[string]*liveInstance    // every instance, by key
+	warm      map[string][]*liveInstance  // idle instances by artifact id, most recently used last
+	draining  bool                        // shutting down: nothing more is parked
+	filling   map[string]int              // prewarm boots in flight, by artifact id
 }
 
 // New returns a host that is not yet serving; Run starts it. Function logs
@@ -106,9 +111,11 @@ func New(cfg Config, d driver.Driver, b *bus.Bus, logBucket, artifactBucket *blo
 		log:        log,
 		startedAt:  time.Now(),
 		slots:      make(chan struct{}, cfg.MaxConcurrency),
+		records:    newRecordQueue(b, log),
+		contracts:  newContractCache(),
 		background: bg,
 		stop:       stop,
-		artifacts:  make(map[string]*bus.Subscription),
+		artifacts:  make(map[string]*hostv1.Artifact),
 		instances:  make(map[string]*liveInstance),
 		warm:       make(map[string][]*liveInstance),
 		filling:    make(map[string]int),
@@ -123,10 +130,10 @@ func (h *Host) Run(ctx context.Context) error {
 		subject, queue string
 		handler        bus.Handler
 	}{
-		// Every host builds every artifact, so any of them can serve it.
-		{bus.BuildSubject, "", h.handleBuild},
-		// The server sends builds here for artifacts this host should serve but lacks.
+		// The server places functions on hosts: it sends this host the builds
+		// and the invocations it chose it for.
 		{bus.HostBuildSubject(h.cfg.Name), "", h.handleBuild},
+		{bus.HostInvokeSubject(h.cfg.Name), "", h.handleInvoke},
 		{bus.DescribeSubject, "", h.handleDescribe},
 		{bus.InstancesSubject, "", h.handleInstances},
 	} {
@@ -136,6 +143,7 @@ func (h *Host) Run(ctx context.Context) error {
 		}
 		subs = append(subs, sub)
 	}
+	h.tasks.Go(func() { h.records.run(h.background) })
 	h.log.Info("host serving", "slots", h.cfg.MaxConcurrency, "memory_mib", h.cfg.MemoryMiB, "warm_ttl", h.cfg.WarmTTL, "prewarm", h.cfg.Prewarm)
 
 	ticker := time.NewTicker(h.cfg.HeartbeatInterval)
@@ -150,11 +158,6 @@ func (h *Host) Run(ctx context.Context) error {
 			for _, s := range subs {
 				s.Unsubscribe()
 			}
-			h.mu.Lock()
-			for _, s := range h.artifacts {
-				s.Unsubscribe()
-			}
-			h.mu.Unlock()
 			h.drainWarm()
 			h.stop()
 			h.tasks.Wait()
@@ -164,15 +167,37 @@ func (h *Host) Run(ctx context.Context) error {
 }
 
 func (h *Host) heartbeat() {
-	h.mu.Lock()
-	ids := make([]string, 0, len(h.artifacts))
-	for id := range h.artifacts {
-		ids = append(ids, id)
-	}
-	h.mu.Unlock()
-	if err := h.bus.Publish(bus.HeartbeatSubject(h.cfg.Name), &hostv1.Heartbeat{Host: h.describe(), ArtifactIds: ids}); err != nil {
+	if err := h.bus.Publish(bus.HeartbeatSubject(h.cfg.Name), &hostv1.Heartbeat{Host: h.describe(), Artifacts: h.artifactStates()}); err != nil {
 		h.log.Warn("heartbeat", "err", err)
 	}
+}
+
+// artifactStates is what this host holds of every artifact it has built:
+// the instances waiting for an invocation and those busy with one.
+func (h *Host) artifactStates() []*hostv1.ArtifactState {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	states := make(map[string]*hostv1.ArtifactState, len(h.artifacts))
+	out := make([]*hostv1.ArtifactState, 0, len(h.artifacts))
+	for id := range h.artifacts {
+		st := &hostv1.ArtifactState{Id: id}
+		states[id] = st
+		out = append(out, st)
+	}
+	for _, live := range h.instances {
+		st, ok := states[live.artifact.GetId()]
+		if !ok {
+			continue
+		}
+		switch live.statusNow() {
+		case functionsv1.InstanceStatus_INSTANCE_STATUS_READY:
+			st.Idle++
+		case functionsv1.InstanceStatus_INSTANCE_STATUS_BOOTING, functionsv1.InstanceStatus_INSTANCE_STATUS_BUSY:
+			st.Busy++
+		default:
+		}
+	}
+	return out
 }
 
 // handleBuild builds an artifact and starts taking invocations for it.
@@ -193,10 +218,8 @@ func (h *Host) handleBuild(ctx context.Context, data []byte) proto.Message {
 		h.log.Warn("build failed", "image", req.GetSpec().GetImage(), "err", err)
 		return &hostv1.BuildResponse{Result: &hostv1.BuildResponse_Error{Error: &hostv1.Error{Code: "internal", Message: err.Error()}}, BuildLog: err.Error()}
 	}
-	artifact := toProto(req.GetTenantId(), built, req.GetLayers())
-	if err := h.serve(artifact); err != nil {
-		return buildError("internal", err)
-	}
+	artifact := toProto(req.GetTenantId(), built, req.GetLayers(), req.GetSpec().GetContract())
+	h.serve(artifact)
 	h.prewarm(artifact)
 	h.log.Info("build ready", "artifact_id", artifact.GetId(), "digest", artifact.GetDigest(), "took", time.Since(start).Round(time.Millisecond))
 	return &hostv1.BuildResponse{Result: &hostv1.BuildResponse_Artifact{Artifact: artifact}}
@@ -223,31 +246,53 @@ func buildError(code string, err error) *hostv1.BuildResponse {
 	return &hostv1.BuildResponse{Result: &hostv1.BuildResponse_Error{Error: &hostv1.Error{Code: code, Message: err.Error()}}}
 }
 
-// serve subscribes to the invoke subject for an artifact this host has
-// ready. Placement is this subscription: the server never picks a host.
-func (h *Host) serve(a *hostv1.Artifact) error {
+// serve marks an artifact ready: this host takes its invocations and
+// reports it in heartbeats, which is how the servers learn to send them.
+func (h *Host) serve(a *hostv1.Artifact) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
-	if _, ok := h.artifacts[a.GetId()]; ok {
-		return nil
-	}
-	sub, err := h.bus.Serve(h.background, bus.InvokeSubject(a.GetId()), bus.HostsQueue, h.handleInvoke)
-	if err != nil {
-		return err
-	}
-	h.artifacts[a.GetId()] = sub
-	return nil
+	h.artifacts[a.GetId()] = a
 }
 
+// serving reports whether this host has built artifact id.
+func (h *Host) serving(id string) bool {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	_, ok := h.artifacts[id]
+	return ok
+}
+
+// Keeping one output in the bucket is on the reply path, so its attempts
+// stay inside the grace the server gives a host.
+const (
+	outputUploadTimeout  = 10 * time.Second
+	outputUploadAttempts = 3
+	outputUploadBackoff  = 500 * time.Millisecond
+)
+
 // handleInvoke runs one input through an instance. Every reply is an
-// InvokeResponse; an Error result means no instance ran the input.
+// InvokeResponse; an Error result means no instance ran the input. When an
+// instance ran it, the host publishes the invocation's record as well: the
+// reply tells the caller, the record tells the database.
 func (h *Host) handleInvoke(ctx context.Context, data []byte) proto.Message {
 	req := &hostv1.InvokeRequest{}
 	if err := proto.Unmarshal(data, req); err != nil {
 		return invokeError("invalid_argument", err)
 	}
-	log := h.log.With("invocation_id", req.GetInvocationId(), "artifact_id", req.GetArtifact().GetId())
+	id := req.GetInvocation().GetId()
+	log := h.log.With("invocation_id", id, "artifact_id", req.GetArtifact().GetId())
 	start := time.Now()
+	if !h.serving(req.GetArtifact().GetId()) {
+		// The server's view of this host is stale; it builds here and retries.
+		return invokeError("not_found", errors.New("artifact is not built on this host"))
+	}
+
+	// Check the input before taking a slot: a rejected input costs no
+	// capacity, and it is the caller's mistake, so it ends here.
+	c, input, rejected := h.checkInput(req, start)
+	if rejected != nil {
+		return rejected
+	}
 
 	select {
 	case h.slots <- struct{}{}:
@@ -256,7 +301,7 @@ func (h *Host) handleInvoke(ctx context.Context, data []byte) proto.Message {
 		return invokeError("resource_exhausted", errors.New("host is at capacity"))
 	}
 
-	h.publishState(req.GetInvocationId(), functionsv1.InvocationStatus_INVOCATION_STATUS_STARTING, "", functionsv1.StartKind_START_KIND_UNSPECIFIED, 0)
+	h.publishState(req, functionsv1.InvocationStatus_INVOCATION_STATUS_STARTING, "", functionsv1.StartKind_START_KIND_UNSPECIFIED, 0)
 	live, err := h.admit(req.GetArtifact())
 	if err != nil {
 		return invokeError("resource_exhausted", err)
@@ -270,7 +315,7 @@ func (h *Host) handleInvoke(ctx context.Context, data []byte) proto.Message {
 			return invokeError("unavailable", fmt.Errorf("acquire instance: %w", err))
 		}
 	}
-	live.ready(instance, startKind, req.GetInvocationId())
+	live.ready(instance, startKind, id)
 	// An instance whose supervisor answered can take the next invocation;
 	// one that stopped answering, or any instance when warm reuse is off, is
 	// released. Neither must delay the reply.
@@ -283,7 +328,7 @@ func (h *Host) handleInvoke(ctx context.Context, data []byte) proto.Message {
 	}()
 	acquired := time.Now()
 	acquireUs := acquired.Sub(start).Microseconds()
-	h.publishState(req.GetInvocationId(), functionsv1.InvocationStatus_INVOCATION_STATUS_RUNNING, instance.ID(), startKind, acquireUs)
+	h.publishState(req, functionsv1.InvocationStatus_INVOCATION_STATUS_RUNNING, instance.ID(), startKind, acquireUs)
 
 	resp := &hostv1.InvokeResponse{
 		InstanceId: instance.ID(),
@@ -295,8 +340,8 @@ func (h *Host) handleInvoke(ctx context.Context, data []byte) proto.Message {
 	defer cancel()
 	fnLogs := h.functionLogs(req, log)
 	out, err := instance.Invoke(runCtx, &supervisorv1.InvokeRequest{
-		InvocationId: req.GetInvocationId(),
-		Input:        req.GetInput(),
+		InvocationId: id,
+		Input:        input.Wire,
 		TimeoutMs:    timeout.Milliseconds(),
 		HostTimeMs:   time.Now().UnixMilli(),
 	}, fnLogs)
@@ -305,24 +350,116 @@ func (h *Host) handleInvoke(ctx context.Context, data []byte) proto.Message {
 	case err == nil:
 		reusable = true
 		if f := out.GetFailure(); f != nil {
-			resp.Result = &hostv1.InvokeResponse_Failure{Failure: f}
+			resp.Result = &hostv1.InvokeResponse_FunctionError{FunctionError: functionError(f)}
 		} else {
-			resp.Result = &hostv1.InvokeResponse_Output{Output: out.GetOutput()}
+			checkOutput(resp, c, input, out.GetOutput(), req.GetMaxOutputBytes())
+			h.keepOutput(req.GetOutputKey(), resp.GetOutput(), log)
 		}
 		resp.RunUs = cmpNonZero(out.GetRunUs(), time.Since(acquired).Microseconds())
 	case errors.Is(runCtx.Err(), context.DeadlineExceeded):
 		// The supervisor never answered; the function is the likeliest cause.
-		resp.Result = &hostv1.InvokeResponse_Failure{Failure: &supervisorv1.Failure{
-			Kind:    supervisorv1.FailureKind_FAILURE_KIND_TIMEOUT,
+		resp.Result = &hostv1.InvokeResponse_FunctionError{FunctionError: &functionsv1.FunctionError{
+			Kind:    functionsv1.FunctionErrorKind_FUNCTION_ERROR_KIND_TIMEOUT,
 			Message: fmt.Sprintf("function exceeded its %dms timeout and the instance stopped responding", timeout.Milliseconds()),
 		}}
 		resp.RunUs = time.Since(acquired).Microseconds()
 	default:
+		// The instance stopped answering after it took the input, so the
+		// function may have run: aborted, not unavailable, tells the server
+		// the outcome is unknown rather than that nothing happened.
 		log.Warn("invoke instance", "instance_id", instance.ID(), "err", err)
-		return invokeError("unavailable", fmt.Errorf("invoke instance: %w", err))
+		return invokeError("aborted", fmt.Errorf("invoke instance: %w", err))
 	}
 	log.Debug("invocation finished", "instance_id", instance.ID(), "start_kind", startKind, "acquire_us", acquireUs, "run_us", resp.GetRunUs())
+	h.records.add(record(h.cfg.Name, req.GetInvocation(), resp, start, acquired))
 	return resp
+}
+
+// checkInput compiles the artifact's contract and checks the input against
+// it. A rejection is the reply to send, already recorded; nothing ran.
+func (h *Host) checkInput(req *hostv1.InvokeRequest, start time.Time) (contract.Contract, *contract.Input, proto.Message) {
+	c, err := h.contracts.get(req.GetArtifact().GetContract())
+	if err != nil {
+		return nil, nil, invokeError("failed_precondition", fmt.Errorf("compile contract: %w", err))
+	}
+	input, violations, err := c.EncodeInput(req.GetInput())
+	if err != nil {
+		return nil, nil, invokeError("internal", fmt.Errorf("encode input: %w", err))
+	}
+	if len(violations) == 0 {
+		return c, input, nil
+	}
+	resp := &hostv1.InvokeResponse{Result: &hostv1.InvokeResponse_FunctionError{FunctionError: &functionsv1.FunctionError{
+		Kind:       functionsv1.FunctionErrorKind_FUNCTION_ERROR_KIND_INPUT_INVALID,
+		Message:    "input violates the version's input schema",
+		Violations: violations,
+	}}}
+	h.records.add(record(h.cfg.Name, req.GetInvocation(), resp, start, time.Time{}))
+	return nil, nil, resp
+}
+
+// checkOutput sets resp's result from raw, enforcing the output side of the
+// contract and the size limit (0: unbounded). What it sets is what the
+// caller receives.
+func checkOutput(resp *hostv1.InvokeResponse, c contract.Contract, input *contract.Input, raw []byte, maxBytes int64) {
+	fail := func(message string, violations []*functionsv1.ContractViolation) {
+		resp.Result = &hostv1.InvokeResponse_FunctionError{FunctionError: &functionsv1.FunctionError{
+			Kind:       functionsv1.FunctionErrorKind_FUNCTION_ERROR_KIND_OUTPUT_INVALID,
+			Message:    message,
+			Violations: violations,
+		}}
+	}
+	if maxBytes > 0 && int64(len(raw)) > maxBytes {
+		fail(fmt.Sprintf("output is %d bytes; the limit is %d", len(raw), maxBytes), nil)
+		return
+	}
+	checked, violations, err := c.DecodeOutput(input, raw)
+	switch {
+	case err != nil:
+		fail(fmt.Sprintf("output could not be decoded: %v", err), nil)
+	case len(violations) > 0:
+		fail("output violates the version's contract", violations)
+	default:
+		resp.Result = &hostv1.InvokeResponse_Output{Output: checked}
+	}
+}
+
+// keepOutput stores a checked output in the bucket at key before the host
+// replies, so that a reply means the output is there for a server to
+// replay. Only keyed calls ask for it and pay the upload. An upload that
+// keeps failing is given up on: the caller still gets its result, and a
+// retry finds no output and learns the key is held.
+func (h *Host) keepOutput(key string, out []byte, log *slog.Logger) {
+	if key == "" || h.logs == nil {
+		return
+	}
+	ctx, cancel := context.WithTimeout(h.background, outputUploadTimeout)
+	defer cancel()
+	var err error
+	for attempt := 0; attempt < outputUploadAttempts && ctx.Err() == nil; attempt++ {
+		if err = logs.WriteOutput(ctx, h.logs, key, out); err == nil {
+			return
+		}
+		select {
+		case <-ctx.Done():
+		case <-time.After(outputUploadBackoff):
+		}
+	}
+	log.Error("output was not kept; a retry of its idempotency key cannot replay it", "key", key, "err", err)
+}
+
+// functionError is a supervisor failure as the caller sees it.
+func functionError(f *supervisorv1.Failure) *functionsv1.FunctionError {
+	fe := &functionsv1.FunctionError{Message: f.GetMessage(), Type: f.GetType()}
+	switch f.GetKind() {
+	case supervisorv1.FailureKind_FAILURE_KIND_RAISED:
+		fe.Kind = functionsv1.FunctionErrorKind_FUNCTION_ERROR_KIND_RAISED
+	case supervisorv1.FailureKind_FAILURE_KIND_TIMEOUT:
+		fe.Kind = functionsv1.FunctionErrorKind_FUNCTION_ERROR_KIND_TIMEOUT
+	default:
+		fe.Kind = functionsv1.FunctionErrorKind_FUNCTION_ERROR_KIND_CRASHED
+	}
+	return fe
 }
 
 // functionLog is where one invocation's stderr goes: the bus, and the log
@@ -336,7 +473,7 @@ type functionLog struct {
 
 func (h *Host) functionLogs(req *hostv1.InvokeRequest, log *slog.Logger) *functionLog {
 	tenantID := req.GetArtifact().GetTenantId()
-	subject := bus.LogSubject(tenantID, req.GetInvocationId())
+	subject := bus.LogSubject(tenantID, req.GetInvocation().GetId())
 	w := logs.NewWriter(h.background, h.logs, req.GetLogKey(),
 		func(p []byte) error { return h.bus.PublishLog(subject, p) }, log)
 	return &functionLog{Writer: w, h: h, subject: subject, log: log}
@@ -359,16 +496,20 @@ func invokeError(code string, err error) *hostv1.InvokeResponse {
 	return &hostv1.InvokeResponse{Result: &hostv1.InvokeResponse_Error{Error: &hostv1.Error{Code: code, Message: err.Error()}}}
 }
 
-func (h *Host) publishState(invocationID string, status functionsv1.InvocationStatus, instanceID string, kind functionsv1.StartKind, acquireUs int64) {
-	err := h.bus.Publish(bus.InvocationStateSubject(invocationID), &hostv1.InvocationEvent{
-		InvocationId: invocationID,
+// publishState tells the server that sent req how its invocation is doing.
+func (h *Host) publishState(req *hostv1.InvokeRequest, status functionsv1.InvocationStatus, instanceID string, kind functionsv1.StartKind, acquireUs int64) {
+	if req.GetStateSubject() == "" {
+		return
+	}
+	err := h.bus.Publish(req.GetStateSubject(), &hostv1.InvocationEvent{
+		InvocationId: req.GetInvocation().GetId(),
 		Status:       status,
 		InstanceId:   instanceID,
 		StartKind:    kind,
 		AcquireUs:    acquireUs,
 	})
 	if err != nil {
-		h.log.Warn("publish invocation state", "invocation_id", invocationID, "err", err)
+		h.log.Warn("publish invocation state", "invocation_id", req.GetInvocation().GetId(), "err", err)
 	}
 }
 
@@ -571,7 +712,9 @@ func (h *Host) handleInstances(context.Context, []byte) proto.Message {
 	h.mu.Unlock()
 	resp := &hostv1.ListInstancesResponse{}
 	for _, live := range all {
-		resp.Instances = append(resp.Instances, live.proto())
+		in := live.proto()
+		in.Host = h.cfg.Name
+		resp.Instances = append(resp.Instances, in)
 	}
 	sort.Slice(resp.Instances, func(i, j int) bool { return resp.Instances[i].GetStartedAt() < resp.Instances[j].GetStartedAt() })
 	return resp
@@ -663,6 +806,12 @@ func (live *liveInstance) releasing() {
 	live.mu.Lock()
 	live.status = functionsv1.InstanceStatus_INSTANCE_STATUS_RELEASING
 	live.mu.Unlock()
+}
+
+func (live *liveInstance) statusNow() functionsv1.InstanceStatus {
+	live.mu.Lock()
+	defer live.mu.Unlock()
+	return live.status
 }
 
 func (live *liveInstance) proto() *functionsv1.Instance {

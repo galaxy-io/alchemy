@@ -1,0 +1,24 @@
+{{- if .Values.server.autoscaling.enabled }}
+{{- $scaling := .Values.server.autoscaling }}
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: {{ include "alchemy.server.fullname" . }}
+  namespace: {{ include "alchemy.namespace" . }}
+  labels:
+    {{- include "alchemy.server.labels" . | nindent 4 }}
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: {{ include "alchemy.server.fullname" . }}
+  minReplicas: {{ $scaling.minReplicas }}
+  maxReplicas: {{ $scaling.maxReplicas }}
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: {{ $scaling.targetCPUUtilizationPercentage }}
+{{- end }}

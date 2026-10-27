@@ -9,7 +9,6 @@ import (
 	"fmt"
 	"log/slog"
 	"sync"
-	"sync/atomic"
 	"time"
 
 	"connectrpc.com/connect"
@@ -23,7 +22,6 @@ import (
 	"github.com/galaxy-io/alchemy/datastore/postgres"
 	"github.com/galaxy-io/alchemy/datastore/postgres/sqlcgen"
 	"github.com/galaxy-io/alchemy/internal/bus"
-	"github.com/galaxy-io/alchemy/internal/contract"
 )
 
 // Config tunes the service's limits and defaults.
@@ -40,6 +38,12 @@ type Config struct {
 	GatherWindow time.Duration
 	// HostTTL is how long a host stays listed after its last heartbeat.
 	HostTTL time.Duration
+	// HostsPerFunction is how many hosts each function is built on and
+	// takes invocations from, when that many are live.
+	HostsPerFunction int
+	// IdempotencyWindow is how long a call's idempotency key keeps later
+	// calls with the same key from running again.
+	IdempotencyWindow time.Duration
 	// LogRetention is how long the bus keeps the latest lines of every
 	// invocation's log, for live and recent reads. The log bucket keeps all
 	// of it after that.
@@ -47,37 +51,52 @@ type Config struct {
 	// LogMaxBytes bounds what the bus keeps across all invocations; the
 	// oldest lines go first.
 	LogMaxBytes int64
+	// Name is the server's identity on the bus; the hostname by default.
+	Name string
+	// InvocationRetention is how long the bus keeps an invocation record no
+	// server has written yet, such as through a database outage.
+	InvocationRetention time.Duration
+	// InvocationReplicas is how many NATS servers keep each record.
+	InvocationReplicas int
 }
 
 // DefaultConfig returns the defaults server starts with.
 func DefaultConfig() Config {
 	return Config{
-		DefaultTimeout:  30 * time.Second,
-		MaxTimeout:      5 * time.Minute,
-		MaxPayloadBytes: 64 << 20,
-		DefaultVCPUs:    1,
-		DefaultMemMiB:   128,
-		BuildTimeout:    5 * time.Minute,
-		GatherWindow:    500 * time.Millisecond,
-		HostTTL:         10 * time.Second,
-		LogRetention:    time.Hour,
-		LogMaxBytes:     1 << 30,
+		DefaultTimeout:      30 * time.Second,
+		MaxTimeout:          5 * time.Minute,
+		MaxPayloadBytes:     64 << 20,
+		DefaultVCPUs:        1,
+		DefaultMemMiB:       128,
+		BuildTimeout:        5 * time.Minute,
+		GatherWindow:        500 * time.Millisecond,
+		HostTTL:             10 * time.Second,
+		HostsPerFunction:    3,
+		IdempotencyWindow:   24 * time.Hour,
+		LogRetention:        time.Hour,
+		LogMaxBytes:         1 << 30,
+		InvocationRetention: 24 * time.Hour,
+		InvocationReplicas:  1,
 	}
 }
 
-// Service is the control plane. Durable state is in Postgres; what lives in
-// memory is per-process: compiled contracts, what hosts last said about
-// themselves, and the event stream.
+// Service is the control plane. Any number of them run side by side.
+// Functions and versions are in Postgres. Invocations are not written while
+// they run: the server that accepted one holds it in memory until it ends,
+// and its record reaches the database afterwards through the bus. What
+// else lives in memory is a view every server keeps for itself: compiled
+// contracts, and what hosts and the other servers last said about
+// themselves.
 type Service struct {
 	functionsv1connect.UnimplementedFunctionsServiceHandler
 
-	cfg    Config
-	store  *postgres.Store
-	bus    *bus.Bus
-	logs   *blob.Bucket // nil when function logs are kept on the bus only
-	log    *slog.Logger
-	tenant string
-	events *eventBus
+	cfg     Config
+	store   *postgres.Store
+	bus     *bus.Bus
+	logs    *blob.Bucket // nil when function logs are kept on the bus only
+	log     *slog.Logger
+	tenant  string
+	tracker *invocationTracker // invocations this server holds
 
 	// background scopes builds and subscriptions to the service's life.
 	background context.Context
@@ -88,23 +107,21 @@ type Service struct {
 	mu         sync.Mutex
 	versions   map[string]*compiledVersion // by version id
 	hosts      map[string]*knownHost       // by host name, from heartbeats
+	servers    map[string]*knownServer     // by server name, from heartbeats
 	hostBuilds map[string]time.Time        // builds sent to one host, by host/artifact
-
-	waiting atomic.Int64 // invocations held for a slot, see Scaling
 }
 
 // compiledVersion is the in-memory half of a ready version.
 type compiledVersion struct {
 	row      *sqlcgen.FunctionVersion
 	spec     *functionsv1.FunctionSpec
-	contract contract.Contract
 	artifact *hostv1.Artifact
 }
 
 // New returns a service backed by store and b, reading function logs from
-// logBucket when there is one. It sets up the bus's log stream, cancels
-// invocations left active by a previous process, resumes interrupted builds
-// and starts listening to hosts.
+// logBucket when there is one. It sets up the bus's streams, starts
+// listening to hosts and other servers, and starts writing invocation
+// records.
 func New(ctx context.Context, cfg Config, store *postgres.Store, b *bus.Bus, logBucket *blob.Bucket, log *slog.Logger) (*Service, error) {
 	bg, stop := context.WithCancel(context.Background())
 	s := &Service{
@@ -114,11 +131,12 @@ func New(ctx context.Context, cfg Config, store *postgres.Store, b *bus.Bus, log
 		logs:       logBucket,
 		log:        log,
 		tenant:     postgres.DefaultTenantID,
-		events:     newEventBus(),
+		tracker:    newTracker(),
 		background: bg,
 		stop:       stop,
 		versions:   make(map[string]*compiledVersion),
 		hosts:      make(map[string]*knownHost),
+		servers:    make(map[string]*knownServer),
 		hostBuilds: make(map[string]time.Time),
 	}
 
@@ -126,28 +144,28 @@ func New(ctx context.Context, cfg Config, store *postgres.Store, b *bus.Bus, log
 		stop()
 		return nil, fmt.Errorf("%w (NATS must have JetStream enabled)", err)
 	}
-	n, err := store.CancelStaleInvocations(ctx)
-	if err != nil {
+	if err := b.EnsureInvocationStream(ctx, bus.InvocationStreamConfig{MaxAge: cfg.InvocationRetention, Replicas: cfg.InvocationReplicas}); err != nil {
 		stop()
 		return nil, err
 	}
-	if n > 0 {
-		log.Warn("canceled invocations left active by a previous process", "count", n)
+	// A starting server has nothing in flight, so claims in its name that
+	// were never marked with a host are a previous process's, lost between
+	// claiming and sending. They are released before this name is live
+	// again, or a retry would wait on them for the whole window.
+	if n, err := store.ReleaseServerIdempotencyKeys(ctx, cfg.Name); err != nil {
+		stop()
+		return nil, fmt.Errorf("release idempotency keys: %w", err)
+	} else if n > 0 {
+		log.Info("released idempotency keys a previous process never sent", "count", n)
 	}
 	if err := s.listen(); err != nil {
 		stop()
 		return nil, err
 	}
-	building, err := store.ListBuildingFunctionVersions(ctx)
-	if err != nil {
-		stop()
-		return nil, err
-	}
-	for _, v := range building {
-		log.Info("resuming build", "function_id", v.FunctionID, "version", v.Version)
-		s.startBuild(v)
-	}
+	s.tasks.Go(s.heartbeat)
+	s.tasks.Go(s.record)
 	s.tasks.Go(s.reconcileHosts)
+	s.tasks.Go(s.expireKeys)
 	return s, nil
 }
 
@@ -176,15 +194,11 @@ func (s *Service) compiled(row *sqlcgen.FunctionVersion) (*compiledVersion, erro
 	if err != nil {
 		return nil, err
 	}
-	c, err := contract.Compile(spec.GetContract())
-	if err != nil {
-		return nil, err
-	}
 	artifact := &hostv1.Artifact{}
 	if err := protojson.Unmarshal(row.Artifact, artifact); err != nil {
 		return nil, fmt.Errorf("stored artifact: %w", err)
 	}
-	cv = &compiledVersion{row: row, spec: spec, contract: c, artifact: artifact}
+	cv = &compiledVersion{row: row, spec: spec, artifact: artifact}
 	s.mu.Lock()
 	s.versions[row.ID] = cv
 	s.mu.Unlock()

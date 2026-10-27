@@ -11,20 +11,6 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
-const cancelStaleInvocations = `-- name: CancelStaleInvocations :execrows
-UPDATE invocations
-SET status = 'canceled', platform_error = 'server restarted', ended_at = now()
-WHERE status IN ('pending', 'starting', 'running')
-`
-
-func (q *Queries) CancelStaleInvocations(ctx context.Context) (int64, error) {
-	result, err := q.db.Exec(ctx, cancelStaleInvocations)
-	if err != nil {
-		return 0, err
-	}
-	return result.RowsAffected(), nil
-}
-
 const countInvocations = `-- name: CountInvocations :one
 SELECT count(*) FROM invocations
 WHERE tenant_id = $1
@@ -58,106 +44,8 @@ func (q *Queries) CountInvocations(ctx context.Context, arg CountInvocationsPara
 	return count, err
 }
 
-const createInvocation = `-- name: CreateInvocation :one
-INSERT INTO invocations (tenant_id, function_id, version, input_bytes, created_by_user_id)
-VALUES ($1, $2, $3, $4, $5)
-RETURNING id, tenant_id, function_id, version, status, start_kind, acquire_us, run_us, total_us, error, platform_error, input_bytes, output_bytes, instance_id, created_by_user_id, created_at, started_at, ended_at
-`
-
-type CreateInvocationParams struct {
-	TenantID        string
-	FunctionID      string
-	Version         int64
-	InputBytes      int64
-	CreatedByUserID pgtype.Text
-}
-
-func (q *Queries) CreateInvocation(ctx context.Context, arg CreateInvocationParams) (*Invocation, error) {
-	row := q.db.QueryRow(ctx, createInvocation,
-		arg.TenantID,
-		arg.FunctionID,
-		arg.Version,
-		arg.InputBytes,
-		arg.CreatedByUserID,
-	)
-	var i Invocation
-	err := row.Scan(
-		&i.ID,
-		&i.TenantID,
-		&i.FunctionID,
-		&i.Version,
-		&i.Status,
-		&i.StartKind,
-		&i.AcquireUs,
-		&i.RunUs,
-		&i.TotalUs,
-		&i.Error,
-		&i.PlatformError,
-		&i.InputBytes,
-		&i.OutputBytes,
-		&i.InstanceID,
-		&i.CreatedByUserID,
-		&i.CreatedAt,
-		&i.StartedAt,
-		&i.EndedAt,
-	)
-	return &i, err
-}
-
-const finishInvocation = `-- name: FinishInvocation :one
-UPDATE invocations
-SET status = $2, run_us = $3, total_us = $4, error = $5, platform_error = $6,
-    output_bytes = $7, ended_at = now()
-WHERE id = $1
-RETURNING id, tenant_id, function_id, version, status, start_kind, acquire_us, run_us, total_us, error, platform_error, input_bytes, output_bytes, instance_id, created_by_user_id, created_at, started_at, ended_at
-`
-
-type FinishInvocationParams struct {
-	ID            string
-	Status        InvocationStatus
-	RunUs         int64
-	TotalUs       int64
-	Error         []byte
-	PlatformError string
-	OutputBytes   int64
-}
-
-func (q *Queries) FinishInvocation(ctx context.Context, arg FinishInvocationParams) (*Invocation, error) {
-	row := q.db.QueryRow(ctx, finishInvocation,
-		arg.ID,
-		arg.Status,
-		arg.RunUs,
-		arg.TotalUs,
-		arg.Error,
-		arg.PlatformError,
-		arg.OutputBytes,
-	)
-	var i Invocation
-	err := row.Scan(
-		&i.ID,
-		&i.TenantID,
-		&i.FunctionID,
-		&i.Version,
-		&i.Status,
-		&i.StartKind,
-		&i.AcquireUs,
-		&i.RunUs,
-		&i.TotalUs,
-		&i.Error,
-		&i.PlatformError,
-		&i.InputBytes,
-		&i.OutputBytes,
-		&i.InstanceID,
-		&i.CreatedByUserID,
-		&i.CreatedAt,
-		&i.StartedAt,
-		&i.EndedAt,
-	)
-	return &i, err
-}
-
 const getInvocation = `-- name: GetInvocation :one
-SELECT id, tenant_id, function_id, version, status, start_kind, acquire_us, run_us, total_us, error, platform_error, input_bytes, output_bytes, instance_id, created_by_user_id, created_at, started_at, ended_at FROM invocations WHERE tenant_id = $1 AND id = $2
+SELECT id, tenant_id, function_id, version, status, start_kind, acquire_us, run_us, total_us, error, platform_error, input_bytes, output_bytes, instance_id, idempotency_key, host, created_by_user_id, created_at, started_at, ended_at FROM invocations WHERE tenant_id = $1 AND id = $2
 `
 
 type GetInvocationParams struct {
@@ -183,6 +71,8 @@ func (q *Queries) GetInvocation(ctx context.Context, arg GetInvocationParams) (*
 		&i.InputBytes,
 		&i.OutputBytes,
 		&i.InstanceID,
+		&i.IdempotencyKey,
+		&i.Host,
 		&i.CreatedByUserID,
 		&i.CreatedAt,
 		&i.StartedAt,
@@ -191,60 +81,104 @@ func (q *Queries) GetInvocation(ctx context.Context, arg GetInvocationParams) (*
 	return &i, err
 }
 
-const listActiveInvocations = `-- name: ListActiveInvocations :many
-SELECT id, tenant_id, function_id, version, status, start_kind, acquire_us, run_us, total_us, error, platform_error, input_bytes, output_bytes, instance_id, created_by_user_id, created_at, started_at, ended_at FROM invocations
-WHERE tenant_id = $1
-  AND ($2::uuid IS NULL OR function_id = $2)
-  AND status IN ('pending', 'starting', 'running')
-ORDER BY created_at
+const insertInvocations = `-- name: InsertInvocations :exec
+WITH r AS (
+  SELECT
+    unnest($2::uuid[]) AS id,
+    unnest($3::uuid[]) AS tenant_id,
+    unnest($4::uuid[]) AS function_id,
+    unnest($5::bigint[]) AS version,
+    unnest($6::text[]) AS status,
+    unnest($7::text[]) AS start_kind,
+    unnest($8::bigint[]) AS acquire_us,
+    unnest($9::bigint[]) AS run_us,
+    unnest($10::bigint[]) AS total_us,
+    unnest($11::text[]) AS error,
+    unnest($12::text[]) AS platform_error,
+    unnest($13::bigint[]) AS input_bytes,
+    unnest($14::bigint[]) AS output_bytes,
+    unnest($15::text[]) AS instance_id,
+    unnest($16::text[]) AS idempotency_key,
+    unnest($17::text[]) AS host,
+    unnest($18::text[]) AS created_by_user_id,
+    unnest($19::timestamptz[]) AS created_at,
+    unnest($20::timestamptz[]) AS started_at,
+    unnest($21::timestamptz[]) AS ended_at
+)
+INSERT INTO invocations (id, tenant_id, function_id, version, status, start_kind, acquire_us, run_us, total_us,
+                         error, platform_error, input_bytes, output_bytes, instance_id, idempotency_key, host, created_by_user_id,
+                         created_at, started_at, ended_at)
+SELECT id, tenant_id, function_id, version, status::invocation_status, nullif(start_kind, '')::start_kind,
+       acquire_us, run_us, total_us, nullif(error, '')::jsonb, platform_error, input_bytes, output_bytes, instance_id, idempotency_key, host,
+       u.id, created_at, started_at, ended_at
+FROM r
+LEFT JOIN users u ON u.id = nullif(r.created_by_user_id, '')::uuid
+ON CONFLICT (id) DO UPDATE SET
+  status = excluded.status, start_kind = excluded.start_kind, acquire_us = excluded.acquire_us,
+  run_us = excluded.run_us, total_us = excluded.total_us, error = excluded.error,
+  platform_error = excluded.platform_error, output_bytes = excluded.output_bytes,
+  instance_id = excluded.instance_id, host = excluded.host, started_at = excluded.started_at, ended_at = excluded.ended_at
+WHERE $1::boolean
 `
 
-type ListActiveInvocationsParams struct {
-	TenantID   string
-	FunctionID pgtype.Text
+type InsertInvocationsParams struct {
+	Override         bool
+	Ids              []string
+	TenantIds        []string
+	FunctionIds      []string
+	Versions         []int64
+	Statuses         []string
+	StartKinds       []string
+	AcquireUs        []int64
+	RunUs            []int64
+	TotalUs          []int64
+	Errors           []string
+	PlatformErrors   []string
+	InputBytes       []int64
+	OutputBytes      []int64
+	InstanceIds      []string
+	IdempotencyKeys  []string
+	Hosts            []string
+	CreatedByUserIds []string
+	CreatedAts       []pgtype.Timestamptz
+	StartedAts       []pgtype.Timestamptz
+	EndedAts         []pgtype.Timestamptz
 }
 
-func (q *Queries) ListActiveInvocations(ctx context.Context, arg ListActiveInvocationsParams) ([]*Invocation, error) {
-	rows, err := q.db.Query(ctx, listActiveInvocations, arg.TenantID, arg.FunctionID)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var items []*Invocation
-	for rows.Next() {
-		var i Invocation
-		if err := rows.Scan(
-			&i.ID,
-			&i.TenantID,
-			&i.FunctionID,
-			&i.Version,
-			&i.Status,
-			&i.StartKind,
-			&i.AcquireUs,
-			&i.RunUs,
-			&i.TotalUs,
-			&i.Error,
-			&i.PlatformError,
-			&i.InputBytes,
-			&i.OutputBytes,
-			&i.InstanceID,
-			&i.CreatedByUserID,
-			&i.CreatedAt,
-			&i.StartedAt,
-			&i.EndedAt,
-		); err != nil {
-			return nil, err
-		}
-		items = append(items, &i)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
+// One row per element of the arrays, which all have the same length. A
+// record of an invocation already written changes it only when override is
+// set: a host's record over a server's, since the host knows what ran. A
+// user deleted since the invocation ran is left null, so a late record
+// never fails on the reference. Functions are never deleted, only flagged.
+func (q *Queries) InsertInvocations(ctx context.Context, arg InsertInvocationsParams) error {
+	_, err := q.db.Exec(ctx, insertInvocations,
+		arg.Override,
+		arg.Ids,
+		arg.TenantIds,
+		arg.FunctionIds,
+		arg.Versions,
+		arg.Statuses,
+		arg.StartKinds,
+		arg.AcquireUs,
+		arg.RunUs,
+		arg.TotalUs,
+		arg.Errors,
+		arg.PlatformErrors,
+		arg.InputBytes,
+		arg.OutputBytes,
+		arg.InstanceIds,
+		arg.IdempotencyKeys,
+		arg.Hosts,
+		arg.CreatedByUserIds,
+		arg.CreatedAts,
+		arg.StartedAts,
+		arg.EndedAts,
+	)
+	return err
 }
 
 const listInvocations = `-- name: ListInvocations :many
-SELECT id, tenant_id, function_id, version, status, start_kind, acquire_us, run_us, total_us, error, platform_error, input_bytes, output_bytes, instance_id, created_by_user_id, created_at, started_at, ended_at FROM invocations
+SELECT id, tenant_id, function_id, version, status, start_kind, acquire_us, run_us, total_us, error, platform_error, input_bytes, output_bytes, instance_id, idempotency_key, host, created_by_user_id, created_at, started_at, ended_at FROM invocations
 WHERE tenant_id = $1
   AND (cardinality($2::uuid[]) = 0 OR function_id = ANY($2::uuid[]))
   AND (cardinality($3::text[]) = 0 OR status::text = ANY($3::text[]))
@@ -299,6 +233,8 @@ func (q *Queries) ListInvocations(ctx context.Context, arg ListInvocationsParams
 			&i.InputBytes,
 			&i.OutputBytes,
 			&i.InstanceID,
+			&i.IdempotencyKey,
+			&i.Host,
 			&i.CreatedByUserID,
 			&i.CreatedAt,
 			&i.StartedAt,
@@ -312,79 +248,4 @@ func (q *Queries) ListInvocations(ctx context.Context, arg ListInvocationsParams
 		return nil, err
 	}
 	return items, nil
-}
-
-const setInvocationRunning = `-- name: SetInvocationRunning :one
-UPDATE invocations
-SET status = 'running', start_kind = $2, instance_id = $3, acquire_us = $4, started_at = now()
-WHERE id = $1
-RETURNING id, tenant_id, function_id, version, status, start_kind, acquire_us, run_us, total_us, error, platform_error, input_bytes, output_bytes, instance_id, created_by_user_id, created_at, started_at, ended_at
-`
-
-type SetInvocationRunningParams struct {
-	ID         string
-	StartKind  NullStartKind
-	InstanceID string
-	AcquireUs  int64
-}
-
-func (q *Queries) SetInvocationRunning(ctx context.Context, arg SetInvocationRunningParams) (*Invocation, error) {
-	row := q.db.QueryRow(ctx, setInvocationRunning,
-		arg.ID,
-		arg.StartKind,
-		arg.InstanceID,
-		arg.AcquireUs,
-	)
-	var i Invocation
-	err := row.Scan(
-		&i.ID,
-		&i.TenantID,
-		&i.FunctionID,
-		&i.Version,
-		&i.Status,
-		&i.StartKind,
-		&i.AcquireUs,
-		&i.RunUs,
-		&i.TotalUs,
-		&i.Error,
-		&i.PlatformError,
-		&i.InputBytes,
-		&i.OutputBytes,
-		&i.InstanceID,
-		&i.CreatedByUserID,
-		&i.CreatedAt,
-		&i.StartedAt,
-		&i.EndedAt,
-	)
-	return &i, err
-}
-
-const setInvocationStarting = `-- name: SetInvocationStarting :one
-UPDATE invocations SET status = 'starting' WHERE id = $1 RETURNING id, tenant_id, function_id, version, status, start_kind, acquire_us, run_us, total_us, error, platform_error, input_bytes, output_bytes, instance_id, created_by_user_id, created_at, started_at, ended_at
-`
-
-func (q *Queries) SetInvocationStarting(ctx context.Context, id string) (*Invocation, error) {
-	row := q.db.QueryRow(ctx, setInvocationStarting, id)
-	var i Invocation
-	err := row.Scan(
-		&i.ID,
-		&i.TenantID,
-		&i.FunctionID,
-		&i.Version,
-		&i.Status,
-		&i.StartKind,
-		&i.AcquireUs,
-		&i.RunUs,
-		&i.TotalUs,
-		&i.Error,
-		&i.PlatformError,
-		&i.InputBytes,
-		&i.OutputBytes,
-		&i.InstanceID,
-		&i.CreatedByUserID,
-		&i.CreatedAt,
-		&i.StartedAt,
-		&i.EndedAt,
-	)
-	return &i, err
 }

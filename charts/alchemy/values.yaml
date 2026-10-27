@@ -77,9 +77,35 @@ server:
     # -- Annotations for the chart-created server ServiceAccount, e.g. an IRSA role ARN.
     annotations: {}
 
-  # -- Number of server replicas. Keep at 1: invocation state events are not
-  # yet shared between replicas.
+  # -- Number of server replicas when `server.autoscaling.enabled` is false.
+  # Any replica serves any request.
   replicas: 1
+
+  # -- How many hosts each function is built on and takes invocations from,
+  # when that many are live. Builds, root filesystems and warm instances
+  # scale with functions times this, not functions times hosts.
+  hostsPerFunction: 3
+
+  # -- How long an invoke's idempotency key keeps a retry with the same key
+  # from running the function again.
+  idempotencyWindow: 24h
+
+  autoscaling:
+    # -- Scale servers with a HorizontalPodAutoscaler on CPU. Needs
+    # `server.resources.requests.cpu`.
+    enabled: false
+    minReplicas: 1
+    maxReplicas: 5
+    # -- Average CPU, as a percent of the request, to hold the servers at.
+    targetCPUUtilizationPercentage: 70
+
+  podDisruptionBudget:
+    # -- Keep a PodDisruptionBudget for the server.
+    enabled: true
+    # -- Server pods that must stay up through voluntary disruptions such as
+    # node drains. With one replica a drain waits for it, so the budget only
+    # applies when there is more than one replica or autoscaling is on.
+    minAvailable: 1
 
   # -- Server log level: `debug`, `info`, `warn` or `error`.
   logLevel: info
@@ -259,17 +285,19 @@ nats:
   config:
     jetstream:
       # -- Enable JetStream in the vendored NATS chart. Alchemy keeps recent
-      # function logs in a JetStream stream.
+      # function logs and unwritten invocation records in JetStream streams.
       enabled: true
       memoryStore:
-        # -- Keep JetStream in memory. Function logs are the only stream, and
-        # the bucket keeps them.
+        # -- Keep function logs in memory; the bucket is their lasting copy.
         enabled: true
         # -- JetStream memory limit. Covers `functionLogs.maxBytes`.
         maxSize: 1Gi
       fileStore:
-        # -- No JetStream file storage, so no volume.
-        enabled: false
+        # -- Keep invocation records on disk until a server writes them to
+        # PostgreSQL, so a NATS restart loses none.
+        enabled: true
+        pvc:
+          size: 10Gi
     merge:
       # -- Largest message NATS accepts. Payloads carry whole function inputs
       # and outputs, so this matches the server's payload limit.

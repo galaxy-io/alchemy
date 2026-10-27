@@ -7,10 +7,12 @@ import (
 	"context"
 	"embed"
 	"fmt"
+	"io/fs"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/jackc/pgx/v5/stdlib"
 	"github.com/pressly/goose/v3"
+	"github.com/pressly/goose/v3/lock"
 
 	"github.com/galaxy-io/alchemy/datastore/postgres/sqlcgen"
 )
@@ -44,16 +46,26 @@ func Open(ctx context.Context, dsn string) (*Store, error) {
 // Close releases the pool.
 func (s *Store) Close() { s.pool.Close() }
 
-// Migrate applies pending migrations. server runs it on every start;
-// goose keeps its own version table.
+// Migrate applies pending migrations. Every server runs it on start, so it
+// holds a Postgres advisory lock while it does: servers starting together
+// migrate one at a time, and the later ones find nothing to do. goose keeps
+// its own version table.
 func (s *Store) Migrate(ctx context.Context) error {
 	db := stdlib.OpenDBFromPool(s.pool)
 	defer func() { _ = db.Close() }()
-	goose.SetBaseFS(migrations)
-	if err := goose.SetDialect("postgres"); err != nil {
-		return fmt.Errorf("datastore/postgres: set dialect: %w", err)
+	fsys, err := fs.Sub(migrations, "migrations")
+	if err != nil {
+		return fmt.Errorf("datastore/postgres: migrations: %w", err)
 	}
-	if err := goose.UpContext(ctx, db, "migrations"); err != nil {
+	locker, err := lock.NewPostgresSessionLocker()
+	if err != nil {
+		return fmt.Errorf("datastore/postgres: migration lock: %w", err)
+	}
+	p, err := goose.NewProvider(goose.DialectPostgres, db, fsys, goose.WithSessionLocker(locker))
+	if err != nil {
+		return fmt.Errorf("datastore/postgres: migrate: %w", err)
+	}
+	if _, err := p.Up(ctx); err != nil {
 		return fmt.Errorf("datastore/postgres: migrate: %w", err)
 	}
 	return nil
