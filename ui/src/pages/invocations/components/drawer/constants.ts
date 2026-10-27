@@ -12,4 +12,5 @@ export const INVOCATION_DRAWER_STATUS_TO_ALERT_VARIANT_MAP: Record<InvocationSta
     [InvocationStatus.FAILED]: AlertVariant.ERROR,
     [InvocationStatus.ERRORED]: AlertVariant.WARNING,
     [InvocationStatus.CANCELED]: AlertVariant.PRIMARY,
+    [InvocationStatus.REJECTED]: AlertVariant.WARNING,
   };

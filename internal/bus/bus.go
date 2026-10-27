@@ -16,21 +16,17 @@ import (
 
 // Subjects. Hosts subscribe; the server publishes and requests.
 const (
-	BuildSubject     = "host.build"
 	DescribeSubject  = "host.describe"
 	InstancesSubject = "host.instances"
-	// HostsQueue is the queue group hosts join on an artifact's invoke
-	// subject, so exactly one host takes each invocation.
-	HostsQueue = "hosts"
 	// ServerInvocationsSubject is where every server answers with the
 	// invocations it holds.
 	ServerInvocationsSubject = "server.invocations"
 )
 
-// InvokeSubject is where hosts that have artifactID ready take invocations.
-func InvokeSubject(artifactID string) string { return "host.invoke." + artifactID }
+// HostInvokeSubject is where host name takes invocations.
+func HostInvokeSubject(name string) string { return "host." + name + ".invoke" }
 
-// HostBuildSubject is where host name alone takes builds.
+// HostBuildSubject is where host name takes builds.
 func HostBuildSubject(name string) string { return "host." + name + ".build" }
 
 // HeartbeatSubject is where host name announces itself.

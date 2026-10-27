@@ -66,6 +66,8 @@ func invocationProto(i *sqlcgen.Invocation) *functionsv1.Invocation {
 		InputBytes:      i.InputBytes,
 		OutputBytes:     i.OutputBytes,
 		InstanceId:      i.InstanceID,
+		IdempotencyKey:  i.IdempotencyKey,
+		Host:            i.Host,
 		CreatedByUserId: i.CreatedByUserID.String,
 	}
 	if i.AcquireUs != 0 || i.RunUs != 0 || i.TotalUs != 0 {
@@ -106,6 +108,7 @@ var invocationStatuses = map[sqlcgen.InvocationStatus]functionsv1.InvocationStat
 	sqlcgen.InvocationStatusFailed:    functionsv1.InvocationStatus_INVOCATION_STATUS_FAILED,
 	sqlcgen.InvocationStatusErrored:   functionsv1.InvocationStatus_INVOCATION_STATUS_ERRORED,
 	sqlcgen.InvocationStatusCanceled:  functionsv1.InvocationStatus_INVOCATION_STATUS_CANCELED,
+	sqlcgen.InvocationStatusRejected:  functionsv1.InvocationStatus_INVOCATION_STATUS_REJECTED,
 }
 
 func invocationStatusProto(s sqlcgen.InvocationStatus) functionsv1.InvocationStatus {

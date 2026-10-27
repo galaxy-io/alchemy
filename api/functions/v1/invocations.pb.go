@@ -36,6 +36,9 @@ const (
 	// OUTPUT_INVALID: the function returned a value that violates its own
 	// output schema.
 	FunctionErrorKind_FUNCTION_ERROR_KIND_OUTPUT_INVALID FunctionErrorKind = 4
+	// INPUT_INVALID: the caller's input violates the input schema; the
+	// function never ran.
+	FunctionErrorKind_FUNCTION_ERROR_KIND_INPUT_INVALID FunctionErrorKind = 5
 )
 
 // Enum value maps for FunctionErrorKind.
@@ -46,6 +49,7 @@ var (
 		2: "FUNCTION_ERROR_KIND_CRASHED",
 		3: "FUNCTION_ERROR_KIND_TIMEOUT",
 		4: "FUNCTION_ERROR_KIND_OUTPUT_INVALID",
+		5: "FUNCTION_ERROR_KIND_INPUT_INVALID",
 	}
 	FunctionErrorKind_value = map[string]int32{
 		"FUNCTION_ERROR_KIND_UNSPECIFIED":    0,
@@ -53,6 +57,7 @@ var (
 		"FUNCTION_ERROR_KIND_CRASHED":        2,
 		"FUNCTION_ERROR_KIND_TIMEOUT":        3,
 		"FUNCTION_ERROR_KIND_OUTPUT_INVALID": 4,
+		"FUNCTION_ERROR_KIND_INPUT_INVALID":  5,
 	}
 )
 
@@ -144,7 +149,7 @@ type InvocationStatus int32
 
 const (
 	InvocationStatus_INVOCATION_STATUS_UNSPECIFIED InvocationStatus = 0
-	// PENDING: accepted and validated, waiting for a instance slot.
+	// PENDING: accepted, waiting for a host to take it.
 	InvocationStatus_INVOCATION_STATUS_PENDING InvocationStatus = 1
 	// STARTING: a instance is booting or being restored for it.
 	InvocationStatus_INVOCATION_STATUS_STARTING InvocationStatus = 2
@@ -157,6 +162,9 @@ const (
 	InvocationStatus_INVOCATION_STATUS_ERRORED InvocationStatus = 6
 	// CANCELED: the caller went away before a result.
 	InvocationStatus_INVOCATION_STATUS_CANCELED InvocationStatus = 7
+	// REJECTED: the input violated the version's contract, so nothing ran;
+	// error is set.
+	InvocationStatus_INVOCATION_STATUS_REJECTED InvocationStatus = 8
 )
 
 // Enum value maps for InvocationStatus.
@@ -170,6 +178,7 @@ var (
 		5: "INVOCATION_STATUS_FAILED",
 		6: "INVOCATION_STATUS_ERRORED",
 		7: "INVOCATION_STATUS_CANCELED",
+		8: "INVOCATION_STATUS_REJECTED",
 	}
 	InvocationStatus_value = map[string]int32{
 		"INVOCATION_STATUS_UNSPECIFIED": 0,
@@ -180,6 +189,7 @@ var (
 		"INVOCATION_STATUS_FAILED":      5,
 		"INVOCATION_STATUS_ERRORED":     6,
 		"INVOCATION_STATUS_CANCELED":    7,
+		"INVOCATION_STATUS_REJECTED":    8,
 	}
 )
 
@@ -360,12 +370,20 @@ func (x *InvocationStats) GetTotalUs() int64 {
 // JSON Schema contract, an Arrow IPC stream for an Arrow contract) and
 // checks it before anything runs.
 type InvokeRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	FunctionId    string                 `protobuf:"bytes,1,opt,name=function_id,json=functionId,proto3" json:"function_id,omitempty"`
-	Version       int64                  `protobuf:"varint,2,opt,name=version,proto3" json:"version,omitempty"`
-	Input         []byte                 `protobuf:"bytes,3,opt,name=input,proto3" json:"input,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state      protoimpl.MessageState `protogen:"open.v1"`
+	FunctionId string                 `protobuf:"bytes,1,opt,name=function_id,json=functionId,proto3" json:"function_id,omitempty"`
+	Version    int64                  `protobuf:"varint,2,opt,name=version,proto3" json:"version,omitempty"`
+	Input      []byte                 `protobuf:"bytes,3,opt,name=input,proto3" json:"input,omitempty"`
+	// idempotency_key makes the call safe to retry. Within the server's
+	// idempotency window, every call to the same function with the same key
+	// returns the invocation the first call started, with its output or
+	// error, instead of running again. The key is released, so that a retry
+	// runs, only when the platform never sent the invocation to a host. A
+	// call a host took but never reported on has an unknown outcome and holds
+	// the key: a retry gets ABORTED, and a new key runs again.
+	IdempotencyKey string `protobuf:"bytes,4,opt,name=idempotency_key,json=idempotencyKey,proto3" json:"idempotency_key,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
 }
 
 func (x *InvokeRequest) Reset() {
@@ -419,6 +437,13 @@ func (x *InvokeRequest) GetInput() []byte {
 	return nil
 }
 
+func (x *InvokeRequest) GetIdempotencyKey() string {
+	if x != nil {
+		return x.IdempotencyKey
+	}
+	return ""
+}
+
 // InvokeResponse is returned whenever the function ran. output is the
 // function's result in the encoding the contract defines, already checked
 // against the output schema; error means the function ran and failed.
@@ -431,8 +456,11 @@ type InvokeResponse struct {
 	//
 	//	*InvokeResponse_Output
 	//	*InvokeResponse_Error
-	Result        isInvokeResponse_Result `protobuf_oneof:"result"`
-	Stats         *InvocationStats        `protobuf:"bytes,5,opt,name=stats,proto3" json:"stats,omitempty"`
+	Result isInvokeResponse_Result `protobuf_oneof:"result"`
+	Stats  *InvocationStats        `protobuf:"bytes,5,opt,name=stats,proto3" json:"stats,omitempty"`
+	// replayed is set when the result is an earlier invocation's, found by
+	// the request's idempotency_key, and nothing ran for this call.
+	Replayed      bool `protobuf:"varint,6,opt,name=replayed,proto3" json:"replayed,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -513,6 +541,13 @@ func (x *InvokeResponse) GetStats() *InvocationStats {
 	return nil
 }
 
+func (x *InvokeResponse) GetReplayed() bool {
+	if x != nil {
+		return x.Replayed
+	}
+	return false
+}
+
 type isInvokeResponse_Result interface {
 	isInvokeResponse_Result()
 }
@@ -551,8 +586,13 @@ type Invocation struct {
 	// instance_id names the microVM that served it, while it exists.
 	InstanceId      string `protobuf:"bytes,15,opt,name=instance_id,json=instanceId,proto3" json:"instance_id,omitempty"`
 	CreatedByUserId string `protobuf:"bytes,17,opt,name=created_by_user_id,json=createdByUserId,proto3" json:"created_by_user_id,omitempty"`
-	unknownFields   protoimpl.UnknownFields
-	sizeCache       protoimpl.SizeCache
+	// idempotency_key is the caller's key, when the call carried one.
+	IdempotencyKey string `protobuf:"bytes,18,opt,name=idempotency_key,json=idempotencyKey,proto3" json:"idempotency_key,omitempty"`
+	// host is the host the invocation was sent to, empty when none took
+	// it. Set by the server when it sends it and by the host in its record.
+	Host          string `protobuf:"bytes,19,opt,name=host,proto3" json:"host,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *Invocation) Reset() {
@@ -693,6 +733,20 @@ func (x *Invocation) GetInstanceId() string {
 func (x *Invocation) GetCreatedByUserId() string {
 	if x != nil {
 		return x.CreatedByUserId
+	}
+	return ""
+}
+
+func (x *Invocation) GetIdempotencyKey() string {
+	if x != nil {
+		return x.IdempotencyKey
+	}
+	return ""
+}
+
+func (x *Invocation) GetHost() string {
+	if x != nil {
+		return x.Host
 	}
 	return ""
 }
@@ -1170,19 +1224,21 @@ const file_functions_v1_invocations_proto_rawDesc = "" +
 	"\n" +
 	"acquire_us\x18\x02 \x01(\x03R\tacquireUs\x12\x15\n" +
 	"\x06run_us\x18\x03 \x01(\x03R\x05runUs\x12\x19\n" +
-	"\btotal_us\x18\x04 \x01(\x03R\atotalUs\"`\n" +
+	"\btotal_us\x18\x04 \x01(\x03R\atotalUs\"\x89\x01\n" +
 	"\rInvokeRequest\x12\x1f\n" +
 	"\vfunction_id\x18\x01 \x01(\tR\n" +
 	"functionId\x12\x18\n" +
 	"\aversion\x18\x02 \x01(\x03R\aversion\x12\x14\n" +
-	"\x05input\x18\x03 \x01(\fR\x05input\"\xdd\x01\n" +
+	"\x05input\x18\x03 \x01(\fR\x05input\x12'\n" +
+	"\x0fidempotency_key\x18\x04 \x01(\tR\x0eidempotencyKey\"\xf9\x01\n" +
 	"\x0eInvokeResponse\x12#\n" +
 	"\rinvocation_id\x18\x01 \x01(\tR\finvocationId\x12\x18\n" +
 	"\aversion\x18\x02 \x01(\x03R\aversion\x12\x18\n" +
 	"\x06output\x18\x03 \x01(\fH\x00R\x06output\x123\n" +
 	"\x05error\x18\x04 \x01(\v2\x1b.functions.v1.FunctionErrorH\x00R\x05error\x123\n" +
-	"\x05stats\x18\x05 \x01(\v2\x1d.functions.v1.InvocationStatsR\x05statsB\b\n" +
-	"\x06result\"\xde\x04\n" +
+	"\x05stats\x18\x05 \x01(\v2\x1d.functions.v1.InvocationStatsR\x05stats\x12\x1a\n" +
+	"\breplayed\x18\x06 \x01(\bR\breplayedB\b\n" +
+	"\x06result\"\x9b\x05\n" +
 	"\n" +
 	"Invocation\x12\x1b\n" +
 	"\ttenant_id\x18\x01 \x01(\tR\btenantId\x12\x0e\n" +
@@ -1207,7 +1263,9 @@ const file_functions_v1_invocations_proto_rawDesc = "" +
 	"\foutput_bytes\x18\x0e \x01(\x03R\voutputBytes\x12\x1f\n" +
 	"\vinstance_id\x18\x0f \x01(\tR\n" +
 	"instanceId\x12+\n" +
-	"\x12created_by_user_id\x18\x11 \x01(\tR\x0fcreatedByUserId\"&\n" +
+	"\x12created_by_user_id\x18\x11 \x01(\tR\x0fcreatedByUserId\x12'\n" +
+	"\x0fidempotency_key\x18\x12 \x01(\tR\x0eidempotencyKey\x12\x12\n" +
+	"\x04host\x18\x13 \x01(\tR\x04host\"&\n" +
 	"\x14GetInvocationRequest\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\"Q\n" +
 	"\x15GetInvocationResponse\x128\n" +
@@ -1246,18 +1304,19 @@ const file_functions_v1_invocations_proto_rawDesc = "" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x16\n" +
 	"\x06follow\x18\x02 \x01(\bR\x06follow\"/\n" +
 	"\x19GetInvocationLogsResponse\x12\x12\n" +
-	"\x04data\x18\x01 \x01(\fR\x04data*\xc2\x01\n" +
+	"\x04data\x18\x01 \x01(\fR\x04data*\xe9\x01\n" +
 	"\x11FunctionErrorKind\x12#\n" +
 	"\x1fFUNCTION_ERROR_KIND_UNSPECIFIED\x10\x00\x12\x1e\n" +
 	"\x1aFUNCTION_ERROR_KIND_RAISED\x10\x01\x12\x1f\n" +
 	"\x1bFUNCTION_ERROR_KIND_CRASHED\x10\x02\x12\x1f\n" +
 	"\x1bFUNCTION_ERROR_KIND_TIMEOUT\x10\x03\x12&\n" +
-	"\"FUNCTION_ERROR_KIND_OUTPUT_INVALID\x10\x04*w\n" +
+	"\"FUNCTION_ERROR_KIND_OUTPUT_INVALID\x10\x04\x12%\n" +
+	"!FUNCTION_ERROR_KIND_INPUT_INVALID\x10\x05*w\n" +
 	"\tStartKind\x12\x1a\n" +
 	"\x16START_KIND_UNSPECIFIED\x10\x00\x12\x18\n" +
 	"\x14START_KIND_COLD_BOOT\x10\x01\x12\x1f\n" +
 	"\x1bSTART_KIND_SNAPSHOT_RESTORE\x10\x02\x12\x13\n" +
-	"\x0fSTART_KIND_WARM\x10\x03*\x91\x02\n" +
+	"\x0fSTART_KIND_WARM\x10\x03*\xb1\x02\n" +
 	"\x10InvocationStatus\x12!\n" +
 	"\x1dINVOCATION_STATUS_UNSPECIFIED\x10\x00\x12\x1d\n" +
 	"\x19INVOCATION_STATUS_PENDING\x10\x01\x12\x1e\n" +
@@ -1266,7 +1325,8 @@ const file_functions_v1_invocations_proto_rawDesc = "" +
 	"\x1bINVOCATION_STATUS_SUCCEEDED\x10\x04\x12\x1c\n" +
 	"\x18INVOCATION_STATUS_FAILED\x10\x05\x12\x1d\n" +
 	"\x19INVOCATION_STATUS_ERRORED\x10\x06\x12\x1e\n" +
-	"\x1aINVOCATION_STATUS_CANCELED\x10\aB\xb0\x01\n" +
+	"\x1aINVOCATION_STATUS_CANCELED\x10\a\x12\x1e\n" +
+	"\x1aINVOCATION_STATUS_REJECTED\x10\bB\xb0\x01\n" +
 	"\x10com.functions.v1B\x10InvocationsProtoP\x01Z9github.com/galaxy-io/alchemy/api/functions/v1;functionsv1\xa2\x02\x03FXX\xaa\x02\fFunctions.V1\xca\x02\fFunctions\\V1\xe2\x02\x18Functions\\V1\\GPBMetadata\xea\x02\rFunctions::V1b\x06proto3"
 
 var (

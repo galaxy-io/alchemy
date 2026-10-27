@@ -2,10 +2,10 @@
 
 This chart deploys the Alchemy server and one host per KVM-capable node, plus the configuration that connects them to PostgreSQL and NATS.
 
-- **server** is a Deployment behind one Service, sized by `server.replicas` or, with `server.autoscaling.enabled`, by a HorizontalPodAutoscaler on CPU. Any replica serves any request. Each applies migrations when it starts, one at a time under a PostgreSQL lock.
+- **server** is a Deployment behind one Service, sized by `server.replicas` or, with `server.autoscaling.enabled`, by a HorizontalPodAutoscaler on CPU. Any replica serves any request. Each applies migrations when it starts, one at a time under a PostgreSQL lock. Servers place each function on `server.hostsPerFunction` hosts and send its invocations to the one with a warm instance.
 
 Invocations are not written to PostgreSQL while they run. The host that ran one publishes its record to a JetStream stream when it ends, and the servers write records in batches, so the database is never on the invocation path.
-- **host** is a Deployment of `host.replicas` hosts, one per node, on nodes matching `host.nodeSelector` (`alchemy.getgalaxy.io/kvm: "true"` by default). Each host boots Firecracker microVMs on its node and pulls function images straight from their registries. No container daemon is involved.
+- **host** is a Deployment of `host.replicas` hosts, one per node, on nodes matching `host.nodeSelector` (`alchemy.getgalaxy.io/kvm: "true"` by default). Each host boots Firecracker microVMs on its node and pulls function images straight from their registries, with no container daemon. Pulls from ECR, Artifact Registry and GCR authenticate with the cloud's workload identity (IRSA or Pod Identity on AWS, Workload Identity on GCP). Other registries use the Docker config or are pulled anonymously.
 
 ## Host nodes
 
@@ -34,7 +34,7 @@ A new host only runs once it has a KVM node. Run a node autoscaler such as Karpe
 
 ## Runtime configuration
 
-Alchemy needs a PostgreSQL DSN and a NATS URL. NATS must accept 64MB messages (`max_payload: 64MB`) and have JetStream enabled with memory storage, which holds recent function logs. You can supply both through an existing Secret:
+Alchemy needs a PostgreSQL DSN and a NATS URL. NATS must accept 64MB messages (`max_payload: 64MB`) and have JetStream enabled with file storage, which keeps recent function logs and invocation records no server has written yet. You can supply both through an existing Secret:
 
 ```sh
 kubectl create secret generic alchemy-runtime \

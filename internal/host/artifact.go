@@ -40,8 +40,9 @@ func artifactID(a *hostv1.Artifact) string {
 }
 
 // toProto turns a built artifact into its wire form and assigns its id.
-// layers are what it was built with.
-func toProto(tenantID string, a *driver.Artifact, layers []*hostv1.Layer) *hostv1.Artifact {
+// layers are what it was built with, and c is the contract its invocations
+// are checked against.
+func toProto(tenantID string, a *driver.Artifact, layers []*hostv1.Layer, c *functionsv1.Contract) *hostv1.Artifact {
 	p := &hostv1.Artifact{
 		TenantId:    tenantID,
 		Image:       a.Image,
@@ -54,6 +55,7 @@ func toProto(tenantID string, a *driver.Artifact, layers []*hostv1.Layer) *hostv
 		Vcpus:       a.VCPUs,
 		MemoryMib:   a.MemoryMiB,
 		Layers:      layers,
+		Contract:    c,
 	}
 	p.Id = artifactID(p)
 	return p

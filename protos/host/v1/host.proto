@@ -8,23 +8,20 @@ import "functions/v1/host.proto";
 import "functions/v1/invocations.proto";
 
 // host.v1 is the contract between the servers and the hosts, and between
-// servers. It rides on NATS rather than a Connect service: a host subscribes
-// to the subjects for the artifacts it has ready, so placement is a
-// subscription and the server keeps no host state beyond what heartbeats
-// last said.
+// servers. It rides on NATS rather than a Connect service. Hosts keep no
+// state the servers rely on beyond what their heartbeats last said, and
+// the servers keep no state about hosts beyond those heartbeats.
 //
-//   host.build.*                 request/reply, queue group: any host builds,
-//                                replies with the Artifact
-//   host.invoke.<artifact_id>    request/reply, queue group: hosts that have
-//                                the artifact ready; no responders means
-//                                nobody has built it yet
+//   host.<name>.invoke           request/reply: that host runs the
+//                                invocation, or answers not_found when it
+//                                has not built the artifact
+//   host.<name>.build            request/reply: that host builds, replies
+//                                with the Artifact
+//   host.<name>.heartbeat        publish: a Heartbeat, periodically
 //   host.describe                request, scatter/gather: every host replies
 //                                with its Host
 //   host.instances               request, scatter/gather: every host replies
 //                                with its instances
-//   host.<name>.build            request/reply: that host builds, replies
-//                                with the Artifact; reconciles a host
-//   host.<name>.heartbeat        publish: a Heartbeat, periodically
 //   server.<name>.state          publish: InvocationEvent, from a host to
 //                                the server whose invocation moved
 //   server.<name>.heartbeat      publish: a ServerHeartbeat, periodically
@@ -35,24 +32,32 @@ import "functions/v1/invocations.proto";
 //   invocations.host, .server    publish, JetStream: InvocationRecords,
 //                                kept until a server has written them
 //
-// Invocations are not written as they run. The host that ran one publishes
-// its record when it ends; the server publishes a record only when it has
-// something the host could not know (no host ran it, or the output failed
-// the contract), and that record wins. Servers share one consumer that
-// writes records to the database in batches.
+// Placement is the server's choice. A function lives on a few hosts, picked
+// by rendezvous hashing of its id over the live hosts, so every server picks
+// the same ones from the same heartbeats and a host joining or leaving
+// moves only the functions that hashed to it. A server builds a function's
+// versions on those hosts and sends each invocation to the one holding a
+// warm instance, else the least loaded one that has the artifact, else it
+// builds the artifact there first.
+//
+// Invocations are not written as they run. The host that took one publishes
+// its record when it ends; the server publishes a record only when no host
+// took it, or the caller went away, and that record wins. Servers share one
+// consumer that writes records to the database in batches.
 //
 // Payloads are protobuf-encoded messages from this file. Request/reply
 // errors are an Error message in the reply, never a NATS-level error.
 
-// Artifact is everything a host needs to start an instance, resolved at
+// Artifact is everything a host needs to run an invocation, resolved at
 // build time so the spec is never consulted again. The server stores it on
 // the version and sends it back verbatim with every invoke.
 //
 // id keys instances and the invoke subject: it hashes everything that makes
 // two instances interchangeable, including the tenant, so two functions with
-// the same image but different env never share a warm instance. The rootfs
-// cache is keyed by the image digest and the layers' digests alone, since
-// those are content-addressed.
+// the same image but different env never share a warm instance. The contract
+// is not in it: an instance can run any input. The rootfs cache is keyed by
+// the image digest and the layers' digests alone, since those are
+// content-addressed.
 message Artifact {
   string id = 1;
   string tenant_id = 2;
@@ -69,6 +74,8 @@ message Artifact {
   uint32 memory_mib = 11;
   // layers were extracted over the image, in order.
   repeated Layer layers = 12;
+  // contract is what the host checks every input and output against.
+  functions.v1.Contract contract = 13;
 }
 
 // Layer is a tar archive, plain or gzipped, in the artifacts bucket that a
@@ -105,8 +112,9 @@ message BuildResponse {
   string build_log = 3;
 }
 
-// InvokeRequest runs one input, already validated by the server, through an
-// instance of artifact. The host decides how the instance is obtained.
+// InvokeRequest runs one input through an instance of artifact. The host
+// checks the input against the artifact's contract before it takes a slot,
+// and the output after the run. It decides how the instance is obtained.
 message InvokeRequest {
   // invocation is the accepted invocation as the server knows it: its id,
   // function, version and when it was created. The host completes it into
@@ -121,12 +129,18 @@ message InvokeRequest {
   // state_subject is where the host publishes InvocationEvents for this
   // invocation: the requesting server's own subject.
   string state_subject = 6;
+  // max_output_bytes bounds the function's output; past it the output is
+  // invalid.
+  int64 max_output_bytes = 7;
+  // output_key, when set, is where the host keeps the checked output in the
+  // bucket, so a server can replay it for a retried call.
+  string output_key = 8;
 }
 
-// InvokeResponse is returned whenever an instance ran the input, including
-// when the function failed. output is raw: the server validates it against
-// the contract. error means no instance ran it (host at capacity, boot
-// failed) and carries nothing else.
+// InvokeResponse is returned whenever the host took the input, including
+// when it rejected it or the function failed. output has been checked
+// against the contract. error means the host could not take it (at
+// capacity, boot failed) and carries nothing else.
 message InvokeResponse {
   oneof result {
     bytes output = 1;
@@ -164,10 +178,18 @@ message ListInstancesResponse {
 // Heartbeat is published by every host on its own subject.
 message Heartbeat {
   functions.v1.Host host = 1;
-  // artifact_ids are the artifacts the host is taking invocations for. The
-  // server builds the current version of every function on any host that
-  // lacks it.
-  repeated string artifact_ids = 2;
+  // artifacts are those the host has built and takes invocations for, with
+  // what it holds of each. The server places invocations from this.
+  repeated ArtifactState artifacts = 2;
+}
+
+// ArtifactState is what a host holds of one artifact.
+message ArtifactState {
+  string id = 1;
+  // idle is how many warm instances are waiting for an invocation.
+  int32 idle = 2;
+  // busy is how many instances are booting or running one.
+  int32 busy = 3;
 }
 
 // ServerHeartbeat is published by every server on its own subject, so any

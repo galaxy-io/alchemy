@@ -17,7 +17,7 @@ import (
 // knownHost is what a host last said about itself.
 type knownHost struct {
 	host      *functionsv1.Host
-	artifacts map[string]bool // ids the host is taking invocations for
+	artifacts map[string]*hostv1.ArtifactState // what it holds, by artifact id
 	seen      time.Time
 }
 
@@ -116,9 +116,9 @@ func (s *Service) onHeartbeat(_ context.Context, data []byte) proto.Message {
 	if err := proto.Unmarshal(data, msg); err != nil || msg.GetHost() == nil {
 		return nil
 	}
-	artifacts := make(map[string]bool, len(msg.GetArtifactIds()))
-	for _, id := range msg.GetArtifactIds() {
-		artifacts[id] = true
+	artifacts := make(map[string]*hostv1.ArtifactState, len(msg.GetArtifacts()))
+	for _, st := range msg.GetArtifacts() {
+		artifacts[st.GetId()] = st
 	}
 	s.mu.Lock()
 	s.hosts[msg.GetHost().GetHostname()] = &knownHost{host: msg.GetHost(), artifacts: artifacts, seen: time.Now()}

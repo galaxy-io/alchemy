@@ -223,15 +223,14 @@ func (s *Service) build(v *sqlcgen.FunctionVersion) {
 	log := s.log.With("function_id", v.FunctionID, "version", v.Version)
 
 	spec, err := decodeSpec(v.Spec)
-	var c contract.Contract
 	if err == nil {
-		c, err = contract.Compile(spec.GetContract())
+		_, err = contract.Compile(spec.GetContract())
 	}
 	var artifact *hostv1.Artifact
 	var buildLog string
 	start := time.Now()
 	if err == nil {
-		artifact, buildLog, err = s.requestBuildWithLog(ctx, v.TenantID, spec, nil)
+		artifact, buildLog, err = s.requestBuild(ctx, v.FunctionID, v.TenantID, spec, nil)
 	}
 
 	finish := sqlcgen.FinishFunctionVersionBuildParams{ID: v.ID, BuildStartedAt: v.BuildStartedAt, BuildLog: buildLog}
@@ -262,38 +261,49 @@ func (s *Service) build(v *sqlcgen.FunctionVersion) {
 	_ = s.store.TouchFunction(context.WithoutCancel(ctx), v.FunctionID)
 	if artifact != nil {
 		s.mu.Lock()
-		s.versions[v.ID] = &compiledVersion{row: row, spec: spec, contract: c, artifact: artifact}
+		s.versions[v.ID] = &compiledVersion{row: row, spec: spec, artifact: artifact}
 		s.mu.Unlock()
 	}
 }
 
-// requestBuild asks any host to build spec with layers and returns the
-// artifact. Hosts cache by image and layer digests, so a rebuild of a known
-// image is a cache hit.
-func (s *Service) requestBuild(ctx context.Context, tenantID string, spec *functionsv1.FunctionSpec, layers []*hostv1.Layer) (*hostv1.Artifact, error) {
-	artifact, _, err := s.requestBuildWithLog(ctx, tenantID, spec, layers)
-	return artifact, err
-}
-
-func (s *Service) requestBuildWithLog(ctx context.Context, tenantID string, spec *functionsv1.FunctionSpec, layers []*hostv1.Layer) (*hostv1.Artifact, string, error) {
+// requestBuild builds spec on the hosts functionID lives on and returns the
+// first artifact to come back with its build log; the other hosts finish on
+// their own and report it in their heartbeats. Hosts cache by image and
+// layer digests, so a rebuild of a known image is a cache hit.
+func (s *Service) requestBuild(ctx context.Context, functionID, tenantID string, spec *functionsv1.FunctionSpec, layers []*hostv1.Layer) (*hostv1.Artifact, string, error) {
+	hosts := s.placedHosts(functionID)
+	if len(hosts) == 0 {
+		return nil, "", errNoHosts
+	}
 	ctx, cancel := context.WithTimeout(ctx, s.cfg.BuildTimeout)
 	defer cancel()
-	// Every host builds, so every host can take the function's invocations;
-	// the first host to finish answers for all of them.
-	reply, err := s.bus.First(ctx, bus.BuildSubject, &hostv1.BuildRequest{TenantId: tenantID, Spec: spec, Layers: layers}, len(s.liveHosts()),
-		func() proto.Message { return &hostv1.BuildResponse{} },
-		func(m proto.Message) bool { return m.(*hostv1.BuildResponse).GetArtifact() != nil }) //nolint:errcheck // newResp makes BuildResponses
+	type result struct {
+		resp *hostv1.BuildResponse
+		err  error
+	}
+	results := make(chan result, len(hosts))
+	req := &hostv1.BuildRequest{TenantId: tenantID, Spec: spec, Layers: layers}
+	for _, name := range hosts {
+		s.tasks.Go(func() {
+			resp := &hostv1.BuildResponse{}
+			err := s.bus.Request(ctx, bus.HostBuildSubject(name), req, resp)
+			results <- result{resp, err}
+		})
+	}
+	var last result
+	for range hosts {
+		last = <-results
+		if last.err == nil && last.resp.GetArtifact() != nil {
+			return last.resp.GetArtifact(), last.resp.GetBuildLog(), nil
+		}
+	}
 	switch {
-	case errors.Is(err, bus.ErrNoResponders):
+	case errors.Is(last.err, bus.ErrNoResponders):
 		return nil, "", errNoHosts
-	case err != nil:
-		return nil, "", err
+	case last.err != nil:
+		return nil, "", last.err
 	}
-	resp := reply.(*hostv1.BuildResponse) //nolint:errcheck // newResp makes BuildResponses
-	if e := resp.GetError(); e != nil {
-		return nil, resp.GetBuildLog(), errors.New(e.GetMessage())
-	}
-	return resp.GetArtifact(), resp.GetBuildLog(), nil
+	return nil, last.resp.GetBuildLog(), errors.New(last.resp.GetError().GetMessage())
 }
 
 // prepareSpec validates a spec, fills in server defaults and checks that

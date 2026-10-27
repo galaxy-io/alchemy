@@ -79,7 +79,7 @@ CREATE TABLE function_versions (
 -- The current version of a function is its newest ready one.
 CREATE INDEX function_versions_ready_idx ON function_versions (function_id, version DESC) WHERE status = 'ready';
 
-CREATE TYPE invocation_status AS ENUM ('pending', 'starting', 'running', 'succeeded', 'failed', 'errored', 'canceled');
+CREATE TYPE invocation_status AS ENUM ('pending', 'starting', 'running', 'succeeded', 'failed', 'errored', 'canceled', 'rejected');
 CREATE TYPE start_kind AS ENUM ('cold_boot', 'snapshot_restore', 'warm');
 
 -- One row per ended invocation, written once, in batches, from the records
@@ -99,7 +99,9 @@ CREATE TABLE invocations (
   platform_error     TEXT              NOT NULL DEFAULT '',
   input_bytes        BIGINT            NOT NULL DEFAULT 0,
   output_bytes       BIGINT            NOT NULL DEFAULT 0,
-  instance_id         TEXT              NOT NULL DEFAULT '',
+  instance_id        TEXT              NOT NULL DEFAULT '',
+  idempotency_key    TEXT              NOT NULL DEFAULT '',
+  host               TEXT              NOT NULL DEFAULT '',
   created_by_user_id UUID              REFERENCES users (id) ON DELETE SET NULL,
   created_at         TIMESTAMPTZ       NOT NULL DEFAULT now(),
   started_at         TIMESTAMPTZ,
@@ -109,7 +111,27 @@ CREATE TABLE invocations (
 CREATE INDEX invocations_function_created_idx ON invocations (function_id, created_at DESC);
 CREATE INDEX invocations_tenant_created_idx ON invocations (tenant_id, created_at DESC);
 
+-- A caller's idempotency key and the invocation it started. Claimed by a
+-- server before the invocation runs, so two servers never run the same key
+-- twice, and marked with the host before the invocation is sent to it, so
+-- a claim with no host behind it is known never to have run. Rows expire
+-- after the server's idempotency window.
+CREATE TABLE idempotency_keys (
+  tenant_id     UUID        NOT NULL REFERENCES tenants (id),
+  function_id   UUID        NOT NULL REFERENCES functions (id) ON DELETE CASCADE,
+  key           TEXT        NOT NULL,
+  invocation_id UUID        NOT NULL,
+  server        TEXT        NOT NULL,
+  host          TEXT        NOT NULL DEFAULT '',
+  sent_at       TIMESTAMPTZ,
+  created_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
+  PRIMARY KEY (tenant_id, function_id, key)
+);
+
+CREATE INDEX idempotency_keys_created_idx ON idempotency_keys (created_at);
+
 -- +goose Down
+DROP TABLE idempotency_keys;
 DROP TABLE invocations;
 DROP TYPE start_kind;
 DROP TYPE invocation_status;

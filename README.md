@@ -47,19 +47,11 @@ just infra down
 
 Kubernetes with Helm is the recommended way to run Alchemy in production. Hosts need `/dev/kvm`, so they run on bare-metal nodes or on VMs with nested virtualization. The server runs anywhere. See the [Helm chart README](charts/alchemy/README.md) for preparing KVM nodes and for all supported values.
 
-Hosts pull function images straight from their registries, with no container daemon. Pulls from ECR, Artifact Registry and GCR authenticate with the cloud's workload identity (IRSA or Pod Identity on AWS, Workload Identity on GCP). Other registries use the Docker config or are pulled anonymously.
-
 ## How it works
 
-A function is an OCI image plus a contract. The contract describes the function's input and output as a JSON Schema or an Arrow schema, and Alchemy checks every invocation against it on the way in and on the way out.
+A function is an OCI image plus a contract, a JSON Schema or an Arrow schema for its input and output. Alchemy builds the image into a root filesystem once, boots a Firecracker microVM per invocation, checks every input and output against the contract, and keeps every invocation's record and logs.
 
-The server accepts functions and invocations over its API, stores functions and versions in PostgreSQL, and dispatches work to hosts over NATS. Any number of servers run side by side. Nothing is written about an invocation while it runs: the host that ran it publishes its record when it ends, and the servers write records to PostgreSQL in batches, so the database is never on the invocation path. Each host owns one KVM machine: it flattens a function's image into a read-only root filesystem once, cached by digest, then boots a Firecracker microVM per invocation. Inside the guest, the supervisor runs as init, receives the input over vsock, runs the function and returns its output.
-
-Everything a function writes to stderr is kept. The UI follows it live while the function runs, and each invocation's full log goes to an S3 or GCS bucket when it ends.
-
-Finished microVMs stay booted for a while so the next invocation of the same function starts warm, and hosts can keep instances booted before any invocation arrives.
-
-Every microVM runs under Firecracker's jailer. It is chrooted into a directory holding only its kernel and root filesystem, placed in a cgroup capped at its vCPUs, and run as a uid no other microVM shares. A guest that escapes the VM lands in a process that can reach nothing else on the host. The host itself runs as root to set this up.
+The server accepts functions and invocations over its API and places each function on a few hosts. Hosts own the KVM machines, build root filesystems and run the microVMs, and a supervisor inside each guest runs the function. PostgreSQL stores functions, versions and finished invocations, and NATS carries everything between servers and hosts, so any number of servers run side by side and the database is never on the invocation path.
 
 ## Developing Alchemy
 
