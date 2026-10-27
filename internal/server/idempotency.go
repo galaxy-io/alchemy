@@ -149,9 +149,10 @@ func (s *Service) takeOver(ctx context.Context, start time.Time, inv *invocation
 
 // outcome waits for the invocation holding held to end and returns it. It
 // returns nil when the invocation is nowhere and never ran: its owner went
-// away before marking the claim with a host. When the owner is gone and the
-// claim is marked, the host's record is waited for until its deadline, and
-// past it the outcome is unknown.
+// away before marking the claim with a host. When the claim is marked and
+// the invocation is nowhere, the host's record is waited for until its
+// deadline, and past it the outcome is unknown, whether or not the owner
+// is live: a live owner that still had it would have answered for it.
 //
 // It wakes on the function's live stream and re-reads durable state on a
 // tick, so an owner that dies mid-way does not strand it: the host still
@@ -196,7 +197,7 @@ func (s *Service) outcome(ctx context.Context, cv *compiledVersion, held *claim)
 			return inv, nil
 		case err != nil && !s.serverLive(held.server) && held.host == "":
 			return nil, nil
-		case err != nil && !s.serverLive(held.server) && time.Since(held.sentAt) > timeout+hostGrace:
+		case err != nil && time.Since(held.sentAt) > timeout+hostGrace:
 			return nil, connect.NewError(connect.CodeAborted,
 				fmt.Errorf("invocation %s was sent to host %s by a server that is gone, and its outcome is unknown; the key is held, use a new key to run again", held.invocationID, held.host))
 		}
@@ -224,7 +225,9 @@ func (s *Service) hostMayStillReport(inv *functionsv1.Invocation, timeout time.D
 	return time.Since(time.UnixMilli(inv.GetEndedAt())) < timeout+hostGrace
 }
 
-// serverLive reports whether name heartbeated within HostTTL.
+// serverLive reports whether name heartbeated within HostTTL. A process
+// restarted under the same name counts as live, which is why a starting
+// server releases the unsent claims in its name first.
 func (s *Service) serverLive(name string) bool {
 	return name == s.cfg.Name || slices.Contains(s.liveServers(), name)
 }

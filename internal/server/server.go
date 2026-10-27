@@ -148,6 +148,16 @@ func New(ctx context.Context, cfg Config, store *postgres.Store, b *bus.Bus, log
 		stop()
 		return nil, err
 	}
+	// A starting server has nothing in flight, so claims in its name that
+	// were never marked with a host are a previous process's, lost between
+	// claiming and sending. They are released before this name is live
+	// again, or a retry would wait on them for the whole window.
+	if n, err := store.ReleaseServerIdempotencyKeys(ctx, cfg.Name); err != nil {
+		stop()
+		return nil, fmt.Errorf("release idempotency keys: %w", err)
+	} else if n > 0 {
+		log.Info("released idempotency keys a previous process never sent", "count", n)
+	}
 	if err := s.listen(); err != nil {
 		stop()
 		return nil, err

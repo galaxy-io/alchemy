@@ -31,5 +31,11 @@ WHERE k.tenant_id = $1 AND k.function_id = $2 AND k.key = $3 AND k.invocation_id
     WHERE i.id = sqlc.arg('old_invocation_id') AND i.host = ''
       AND i.status IN ('errored'::invocation_status, 'canceled'::invocation_status)));
 
+-- name: ReleaseServerIdempotencyKeys :execrows
+-- Releases the claims server made and never marked with a host. A server
+-- that is starting has nothing in flight, so these are a previous process's
+-- of the same name, lost between claiming and sending.
+DELETE FROM idempotency_keys WHERE server = $1 AND host = '';
+
 -- name: DeleteExpiredIdempotencyKeys :execrows
 DELETE FROM idempotency_keys WHERE created_at < now() - sqlc.arg('window')::interval;

@@ -118,6 +118,21 @@ func (q *Queries) MarkIdempotencyKeySent(ctx context.Context, arg MarkIdempotenc
 	return result.RowsAffected(), nil
 }
 
+const releaseServerIdempotencyKeys = `-- name: ReleaseServerIdempotencyKeys :execrows
+DELETE FROM idempotency_keys WHERE server = $1 AND host = ''
+`
+
+// Releases the claims server made and never marked with a host. A server
+// that is starting has nothing in flight, so these are a previous process's
+// of the same name, lost between claiming and sending.
+func (q *Queries) ReleaseServerIdempotencyKeys(ctx context.Context, server string) (int64, error) {
+	result, err := q.db.Exec(ctx, releaseServerIdempotencyKeys, server)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
 const takeOverIdempotencyKey = `-- name: TakeOverIdempotencyKey :execrows
 UPDATE idempotency_keys k
 SET invocation_id = $4, server = $5, host = '', sent_at = NULL, created_at = now()
