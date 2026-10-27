@@ -159,6 +159,7 @@ export const INVOCATION_SETTLED_STATUSES = [
   InvocationStatus.SUCCEEDED,
   InvocationStatus.FAILED,
   InvocationStatus.ERRORED,
+  InvocationStatus.REJECTED,
 ];
 
 export const INVOCATION_PHASES = [
