@@ -5,6 +5,5 @@ COPY Cargo.toml Cargo.lock ./
 COPY src ./src
 RUN cargo build --release --locked
 
-FROM scratch
-COPY --from=build /src/target/release/embed /embed
-ENTRYPOINT ["/embed"]
+FROM ghcr.io/galaxy-io/alchemy/runtime/static:13
+COPY --from=build /src/target/release/embed /app/handler

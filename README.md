@@ -43,6 +43,17 @@ just vm down
 just infra down
 ```
 
+## Writing a function
+
+A function is an OCI image whose entrypoint reads its input on stdin and writes its output on stdout. Alchemy publishes a runtime image per language with the interpreter and the Arrow library in it, so a function in Python or TypeScript is a handler and a two line Dockerfile:
+
+```Dockerfile
+FROM ghcr.io/galaxy-io/alchemy/runtime/python:3.13
+COPY handler.py /app/
+```
+
+The runtimes are `runtime/python:3.13`, `runtime/node:24` and `runtime/static:13`, a distroless Debian 13 for a function that compiles to one static binary, as the [Go and Rust examples](examples/embed) do. They are built from [`runtimes/`](runtimes). Any other image whose entrypoint speaks stdin and stdout works too.
+
 ## Deploying Alchemy
 
 Kubernetes with Helm is the recommended way to run Alchemy in production. Hosts need `/dev/kvm`, so they run on bare-metal nodes or on VMs with nested virtualization. The server runs anywhere. See the [Helm chart README](charts/alchemy/README.md) for preparing KVM nodes and for all supported values.

@@ -1,9 +1,7 @@
 FROM golang:1.26-alpine AS build
 WORKDIR /src
 COPY go.mod go.sum main.go ./
-RUN CGO_ENABLED=0 go build -trimpath -o /out/embed .
+RUN CGO_ENABLED=0 go build -trimpath -o /out/handler .
 
-# No shell, no libc: the supervisor and the function are both static.
-FROM scratch
-COPY --from=build /out/embed /embed
-ENTRYPOINT ["/embed"]
+FROM ghcr.io/galaxy-io/alchemy/runtime/static:13
+COPY --from=build /out/handler /app/handler
