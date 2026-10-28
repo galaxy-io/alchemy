@@ -22,16 +22,23 @@ import {
   CREATE_FUNCTION_MODAL_MODE_TO_HEADER_MAP,
   CREATE_FUNCTION_MODAL_STEP_TO_IS_PADDED_MAP,
 } from "@/pages/functions/components/create/constants";
+import CreateFunctionModalCode from "@/pages/functions/components/create/steps/CreateFunctionModalCode";
 import CreateFunctionModalContract from "@/pages/functions/components/create/steps/CreateFunctionModalContract";
 import CreateFunctionModalDetails from "@/pages/functions/components/create/steps/CreateFunctionModalDetails";
 import CreateFunctionModalResources from "@/pages/functions/components/create/steps/CreateFunctionModalResources";
-import CreateFunctionModalRuntime from "@/pages/functions/components/create/steps/CreateFunctionModalRuntime";
+import CreateFunctionModalSource from "@/pages/functions/components/create/steps/CreateFunctionModalSource";
 import {
   CreateFunctionModalMode,
   CreateFunctionModalStep,
 } from "@/pages/functions/components/create/types";
+import { getFunctionCurrentVersion } from "@/pages/functions/utils";
 
+import {
+  createGetFunctionVersionInput,
+  useGetFunctionVersionQuery,
+} from "@/api/queries/function_versions";
 import { createGetFunctionInput, useGetFunctionQuery } from "@/api/queries/functions";
+import { useListRuntimesQuery } from "@/api/queries/runtimes";
 
 import { useOverlaySession } from "@/hooks/useOverlaySession";
 
@@ -45,8 +52,9 @@ const CreateFunctionModalContent: FC<CreateFunctionModalContentProps> = ({ isOpe
 
   const renderBody = () => {
     const body = match(step)
-      .with(CreateFunctionModalStep.RUNTIME, () => <CreateFunctionModalRuntime />)
+      .with(CreateFunctionModalStep.SOURCE, () => <CreateFunctionModalSource />)
       .with(CreateFunctionModalStep.CONTRACT, () => <CreateFunctionModalContract />)
+      .with(CreateFunctionModalStep.CODE, () => <CreateFunctionModalCode />)
       .with(CreateFunctionModalStep.RESOURCES, () => <CreateFunctionModalResources />)
       .with(CreateFunctionModalStep.DETAILS, () => <CreateFunctionModalDetails />)
       .exhaustive();
@@ -111,12 +119,22 @@ const CreateFunctionModal: FC<CreateFunctionModalProps> = ({ isOpen, functionId,
     options: { enabled: !!session && !!functionId },
   });
   const alchemyFunction = data?.function;
+  const seed = alchemyFunction
+    ? (getFunctionCurrentVersion(alchemyFunction) ?? alchemyFunction.versions[0])
+    : undefined;
+  const hasSource = !!seed?.spec?.source;
+  const { data: versionData } = useGetFunctionVersionQuery({
+    input: createGetFunctionVersionInput(functionId ?? "", seed?.version ?? 0n),
+    options: { enabled: !!session && hasSource },
+  });
+  const version = hasSource ? versionData?.version : seed;
+  const { data: runtimesData } = useListRuntimesQuery({ options: { enabled: !!session } });
 
   if (!session) {
     return null;
   }
 
-  if (functionId && !alchemyFunction) {
+  if (!runtimesData || (functionId && (!alchemyFunction || !version))) {
     return (
       <Modal
         isOpen={isOpen}
@@ -132,7 +150,13 @@ const CreateFunctionModal: FC<CreateFunctionModalProps> = ({ isOpen, functionId,
   }
 
   return (
-    <CreateFunctionModalProvider key={session} alchemyFunction={alchemyFunction}>
+    <CreateFunctionModalProvider
+      key={session}
+      alchemyFunction={alchemyFunction}
+      version={version}
+      runtimes={runtimesData.runtimes}
+      limits={runtimesData.limits}
+    >
       <CreateFunctionModalContent isOpen={isOpen} onClose={onClose} />
     </CreateFunctionModalProvider>
   );

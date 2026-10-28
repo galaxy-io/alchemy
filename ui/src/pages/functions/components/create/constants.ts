@@ -1,5 +1,5 @@
 import type { JsonObject } from "@bufbuild/protobuf";
-import { HammerIcon, type Icon, PlusIcon } from "@phosphor-icons/react";
+import { CodeIcon, CubeIcon, HammerIcon, type Icon, PlusIcon } from "@phosphor-icons/react";
 
 import {
   type CreateFunctionModalArrowField,
@@ -8,7 +8,7 @@ import {
   CreateFunctionModalStep,
 } from "@/pages/functions/components/create/types";
 import type { FunctionContractKind } from "@/pages/functions/types";
-import { FunctionContractSide } from "@/pages/functions/types";
+import { FunctionContractSide, FunctionSourceKind } from "@/pages/functions/types";
 
 import { formatJson } from "@/utils/json";
 
@@ -16,61 +16,95 @@ export const CREATE_FUNCTION_MODAL_SIDEBAR_WIDTH = 240;
 export const CREATE_FUNCTION_MODAL_RESOURCES_MAX_WIDTH = 560;
 export const CREATE_FUNCTION_MODAL_ARROW_TYPE_WIDTH = 180;
 export const CREATE_FUNCTION_MODAL_DESCRIPTION_MIN_ROWS = 12;
+export const CREATE_FUNCTION_MODAL_SOURCE_TOOLTIP_MAX_WIDTH = 320;
 
-export const CREATE_FUNCTION_MODAL_MODE_TO_STEP_ORDER_MAP: Record<
+export const CREATE_FUNCTION_MODAL_STEPS: CreateFunctionModalStep[] = [
+  CreateFunctionModalStep.SOURCE,
+  CreateFunctionModalStep.CONTRACT,
+  CreateFunctionModalStep.CODE,
+  CreateFunctionModalStep.RESOURCES,
+  CreateFunctionModalStep.DETAILS,
+];
+
+export const CREATE_FUNCTION_MODAL_MODE_TO_SKIPPED_STEPS_MAP: Record<
   CreateFunctionModalMode,
   CreateFunctionModalStep[]
 > = {
-  [CreateFunctionModalMode.FUNCTION]: [
-    CreateFunctionModalStep.RUNTIME,
-    CreateFunctionModalStep.CONTRACT,
-    CreateFunctionModalStep.RESOURCES,
-    CreateFunctionModalStep.DETAILS,
-  ],
-  [CreateFunctionModalMode.VERSION]: [
-    CreateFunctionModalStep.RUNTIME,
-    CreateFunctionModalStep.CONTRACT,
-    CreateFunctionModalStep.RESOURCES,
-  ],
+  [CreateFunctionModalMode.FUNCTION]: [],
+  [CreateFunctionModalMode.VERSION]: [CreateFunctionModalStep.DETAILS],
 };
 
+export const CREATE_FUNCTION_MODAL_SOURCE_KIND_TO_SKIPPED_STEPS_MAP: Record<
+  FunctionSourceKind,
+  CreateFunctionModalStep[]
+> = {
+  [FunctionSourceKind.SOURCE]: [],
+  [FunctionSourceKind.IMAGE]: [CreateFunctionModalStep.CODE],
+};
+
+export const CREATE_FUNCTION_MODAL_SOURCE_KIND_TO_ICON_MAP: Record<FunctionSourceKind, Icon> = {
+  [FunctionSourceKind.SOURCE]: CodeIcon,
+  [FunctionSourceKind.IMAGE]: CubeIcon,
+};
+
+export const CREATE_FUNCTION_MODAL_SOURCE_KIND_TO_DESCRIPTION_MAP: Record<
+  FunctionSourceKind,
+  string
+> = {
+  [FunctionSourceKind.SOURCE]: "Write it here and Alchemy builds it.",
+  [FunctionSourceKind.IMAGE]: "Run an OCI image you build.",
+};
+
+export const CREATE_FUNCTION_MODAL_SOURCE_KIND_TO_DETAILS_MAP: Record<FunctionSourceKind, string> =
+  {
+    [FunctionSourceKind.SOURCE]:
+      "Write the handler here. It lands on a runtime image with the language and Arrow in it, and Alchemy builds the version from it.",
+    [FunctionSourceKind.IMAGE]:
+      "Point at an OCI image you build and push yourself. Its entrypoint reads input on stdin and writes output on stdout.",
+  };
+
 export const CREATE_FUNCTION_MODAL_STEP_TO_TITLE_MAP: Record<CreateFunctionModalStep, string> = {
-  [CreateFunctionModalStep.RUNTIME]: "Choose image",
+  [CreateFunctionModalStep.SOURCE]: "Choose source",
   [CreateFunctionModalStep.CONTRACT]: "Define contract",
+  [CreateFunctionModalStep.CODE]: "Write code",
   [CreateFunctionModalStep.RESOURCES]: "Set resources",
-  [CreateFunctionModalStep.DETAILS]: "Name image",
+  [CreateFunctionModalStep.DETAILS]: "Name function",
 };
 
 export const CREATE_FUNCTION_MODAL_STEP_TO_DESCRIPTION_MAP: Record<
   CreateFunctionModalStep,
   string
 > = {
-  [CreateFunctionModalStep.RUNTIME]:
-    "Point at the OCI image to run, and override its command or environment if you need to.",
+  [CreateFunctionModalStep.SOURCE]:
+    "Write the function here and Alchemy builds it, or point at an OCI image you already ship.",
   [CreateFunctionModalStep.CONTRACT]:
-    "Describe what the image takes and returns. Every invocation is checked against it.",
+    "Describe what the function takes and returns. Every invocation is checked against it.",
+  [CreateFunctionModalStep.CODE]:
+    "Start from the handler your contract generated. It reads one input on stdin and writes one output on stdout.",
   [CreateFunctionModalStep.RESOURCES]: "Size the microVM each invocation runs in.",
   [CreateFunctionModalStep.DETAILS]:
-    "Name your image and add an optional description so your team knows what it does.",
+    "Name your function and add an optional description so your team knows what it does.",
 };
 
 export const CREATE_FUNCTION_MODAL_STEP_TO_HINT_MAP: Record<CreateFunctionModalStep, string> = {
-  [CreateFunctionModalStep.RUNTIME]: "Choose an image",
+  [CreateFunctionModalStep.SOURCE]: "Choose a source",
   [CreateFunctionModalStep.CONTRACT]: "Fix the schemas",
+  [CreateFunctionModalStep.CODE]: "Write the handler",
   [CreateFunctionModalStep.RESOURCES]: "Fix the limits",
-  [CreateFunctionModalStep.DETAILS]: "Enter a valid image name",
+  [CreateFunctionModalStep.DETAILS]: "Enter a valid function name",
 };
 
 export const CREATE_FUNCTION_MODAL_STEP_TO_IS_PADDED_MAP: Record<CreateFunctionModalStep, boolean> =
   {
-    [CreateFunctionModalStep.RUNTIME]: true,
+    [CreateFunctionModalStep.SOURCE]: true,
     [CreateFunctionModalStep.CONTRACT]: false,
+    [CreateFunctionModalStep.CODE]: false,
     [CreateFunctionModalStep.RESOURCES]: true,
     [CreateFunctionModalStep.DETAILS]: true,
   };
 
 export const CREATE_FUNCTION_MODAL_MODE_TO_HEADER_MAP: Record<CreateFunctionModalMode, string> = {
-  [CreateFunctionModalMode.FUNCTION]: "New image",
+  [CreateFunctionModalMode.FUNCTION]: "New function",
   [CreateFunctionModalMode.VERSION]: "New version",
 };
 
@@ -78,7 +112,7 @@ export const CREATE_FUNCTION_MODAL_MODE_TO_SUBMIT_LABEL_MAP: Record<
   CreateFunctionModalMode,
   string
 > = {
-  [CreateFunctionModalMode.FUNCTION]: "Create image",
+  [CreateFunctionModalMode.FUNCTION]: "Create function",
   [CreateFunctionModalMode.VERSION]: "Build version",
 };
 
@@ -142,11 +176,18 @@ const CREATE_FUNCTION_MODAL_DEFAULT_ARROW_FIELDS: Record<
 export const CREATE_FUNCTION_MODAL_DEFAULT_STATE: CreateFunctionModalState = {
   mode: CreateFunctionModalMode.FUNCTION,
   functionId: undefined,
-  step: CreateFunctionModalStep.RUNTIME,
+  step: CreateFunctionModalStep.SOURCE,
   name: "",
   isNameTouched: false,
   description: "",
+  sourceKind: FunctionSourceKind.SOURCE,
   image: "",
+  runtimes: [],
+  limits: undefined,
+  runtime: "",
+  sourceFiles: [],
+  sourceFile: "",
+  isSourceTouched: false,
   command: [],
   env: [],
   contractKind: "jsonSchema",

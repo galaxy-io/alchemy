@@ -63,7 +63,7 @@ const CreateFunctionModalSidebar: FC = () => {
                   onChange={isSubmitting ? undefined : handleStepChange}
                   orientation={Orientation.VERTICAL}
                   size={StepperSize.SMALL}
-                  ariaLabel="Image setup"
+                  ariaLabel="Function setup"
                 />
               </Flex>
             </Widget>

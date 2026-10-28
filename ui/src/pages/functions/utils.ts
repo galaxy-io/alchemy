@@ -1,15 +1,30 @@
+import { clone, create } from "@bufbuild/protobuf";
 import { Field, Schema } from "apache-arrow";
+import { match } from "ts-pattern";
 
+import { CodeEditorLanguage } from "@galaxy-io/dls/editor/CodeEditor";
 import type { JsonValue } from "@galaxy-io/dls/json/JsonViewer";
+import { GalaxyTheme } from "@galaxy-io/dls/theme/enums";
 
-import type {
-  Function as AlchemyFunction,
-  FunctionSpec,
-  FunctionVersion,
+import {
+  type Function as AlchemyFunction,
+  type FunctionSpec,
+  FunctionSpecSchema,
+  type FunctionVersion,
+  type Runtime,
+  SourceSchema,
 } from "@/gen/functions/v1/functions_pb";
 
-import { FUNCTION_NAME_PATTERN, FUNCTION_PROTOCOL_TO_TOKEN_MAP } from "@/pages/functions/constants";
-import type { FunctionArrowField } from "@/pages/functions/types";
+import {
+  FUNCTION_NAME_PATTERN,
+  FUNCTION_PROTOCOL_TO_TOKEN_MAP,
+  FUNCTION_SOURCE_EXTENSION_TO_LANGUAGE_MAP,
+} from "@/pages/functions/constants";
+import type {
+  FunctionArrowField,
+  FunctionContractKind,
+  FunctionSourceFile,
+} from "@/pages/functions/types";
 
 import {
   decodeArrowSchema,
@@ -65,4 +80,55 @@ export const createFunctionSpecJson = (spec: FunctionSpec): JsonValue => ({
     memoryMib: spec.resources?.memoryMib ?? 0,
   },
   timeoutMs: Number(spec.timeoutMs),
+  ...(spec.source && {
+    source: {
+      files: spec.source.files.map(({ path, size }) => ({ path, size: Number(size) })),
+      ...(spec.source.layer && {
+        layer: { key: spec.source.layer.key, sha256: spec.source.layer.sha256 },
+      }),
+    },
+  }),
 });
+
+export const getFunctionRuntime = (
+  runtimes: Runtime[],
+  image: string | undefined,
+): Runtime | undefined => runtimes.find((runtime) => runtime.image === image);
+
+export const getFunctionRuntimeIconUrl = (
+  runtime: Runtime,
+  theme: GalaxyTheme.DARK | GalaxyTheme.LIGHT,
+) =>
+  match(theme)
+    .with(GalaxyTheme.DARK, () => runtime.darkIconUrl)
+    .with(GalaxyTheme.LIGHT, () => runtime.lightIconUrl)
+    .exhaustive();
+
+export const getFunctionSourceLanguage = (path: string): CodeEditorLanguage =>
+  FUNCTION_SOURCE_EXTENSION_TO_LANGUAGE_MAP[path.split(".").pop() ?? ""] ??
+  CodeEditorLanguage.PLAIN;
+
+export const decodeFunctionSourceFile = (content: Uint8Array) => new TextDecoder().decode(content);
+
+export const encodeFunctionSourceFile = (content: string) => new TextEncoder().encode(content);
+
+export const createFunctionSourceStarter = (
+  runtime: Runtime,
+  contractKind: FunctionContractKind,
+): FunctionSourceFile[] => [
+  {
+    path: runtime.handlerPath,
+    content: match(contractKind)
+      .with("jsonSchema", () => runtime.starters?.jsonSchema ?? "")
+      .with("arrow", () => runtime.starters?.arrow ?? "")
+      .exhaustive(),
+  },
+];
+
+export const createFunctionSourceSpec = (spec: FunctionSpec, files: FunctionSourceFile[]) => {
+  const next = clone(FunctionSpecSchema, spec);
+  next.source = create(SourceSchema, {
+    files: files.map(({ path, content }) => ({ path, content: encodeFunctionSourceFile(content) })),
+  });
+  return next;
+};

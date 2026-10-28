@@ -10,8 +10,8 @@ import { FUNCTION_CREATE_TITLE } from "@/components/functions/constants";
 
 import {
   ALCHEMY_COMMAND_GROUP_CREATE,
+  ALCHEMY_COMMAND_GROUP_FUNCTIONS,
   ALCHEMY_COMMAND_GROUP_GO_TO,
-  ALCHEMY_COMMAND_GROUP_IMAGES,
 } from "@/module/constants";
 import { useAlchemyFlowOpen, useAlchemyMountedBase } from "@/module/hooks";
 import {
@@ -81,8 +81,8 @@ export const useAlchemyCommandItems = ({
         id: `function-${alchemyFunction.id}`,
         label: alchemyFunction.name,
         description: alchemyFunction.description || undefined,
-        icon: ALCHEMY_NAV_ITEM_TO_ICON_MAP[AlchemyNavItem.IMAGES],
-        group: ALCHEMY_COMMAND_GROUP_IMAGES,
+        icon: ALCHEMY_NAV_ITEM_TO_ICON_MAP[AlchemyNavItem.FUNCTIONS],
+        group: ALCHEMY_COMMAND_GROUP_FUNCTIONS,
         onSelect: () =>
           navigateFromBase(AlchemyPath.FUNCTION, { params: { id: alchemyFunction.id } }),
       })),

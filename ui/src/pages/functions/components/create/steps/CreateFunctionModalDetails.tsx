@@ -25,7 +25,7 @@ const CreateFunctionModalDetails: FC = () => {
       <TextInput
         value={name}
         onChange={setName}
-        placeholder="Enter image name..."
+        placeholder="Enter function name..."
         label="Name"
         isRequired
         error={isNameTouched ? nameError : undefined}

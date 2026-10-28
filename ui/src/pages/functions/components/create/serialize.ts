@@ -10,8 +10,8 @@ import {
 } from "@/gen/functions/v1/functions_pb";
 
 import type { CreateFunctionModalState } from "@/pages/functions/components/create/types";
-import { FunctionContractSide } from "@/pages/functions/types";
-import { encodeFunctionArrowFields } from "@/pages/functions/utils";
+import { FunctionContractSide, FunctionSourceKind } from "@/pages/functions/types";
+import { encodeFunctionArrowFields, encodeFunctionSourceFile } from "@/pages/functions/utils";
 
 const mapCreateFunctionModalStateToContract = (state: CreateFunctionModalState): Contract =>
   state.contractKind === "jsonSchema"
@@ -37,9 +37,20 @@ const mapCreateFunctionModalStateToContract = (state: CreateFunctionModalState):
 export const mapCreateFunctionModalStateToSpec = (
   state: CreateFunctionModalState,
 ): FunctionSpec | undefined => {
+  const isSource = state.sourceKind === FunctionSourceKind.SOURCE;
   try {
     return create(FunctionSpecSchema, {
-      image: state.image.trim(),
+      image: isSource
+        ? (state.runtimes.find((runtime) => runtime.id === state.runtime)?.image ?? "")
+        : state.image.trim(),
+      source: isSource
+        ? {
+            files: state.sourceFiles.map(({ path, content }) => ({
+              path,
+              content: encodeFunctionSourceFile(content),
+            })),
+          }
+        : undefined,
       command: state.command,
       env: Object.fromEntries(
         state.env

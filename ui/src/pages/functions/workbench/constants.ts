@@ -19,7 +19,9 @@ export const FUNCTION_WORKBENCH_RESULT_ID_LENGTH = 14;
 
 export const FUNCTION_WORKBENCH_DEFAULT_INPUT: JsonValue = {};
 
-export const FUNCTION_WORKBENCH_DEFAULT_FILE = FunctionWorkbenchFile.INPUT;
+export const FUNCTION_WORKBENCH_DEFAULT_FILE: string = FunctionWorkbenchFile.INPUT;
+
+export const FUNCTION_WORKBENCH_SOURCE_PREFIX = "source:";
 
 export const FUNCTION_WORKBENCH_FILES = Object.values(FunctionWorkbenchFile);
 

@@ -47,7 +47,7 @@ const HomePage: FC = () => {
     <>
       <Link to={`/${MOUNT_PATH}`}>Open the module</Link>
       <Link from={`/${MOUNT_PATH}`} to={AlchemyPath.FUNCTION_WORKBENCH} params={{ id: "f" }}>
-        Open an image workbench
+        Open a function workbench
       </Link>
       <CommandPalette items={commandItems} shouldBindHotKey />
     </>
@@ -99,14 +99,14 @@ const notFoundRoute = createRoute({
 
 const functionsRoute = createRoute({
   getParentRoute: () => mountRoute,
-  path: "images",
+  path: "functions",
   ...functionsRouteOptions,
   component: lazyRouteComponent(() => import("@galaxy-io/alchemy-ui/pages/FunctionsPage")),
 });
 
 const functionRoute = createRoute({
   getParentRoute: () => mountRoute,
-  path: "images/$id",
+  path: "functions/$id",
   ...functionRouteOptions,
   component: lazyRouteComponent(() => import("@galaxy-io/alchemy-ui/pages/FunctionPage")),
 });
@@ -192,7 +192,7 @@ const routeTree = rootRoute.addChildren([
 export const router = createRouter({ routeTree });
 
 export const unknownSearchKeyLink = linkOptions({
-  to: `/${MOUNT_PATH}/images`,
+  to: `/${MOUNT_PATH}/functions`,
   // @ts-expect-error a module route rejects search keys its schema does not declare
   search: { nope: 1 },
 });

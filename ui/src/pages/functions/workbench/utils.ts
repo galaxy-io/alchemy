@@ -1,9 +1,12 @@
 import type { JsonObject, JsonValue } from "@bufbuild/protobuf";
+import { FileIcon, FolderIcon } from "@phosphor-icons/react";
 import type { Schema } from "apache-arrow";
 import { match } from "ts-pattern";
 
+import type { TreeItem } from "@galaxy-io/dls/tree/Tree";
+
 import type { Contract } from "@/gen/functions/v1/common_pb";
-import type { FunctionVersion } from "@/gen/functions/v1/functions_pb";
+import type { FunctionVersion, SourceFile } from "@/gen/functions/v1/functions_pb";
 
 import { createContractSideJson } from "@/pages/functions/contract/utils";
 import { FunctionContractSide } from "@/pages/functions/types";
@@ -11,6 +14,8 @@ import { createFunctionSpecJson } from "@/pages/functions/utils";
 import {
   FUNCTION_WORKBENCH_DEFAULT_INPUT,
   FUNCTION_WORKBENCH_FILES,
+  FUNCTION_WORKBENCH_SOURCE_PREFIX,
+  FUNCTION_WORKBENCH_TREE_ITEMS,
 } from "@/pages/functions/workbench/constants";
 import { FunctionWorkbenchFile } from "@/pages/functions/workbench/types";
 
@@ -25,6 +30,46 @@ import { createJsonSchemaSample } from "@/utils/jsonSchema";
 
 export const isFunctionWorkbenchFile = (id: string): id is FunctionWorkbenchFile =>
   FUNCTION_WORKBENCH_FILES.some((file) => file === id);
+
+export const getFunctionWorkbenchSourcePath = (id: string) =>
+  id.startsWith(FUNCTION_WORKBENCH_SOURCE_PREFIX)
+    ? id.slice(FUNCTION_WORKBENCH_SOURCE_PREFIX.length)
+    : undefined;
+
+export const createFunctionWorkbenchSourceId = (path: string) =>
+  `${FUNCTION_WORKBENCH_SOURCE_PREFIX}${path}`;
+
+const insertFunctionWorkbenchSourceItem = (
+  items: TreeItem[],
+  segments: string[],
+  prefix: string,
+) => {
+  const [head, ...rest] = segments;
+  if (!head) return;
+  if (!rest.length) {
+    items.push({
+      id: createFunctionWorkbenchSourceId(`${prefix}${head}`),
+      label: head,
+      icon: FileIcon,
+    });
+    return;
+  }
+  const id = createFunctionWorkbenchSourceId(`${prefix}${head}/`);
+  let folder = items.find((item) => item.id === id);
+  if (!folder) {
+    folder = { id, label: head, icon: FolderIcon, children: [] };
+    items.push(folder);
+  }
+  insertFunctionWorkbenchSourceItem(folder.children ?? [], rest, `${prefix}${head}/`);
+};
+
+export const createFunctionWorkbenchTreeItems = (files: SourceFile[]): TreeItem[] => {
+  const sources: TreeItem[] = [];
+  for (const file of files) {
+    insertFunctionWorkbenchSourceItem(sources, file.path.split("/"), "");
+  }
+  return [...sources, ...FUNCTION_WORKBENCH_TREE_ITEMS];
+};
 
 export const getFunctionWorkbenchArrowSchema = (contract: Contract | undefined) =>
   contract?.kind.case === "arrow" ? decodeArrowSchema(contract.kind.value.inputSchema) : undefined;

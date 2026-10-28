@@ -11,14 +11,34 @@ import {
   type SetImageAction,
   type SetMemoryMibAction,
   type SetNameAction,
+  type SetRuntimeAction,
   type SetSchemaTextAction,
+  type SetSourceFileAction,
+  type SetSourceFileContentAction,
+  type SetSourceKindAction,
   type SetSubmittingAction,
   type SetTimeoutMsAction,
   type SetVcpusAction,
   type UpdateArrowFieldAction,
 } from "@/pages/functions/components/create/actions";
-import { CREATE_FUNCTION_MODAL_MODE_TO_STEP_ORDER_MAP } from "@/pages/functions/components/create/constants";
-import type { CreateFunctionModalState } from "@/pages/functions/components/create/types";
+import {
+  type CreateFunctionModalState,
+  CreateFunctionModalStep,
+} from "@/pages/functions/components/create/types";
+import { getCreateFunctionModalSteps } from "@/pages/functions/components/create/utils";
+import { createFunctionSourceStarter } from "@/pages/functions/utils";
+
+function regenerateStarter(state: CreateFunctionModalState): CreateFunctionModalState {
+  const runtime = state.runtimes.find((candidate) => candidate.id === state.runtime);
+  if (state.isSourceTouched || !runtime) return state;
+  const sourceFiles = createFunctionSourceStarter(runtime, state.contractKind);
+  return { ...state, sourceFiles, sourceFile: sourceFiles[0]?.path ?? state.sourceFile };
+}
+
+function enterStep(state: CreateFunctionModalState, step: CreateFunctionModalStep) {
+  const next = { ...state, step };
+  return step === CreateFunctionModalStep.CODE ? regenerateStarter(next) : next;
+}
 
 function setName(state: CreateFunctionModalState, action: SetNameAction): CreateFunctionModalState {
   return { ...state, name: action.payload, isNameTouched: true };
@@ -36,6 +56,40 @@ function setImage(
   action: SetImageAction,
 ): CreateFunctionModalState {
   return { ...state, image: action.payload };
+}
+
+function setSourceKind(
+  state: CreateFunctionModalState,
+  action: SetSourceKindAction,
+): CreateFunctionModalState {
+  return { ...state, sourceKind: action.payload };
+}
+
+function setRuntime(
+  state: CreateFunctionModalState,
+  action: SetRuntimeAction,
+): CreateFunctionModalState {
+  return regenerateStarter({ ...state, runtime: action.payload });
+}
+
+function setSourceFile(
+  state: CreateFunctionModalState,
+  action: SetSourceFileAction,
+): CreateFunctionModalState {
+  return { ...state, sourceFile: action.payload };
+}
+
+function setSourceFileContent(
+  state: CreateFunctionModalState,
+  action: SetSourceFileContentAction,
+): CreateFunctionModalState {
+  return {
+    ...state,
+    isSourceTouched: true,
+    sourceFiles: state.sourceFiles.map((file) =>
+      file.path === action.payload.path ? action.payload : file,
+    ),
+  };
 }
 
 function setCommand(
@@ -137,23 +191,23 @@ function goToStep(
   state: CreateFunctionModalState,
   action: GoToStepAction,
 ): CreateFunctionModalState {
-  const steps = CREATE_FUNCTION_MODAL_MODE_TO_STEP_ORDER_MAP[state.mode];
+  const steps = getCreateFunctionModalSteps(state.mode, state.sourceKind);
   const index = steps.indexOf(action.payload);
   if (state.isSubmitting || index === -1 || index > steps.indexOf(state.step)) return state;
-  return { ...state, step: action.payload };
+  return enterStep(state, action.payload);
 }
 
 function goBack(state: CreateFunctionModalState): CreateFunctionModalState {
-  const steps = CREATE_FUNCTION_MODAL_MODE_TO_STEP_ORDER_MAP[state.mode];
-  return { ...state, step: steps[Math.max(steps.indexOf(state.step) - 1, 0)] ?? state.step };
+  const steps = getCreateFunctionModalSteps(state.mode, state.sourceKind);
+  return enterStep(state, steps[Math.max(steps.indexOf(state.step) - 1, 0)] ?? state.step);
 }
 
 function goNext(state: CreateFunctionModalState): CreateFunctionModalState {
-  const steps = CREATE_FUNCTION_MODAL_MODE_TO_STEP_ORDER_MAP[state.mode];
-  return {
-    ...state,
-    step: steps[Math.min(steps.indexOf(state.step) + 1, steps.length - 1)] ?? state.step,
-  };
+  const steps = getCreateFunctionModalSteps(state.mode, state.sourceKind);
+  return enterStep(
+    state,
+    steps[Math.min(steps.indexOf(state.step) + 1, steps.length - 1)] ?? state.step,
+  );
 }
 
 const createFunctionModalReducer = (
@@ -165,8 +219,16 @@ const createFunctionModalReducer = (
       return setName(state, action);
     case CreateFunctionModalActionType.SET_DESCRIPTION:
       return setDescription(state, action);
+    case CreateFunctionModalActionType.SET_SOURCE_KIND:
+      return setSourceKind(state, action);
     case CreateFunctionModalActionType.SET_IMAGE:
       return setImage(state, action);
+    case CreateFunctionModalActionType.SET_RUNTIME:
+      return setRuntime(state, action);
+    case CreateFunctionModalActionType.SET_SOURCE_FILE:
+      return setSourceFile(state, action);
+    case CreateFunctionModalActionType.SET_SOURCE_FILE_CONTENT:
+      return setSourceFileContent(state, action);
     case CreateFunctionModalActionType.SET_COMMAND:
       return setCommand(state, action);
     case CreateFunctionModalActionType.SET_ENV:

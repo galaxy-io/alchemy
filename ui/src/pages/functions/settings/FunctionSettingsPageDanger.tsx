@@ -29,7 +29,7 @@ const FunctionSettingsPageDanger: FC<FunctionSettingsPageDangerProps> = ({ alche
   const { mutate: deleteFunction } = useDeleteFunctionMutation();
 
   const { handleOpen, isOpen, target, handleClose, handleConfirm } = useConfirm<AlchemyFunction>({
-    entityLabel: "Image",
+    entityLabel: "Function",
     onConfirm: (deleted, { onSuccess, onError }) =>
       deleteFunction(create(DeleteFunctionRequestSchema, { id: deleted.id }), {
         onSuccess,
@@ -44,13 +44,13 @@ const FunctionSettingsPageDanger: FC<FunctionSettingsPageDangerProps> = ({ alche
     <Widget header="Danger zone" isCollapsible defaultIsOpen>
       <Flex justifyContent={JustifyContent.SPACE_BETWEEN} alignItems={AlignItems.CENTER} gap={16}>
         <Flex direction={FlexDirection.COLUMN} gap={2}>
-          <Text size={TextSize.BODY_SM}>Delete this image</Text>
+          <Text size={TextSize.BODY_SM}>Delete this function</Text>
           <Text size={TextSize.CAPTION} variant={TextVariant.TERTIARY}>
             Every version and invocation record goes with it
           </Text>
         </Flex>
         <Button
-          label="Delete image"
+          label="Delete function"
           variant={ButtonVariant.ERROR}
           onClick={() => handleOpen(alchemyFunction)}
         />
@@ -62,8 +62,8 @@ const FunctionSettingsPageDanger: FC<FunctionSettingsPageDangerProps> = ({ alche
         }}
         onConfirm={handleConfirm}
         header={`Delete ${target?.name ?? alchemyFunction.name}?`}
-        description="Type the image's name to confirm. Callers will get NOT_FOUND."
-        label="Delete image"
+        description="Type the function's name to confirm. Callers will get NOT_FOUND."
+        label="Delete function"
         confirmValue={target?.name}
         isDestructive
       />

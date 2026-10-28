@@ -1,4 +1,5 @@
 import { ChipVariant } from "@galaxy-io/dls/chips/Chip";
+import { CodeEditorLanguage } from "@galaxy-io/dls/editor/CodeEditor";
 import type { RoleColor } from "@galaxy-io/dls/theme/tokens/types";
 
 import {
@@ -8,7 +9,11 @@ import {
 } from "@/gen/functions/v1/common_pb";
 import { FunctionVersionStatus } from "@/gen/functions/v1/functions_pb";
 
-import { type FunctionContractKind, FunctionContractSide } from "@/pages/functions/types";
+import {
+  type FunctionContractKind,
+  FunctionContractSide,
+  FunctionSourceKind,
+} from "@/pages/functions/types";
 
 export const FUNCTION_NAME_PATTERN = /^[a-z][a-z0-9-]{1,62}$/;
 export const FUNCTION_NAME_MAX_LENGTH = 63;
@@ -51,3 +56,22 @@ export const FUNCTION_CONTRACT_SIDE_TO_ARROW_SCHEMA_KEY_MAP = {
   [FunctionContractSide.INPUT]: "inputSchema",
   [FunctionContractSide.OUTPUT]: "outputSchema",
 } as const satisfies Record<FunctionContractSide, keyof ArrowContract>;
+
+export const FUNCTION_SOURCE_KIND_TO_LABEL_MAP: Record<FunctionSourceKind, string> = {
+  [FunctionSourceKind.SOURCE]: "Code",
+  [FunctionSourceKind.IMAGE]: "Image",
+};
+
+export const FUNCTION_SOURCE_KINDS = Object.values(FunctionSourceKind);
+
+export const FUNCTION_SOURCE_EXTENSION_TO_LANGUAGE_MAP: Record<string, CodeEditorLanguage> = {
+  py: CodeEditorLanguage.PYTHON,
+  ts: CodeEditorLanguage.TYPESCRIPT,
+  js: CodeEditorLanguage.JAVASCRIPT,
+  mjs: CodeEditorLanguage.JAVASCRIPT,
+  json: CodeEditorLanguage.JSON,
+  md: CodeEditorLanguage.MARKDOWN,
+  toml: CodeEditorLanguage.TOML,
+  yaml: CodeEditorLanguage.YAML,
+  yml: CodeEditorLanguage.YAML,
+};

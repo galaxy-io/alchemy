@@ -16,14 +16,14 @@ import { Route as AppAlchemySplatRouteImport } from './routes/_app/_alchemy/$'
 import { Route as AppAlchemyHostsRouteImport } from './routes/_app/_alchemy/hosts'
 import { Route as AppAlchemyInvocationsRouteImport } from './routes/_app/_alchemy/invocations'
 import { Route as AppAlchemyObservabilityRouteImport } from './routes/_app/_alchemy/observability'
-import { Route as AppAlchemyImagesIndexRouteImport } from './routes/_app/_alchemy/images/index'
-import { Route as AppAlchemyImagesIdRouteImport } from './routes/_app/_alchemy/images/$id'
-import { Route as AppAlchemyImagesIdIndexRouteImport } from './routes/_app/_alchemy/images/$id/index'
-import { Route as AppAlchemyImagesIdContractRouteImport } from './routes/_app/_alchemy/images/$id/contract'
-import { Route as AppAlchemyImagesIdInvocationsRouteImport } from './routes/_app/_alchemy/images/$id/invocations'
-import { Route as AppAlchemyImagesIdSettingsRouteImport } from './routes/_app/_alchemy/images/$id/settings'
-import { Route as AppAlchemyImagesIdVersionsRouteImport } from './routes/_app/_alchemy/images/$id/versions'
-import { Route as AppAlchemyImagesIdWorkbenchRouteImport } from './routes/_app/_alchemy/images/$id/workbench'
+import { Route as AppAlchemyFunctionsIndexRouteImport } from './routes/_app/_alchemy/functions/index'
+import { Route as AppAlchemyFunctionsIdRouteImport } from './routes/_app/_alchemy/functions/$id'
+import { Route as AppAlchemyFunctionsIdIndexRouteImport } from './routes/_app/_alchemy/functions/$id/index'
+import { Route as AppAlchemyFunctionsIdContractRouteImport } from './routes/_app/_alchemy/functions/$id/contract'
+import { Route as AppAlchemyFunctionsIdInvocationsRouteImport } from './routes/_app/_alchemy/functions/$id/invocations'
+import { Route as AppAlchemyFunctionsIdSettingsRouteImport } from './routes/_app/_alchemy/functions/$id/settings'
+import { Route as AppAlchemyFunctionsIdVersionsRouteImport } from './routes/_app/_alchemy/functions/$id/versions'
+import { Route as AppAlchemyFunctionsIdWorkbenchRouteImport } from './routes/_app/_alchemy/functions/$id/workbench'
 
 const AppRouteRoute = AppRouteRouteImport.update({
   id: '/_app',
@@ -58,50 +58,52 @@ const AppAlchemyObservabilityRoute = AppAlchemyObservabilityRouteImport.update({
   path: '/observability',
   getParentRoute: () => AppAlchemyRouteRoute,
 } as any)
-const AppAlchemyImagesIndexRoute = AppAlchemyImagesIndexRouteImport.update({
-  id: '/images/',
-  path: '/images/',
+const AppAlchemyFunctionsIndexRoute =
+  AppAlchemyFunctionsIndexRouteImport.update({
+    id: '/functions/',
+    path: '/functions/',
+    getParentRoute: () => AppAlchemyRouteRoute,
+  } as any)
+const AppAlchemyFunctionsIdRoute = AppAlchemyFunctionsIdRouteImport.update({
+  id: '/functions/$id',
+  path: '/functions/$id',
   getParentRoute: () => AppAlchemyRouteRoute,
 } as any)
-const AppAlchemyImagesIdRoute = AppAlchemyImagesIdRouteImport.update({
-  id: '/images/$id',
-  path: '/images/$id',
-  getParentRoute: () => AppAlchemyRouteRoute,
-} as any)
-const AppAlchemyImagesIdIndexRoute = AppAlchemyImagesIdIndexRouteImport.update({
-  id: '/',
-  path: '/',
-  getParentRoute: () => AppAlchemyImagesIdRoute,
-} as any)
-const AppAlchemyImagesIdContractRoute =
-  AppAlchemyImagesIdContractRouteImport.update({
+const AppAlchemyFunctionsIdIndexRoute =
+  AppAlchemyFunctionsIdIndexRouteImport.update({
+    id: '/',
+    path: '/',
+    getParentRoute: () => AppAlchemyFunctionsIdRoute,
+  } as any)
+const AppAlchemyFunctionsIdContractRoute =
+  AppAlchemyFunctionsIdContractRouteImport.update({
     id: '/contract',
     path: '/contract',
-    getParentRoute: () => AppAlchemyImagesIdRoute,
+    getParentRoute: () => AppAlchemyFunctionsIdRoute,
   } as any)
-const AppAlchemyImagesIdInvocationsRoute =
-  AppAlchemyImagesIdInvocationsRouteImport.update({
+const AppAlchemyFunctionsIdInvocationsRoute =
+  AppAlchemyFunctionsIdInvocationsRouteImport.update({
     id: '/invocations',
     path: '/invocations',
-    getParentRoute: () => AppAlchemyImagesIdRoute,
+    getParentRoute: () => AppAlchemyFunctionsIdRoute,
   } as any)
-const AppAlchemyImagesIdSettingsRoute =
-  AppAlchemyImagesIdSettingsRouteImport.update({
+const AppAlchemyFunctionsIdSettingsRoute =
+  AppAlchemyFunctionsIdSettingsRouteImport.update({
     id: '/settings',
     path: '/settings',
-    getParentRoute: () => AppAlchemyImagesIdRoute,
+    getParentRoute: () => AppAlchemyFunctionsIdRoute,
   } as any)
-const AppAlchemyImagesIdVersionsRoute =
-  AppAlchemyImagesIdVersionsRouteImport.update({
+const AppAlchemyFunctionsIdVersionsRoute =
+  AppAlchemyFunctionsIdVersionsRouteImport.update({
     id: '/versions',
     path: '/versions',
-    getParentRoute: () => AppAlchemyImagesIdRoute,
+    getParentRoute: () => AppAlchemyFunctionsIdRoute,
   } as any)
-const AppAlchemyImagesIdWorkbenchRoute =
-  AppAlchemyImagesIdWorkbenchRouteImport.update({
+const AppAlchemyFunctionsIdWorkbenchRoute =
+  AppAlchemyFunctionsIdWorkbenchRouteImport.update({
     id: '/workbench',
     path: '/workbench',
-    getParentRoute: () => AppAlchemyImagesIdRoute,
+    getParentRoute: () => AppAlchemyFunctionsIdRoute,
   } as any)
 
 export interface FileRoutesByFullPath {
@@ -110,14 +112,14 @@ export interface FileRoutesByFullPath {
   '/hosts': typeof AppAlchemyHostsRoute
   '/invocations': typeof AppAlchemyInvocationsRoute
   '/observability': typeof AppAlchemyObservabilityRoute
-  '/images/$id': typeof AppAlchemyImagesIdRouteWithChildren
-  '/images/': typeof AppAlchemyImagesIndexRoute
-  '/images/$id/contract': typeof AppAlchemyImagesIdContractRoute
-  '/images/$id/invocations': typeof AppAlchemyImagesIdInvocationsRoute
-  '/images/$id/settings': typeof AppAlchemyImagesIdSettingsRoute
-  '/images/$id/versions': typeof AppAlchemyImagesIdVersionsRoute
-  '/images/$id/workbench': typeof AppAlchemyImagesIdWorkbenchRoute
-  '/images/$id/': typeof AppAlchemyImagesIdIndexRoute
+  '/functions/$id': typeof AppAlchemyFunctionsIdRouteWithChildren
+  '/functions/': typeof AppAlchemyFunctionsIndexRoute
+  '/functions/$id/contract': typeof AppAlchemyFunctionsIdContractRoute
+  '/functions/$id/invocations': typeof AppAlchemyFunctionsIdInvocationsRoute
+  '/functions/$id/settings': typeof AppAlchemyFunctionsIdSettingsRoute
+  '/functions/$id/versions': typeof AppAlchemyFunctionsIdVersionsRoute
+  '/functions/$id/workbench': typeof AppAlchemyFunctionsIdWorkbenchRoute
+  '/functions/$id/': typeof AppAlchemyFunctionsIdIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof AppAlchemyIndexRoute
@@ -125,13 +127,13 @@ export interface FileRoutesByTo {
   '/hosts': typeof AppAlchemyHostsRoute
   '/invocations': typeof AppAlchemyInvocationsRoute
   '/observability': typeof AppAlchemyObservabilityRoute
-  '/images': typeof AppAlchemyImagesIndexRoute
-  '/images/$id/contract': typeof AppAlchemyImagesIdContractRoute
-  '/images/$id/invocations': typeof AppAlchemyImagesIdInvocationsRoute
-  '/images/$id/settings': typeof AppAlchemyImagesIdSettingsRoute
-  '/images/$id/versions': typeof AppAlchemyImagesIdVersionsRoute
-  '/images/$id/workbench': typeof AppAlchemyImagesIdWorkbenchRoute
-  '/images/$id': typeof AppAlchemyImagesIdIndexRoute
+  '/functions': typeof AppAlchemyFunctionsIndexRoute
+  '/functions/$id/contract': typeof AppAlchemyFunctionsIdContractRoute
+  '/functions/$id/invocations': typeof AppAlchemyFunctionsIdInvocationsRoute
+  '/functions/$id/settings': typeof AppAlchemyFunctionsIdSettingsRoute
+  '/functions/$id/versions': typeof AppAlchemyFunctionsIdVersionsRoute
+  '/functions/$id/workbench': typeof AppAlchemyFunctionsIdWorkbenchRoute
+  '/functions/$id': typeof AppAlchemyFunctionsIdIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -142,14 +144,14 @@ export interface FileRoutesById {
   '/_app/_alchemy/invocations': typeof AppAlchemyInvocationsRoute
   '/_app/_alchemy/observability': typeof AppAlchemyObservabilityRoute
   '/_app/_alchemy/': typeof AppAlchemyIndexRoute
-  '/_app/_alchemy/images/$id': typeof AppAlchemyImagesIdRouteWithChildren
-  '/_app/_alchemy/images/': typeof AppAlchemyImagesIndexRoute
-  '/_app/_alchemy/images/$id/contract': typeof AppAlchemyImagesIdContractRoute
-  '/_app/_alchemy/images/$id/invocations': typeof AppAlchemyImagesIdInvocationsRoute
-  '/_app/_alchemy/images/$id/settings': typeof AppAlchemyImagesIdSettingsRoute
-  '/_app/_alchemy/images/$id/versions': typeof AppAlchemyImagesIdVersionsRoute
-  '/_app/_alchemy/images/$id/workbench': typeof AppAlchemyImagesIdWorkbenchRoute
-  '/_app/_alchemy/images/$id/': typeof AppAlchemyImagesIdIndexRoute
+  '/_app/_alchemy/functions/$id': typeof AppAlchemyFunctionsIdRouteWithChildren
+  '/_app/_alchemy/functions/': typeof AppAlchemyFunctionsIndexRoute
+  '/_app/_alchemy/functions/$id/contract': typeof AppAlchemyFunctionsIdContractRoute
+  '/_app/_alchemy/functions/$id/invocations': typeof AppAlchemyFunctionsIdInvocationsRoute
+  '/_app/_alchemy/functions/$id/settings': typeof AppAlchemyFunctionsIdSettingsRoute
+  '/_app/_alchemy/functions/$id/versions': typeof AppAlchemyFunctionsIdVersionsRoute
+  '/_app/_alchemy/functions/$id/workbench': typeof AppAlchemyFunctionsIdWorkbenchRoute
+  '/_app/_alchemy/functions/$id/': typeof AppAlchemyFunctionsIdIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -159,14 +161,14 @@ export interface FileRouteTypes {
     | '/hosts'
     | '/invocations'
     | '/observability'
-    | '/images/$id'
-    | '/images/'
-    | '/images/$id/contract'
-    | '/images/$id/invocations'
-    | '/images/$id/settings'
-    | '/images/$id/versions'
-    | '/images/$id/workbench'
-    | '/images/$id/'
+    | '/functions/$id'
+    | '/functions/'
+    | '/functions/$id/contract'
+    | '/functions/$id/invocations'
+    | '/functions/$id/settings'
+    | '/functions/$id/versions'
+    | '/functions/$id/workbench'
+    | '/functions/$id/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -174,13 +176,13 @@ export interface FileRouteTypes {
     | '/hosts'
     | '/invocations'
     | '/observability'
-    | '/images'
-    | '/images/$id/contract'
-    | '/images/$id/invocations'
-    | '/images/$id/settings'
-    | '/images/$id/versions'
-    | '/images/$id/workbench'
-    | '/images/$id'
+    | '/functions'
+    | '/functions/$id/contract'
+    | '/functions/$id/invocations'
+    | '/functions/$id/settings'
+    | '/functions/$id/versions'
+    | '/functions/$id/workbench'
+    | '/functions/$id'
   id:
     | '__root__'
     | '/_app'
@@ -190,14 +192,14 @@ export interface FileRouteTypes {
     | '/_app/_alchemy/invocations'
     | '/_app/_alchemy/observability'
     | '/_app/_alchemy/'
-    | '/_app/_alchemy/images/$id'
-    | '/_app/_alchemy/images/'
-    | '/_app/_alchemy/images/$id/contract'
-    | '/_app/_alchemy/images/$id/invocations'
-    | '/_app/_alchemy/images/$id/settings'
-    | '/_app/_alchemy/images/$id/versions'
-    | '/_app/_alchemy/images/$id/workbench'
-    | '/_app/_alchemy/images/$id/'
+    | '/_app/_alchemy/functions/$id'
+    | '/_app/_alchemy/functions/'
+    | '/_app/_alchemy/functions/$id/contract'
+    | '/_app/_alchemy/functions/$id/invocations'
+    | '/_app/_alchemy/functions/$id/settings'
+    | '/_app/_alchemy/functions/$id/versions'
+    | '/_app/_alchemy/functions/$id/workbench'
+    | '/_app/_alchemy/functions/$id/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -255,85 +257,87 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppAlchemyObservabilityRouteImport
       parentRoute: typeof AppAlchemyRouteRoute
     }
-    '/_app/_alchemy/images/': {
-      id: '/_app/_alchemy/images/'
-      path: '/images'
-      fullPath: '/images/'
-      preLoaderRoute: typeof AppAlchemyImagesIndexRouteImport
+    '/_app/_alchemy/functions/': {
+      id: '/_app/_alchemy/functions/'
+      path: '/functions'
+      fullPath: '/functions/'
+      preLoaderRoute: typeof AppAlchemyFunctionsIndexRouteImport
       parentRoute: typeof AppAlchemyRouteRoute
     }
-    '/_app/_alchemy/images/$id': {
-      id: '/_app/_alchemy/images/$id'
-      path: '/images/$id'
-      fullPath: '/images/$id'
-      preLoaderRoute: typeof AppAlchemyImagesIdRouteImport
+    '/_app/_alchemy/functions/$id': {
+      id: '/_app/_alchemy/functions/$id'
+      path: '/functions/$id'
+      fullPath: '/functions/$id'
+      preLoaderRoute: typeof AppAlchemyFunctionsIdRouteImport
       parentRoute: typeof AppAlchemyRouteRoute
     }
-    '/_app/_alchemy/images/$id/': {
-      id: '/_app/_alchemy/images/$id/'
+    '/_app/_alchemy/functions/$id/': {
+      id: '/_app/_alchemy/functions/$id/'
       path: '/'
-      fullPath: '/images/$id/'
-      preLoaderRoute: typeof AppAlchemyImagesIdIndexRouteImport
-      parentRoute: typeof AppAlchemyImagesIdRoute
+      fullPath: '/functions/$id/'
+      preLoaderRoute: typeof AppAlchemyFunctionsIdIndexRouteImport
+      parentRoute: typeof AppAlchemyFunctionsIdRoute
     }
-    '/_app/_alchemy/images/$id/contract': {
-      id: '/_app/_alchemy/images/$id/contract'
+    '/_app/_alchemy/functions/$id/contract': {
+      id: '/_app/_alchemy/functions/$id/contract'
       path: '/contract'
-      fullPath: '/images/$id/contract'
-      preLoaderRoute: typeof AppAlchemyImagesIdContractRouteImport
-      parentRoute: typeof AppAlchemyImagesIdRoute
+      fullPath: '/functions/$id/contract'
+      preLoaderRoute: typeof AppAlchemyFunctionsIdContractRouteImport
+      parentRoute: typeof AppAlchemyFunctionsIdRoute
     }
-    '/_app/_alchemy/images/$id/invocations': {
-      id: '/_app/_alchemy/images/$id/invocations'
+    '/_app/_alchemy/functions/$id/invocations': {
+      id: '/_app/_alchemy/functions/$id/invocations'
       path: '/invocations'
-      fullPath: '/images/$id/invocations'
-      preLoaderRoute: typeof AppAlchemyImagesIdInvocationsRouteImport
-      parentRoute: typeof AppAlchemyImagesIdRoute
+      fullPath: '/functions/$id/invocations'
+      preLoaderRoute: typeof AppAlchemyFunctionsIdInvocationsRouteImport
+      parentRoute: typeof AppAlchemyFunctionsIdRoute
     }
-    '/_app/_alchemy/images/$id/settings': {
-      id: '/_app/_alchemy/images/$id/settings'
+    '/_app/_alchemy/functions/$id/settings': {
+      id: '/_app/_alchemy/functions/$id/settings'
       path: '/settings'
-      fullPath: '/images/$id/settings'
-      preLoaderRoute: typeof AppAlchemyImagesIdSettingsRouteImport
-      parentRoute: typeof AppAlchemyImagesIdRoute
+      fullPath: '/functions/$id/settings'
+      preLoaderRoute: typeof AppAlchemyFunctionsIdSettingsRouteImport
+      parentRoute: typeof AppAlchemyFunctionsIdRoute
     }
-    '/_app/_alchemy/images/$id/versions': {
-      id: '/_app/_alchemy/images/$id/versions'
+    '/_app/_alchemy/functions/$id/versions': {
+      id: '/_app/_alchemy/functions/$id/versions'
       path: '/versions'
-      fullPath: '/images/$id/versions'
-      preLoaderRoute: typeof AppAlchemyImagesIdVersionsRouteImport
-      parentRoute: typeof AppAlchemyImagesIdRoute
+      fullPath: '/functions/$id/versions'
+      preLoaderRoute: typeof AppAlchemyFunctionsIdVersionsRouteImport
+      parentRoute: typeof AppAlchemyFunctionsIdRoute
     }
-    '/_app/_alchemy/images/$id/workbench': {
-      id: '/_app/_alchemy/images/$id/workbench'
+    '/_app/_alchemy/functions/$id/workbench': {
+      id: '/_app/_alchemy/functions/$id/workbench'
       path: '/workbench'
-      fullPath: '/images/$id/workbench'
-      preLoaderRoute: typeof AppAlchemyImagesIdWorkbenchRouteImport
-      parentRoute: typeof AppAlchemyImagesIdRoute
+      fullPath: '/functions/$id/workbench'
+      preLoaderRoute: typeof AppAlchemyFunctionsIdWorkbenchRouteImport
+      parentRoute: typeof AppAlchemyFunctionsIdRoute
     }
   }
 }
 
-interface AppAlchemyImagesIdRouteChildren {
-  AppAlchemyImagesIdContractRoute: typeof AppAlchemyImagesIdContractRoute
-  AppAlchemyImagesIdInvocationsRoute: typeof AppAlchemyImagesIdInvocationsRoute
-  AppAlchemyImagesIdSettingsRoute: typeof AppAlchemyImagesIdSettingsRoute
-  AppAlchemyImagesIdVersionsRoute: typeof AppAlchemyImagesIdVersionsRoute
-  AppAlchemyImagesIdWorkbenchRoute: typeof AppAlchemyImagesIdWorkbenchRoute
-  AppAlchemyImagesIdIndexRoute: typeof AppAlchemyImagesIdIndexRoute
+interface AppAlchemyFunctionsIdRouteChildren {
+  AppAlchemyFunctionsIdContractRoute: typeof AppAlchemyFunctionsIdContractRoute
+  AppAlchemyFunctionsIdInvocationsRoute: typeof AppAlchemyFunctionsIdInvocationsRoute
+  AppAlchemyFunctionsIdSettingsRoute: typeof AppAlchemyFunctionsIdSettingsRoute
+  AppAlchemyFunctionsIdVersionsRoute: typeof AppAlchemyFunctionsIdVersionsRoute
+  AppAlchemyFunctionsIdWorkbenchRoute: typeof AppAlchemyFunctionsIdWorkbenchRoute
+  AppAlchemyFunctionsIdIndexRoute: typeof AppAlchemyFunctionsIdIndexRoute
 }
 
-const AppAlchemyImagesIdRouteChildren: AppAlchemyImagesIdRouteChildren = {
-  AppAlchemyImagesIdContractRoute: AppAlchemyImagesIdContractRoute,
-  AppAlchemyImagesIdInvocationsRoute: AppAlchemyImagesIdInvocationsRoute,
-  AppAlchemyImagesIdSettingsRoute: AppAlchemyImagesIdSettingsRoute,
-  AppAlchemyImagesIdVersionsRoute: AppAlchemyImagesIdVersionsRoute,
-  AppAlchemyImagesIdWorkbenchRoute: AppAlchemyImagesIdWorkbenchRoute,
-  AppAlchemyImagesIdIndexRoute: AppAlchemyImagesIdIndexRoute,
+const AppAlchemyFunctionsIdRouteChildren: AppAlchemyFunctionsIdRouteChildren = {
+  AppAlchemyFunctionsIdContractRoute: AppAlchemyFunctionsIdContractRoute,
+  AppAlchemyFunctionsIdInvocationsRoute: AppAlchemyFunctionsIdInvocationsRoute,
+  AppAlchemyFunctionsIdSettingsRoute: AppAlchemyFunctionsIdSettingsRoute,
+  AppAlchemyFunctionsIdVersionsRoute: AppAlchemyFunctionsIdVersionsRoute,
+  AppAlchemyFunctionsIdWorkbenchRoute: AppAlchemyFunctionsIdWorkbenchRoute,
+  AppAlchemyFunctionsIdIndexRoute: AppAlchemyFunctionsIdIndexRoute,
 }
 
-const AppAlchemyImagesIdRouteWithChildren =
-  AppAlchemyImagesIdRoute._addFileChildren(AppAlchemyImagesIdRouteChildren)
+const AppAlchemyFunctionsIdRouteWithChildren =
+  AppAlchemyFunctionsIdRoute._addFileChildren(
+    AppAlchemyFunctionsIdRouteChildren,
+  )
 
 interface AppAlchemyRouteRouteChildren {
   AppAlchemySplatRoute: typeof AppAlchemySplatRoute
@@ -341,8 +345,8 @@ interface AppAlchemyRouteRouteChildren {
   AppAlchemyInvocationsRoute: typeof AppAlchemyInvocationsRoute
   AppAlchemyObservabilityRoute: typeof AppAlchemyObservabilityRoute
   AppAlchemyIndexRoute: typeof AppAlchemyIndexRoute
-  AppAlchemyImagesIdRoute: typeof AppAlchemyImagesIdRouteWithChildren
-  AppAlchemyImagesIndexRoute: typeof AppAlchemyImagesIndexRoute
+  AppAlchemyFunctionsIdRoute: typeof AppAlchemyFunctionsIdRouteWithChildren
+  AppAlchemyFunctionsIndexRoute: typeof AppAlchemyFunctionsIndexRoute
 }
 
 const AppAlchemyRouteRouteChildren: AppAlchemyRouteRouteChildren = {
@@ -351,8 +355,8 @@ const AppAlchemyRouteRouteChildren: AppAlchemyRouteRouteChildren = {
   AppAlchemyInvocationsRoute: AppAlchemyInvocationsRoute,
   AppAlchemyObservabilityRoute: AppAlchemyObservabilityRoute,
   AppAlchemyIndexRoute: AppAlchemyIndexRoute,
-  AppAlchemyImagesIdRoute: AppAlchemyImagesIdRouteWithChildren,
-  AppAlchemyImagesIndexRoute: AppAlchemyImagesIndexRoute,
+  AppAlchemyFunctionsIdRoute: AppAlchemyFunctionsIdRouteWithChildren,
+  AppAlchemyFunctionsIndexRoute: AppAlchemyFunctionsIndexRoute,
 }
 
 const AppAlchemyRouteRouteWithChildren = AppAlchemyRouteRoute._addFileChildren(

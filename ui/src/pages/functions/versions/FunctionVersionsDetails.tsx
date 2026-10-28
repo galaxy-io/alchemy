@@ -33,6 +33,13 @@ const FunctionVersionsDetails: FC<FunctionVersionsDetailsProps> = ({ version }) 
             value={contractKind ? FUNCTION_CONTRACT_KIND_TO_LABEL_MAP[contractKind] : EMPTY_VALUE}
           />
           <KeyValueListRow
+            label="Files"
+            value={
+              spec?.source ? spec.source.files.map(({ path }) => path).join(", ") : EMPTY_VALUE
+            }
+            isMono
+          />
+          <KeyValueListRow
             label="Command"
             value={spec?.command.length ? spec.command.join(" ") : "Image entrypoint"}
             isMono

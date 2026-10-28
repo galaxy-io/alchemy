@@ -1,6 +1,6 @@
 import type { FC } from "react";
 
-import { FloppyDiskIcon } from "@phosphor-icons/react";
+import { CubeIcon } from "@phosphor-icons/react";
 
 import { ChipSize } from "@galaxy-io/dls/chips/Chip";
 import Box from "@galaxy-io/dls/layout/Box";
@@ -38,7 +38,7 @@ const FunctionCard: FC<FunctionCardProps> = ({ alchemyFunction, metrics }) => {
   return (
     <Widget
       header={alchemyFunction.name}
-      icon={FloppyDiskIcon}
+      icon={CubeIcon}
       isInteractive
       onClick={handleOpen}
       actions={

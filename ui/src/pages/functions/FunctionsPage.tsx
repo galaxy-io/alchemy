@@ -1,6 +1,6 @@
 import { type FC, type RefObject, useMemo } from "react";
 
-import { FloppyDiskIcon, MagnifyingGlassIcon, PlusIcon } from "@phosphor-icons/react";
+import { CubeIcon, MagnifyingGlassIcon, PlusIcon } from "@phosphor-icons/react";
 
 import Button, { ButtonSize } from "@galaxy-io/dls/buttons/Button";
 import { useEndReached } from "@galaxy-io/dls/hooks/useEndReached";
@@ -45,14 +45,14 @@ const FunctionsPage: FC = () => {
 
   const renderContent = () => {
     if (!functions.length && search.q) {
-      return <EmptyLayout icon={MagnifyingGlassIcon} header="No images match your search" />;
+      return <EmptyLayout icon={MagnifyingGlassIcon} header="No functions match your search" />;
     }
     if (!functions.length) {
       return (
         <EmptyLayout
-          icon={FloppyDiskIcon}
-          header="No images yet"
-          description="An image plus a typed contract, built once and booted on demand"
+          icon={CubeIcon}
+          header="No functions yet"
+          description="An image or a handler plus a typed contract, built once and booted on demand"
           actions={
             <Button
               label={FUNCTION_CREATE_TITLE}
@@ -87,9 +87,9 @@ const FunctionsPage: FC = () => {
 
   return (
     <PageLayout
-      header="Images"
+      header="Functions"
       actions={<Button label={FUNCTION_CREATE_TITLE} icon={PlusIcon} onClick={handleNewFunction} />}
-      toolbar={<ListSearch placeholder="Search images" />}
+      toolbar={<ListSearch placeholder="Search functions" />}
     >
       {renderContent()}
     </PageLayout>

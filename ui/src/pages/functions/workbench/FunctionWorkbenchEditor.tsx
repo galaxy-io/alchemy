@@ -7,16 +7,23 @@ import Text, { TextSize, TextVariant } from "@galaxy-io/dls/text/Text";
 import type { FunctionVersion } from "@/gen/functions/v1/functions_pb";
 
 import FunctionCodeEditorFrame from "@/pages/functions/components/FunctionCodeEditorFrame";
+import { getFunctionSourceLanguage } from "@/pages/functions/utils";
 import { FUNCTION_WORKBENCH_FILE_TO_PATH_MAP } from "@/pages/functions/workbench/constants";
 import { FunctionWorkbenchFile } from "@/pages/functions/workbench/types";
-import { formatFunctionWorkbenchReadOnlyFile } from "@/pages/functions/workbench/utils";
+import {
+  formatFunctionWorkbenchReadOnlyFile,
+  getFunctionWorkbenchSourcePath,
+  isFunctionWorkbenchFile,
+} from "@/pages/functions/workbench/utils";
 
 interface FunctionWorkbenchEditorProps {
-  file: FunctionWorkbenchFile;
+  file: string;
   version: FunctionVersion | undefined;
   input: string;
   inputError: string | undefined;
+  source: string | undefined;
   onInputChange: (value: string) => void;
+  onSourceChange: (path: string, value: string) => void;
   onRun: () => void;
 }
 
@@ -25,9 +32,33 @@ const FunctionWorkbenchEditor: FC<FunctionWorkbenchEditorProps> = ({
   version,
   input,
   inputError,
+  source,
   onInputChange,
+  onSourceChange,
   onRun,
 }) => {
+  const path = getFunctionWorkbenchSourcePath(file);
+  if (path !== undefined) {
+    return (
+      <Flex direction={FlexDirection.COLUMN} height="100%" minWidth={0}>
+        <FunctionCodeEditorFrame>
+          <CodeEditor
+            key={file}
+            ariaLabel={path}
+            language={getFunctionSourceLanguage(path)}
+            value={source ?? ""}
+            onChange={(value) => onSourceChange(path, value)}
+            isReadOnly={source === undefined}
+            isGhost
+            hasLineNumbers
+          />
+        </FunctionCodeEditorFrame>
+      </Flex>
+    );
+  }
+
+  if (!isFunctionWorkbenchFile(file)) return null;
+
   if (file !== FunctionWorkbenchFile.INPUT) {
     return (
       <Flex direction={FlexDirection.COLUMN} height="100%" minWidth={0}>
