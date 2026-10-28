@@ -13,6 +13,7 @@ import (
 	"os"
 	"os/signal"
 	"strconv"
+	"strings"
 	"syscall"
 	"time"
 
@@ -45,7 +46,9 @@ func run(log *slog.Logger) error {
 	dsn := envOr("PERSISTENCE_DSN", "postgresql://alchemy:alchemy@localhost:5435/alchemy?sslmode=disable")
 	natsURL := envOr("NATS_URL", "nats://localhost:4223")
 	// Empty keeps function logs on NATS only.
-	logsBucket := os.Getenv("FUNCTION_LOGS_BUCKET")
+	logsBucket := os.Getenv("LOGS_BUCKET")
+	// Empty means functions are built from images only.
+	artifactsBucket := os.Getenv("ARTIFACTS_BUCKET")
 	if err := configure(&cfg); err != nil {
 		return err
 	}
@@ -78,7 +81,17 @@ func run(log *slog.Logger) error {
 		defer func() { _ = bucket.Close() }()
 	}
 
-	svc, err := server.New(ctx, cfg, store, b, bucket, log)
+	artifacts, err := logs.OpenBucket(ctx, artifactsBucket)
+	if err != nil {
+		return fmt.Errorf("artifacts bucket: %w", err)
+	}
+	if artifacts == nil {
+		log.Warn("no artifacts bucket: functions are built from images only")
+	} else {
+		defer func() { _ = artifacts.Close() }()
+	}
+
+	svc, err := server.New(ctx, cfg, store, b, bucket, artifacts, log)
 	if err != nil {
 		return err
 	}
@@ -135,22 +148,24 @@ func envOr(key, fallback string) string {
 
 // configure sets cfg from the environment.
 func configure(cfg *server.Config) error {
-	if s := os.Getenv("FUNCTION_LOGS_RETENTION"); s != "" {
+	if s := os.Getenv("LOGS_RETENTION"); s != "" {
 		d, err := time.ParseDuration(s)
 		if err != nil {
-			return fmt.Errorf("FUNCTION_LOGS_RETENTION: %w", err)
+			return fmt.Errorf("LOGS_RETENTION: %w", err)
 		}
 		cfg.LogRetention = d
 	}
-	if s := os.Getenv("FUNCTION_LOGS_MAX_BYTES"); s != "" {
+	if s := os.Getenv("LOGS_MAX_BYTES"); s != "" {
 		n, err := strconv.ParseInt(s, 10, 64)
 		if err != nil {
-			return fmt.Errorf("FUNCTION_LOGS_MAX_BYTES: %w", err)
+			return fmt.Errorf("LOGS_MAX_BYTES: %w", err)
 		}
 		cfg.LogMaxBytes = n
 	}
 	hostname, _ := os.Hostname()
 	cfg.Name = envOr("SERVER_NAME", hostname)
+	cfg.RuntimeImagePrefix = strings.TrimSuffix(envOr("RUNTIME_IMAGE_PREFIX", cfg.RuntimeImagePrefix), "/")
+	cfg.RuntimeIconBaseURL = strings.TrimSuffix(envOr("RUNTIME_ICON_BASE_URL", cfg.RuntimeIconBaseURL), "/")
 	if s := os.Getenv("IDEMPOTENCY_WINDOW"); s != "" {
 		d, err := time.ParseDuration(s)
 		if err != nil {

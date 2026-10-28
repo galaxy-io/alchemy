@@ -73,7 +73,11 @@ Older logs move to colder storage through the bucket's own lifecycle rules, not 
 
 ## Artifacts
 
-A build can extract layers over a function's image: tar archives kept in `artifacts.bucket`, each checked against its digest. They are how a function built from source reaches its root filesystem. Hosts need to read the bucket through their service account's cloud identity (`host.serviceAccount.annotations`).
+A build can extract layers over a function's image: tar archives kept in `artifacts.bucket`, each checked against its digest. They are how a function built from source reaches its root filesystem: the server writes the function's files there as one archive, and the hosts that build the version read it. The server needs to write the bucket and hosts to read it, through their service accounts' cloud identity (`server.serviceAccount.annotations`, `host.serviceAccount.annotations`). Without a bucket, functions are built from images only.
+
+## Runtimes
+
+A function built from source lands on a runtime image, one per language, published under `runtimes.imagePrefix` as `<imagePrefix>/python:3.13` and so on. The server lists them to clients with their icons from `runtimes.iconBaseUrl`. Point `imagePrefix` at a registry of your own to serve the runtimes from there.
 
 A version uses its layers for as long as it exists, so the bucket must not expire them. Keep it separate from `functionLogs.bucket`, whose lifecycle rules do.
 

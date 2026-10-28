@@ -1,5 +1,6 @@
-# Local infrastructure only: Postgres and NATS. `server` runs on the Mac;
-# `host` runs in the Lima VM and reaches NATS at host.lima.internal.
+# Local infrastructure only: Postgres, NATS and an object store. `server`
+# runs on the Mac; `host` runs in the Lima VM and reaches them at
+# host.lima.internal.
 name: alchemy
 
 services:
@@ -32,6 +33,21 @@ services:
     volumes:
       - nats-data:/data
 
+  # Object store for the function logs and artifacts buckets, which `just
+  # infra` makes with rc. The console is on 9001.
+  rustfs:
+    image: ${RUSTFS_IMAGE:-docker.io/rustfs/rustfs:latest}
+    ports:
+      - "${ALCHEMY_RUSTFS_PORT:-9000}:9000"
+      - "${ALCHEMY_RUSTFS_CONSOLE_PORT:-9001}:9001"
+    environment:
+      RUSTFS_ACCESS_KEY: alchemy
+      RUSTFS_SECRET_KEY: alchemy123
+      RUSTFS_CONSOLE_ENABLE: "true"
+      RUSTFS_OBS_LOGGER_LEVEL: error
+    volumes:
+      - rustfs-data:/data
+
 # Payloads carry whole function inputs and outputs, so the message cap
 # matches the server's payload limit.
 configs:
@@ -44,3 +60,4 @@ configs:
 volumes:
   postgres-data:
   nats-data:
+  rustfs-data:

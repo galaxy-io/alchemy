@@ -52,12 +52,21 @@ functionLogs:
   maxBytes: 1073741824
 
 artifacts:
-  # -- Bucket of the layers builds extract over an image, such as a function
-  # built from source: `s3://BUCKET?region=REGION` or `gs://BUCKET`. Hosts
-  # need read access through their service account's cloud identity. Layers
-  # must outlive every version that uses them, so give it no expiry rule.
-  # Empty means only image functions can be built.
+  # -- Bucket of the layers builds extract over an image, such as the files
+  # of a function built from source: `s3://BUCKET?region=REGION` or
+  # `gs://BUCKET`. The server needs write access and hosts read access,
+  # through the service accounts' cloud identity. Layers must outlive every
+  # version that uses them, so give it no expiry rule. Empty means functions
+  # are built from images only.
   bucket: ""
+
+runtimes:
+  # -- Registry prefix of the runtime images functions built from source land
+  # on: a runtime's image is `<imagePrefix>/python:3.13`.
+  imagePrefix: ghcr.io/galaxy-io/alchemy/runtime
+  # -- Where the runtimes' icons are served from, as
+  # `<iconBaseUrl>/runtime-icon-<runtime>-<dark|light>.svg`.
+  iconBaseUrl: https://cdn.getgalaxy.io/runtimes
 
 server:
   image:

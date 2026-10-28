@@ -58,6 +58,11 @@ type Config struct {
 	InvocationRetention time.Duration
 	// InvocationReplicas is how many NATS servers keep each record.
 	InvocationReplicas int
+	// RuntimeImagePrefix is where the runtime images are, such that a
+	// runtime's image is prefix/python:3.13.
+	RuntimeImagePrefix string
+	// RuntimeIconBaseURL is where the runtimes' icons are served from.
+	RuntimeIconBaseURL string
 }
 
 // DefaultConfig returns the defaults server starts with.
@@ -77,6 +82,8 @@ func DefaultConfig() Config {
 		LogMaxBytes:         1 << 30,
 		InvocationRetention: 24 * time.Hour,
 		InvocationReplicas:  1,
+		RuntimeImagePrefix:  "ghcr.io/galaxy-io/alchemy/runtime",
+		RuntimeIconBaseURL:  "https://cdn.getgalaxy.io/runtimes",
 	}
 }
 
@@ -90,13 +97,16 @@ func DefaultConfig() Config {
 type Service struct {
 	functionsv1connect.UnimplementedFunctionsServiceHandler
 
-	cfg     Config
-	store   *postgres.Store
-	bus     *bus.Bus
-	logs    *blob.Bucket // nil when function logs are kept on the bus only
-	log     *slog.Logger
-	tenant  string
-	tracker *invocationTracker // invocations this server holds
+	cfg   Config
+	store *postgres.Store
+	bus   *bus.Bus
+	logs  *blob.Bucket // nil when function logs are kept on the bus only
+	// artifacts holds the layers builds extract over an image, such as the
+	// files of a function built from source. nil means image functions only.
+	artifacts *blob.Bucket
+	log       *slog.Logger
+	tenant    string
+	tracker   *invocationTracker // invocations this server holds
 
 	// background scopes builds and subscriptions to the service's life.
 	background context.Context
@@ -122,13 +132,14 @@ type compiledVersion struct {
 // logBucket when there is one. It sets up the bus's streams, starts
 // listening to hosts and other servers, and starts writing invocation
 // records.
-func New(ctx context.Context, cfg Config, store *postgres.Store, b *bus.Bus, logBucket *blob.Bucket, log *slog.Logger) (*Service, error) {
+func New(ctx context.Context, cfg Config, store *postgres.Store, b *bus.Bus, logBucket, artifactBucket *blob.Bucket, log *slog.Logger) (*Service, error) {
 	bg, stop := context.WithCancel(context.Background())
 	s := &Service{
 		cfg:        cfg,
 		store:      store,
 		bus:        b,
 		logs:       logBucket,
+		artifacts:  artifactBucket,
 		log:        log,
 		tenant:     postgres.DefaultTenantID,
 		tracker:    newTracker(),

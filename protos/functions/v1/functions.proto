@@ -20,6 +20,8 @@ enum FunctionVersionStatus {
 // FunctionSpec is everything needed to build and run one version.
 message FunctionSpec {
   // image is an OCI reference, e.g. ghcr.io/galaxy-io/enrich-company:1.4.0.
+  // With source set it is the runtime the files land on, such as
+  // ghcr.io/galaxy-io/alchemy/runtime/python:3.13.
   string image = 1;
   // command is the process to run, as an argv. Empty means the image's own
   // Entrypoint + Cmd.
@@ -32,6 +34,71 @@ message FunctionSpec {
   // timeout_ms bounds a single invocation's run time, measured from the
   // moment input is handed to the function. Zero takes the server default.
   int64 timeout_ms = 7;
+  // source makes the version a function built from source: files extracted
+  // over image under /app, where the runtime images look for the handler.
+  Source source = 8;
+}
+
+// Source is the files of a function built from source. A request carries
+// their content; the server keeps them as an archive in the artifacts bucket
+// and the version's spec names the archive and lists the files, with their
+// content again on GetFunctionVersion. A spec that names an archive and
+// carries no content, such as a version's own spec sent back to build it
+// again, reuses the archive.
+message Source {
+  repeated SourceFile files = 1;
+  SourceLayer layer = 2;
+}
+
+message SourceFile {
+  // path is relative to /app, e.g. handler.py.
+  string path = 1;
+  bytes content = 2;
+  // size is the content's length, set by the server.
+  int64 size = 3;
+}
+
+// SourceLayer is the archive of a Source's files in the artifacts bucket.
+message SourceLayer {
+  string key = 1;
+  // sha256 is the archive's content digest, in hex.
+  string sha256 = 2;
+}
+
+// Runtime is an image a function built from source lands on, with what a
+// client needs to offer it: the handler the image runs and a starter for it.
+message Runtime {
+  // id names the runtime in a request, e.g. python.
+  string id = 1;
+  // label is the runtime's name for people, e.g. Python 3.13.
+  string label = 2;
+  // image is the reference a source spec sets as spec.image.
+  string image = 3;
+  // handler_path is the file under /app the image runs, e.g. handler.py.
+  string handler_path = 4;
+  string dark_icon_url = 5;
+  string light_icon_url = 6;
+  RuntimeStarters starters = 7;
+}
+
+// RuntimeStarters are handlers that read one input and write one output, per
+// contract kind, for a function to start from.
+message RuntimeStarters {
+  string json_schema = 1;
+  string arrow = 2;
+}
+
+// SourceLimits bound a Source.
+message SourceLimits {
+  int32 max_files = 1;
+  int64 max_bytes = 2;
+}
+
+message ListRuntimesRequest {}
+
+message ListRuntimesResponse {
+  repeated Runtime runtimes = 1;
+  SourceLimits limits = 2;
 }
 
 // FunctionVersion is an immutable, buildable version of a function. The
