@@ -50,8 +50,8 @@ export const CREATE_FUNCTION_MODAL_SOURCE_KIND_TO_DESCRIPTION_MAP: Record<
   FunctionSourceKind,
   string
 > = {
-  [FunctionSourceKind.SOURCE]: "Write it here and Alchemy builds it.",
-  [FunctionSourceKind.IMAGE]: "Run an OCI image you build.",
+  [FunctionSourceKind.SOURCE]: "Write it here and Alchemy builds it",
+  [FunctionSourceKind.IMAGE]: "Run an OCI image you build",
 };
 
 export const CREATE_FUNCTION_MODAL_SOURCE_KIND_TO_DETAILS_MAP: Record<FunctionSourceKind, string> =
