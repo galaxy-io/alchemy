@@ -5,16 +5,16 @@ import { FlaskIcon, ReceiptIcon } from "@phosphor-icons/react";
 import Button, { ButtonSize, ButtonVariant } from "@galaxy-io/dls/buttons/Button";
 import Drawer, { DrawerSize } from "@galaxy-io/dls/drawer/Drawer";
 import ErrorLayout from "@galaxy-io/dls/layout/ErrorLayout";
-import Flex, { FlexDirection } from "@galaxy-io/dls/layout/Flex";
 import PendingLayout from "@galaxy-io/dls/layout/PendingLayout";
 
 import type { Invocation } from "@/gen/functions/v1/invocations_pb";
 
-import InvocationLogs from "@/components/invocations/InvocationLogs";
+import InvocationLogsSplit from "@/components/invocations/InvocationLogsSplit";
+import InvocationOutcome from "@/components/invocations/InvocationOutcome";
 
+import { INVOCATION_DRAWER_STORAGE_KEY } from "@/pages/invocations/components/drawer/constants";
 import InvocationDrawerFacts from "@/pages/invocations/components/drawer/InvocationDrawerFacts";
 import InvocationDrawerHeader from "@/pages/invocations/components/drawer/InvocationDrawerHeader";
-import InvocationDrawerOutcome from "@/pages/invocations/components/drawer/InvocationDrawerOutcome";
 
 import { useAlchemyNavigate } from "@/module/hooks";
 import { AlchemyPath } from "@/module/paths";
@@ -67,11 +67,14 @@ const InvocationDrawer: FC<InvocationDrawerProps> = ({ invocationId, isOpen, onC
     }
 
     return (
-      <Flex direction={FlexDirection.COLUMN} gap={16}>
-        <InvocationDrawerOutcome invocation={invocation} />
+      <InvocationLogsSplit
+        id="invocation-drawer"
+        storageKey={INVOCATION_DRAWER_STORAGE_KEY}
+        invocationId={invocation.id}
+      >
+        <InvocationOutcome invocation={invocation} />
         <InvocationDrawerFacts invocation={invocation} />
-        <InvocationLogs invocationId={invocation.id} />
-      </Flex>
+      </InvocationLogsSplit>
     );
   };
 
@@ -82,6 +85,8 @@ const InvocationDrawer: FC<InvocationDrawerProps> = ({ invocationId, isOpen, onC
       onOpenChange={(open) => {
         if (!open) onClose();
       }}
+      hasDividers
+      isFlush
       icon={ReceiptIcon}
       header={invocation ? <InvocationDrawerHeader invocationId={invocation.id} /> : "Invocation"}
       actions={

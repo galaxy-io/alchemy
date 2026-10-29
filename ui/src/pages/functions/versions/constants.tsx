@@ -20,10 +20,10 @@ const FUNCTION_VERSIONS_TABLE_COLUMN_WIDTH_MEMORY = 100;
 const FUNCTION_VERSIONS_TABLE_COLUMN_WIDTH_BUILD = 90;
 const FUNCTION_VERSIONS_TABLE_COLUMN_WIDTH_CREATED_AT = 120;
 
-export const FUNCTION_VERSIONS_DETAILS_COLUMNS = "minmax(0, 2fr) minmax(0, 3fr)";
-export const FUNCTION_VERSIONS_BUILD_LOG_MAX_HEIGHT = 240;
-export const FUNCTION_VERSIONS_BUILD_LOG_HEADER_HEIGHT = 32;
-export const FUNCTION_VERSIONS_BUILD_LOG_PLACEHOLDER = "Waiting for a builder...";
+export const FUNCTION_VERSIONS_DETAILS_FILE_ICON_SIZE = 12;
+
+export const FUNCTION_VERSIONS_DETAILS_COLUMNS =
+  "max-content auto minmax(0, 1fr) minmax(0, 1fr) auto auto";
 
 export const FUNCTION_VERSIONS_TABLE_COLUMNS: TableColumn<FunctionVersionsTableRow>[] = [
   {
@@ -35,7 +35,7 @@ export const FUNCTION_VERSIONS_TABLE_COLUMNS: TableColumn<FunctionVersionsTableR
       <Flex gap={8} alignItems={AlignItems.CENTER}>
         <Text size={TextSize.BODY_SM}>{formatVersion(row.version.version)}</Text>
         {row.isCurrent && (
-          <Chip label="Current" size={ChipSize.X_SMALL} variant={ChipVariant.PRIMARY} />
+          <Chip label="Current" size={ChipSize.X_SMALL} variant={ChipVariant.SECONDARY} />
         )}
       </Flex>
     ),

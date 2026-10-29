@@ -13,7 +13,11 @@ import {
 import { INVOCATIONS_TIMEFRAME_TO_CONFIG_MAP } from "@/components/invocations/constants";
 import type { InvocationsTimeframe } from "@/components/invocations/types";
 
-import { OBSERVABILITY_GRANULARITY_TO_DURATION_MS_MAP } from "@/pages/observability/constants";
+import {
+  OBSERVABILITY_GRANULARITY_TO_DURATION_MS_MAP,
+  OBSERVABILITY_SCROLL_END_TOLERANCE_PX,
+  OBSERVABILITY_WHEEL_LINE_PX,
+} from "@/pages/observability/constants";
 
 const formatTimeBucketLabel = (bucketKey: string) =>
   new Date(Number(bucketKey)).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
@@ -76,3 +80,13 @@ export const createObservabilityTimeseriesInput = (
     granularity: INVOCATIONS_TIMEFRAME_TO_CONFIG_MAP[timeframe].granularity,
     tzOffsetMinutes: -new Date(bucketStartMs).getTimezoneOffset(),
   });
+
+export const isObservabilityScrolledToEnd = (scroll: HTMLElement) =>
+  scroll.scrollTop + scroll.clientHeight >=
+  scroll.scrollHeight - OBSERVABILITY_SCROLL_END_TOLERANCE_PX;
+
+export const getObservabilityWheelDeltaPx = (event: WheelEvent, pageHeight: number) =>
+  match(event.deltaMode)
+    .with(WheelEvent.DOM_DELTA_LINE, () => event.deltaY * OBSERVABILITY_WHEEL_LINE_PX)
+    .with(WheelEvent.DOM_DELTA_PAGE, () => event.deltaY * pageHeight)
+    .otherwise(() => event.deltaY);

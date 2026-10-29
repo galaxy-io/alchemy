@@ -10,13 +10,18 @@ import {
   useCreateFunctionModalState,
 } from "@/pages/functions/components/create/CreateFunctionModalProvider";
 import FunctionCodeEditorFrame from "@/pages/functions/components/FunctionCodeEditorFrame";
+import FunctionSourceFileIcon from "@/pages/functions/components/FunctionSourceFileIcon";
 import { getFunctionSourceLanguage } from "@/pages/functions/utils";
 
 const CreateFunctionModalCode: FC = () => {
-  const { sourceFiles, sourceFile } = useCreateFunctionModalState();
+  const { sourceFiles, sourceFile, runtimes } = useCreateFunctionModalState();
   const { setSourceFile, setSourceFileContent } = useCreateFunctionModalActions();
   const file = sourceFiles.find((candidate) => candidate.path === sourceFile) ?? sourceFiles[0];
-  const items: TabItem[] = sourceFiles.map(({ path }) => ({ id: path, label: path }));
+  const items: TabItem[] = sourceFiles.map(({ path }) => ({
+    id: path,
+    label: path,
+    leading: <FunctionSourceFileIcon path={path} runtimes={runtimes} />,
+  }));
 
   if (!file) return null;
 

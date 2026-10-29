@@ -106,6 +106,7 @@
     "prepublishOnly": "pnpm build:lib && pnpm check:package && pnpm check:host"
   },
   "dependencies": {
+    "@linaria/core": "^7.0.0",
     "@linaria/react": "^7.0.1",
     "@phosphor-icons/react": "^2.1.10",
     "apache-arrow": "^21.2.0",

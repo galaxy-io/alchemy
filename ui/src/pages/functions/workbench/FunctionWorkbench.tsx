@@ -7,7 +7,6 @@ import Button, { ButtonSize } from "@galaxy-io/dls/buttons/Button";
 import Divider from "@galaxy-io/dls/layout/Divider";
 import Flex, { AlignItems, FlexDirection, JustifyContent } from "@galaxy-io/dls/layout/Flex";
 import ResizablePanels, { ResizablePanel } from "@galaxy-io/dls/layout/ResizablePanels";
-import ScrollArea from "@galaxy-io/dls/layout/ScrollArea";
 import Text, { TextSize } from "@galaxy-io/dls/text/Text";
 import { FontFamily, Orientation } from "@galaxy-io/dls/theme/enums";
 import { ToastVariant } from "@galaxy-io/dls/toast/Toast";
@@ -239,15 +238,11 @@ const FunctionWorkbench: FC<FunctionWorkbenchProps> = ({ functionId, version }) 
             max={FUNCTION_WORKBENCH_RESULT_MAX_WIDTH}
             ariaLabel="Result"
           >
-            <ScrollArea>
-              <Flex direction={FlexDirection.COLUMN} gap={12} padding={12}>
-                <FunctionWorkbenchResult
-                  response={state.response}
-                  contract={contract}
-                  isRunning={isRunning}
-                />
-              </Flex>
-            </ScrollArea>
+            <FunctionWorkbenchResult
+              response={state.response}
+              contract={contract}
+              isRunning={isRunning}
+            />
           </ResizablePanel>
         </ResizablePanels>
       </Flex>
