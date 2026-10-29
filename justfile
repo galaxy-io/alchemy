@@ -13,8 +13,8 @@ export ARTIFACTS_BUCKET := env("ARTIFACTS_BUCKET", "s3://alchemy-artifacts" + bu
 host_logs_bucket := replace(LOGS_BUCKET, "localhost", "host.lima.internal")
 host_artifacts_bucket := replace(ARTIFACTS_BUCKET, "localhost", "host.lima.internal")
 # runtime images come from a registry in compose: `just images` pushes them there, and hosts pull them from the Mac by its private address, which is host.lima.internal and needs no TLS
-registry := "localhost:5000"
-host_registry := "192.168.5.2:5000"
+registry := "localhost:5001"
+host_registry := "192.168.5.2:5001"
 export RUNTIME_IMAGE_PREFIX := env("RUNTIME_IMAGE_PREFIX", host_registry + "/galaxy-io/alchemy/runtime")
 # text logs read better in a terminal; the chart defaults to json
 export LOG_FORMAT := env("LOG_FORMAT", "text")
