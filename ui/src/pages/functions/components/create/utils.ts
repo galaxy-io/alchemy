@@ -38,7 +38,8 @@ import { FunctionContractSide, FunctionSourceKind } from "@/pages/functions/type
 import {
   createFunctionSourceStarter,
   decodeFunctionArrowFields,
-  decodeFunctionSourceFile,
+  decodeFunctionSourceFiles,
+  encodeFunctionSourceFile,
   getFunctionRuntime,
 } from "@/pages/functions/utils";
 
@@ -62,14 +63,8 @@ export const createInitialCreateFunctionModalState = ({
   const contract = spec?.contract?.kind;
   const runtime = getFunctionRuntime(runtimes, spec?.image) ?? runtimes[0];
   const contractKind = contract?.case ?? "jsonSchema";
-  const sourceFiles = spec?.source
-    ? spec.source.files.map(({ path, content }) => ({
-        path,
-        content: decodeFunctionSourceFile(content),
-      }))
-    : runtime
-      ? createFunctionSourceStarter(runtime, contractKind)
-      : [];
+  const starterFiles = runtime ? createFunctionSourceStarter(runtime, contractKind) : [];
+  const sourceFiles = spec?.source ? decodeFunctionSourceFiles(spec.source.files) : starterFiles;
   const state: CreateFunctionModalState = {
     ...CREATE_FUNCTION_MODAL_DEFAULT_STATE,
     runtimes,
@@ -117,6 +112,9 @@ export const createInitialCreateFunctionModalState = ({
   };
 };
 
+export const getCreateFunctionModalRuntime = (state: CreateFunctionModalState) =>
+  state.runtimes.find((runtime) => runtime.id === state.runtime);
+
 export const getCreateFunctionModalSteps = (
   mode: CreateFunctionModalMode,
   sourceKind: FunctionSourceKind,
@@ -139,7 +137,7 @@ const getSourceHints = (state: CreateFunctionModalState) =>
 
 const getCodeHints = (state: CreateFunctionModalState) => {
   const bytes = state.sourceFiles.reduce(
-    (total, file) => total + new TextEncoder().encode(file.content).byteLength,
+    (total, file) => total + encodeFunctionSourceFile(file.content).byteLength,
     0,
   );
   return [
@@ -208,10 +206,7 @@ export const getCreateFunctionModalStepSummary = (
         FUNCTION_SOURCE_KIND_TO_LABEL_MAP[state.sourceKind],
         match(state.sourceKind)
           .with(FunctionSourceKind.IMAGE, () => state.image.split("/").pop() ?? state.image)
-          .with(
-            FunctionSourceKind.SOURCE,
-            () => state.runtimes.find((runtime) => runtime.id === state.runtime)?.label ?? "",
-          )
+          .with(FunctionSourceKind.SOURCE, () => getCreateFunctionModalRuntime(state)?.label ?? "")
           .exhaustive(),
       ].join(", "),
     )

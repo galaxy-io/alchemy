@@ -12,6 +12,7 @@ import {
   FunctionSpecSchema,
   type FunctionVersion,
   type Runtime,
+  type SourceFile,
   SourceSchema,
 } from "@/gen/functions/v1/functions_pb";
 
@@ -125,10 +126,16 @@ export const createFunctionSourceStarter = (
   },
 ];
 
-export const createFunctionSourceSpec = (spec: FunctionSpec, files: FunctionSourceFile[]) => {
-  const next = clone(FunctionSpecSchema, spec);
-  next.source = create(SourceSchema, {
+export const decodeFunctionSourceFiles = (files: SourceFile[]): FunctionSourceFile[] =>
+  files.map(({ path, content }) => ({ path, content: decodeFunctionSourceFile(content) }));
+
+export const createFunctionSource = (files: FunctionSourceFile[]) =>
+  create(SourceSchema, {
     files: files.map(({ path, content }) => ({ path, content: encodeFunctionSourceFile(content) })),
   });
+
+export const createFunctionSourceSpec = (spec: FunctionSpec, files: FunctionSourceFile[]) => {
+  const next = clone(FunctionSpecSchema, spec);
+  next.source = createFunctionSource(files);
   return next;
 };

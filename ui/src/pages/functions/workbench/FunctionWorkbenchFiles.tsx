@@ -7,8 +7,8 @@ import Tree from "@galaxy-io/dls/tree/Tree";
 
 import { FUNCTION_WORKBENCH_TREE_EXPANDED_IDS } from "@/pages/functions/workbench/constants";
 import {
-  getFunctionWorkbenchSourcePath,
   isFunctionWorkbenchFile,
+  isFunctionWorkbenchSourceFile,
 } from "@/pages/functions/workbench/utils";
 
 interface FunctionWorkbenchFilesProps {
@@ -26,8 +26,7 @@ const FunctionWorkbenchFiles: FC<FunctionWorkbenchFilesProps> = ({ items, file, 
         value={file}
         defaultExpandedIds={FUNCTION_WORKBENCH_TREE_EXPANDED_IDS}
         onChange={(id) => {
-          const path = getFunctionWorkbenchSourcePath(id);
-          if (isFunctionWorkbenchFile(id) || (path && !path.endsWith("/"))) onChange(id);
+          if (isFunctionWorkbenchFile(id) || isFunctionWorkbenchSourceFile(id)) onChange(id);
         }}
       />
     </Box>
