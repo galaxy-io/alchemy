@@ -17,6 +17,8 @@ import (
 	"syscall"
 	"time"
 
+	"gocloud.dev/blob"
+
 	"github.com/galaxy-io/alchemy/api/functions/v1/functionsv1connect"
 	"github.com/galaxy-io/alchemy/api/metrics/v1/metricsv1connect"
 	"github.com/galaxy-io/alchemy/cmd/internal/logger"
@@ -81,13 +83,13 @@ func run(log *slog.Logger) error {
 		defer func() { _ = bucket.Close() }()
 	}
 
-	artifacts, err := logs.OpenBucket(ctx, artifactsBucket)
-	if err != nil {
-		return fmt.Errorf("artifacts bucket: %w", err)
-	}
-	if artifacts == nil {
+	var artifacts *blob.Bucket
+	if artifactsBucket == "" {
 		log.Warn("no artifacts bucket: functions are built from images only")
 	} else {
+		if artifacts, err = blob.OpenBucket(ctx, artifactsBucket); err != nil {
+			return fmt.Errorf("artifacts bucket: %w", err)
+		}
 		defer func() { _ = artifacts.Close() }()
 	}
 
