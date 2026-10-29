@@ -26,11 +26,12 @@ brew bundle
 
 Firecracker needs KVM, which Docker Desktop does not provide. On macOS the KVM host is a Lima VM with nested virtualization (Apple M3 or later, macOS 15 or later), and `just vm` creates it on first run.
 
-Start PostgreSQL, NATS and RustFS, the object store for logs and artifacts, then start the VM and run Alchemy:
+Start PostgreSQL, NATS, RustFS, the object store for logs and artifacts, and a registry for the runtime images, then start the VM, build the images and run Alchemy:
 
 ```sh
 just infra
 just vm
+just images
 just dev
 ```
 

@@ -1,4 +1,4 @@
-# Local infrastructure only: Postgres, NATS and an object store. `server`
+# Local infrastructure only: Postgres, NATS, an object store and a registry. `server`
 # runs on the Mac; `host` runs in the Lima VM and reaches them at
 # host.lima.internal.
 name: alchemy
@@ -48,6 +48,15 @@ services:
     volumes:
       - rustfs-data:/data
 
+  # Registry for the runtime images `just images` builds. Hosts pull from it
+  # over the Lima network.
+  registry:
+    image: ${REGISTRY_IMAGE:-docker.io/library/registry:3}
+    ports:
+      - "${ALCHEMY_REGISTRY_PORT:-5000}:5000"
+    volumes:
+      - registry-data:/var/lib/registry
+
 # Payloads carry whole function inputs and outputs, so the message cap
 # matches the server's payload limit.
 configs:
@@ -61,3 +70,4 @@ volumes:
   postgres-data:
   nats-data:
   rustfs-data:
+  registry-data:

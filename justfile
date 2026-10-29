@@ -4,8 +4,6 @@ set dotenv-load
 export PERSISTENCE_DSN := env("PERSISTENCE_DSN", "postgresql://alchemy:alchemy@localhost:5435/alchemy?sslmode=disable")
 export NATS_URL := env("NATS_URL", "nats://localhost:4223")
 host_nats_url := "nats://host.lima.internal:4223"
-# temporary, until the ghcr runtime packages are public: the VM mounts ~/.aws read-only at the same path, so hosts pull from ECR with the Mac's own credential chain
-aws_dir := home_directory() + "/.aws"
 # the buckets live in RustFS from compose, open to anonymous access so nothing carries keys; the VM reaches it at host.lima.internal
 rustfs_access_key := "alchemy"
 rustfs_secret_key := "alchemy123"
@@ -14,8 +12,10 @@ export LOGS_BUCKET := env("LOGS_BUCKET", "s3://alchemy-logs" + bucket_query)
 export ARTIFACTS_BUCKET := env("ARTIFACTS_BUCKET", "s3://alchemy-artifacts" + bucket_query)
 host_logs_bucket := replace(LOGS_BUCKET, "localhost", "host.lima.internal")
 host_artifacts_bucket := replace(ARTIFACTS_BUCKET, "localhost", "host.lima.internal")
-# temporary, until the ghcr runtime packages are public: runtime images come from ECR
-export RUNTIME_IMAGE_PREFIX := env("RUNTIME_IMAGE_PREFIX", "162811751577.dkr.ecr.us-east-2.amazonaws.com/alchemy/runtime")
+# runtime images come from a registry in compose: `just images` pushes them there, and hosts pull them from the Mac by its private address, which is host.lima.internal and needs no TLS
+registry := "localhost:5000"
+host_registry := "192.168.5.2:5000"
+export RUNTIME_IMAGE_PREFIX := env("RUNTIME_IMAGE_PREFIX", host_registry + "/galaxy-io/alchemy/runtime")
 # text logs read better in a terminal; the chart defaults to json
 export LOG_FORMAT := env("LOG_FORMAT", "text")
 export LOG_LEVEL := env("LOG_LEVEL", "info")
@@ -23,7 +23,7 @@ export LOG_LEVEL := env("LOG_LEVEL", "info")
 default:
     @just --list
 
-# start local infra (Postgres, NATS, RustFS) and make the buckets; `just infra down` stops it, `just infra down volumes` also drops the data
+# start local infra (Postgres, NATS, RustFS, a registry) and make the buckets; `just infra down` stops it, `just infra down volumes` also drops the data
 infra mode="up" scope="":
     #!/usr/bin/env bash
     set -euo pipefail
@@ -45,7 +45,7 @@ vm mode="up":
     set -euo pipefail
     case "{{ mode }}" in
       up)
-        if limactl list --quiet | grep -qx alchemy; then limactl start alchemy; else limactl start --name alchemy --tty=false --mount-only "{{ justfile_directory() }}:w" --mount-only "{{ aws_dir }}" lima.yaml; fi
+        if limactl list --quiet | grep -qx alchemy; then limactl start alchemy; else limactl start --name alchemy --tty=false --mount-only "{{ justfile_directory() }}:w" lima.yaml; fi
         docker context inspect lima-alchemy >/dev/null 2>&1 || docker context create lima-alchemy --docker "host=unix://$HOME/.lima/alchemy/sock/docker.sock"
         ;;
       down)   limactl shell alchemy -- sudo pkill -f 'bin/linux-arm64/host' || true; limactl stop alchemy ;;
@@ -70,7 +70,6 @@ host count="3" memory="512" warm="5m" prewarm="0": build-linux
       for i in $(seq 1 {{ count }}); do \
         sudo systemd-run --scope --quiet -p Delegate=yes -- env LOG_FORMAT={{ LOG_FORMAT }} LOG_LEVEL={{ LOG_LEVEL }} \
           NATS_URL="{{ host_nats_url }}" LOGS_BUCKET="{{ host_logs_bucket }}" ARTIFACTS_BUCKET="{{ host_artifacts_bucket }}" \
-          AWS_CONFIG_FILE="{{ aws_dir }}/config" AWS_SHARED_CREDENTIALS_FILE="{{ aws_dir }}/credentials" AWS_PROFILE="{{ env("AWS_PROFILE", "default") }}" \
           HOST_NAME=host-$i DATA_DIR=/var/lib/alchemy/host-$i UID_BASE=$((100000 * i)) \
           MEMORY_MIB={{ memory }} WARM_TTL={{ warm }} PREWARM={{ prewarm }} bin/linux-arm64/host 2>&1 | sed -u "s/^/[host-$i] /" & \
       done; wait'
@@ -140,13 +139,15 @@ binaries arch=`go env GOARCH`: ui-build
     CGO_ENABLED=0 GOOS=linux GOARCH={{ arch }} go build -trimpath -ldflags='-s -w' -o bin/alchemy/host ./cmd/host
     CGO_ENABLED=0 GOOS=linux GOARCH={{ arch }} go build -trimpath -ldflags='-s -w' -o bin/alchemy/supervisor ./cmd/supervisor
 
-# build the server, host and runtime container images for `arch`
+# build the server, host and runtime container images for `arch`, and push the runtimes to the registry from `just infra` for the hosts
 images arch=`go env GOARCH`: (binaries arch)
-    docker build --platform linux/{{ arch }} -f cmd/server/Dockerfile -t galaxy-io/alchemy/server:latest .
-    docker build --platform linux/{{ arch }} -f cmd/host/Dockerfile -t galaxy-io/alchemy/host:latest .
-    docker build --platform linux/{{ arch }} -t galaxy-io/alchemy/runtime/python:3.13 runtimes/python
-    docker build --platform linux/{{ arch }} -t galaxy-io/alchemy/runtime/node:24 runtimes/node
-    docker build --platform linux/{{ arch }} -t galaxy-io/alchemy/runtime/static:13 runtimes/static
+    docker --context default build --platform linux/{{ arch }} -f cmd/server/Dockerfile -t galaxy-io/alchemy/server:latest .
+    docker --context default build --platform linux/{{ arch }} -f cmd/host/Dockerfile -t galaxy-io/alchemy/host:latest .
+    for runtime in python:3.13 node:24 static:13; do \
+      docker --context default build --platform linux/{{ arch }} -t "galaxy-io/alchemy/runtime/$runtime" "runtimes/${runtime%%:*}" && \
+      docker --context default tag "galaxy-io/alchemy/runtime/$runtime" "{{ registry }}/galaxy-io/alchemy/runtime/$runtime" && \
+      docker --context default push --quiet "{{ registry }}/galaxy-io/alchemy/runtime/$runtime"; \
+    done
 
 # run cmd in every Go module
 _each cmd:
