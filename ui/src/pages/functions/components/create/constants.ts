@@ -12,7 +12,6 @@ import { FunctionContractSide, FunctionSourceKind } from "@/pages/functions/type
 
 import { formatJson } from "@/utils/json";
 
-export const CREATE_FUNCTION_MODAL_SIDEBAR_WIDTH = 240;
 export const CREATE_FUNCTION_MODAL_RESOURCES_MAX_WIDTH = 560;
 export const CREATE_FUNCTION_MODAL_ARROW_TYPE_WIDTH = 180;
 export const CREATE_FUNCTION_MODAL_DESCRIPTION_MIN_ROWS = 12;
