@@ -4,6 +4,7 @@ import {
   createConnectQueryKey,
   type UseMutationOptions,
   type UseQueryOptions,
+  useInfiniteQuery,
   useMutation,
   useQuery,
   useSuspenseInfiniteQuery,
@@ -92,6 +93,23 @@ export const useListInvocationsQuery = ({
     refetchInterval: (query) => getInvocationsRefetchInterval(query.state.data?.invocations),
     ...options,
   });
+};
+
+export const useListInvocationsInfiniteQuery = ({
+  input,
+}: {
+  input?: InfiniteQueryInput<typeof FunctionsService.method.listInvocations.input>;
+} = {}) => {
+  return useInfiniteQuery(
+    FunctionsService.method.listInvocations,
+    { ...input, pagination: INITIAL_PAGE_PARAM },
+    {
+      pageParamKey: "pagination",
+      getNextPageParam,
+      refetchInterval: (query) =>
+        getInvocationsRefetchInterval(query.state.data?.pages.flatMap((page) => page.invocations)),
+    },
+  );
 };
 
 export const useSuspenseListInvocationsInfiniteQuery = ({

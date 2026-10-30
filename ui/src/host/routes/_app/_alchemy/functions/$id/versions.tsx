@@ -4,7 +4,7 @@ import FunctionVersionsPage from "@/pages/functions/FunctionVersionsPage";
 
 import { functionVersionsRouteOptions } from "@/module/routes";
 
-export const Route = createFileRoute("/_app/_alchemy/images/$id/versions")({
+export const Route = createFileRoute("/_app/_alchemy/functions/$id/versions")({
   ...functionVersionsRouteOptions,
   component: FunctionVersionsPage,
 });

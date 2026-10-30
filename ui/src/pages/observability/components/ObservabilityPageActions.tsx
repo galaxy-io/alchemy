@@ -23,6 +23,7 @@ const ObservabilityPageActions: FC = () => {
       (prev) => ({
         ...prev,
         timeframe: next === INVOCATIONS_DEFAULT_TIMEFRAME ? undefined : next,
+        invocationsBucket: undefined,
       }),
       { replace: true },
     );

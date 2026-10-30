@@ -8,7 +8,7 @@ import {
   useReducer,
 } from "react";
 
-import type { Function as AlchemyFunction } from "@/gen/functions/v1/functions_pb";
+import type { Runtime } from "@/gen/functions/v1/functions_pb";
 
 import {
   type CreateFunctionModalAction,
@@ -16,7 +16,6 @@ import {
 } from "@/pages/functions/components/create/actions";
 import {
   CREATE_FUNCTION_MODAL_DEFAULT_ARROW_TYPE,
-  CREATE_FUNCTION_MODAL_MODE_TO_STEP_ORDER_MAP,
   CREATE_FUNCTION_MODAL_STEP_TO_HINT_MAP,
 } from "@/pages/functions/components/create/constants";
 import createFunctionModalReducer from "@/pages/functions/components/create/reducer";
@@ -28,10 +27,16 @@ import type {
   CreateFunctionModalStep,
 } from "@/pages/functions/components/create/types";
 import {
+  type CreateFunctionModalSeed,
   createInitialCreateFunctionModalState,
   getCreateFunctionModalStepHints,
+  getCreateFunctionModalSteps,
 } from "@/pages/functions/components/create/utils";
-import type { FunctionContractKind } from "@/pages/functions/types";
+import type {
+  FunctionContractKind,
+  FunctionSourceFile,
+  FunctionSourceKind,
+} from "@/pages/functions/types";
 import { FunctionContractSide } from "@/pages/functions/types";
 import { getFunctionNameError, getFunctionSchemaError } from "@/pages/functions/utils";
 
@@ -68,8 +73,16 @@ export const useCreateFunctionModalActions = () => {
         dispatch({ type: CreateFunctionModalActionType.SET_NAME, payload }),
       setDescription: (payload: CreateFunctionModalState["description"]) =>
         dispatch({ type: CreateFunctionModalActionType.SET_DESCRIPTION, payload }),
+      setSourceKind: (payload: FunctionSourceKind) =>
+        dispatch({ type: CreateFunctionModalActionType.SET_SOURCE_KIND, payload }),
       setImage: (payload: CreateFunctionModalState["image"]) =>
         dispatch({ type: CreateFunctionModalActionType.SET_IMAGE, payload }),
+      setRuntime: (payload: Runtime["id"]) =>
+        dispatch({ type: CreateFunctionModalActionType.SET_RUNTIME, payload }),
+      setSourceFile: (payload: FunctionSourceFile["path"]) =>
+        dispatch({ type: CreateFunctionModalActionType.SET_SOURCE_FILE, payload }),
+      setSourceFileContent: (payload: FunctionSourceFile) =>
+        dispatch({ type: CreateFunctionModalActionType.SET_SOURCE_FILE_CONTENT, payload }),
       setCommand: (payload: CreateFunctionModalState["command"]) =>
         dispatch({ type: CreateFunctionModalActionType.SET_COMMAND, payload }),
       setEnv: (payload: CreateFunctionModalState["env"]) =>
@@ -119,22 +132,21 @@ export const useCreateFunctionModalActions = () => {
   );
 };
 
-interface CreateFunctionModalProviderProps {
-  alchemyFunction?: AlchemyFunction;
-}
-
-const CreateFunctionModalProvider: FC<PropsWithChildren<CreateFunctionModalProviderProps>> = ({
+const CreateFunctionModalProvider: FC<PropsWithChildren<CreateFunctionModalSeed>> = ({
   alchemyFunction,
+  version,
+  runtimes,
+  limits,
   children,
 }) => {
   const [state, dispatch] = useReducer(
     createFunctionModalReducer,
-    alchemyFunction,
+    { alchemyFunction, version, runtimes, limits },
     createInitialCreateFunctionModalState,
   );
 
   const value = useMemo<CreateFunctionModalContextValue>(() => {
-    const steps = CREATE_FUNCTION_MODAL_MODE_TO_STEP_ORDER_MAP[state.mode];
+    const steps = getCreateFunctionModalSteps(state.mode, state.sourceKind);
     const stepIndex = steps.indexOf(state.step);
     const name = state.name.trim();
     const nameError = state.isNameTouched || !name ? getFunctionNameError(name) : undefined;

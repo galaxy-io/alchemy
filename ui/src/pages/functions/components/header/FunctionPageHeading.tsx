@@ -46,7 +46,7 @@ const FunctionPageHeading: FC<FunctionPageHeadingProps> = ({ alchemyFunction }) 
         onError: (error) => {
           toast({
             header: "Save failed",
-            description: getErrorMessage(error, "Failed to save image"),
+            description: getErrorMessage(error, "Failed to save function"),
             variant: ToastVariant.ERROR,
           });
         },
@@ -76,13 +76,13 @@ const FunctionPageHeading: FC<FunctionPageHeadingProps> = ({ alchemyFunction }) 
       <Button
         icon={ArrowLeftIcon}
         variant={ButtonVariant.TERTIARY}
-        ariaLabel="All images"
-        tooltip="All images"
+        ariaLabel="All functions"
+        tooltip="All functions"
         href={createAlchemyHref(AlchemyPath.FUNCTIONS)}
         as={RouterLink}
       />
       <EditableText
-        ariaLabel="Image name"
+        ariaLabel="Function name"
         value={alchemyFunction.name}
         onChange={handleRename}
         size={TextSize.HEADING_MD}
@@ -92,7 +92,7 @@ const FunctionPageHeading: FC<FunctionPageHeadingProps> = ({ alchemyFunction }) 
       <FunctionPageVersionSelect alchemyFunction={alchemyFunction} />
       <Flex minWidth={0} padding={[0, 0, 0, 8]}>
         <EditableText
-          ariaLabel="Image description"
+          ariaLabel="Function description"
           value={alchemyFunction.description}
           placeholder="Add a description..."
           onChange={handleDescriptionChange}

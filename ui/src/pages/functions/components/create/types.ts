@@ -1,17 +1,25 @@
 import type { Resources } from "@/gen/functions/v1/common_pb";
-import type { Function as AlchemyFunction, FunctionSpec } from "@/gen/functions/v1/functions_pb";
+import type {
+  Function as AlchemyFunction,
+  FunctionSpec,
+  Runtime,
+  SourceLimits,
+} from "@/gen/functions/v1/functions_pb";
 
 import type {
   FunctionArrowField,
   FunctionContractKind,
   FunctionContractSide,
+  FunctionSourceFile,
+  FunctionSourceKind,
 } from "@/pages/functions/types";
 
 export enum CreateFunctionModalStep {
-  DETAILS = "DETAILS",
-  RUNTIME = "RUNTIME",
+  SOURCE = "SOURCE",
   CONTRACT = "CONTRACT",
+  CODE = "CODE",
   RESOURCES = "RESOURCES",
+  DETAILS = "DETAILS",
 }
 
 export enum CreateFunctionModalMode {
@@ -35,7 +43,14 @@ export interface CreateFunctionModalState {
   name: AlchemyFunction["name"];
   isNameTouched: boolean;
   description: AlchemyFunction["description"];
+  sourceKind: FunctionSourceKind;
   image: FunctionSpec["image"];
+  runtimes: Runtime[];
+  limits: SourceLimits | undefined;
+  runtime: Runtime["id"];
+  sourceFiles: FunctionSourceFile[];
+  sourceFile: FunctionSourceFile["path"];
+  isSourceTouched: boolean;
   command: FunctionSpec["command"];
   env: CreateFunctionModalEnvEntry[];
   contractKind: FunctionContractKind;

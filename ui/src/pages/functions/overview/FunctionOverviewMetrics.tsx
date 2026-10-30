@@ -28,7 +28,7 @@ const FunctionOverviewMetrics: FC<FunctionOverviewMetricsProps> = ({ functionId 
 
   return (
     <BigNumberGroup
-      ariaLabel="Image metrics"
+      ariaLabel="Function metrics"
       variant={BigNumberGroupVariant.PRIMARY}
       hasBorder
       fillWidth

@@ -1,6 +1,6 @@
 import type { FC } from "react";
 
-import MultiSelectInput, { MultiSelectInputSize } from "@galaxy-io/dls/inputs/MultiSelectInput";
+import MultiSelectInput from "@galaxy-io/dls/inputs/MultiSelectInput";
 import type { SelectOption } from "@galaxy-io/dls/inputs/SelectInput";
 import Box from "@galaxy-io/dls/layout/Box";
 
@@ -31,7 +31,6 @@ const InvocationsStatusFilter: FC<InvocationsStatusFilterProps> = ({ value, onCh
     <MultiSelectInput
       ariaLabel="Status"
       placeholder="All statuses"
-      size={MultiSelectInputSize.SMALL}
       options={INVOCATIONS_STATUS_FILTER_OPTIONS}
       value={value.map(String)}
       onChange={(ids) => onChange(ids.map((id) => mapOptionIdToEnum(InvocationStatus, id)))}
