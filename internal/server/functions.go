@@ -235,7 +235,7 @@ func (s *Service) build(v *sqlcgen.FunctionVersion) {
 	var buildLog string
 	start := time.Now()
 	if err == nil {
-		artifact, buildLog, err = s.requestBuild(ctx, v.FunctionID, v.TenantID, spec, sourceLayers(spec))
+		artifact, buildLog, err = s.requestBuild(ctx, v, spec, sourceLayers(spec))
 	}
 
 	finish := sqlcgen.FinishFunctionVersionBuildParams{ID: v.ID, BuildStartedAt: v.BuildStartedAt, BuildLog: buildLog}
@@ -275,8 +275,8 @@ func (s *Service) build(v *sqlcgen.FunctionVersion) {
 // first artifact to come back with its build log; the other hosts finish on
 // their own and report it in their heartbeats. Hosts cache by image and
 // layer digests, so a rebuild of a known image is a cache hit.
-func (s *Service) requestBuild(ctx context.Context, functionID, tenantID string, spec *functionsv1.FunctionSpec, layers []*hostv1.Layer) (*hostv1.Artifact, string, error) {
-	hosts := s.placedHosts(functionID)
+func (s *Service) requestBuild(ctx context.Context, v *sqlcgen.FunctionVersion, spec *functionsv1.FunctionSpec, layers []*hostv1.Layer) (*hostv1.Artifact, string, error) {
+	hosts := s.placedHosts(v.FunctionID)
 	if len(hosts) == 0 {
 		return nil, "", errNoHosts
 	}
@@ -287,7 +287,7 @@ func (s *Service) requestBuild(ctx context.Context, functionID, tenantID string,
 		err  error
 	}
 	results := make(chan result, len(hosts))
-	req := &hostv1.BuildRequest{TenantId: tenantID, Spec: spec, Layers: layers}
+	req := &hostv1.BuildRequest{TenantId: v.TenantID, FunctionId: v.FunctionID, Version: v.Version, Spec: spec, Layers: layers}
 	for _, name := range hosts {
 		s.tasks.Go(func() {
 			resp := &hostv1.BuildResponse{}

@@ -229,6 +229,12 @@ host:
   console:
     # -- Keep the guest serial console on (`CONSOLE_ENABLED`). Observable, slower boot.
     enabled: false
+  eviction:
+    # -- Newest versions of each function a host keeps built whatever their use (`KEPT_VERSIONS`).
+    keptVersions: 2
+    # -- How long an older version goes without an invocation before the host
+    # drops its snapshot and drives (`VERSION_IDLE_TTL`). `0s` keeps every version.
+    versionIdleTTL: 24h
 
   # -- Host log level: `debug`, `info`, `warn` or `error`.
   logLevel: info

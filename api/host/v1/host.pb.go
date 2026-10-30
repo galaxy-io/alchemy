@@ -50,7 +50,11 @@ type Artifact struct {
 	// layers were extracted over the image, in order.
 	Layers []*Layer `protobuf:"bytes,12,rep,name=layers,proto3" json:"layers,omitempty"`
 	// contract is what the host checks every input and output against.
-	Contract      *v1.Contract `protobuf:"bytes,13,opt,name=contract,proto3" json:"contract,omitempty"`
+	Contract *v1.Contract `protobuf:"bytes,13,opt,name=contract,proto3" json:"contract,omitempty"`
+	// function_id and version are what the artifact was last built for. The
+	// host ranks a function's artifacts by version when it evicts old ones.
+	FunctionId    string `protobuf:"bytes,14,opt,name=function_id,json=functionId,proto3" json:"function_id,omitempty"`
+	Version       int64  `protobuf:"varint,15,opt,name=version,proto3" json:"version,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -176,6 +180,20 @@ func (x *Artifact) GetContract() *v1.Contract {
 	return nil
 }
 
+func (x *Artifact) GetFunctionId() string {
+	if x != nil {
+		return x.FunctionId
+	}
+	return ""
+}
+
+func (x *Artifact) GetVersion() int64 {
+	if x != nil {
+		return x.Version
+	}
+	return 0
+}
+
 // Layer is a tar archive, plain or gzipped, in the artifacts bucket that a
 // build extracts over its image. It is how files that are not in the image,
 // such as a function built from source, reach the root filesystem.
@@ -294,6 +312,8 @@ type BuildRequest struct {
 	Spec     *v1.FunctionSpec       `protobuf:"bytes,2,opt,name=spec,proto3" json:"spec,omitempty"`
 	// layers are extracted over spec.image, in order.
 	Layers        []*Layer `protobuf:"bytes,3,rep,name=layers,proto3" json:"layers,omitempty"`
+	FunctionId    string   `protobuf:"bytes,4,opt,name=function_id,json=functionId,proto3" json:"function_id,omitempty"`
+	Version       int64    `protobuf:"varint,5,opt,name=version,proto3" json:"version,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -347,6 +367,20 @@ func (x *BuildRequest) GetLayers() []*Layer {
 		return x.Layers
 	}
 	return nil
+}
+
+func (x *BuildRequest) GetFunctionId() string {
+	if x != nil {
+		return x.FunctionId
+	}
+	return ""
+}
+
+func (x *BuildRequest) GetVersion() int64 {
+	if x != nil {
+		return x.Version
+	}
+	return 0
 }
 
 type BuildResponse struct {
@@ -1234,7 +1268,7 @@ var File_host_v1_host_proto protoreflect.FileDescriptor
 
 const file_host_v1_host_proto_rawDesc = "" +
 	"\n" +
-	"\x12host/v1/host.proto\x12\ahost.v1\x1a\x19functions/v1/common.proto\x1a\x1cfunctions/v1/functions.proto\x1a\x17functions/v1/host.proto\x1a\x1efunctions/v1/invocations.proto\"\xf2\x03\n" +
+	"\x12host/v1/host.proto\x12\ahost.v1\x1a\x19functions/v1/common.proto\x1a\x1cfunctions/v1/functions.proto\x1a\x17functions/v1/host.proto\x1a\x1efunctions/v1/invocations.proto\"\xad\x04\n" +
 	"\bArtifact\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x1b\n" +
 	"\ttenant_id\x18\x02 \x01(\tR\btenantId\x12\x14\n" +
@@ -1251,7 +1285,10 @@ const file_host_v1_host_proto_rawDesc = "" +
 	"\n" +
 	"memory_mib\x18\v \x01(\rR\tmemoryMib\x12&\n" +
 	"\x06layers\x18\f \x03(\v2\x0e.host.v1.LayerR\x06layers\x122\n" +
-	"\bcontract\x18\r \x01(\v2\x16.functions.v1.ContractR\bcontract\x1a6\n" +
+	"\bcontract\x18\r \x01(\v2\x16.functions.v1.ContractR\bcontract\x12\x1f\n" +
+	"\vfunction_id\x18\x0e \x01(\tR\n" +
+	"functionId\x12\x18\n" +
+	"\aversion\x18\x0f \x01(\x03R\aversion\x1a6\n" +
 	"\bEnvEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
 	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"1\n" +
@@ -1260,11 +1297,14 @@ const file_host_v1_host_proto_rawDesc = "" +
 	"\x06sha256\x18\x02 \x01(\tR\x06sha256\"5\n" +
 	"\x05Error\x12\x12\n" +
 	"\x04code\x18\x01 \x01(\tR\x04code\x12\x18\n" +
-	"\amessage\x18\x02 \x01(\tR\amessage\"\x83\x01\n" +
+	"\amessage\x18\x02 \x01(\tR\amessage\"\xbe\x01\n" +
 	"\fBuildRequest\x12\x1b\n" +
 	"\ttenant_id\x18\x01 \x01(\tR\btenantId\x12.\n" +
 	"\x04spec\x18\x02 \x01(\v2\x1a.functions.v1.FunctionSpecR\x04spec\x12&\n" +
-	"\x06layers\x18\x03 \x03(\v2\x0e.host.v1.LayerR\x06layers\"\x8f\x01\n" +
+	"\x06layers\x18\x03 \x03(\v2\x0e.host.v1.LayerR\x06layers\x12\x1f\n" +
+	"\vfunction_id\x18\x04 \x01(\tR\n" +
+	"functionId\x12\x18\n" +
+	"\aversion\x18\x05 \x01(\x03R\aversion\"\x8f\x01\n" +
 	"\rBuildResponse\x12/\n" +
 	"\bartifact\x18\x01 \x01(\v2\x11.host.v1.ArtifactH\x00R\bartifact\x12&\n" +
 	"\x05error\x18\x02 \x01(\v2\x0e.host.v1.ErrorH\x00R\x05error\x12\x1b\n" +

@@ -13,6 +13,9 @@ data:
   PREWARM_COUNT: {{ .Values.host.prewarmCount | quote }}
   SNAPSHOTS_ENABLED: {{ .Values.host.snapshots.enabled | quote }}
   CONSOLE_ENABLED: {{ .Values.host.console.enabled | quote }}
+  # Eviction
+  KEPT_VERSIONS: {{ .Values.host.eviction.keptVersions | quote }}
+  VERSION_IDLE_TTL: {{ .Values.host.eviction.versionIdleTTL | quote }}
   # Observability
   LOG_LEVEL: {{ .Values.host.logLevel | quote }}
   LOG_FORMAT: {{ .Values.host.logFormat | quote }}

@@ -39,12 +39,14 @@ func artifactID(a *hostv1.Artifact) string {
 	return hex.EncodeToString(sum[:16])
 }
 
-// toProto turns a built artifact into its wire form and assigns its id.
-// layers are what it was built with, and c is the contract its invocations
-// are checked against.
-func toProto(tenantID string, a *driver.Artifact, layers []*hostv1.Layer, c *functionsv1.Contract) *hostv1.Artifact {
+// toProto turns a built artifact into its wire form and assigns its id,
+// with the layers it was built with and the contract its invocations are
+// checked against from the request.
+func toProto(req *hostv1.BuildRequest, a *driver.Artifact) *hostv1.Artifact {
 	p := &hostv1.Artifact{
-		TenantId:    tenantID,
+		TenantId:    req.GetTenantId(),
+		FunctionId:  req.GetFunctionId(),
+		Version:     req.GetVersion(),
 		Image:       a.Image,
 		Digest:      a.Digest,
 		RootfsBytes: a.RootfsBytes,
@@ -54,8 +56,8 @@ func toProto(tenantID string, a *driver.Artifact, layers []*hostv1.Layer, c *fun
 		Protocol:    protocolProto(a.Protocol),
 		Vcpus:       a.VCPUs,
 		MemoryMib:   a.MemoryMiB,
-		Layers:      layers,
-		Contract:    c,
+		Layers:      req.GetLayers(),
+		Contract:    req.GetSpec().GetContract(),
 	}
 	p.Id = artifactID(p)
 	return p

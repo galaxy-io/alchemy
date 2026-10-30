@@ -6,6 +6,7 @@
 package host
 
 import (
+	"cmp"
 	"context"
 	"crypto/rand"
 	"encoding/hex"
@@ -13,6 +14,7 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"slices"
 	"sort"
 	"sync"
 	"time"
@@ -54,7 +56,14 @@ type Config struct {
 	// artifact it serves, so even the first invocation skips the boot. They
 	// are booted from free memory only, never by evicting other instances,
 	// and the warm TTL never takes an artifact below this many.
-	Prewarm           int
+	Prewarm int
+	// KeptVersions is how many of a function's newest versions this host
+	// has built stay built whatever their use. The rest are evicted once
+	// idle for VersionIdleTTL: the host stops serving them and drops their
+	// snapshot and drives, and the next invocation builds again. 0 for the
+	// TTL keeps every version.
+	KeptVersions      int
+	VersionIdleTTL    time.Duration
 	BuildTimeout      time.Duration
 	HeartbeatInterval time.Duration
 }
@@ -64,6 +73,8 @@ func DefaultConfig() Config {
 	return Config{
 		MaxConcurrency:    8,
 		WarmTTL:           5 * time.Minute,
+		KeptVersions:      2,
+		VersionIdleTTL:    24 * time.Hour,
 		BuildTimeout:      5 * time.Minute,
 		HeartbeatInterval: 2 * time.Second,
 	}
@@ -91,6 +102,7 @@ type Host struct {
 
 	mu        sync.Mutex
 	artifacts map[string]*hostv1.Artifact // built and ready to run, by id
+	used      map[string]time.Time        // when each artifact was built or last invoked, by id
 	instances map[string]*liveInstance    // every instance, by key
 	warm      map[string][]*liveInstance  // idle instances by artifact id, most recently used last
 	draining  bool                        // shutting down: nothing more is parked
@@ -116,6 +128,7 @@ func New(cfg Config, d driver.Driver, b *bus.Bus, logBucket, artifactBucket *blo
 		background: bg,
 		stop:       stop,
 		artifacts:  make(map[string]*hostv1.Artifact),
+		used:       make(map[string]time.Time),
 		instances:  make(map[string]*liveInstance),
 		warm:       make(map[string][]*liveInstance),
 		filling:    make(map[string]int),
@@ -144,7 +157,7 @@ func (h *Host) Run(ctx context.Context) error {
 		subs = append(subs, sub)
 	}
 	h.tasks.Go(func() { h.records.run(h.background) })
-	h.log.Info("host serving", "slots", h.cfg.MaxConcurrency, "memory_mib", h.cfg.MemoryMiB, "warm_ttl", h.cfg.WarmTTL, "prewarm", h.cfg.Prewarm)
+	h.log.Info("host serving", "slots", h.cfg.MaxConcurrency, "memory_mib", h.cfg.MemoryMiB, "warm_ttl", h.cfg.WarmTTL, "prewarm", h.cfg.Prewarm, "kept_versions", h.cfg.KeptVersions, "version_idle_ttl", h.cfg.VersionIdleTTL)
 
 	ticker := time.NewTicker(h.cfg.HeartbeatInterval)
 	defer ticker.Stop()
@@ -153,6 +166,7 @@ func (h *Host) Run(ctx context.Context) error {
 		select {
 		case <-ticker.C:
 			h.expireWarm(time.Now())
+			h.evictVersions(time.Now())
 			h.heartbeat()
 		case <-ctx.Done():
 			for _, s := range subs {
@@ -218,7 +232,7 @@ func (h *Host) handleBuild(ctx context.Context, data []byte) proto.Message {
 		h.log.Warn("build failed", "image", req.GetSpec().GetImage(), "err", err)
 		return &hostv1.BuildResponse{Result: &hostv1.BuildResponse_Error{Error: &hostv1.Error{Code: "internal", Message: err.Error()}}, BuildLog: err.Error()}
 	}
-	artifact := toProto(req.GetTenantId(), built, req.GetLayers(), req.GetSpec().GetContract())
+	artifact := toProto(req, built)
 	if err := h.driver.Snapshot(ctx, fromProto(artifact)); err != nil {
 		h.log.Warn("snapshot failed", "artifact_id", artifact.GetId(), "err", err)
 		return &hostv1.BuildResponse{Result: &hostv1.BuildResponse_Error{Error: &hostv1.Error{Code: "internal", Message: "snapshot: " + err.Error()}}, BuildLog: err.Error()}
@@ -256,14 +270,65 @@ func (h *Host) serve(a *hostv1.Artifact) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 	h.artifacts[a.GetId()] = a
+	h.used[a.GetId()] = time.Now()
 }
 
-// serving reports whether this host has built artifact id.
+// serving reports whether this host has built artifact id, and counts the
+// use.
 func (h *Host) serving(id string) bool {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 	_, ok := h.artifacts[id]
+	if ok {
+		h.used[id] = time.Now()
+	}
 	return ok
+}
+
+// evictVersions stops serving every artifact beyond a function's newest
+// KeptVersions that has gone VersionIdleTTL without an invocation, releases
+// its warm instances and drops what the driver kept for it. Busy instances
+// finish on what their jail holds.
+func (h *Host) evictVersions(now time.Time) {
+	if h.cfg.VersionIdleTTL <= 0 {
+		return
+	}
+	cutoff := now.Add(-h.cfg.VersionIdleTTL)
+	h.mu.Lock()
+	byFunction := make(map[string][]*hostv1.Artifact)
+	for _, a := range h.artifacts {
+		key := a.GetTenantId() + "/" + a.GetFunctionId()
+		byFunction[key] = append(byFunction[key], a)
+	}
+	var evicted []*hostv1.Artifact
+	var idle []*liveInstance
+	for _, versions := range byFunction {
+		slices.SortFunc(versions, func(a, b *hostv1.Artifact) int { return cmp.Compare(b.GetVersion(), a.GetVersion()) })
+		for i, a := range versions {
+			if i < h.cfg.KeptVersions || !h.used[a.GetId()].Before(cutoff) {
+				continue
+			}
+			delete(h.artifacts, a.GetId())
+			delete(h.used, a.GetId())
+			idle = append(idle, h.warm[a.GetId()]...)
+			delete(h.warm, a.GetId())
+			evicted = append(evicted, a)
+		}
+	}
+	keep := make([]*driver.Artifact, 0, len(h.artifacts))
+	for _, a := range h.artifacts {
+		keep = append(keep, fromProto(a))
+	}
+	h.mu.Unlock()
+	for _, live := range idle {
+		h.release(live)
+	}
+	for _, a := range evicted {
+		if err := h.driver.Forget(h.background, fromProto(a), keep); err != nil {
+			h.log.Warn("forget artifact", "artifact_id", a.GetId(), "err", err)
+		}
+		h.log.Info("evicted version", "artifact_id", a.GetId(), "function_id", a.GetFunctionId(), "version", a.GetVersion())
+	}
 }
 
 // Keeping one output in the bucket is on the reply path, so its attempts
@@ -628,6 +693,10 @@ func (h *Host) prewarm(a *hostv1.Artifact) {
 
 func (h *Host) prewarmLocked(a *hostv1.Artifact) {
 	id := a.GetId()
+	// An evicted artifact is not topped up.
+	if _, ok := h.artifacts[id]; !ok {
+		return
+	}
 	for !h.draining && len(h.warm[id])+h.filling[id] < h.cfg.Prewarm {
 		need := int64(a.GetMemoryMib())
 		if h.cfg.MemoryMiB > 0 && h.committedLocked()+need > h.cfg.MemoryMiB {

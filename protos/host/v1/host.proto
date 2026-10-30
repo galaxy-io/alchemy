@@ -76,6 +76,10 @@ message Artifact {
   repeated Layer layers = 12;
   // contract is what the host checks every input and output against.
   functions.v1.Contract contract = 13;
+  // function_id and version are what the artifact was last built for. The
+  // host ranks a function's artifacts by version when it evicts old ones.
+  string function_id = 14;
+  int64 version = 15;
 }
 
 // Layer is a tar archive, plain or gzipped, in the artifacts bucket that a
@@ -101,6 +105,8 @@ message BuildRequest {
   functions.v1.FunctionSpec spec = 2;
   // layers are extracted over spec.image, in order.
   repeated Layer layers = 3;
+  string function_id = 4;
+  int64 version = 5;
 }
 
 message BuildResponse {

@@ -153,3 +153,28 @@ func (s *instance) snapshot(ctx context.Context) error {
 	}
 	return nil
 }
+
+// Forget removes a's snapshot, and its drives when no artifact in keep
+// shares them. A running microVM holds hard links to all of them, so it is
+// unaffected.
+func (d *Driver) Forget(_ context.Context, a *driver.Artifact, keep []*driver.Artifact) error {
+	paths := []string{filepath.Join(d.snapshotsDir(), a.ID)}
+	rootfsShared, layersShared := false, false
+	for _, k := range keep {
+		rootfsShared = rootfsShared || k.Digest == a.Digest
+		layersShared = layersShared || (len(a.Layers) > 0 && d.layersPath(k.Layers) == d.layersPath(a.Layers))
+	}
+	if !rootfsShared {
+		paths = append(paths, d.rootfsPath(a.Digest))
+	}
+	if layers := d.layersPath(a.Layers); layers != "" && !layersShared {
+		paths = append(paths, layers)
+	}
+	var errs []error
+	for _, p := range paths {
+		if err := os.RemoveAll(p); err != nil {
+			errs = append(errs, err)
+		}
+	}
+	return errors.Join(errs...)
+}

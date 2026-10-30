@@ -42,6 +42,10 @@ type Driver interface {
 	Snapshot(ctx context.Context, a *Artifact) error
 	// Acquire returns a started instance ready to take one invocation.
 	Acquire(ctx context.Context, a *Artifact) (Instance, functionsv1.StartKind, error)
+	// Forget drops what was kept for a: its snapshot, and its drives unless
+	// an artifact in keep shares them. Running instances keep what they
+	// hold.
+	Forget(ctx context.Context, a *Artifact, keep []*Artifact) error
 	// Info describes the host-side pieces the driver runs with.
 	Info(ctx context.Context) HostInfo
 }
