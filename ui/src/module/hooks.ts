@@ -106,6 +106,8 @@ export const useObservabilitySearch = () =>
       return {
         timeframe: parsed.timeframe ?? INVOCATIONS_DEFAULT_TIMEFRAME,
         traffic: parsed.traffic ?? OBSERVABILITY_DEFAULT_TRAFFIC_FILL,
+        invocationsBucket: parsed.invocationsBucket,
+        invocationsStatus: parsed.invocationsStatus,
       };
     },
   });

@@ -70,9 +70,6 @@ const HostsCard: FC<HostsCardProps> = ({ host, instances }) => {
         <Stat label="Memory" value={formatMemory(host.memoryMibCommitted)} />
         <Stat label="Cached images" value={formatCount(host.rootfsCacheImages)} />
         <Stat label="Rootfs cache" value={formatBytes(host.rootfsCacheBytes, { binary: true })} />
-      </Grid>
-      <Divider />
-      <Grid columns={HOSTS_CARD_STATS_COLUMNS} gap={12} padding={12}>
         <Stat label="Uptime" value={formatDuration(Date.now() - Number(host.startedAt))} />
         <Stat label="Firecracker" value={getHostsFirecrackerVersion(host.firecrackerVersion)} />
         <Stat label="Kernel" value={getHostsKernelName(host.kernel)} />

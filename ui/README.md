@@ -58,7 +58,7 @@ pnpm check:host      # type-check and build the fixture host against the package
    - A layout route `{ ...alchemyLayoutRouteOptions, component: Layout }`.
    - One child per page, `{ ...functionsRouteOptions, component: FunctionsPage }`.
    - A `$` splat `{ ...alchemyNotFoundRouteOptions, component: NotFoundPage }`.
-   - The `/` → `observability` redirect as a host file with an absolute path. `images/$id/` is the image's overview, not a redirect.
+   - The `/` → `observability` redirect as a host file with an absolute path. `functions/$id/` is the function's overview, not a redirect.
    - No `defaultPendingComponent`, `defaultErrorComponent` or `defaultNotFoundComponent` is needed. The route options carry Alchemy's own.
 6. **Own the query client.** Skip retries for `NotFound`, `PermissionDenied`, `Unauthenticated`, `InvalidArgument` and `Unimplemented`, or a missing function retries for about 7s before its not-found page. A `staleTime` of 30s is recommended.
 7. **Proxy** `/functions.v1.FunctionsService` and `/metrics.v1.MetricsService` to the Alchemy API at the transport's `baseUrl`. When another product the host mounts also serves `metrics.v1.MetricsService`, put one product behind a prefix.

@@ -1,6 +1,13 @@
 import { match } from "ts-pattern";
 
-import type { Function as AlchemyFunction } from "@/gen/functions/v1/functions_pb";
+import { formatBytes } from "@galaxy-io/dls/utils/format";
+
+import type {
+  Function as AlchemyFunction,
+  FunctionVersion,
+  Runtime,
+  SourceLimits,
+} from "@/gen/functions/v1/functions_pb";
 
 import {
   CREATE_FUNCTION_MODAL_CONTRACT_SIDE_TO_LABEL_MAP,
@@ -9,6 +16,9 @@ import {
   CREATE_FUNCTION_MODAL_IMAGE_PATTERN,
   CREATE_FUNCTION_MODAL_MEMORY_MIB_MAX,
   CREATE_FUNCTION_MODAL_MEMORY_MIB_MIN,
+  CREATE_FUNCTION_MODAL_MODE_TO_SKIPPED_STEPS_MAP,
+  CREATE_FUNCTION_MODAL_SOURCE_KIND_TO_SKIPPED_STEPS_MAP,
+  CREATE_FUNCTION_MODAL_STEPS,
   CREATE_FUNCTION_MODAL_TIMEOUT_MAX_MS,
   CREATE_FUNCTION_MODAL_TIMEOUT_MIN_MS,
   CREATE_FUNCTION_MODAL_VCPUS_MAX,
@@ -20,32 +30,64 @@ import {
   type CreateFunctionModalState,
   CreateFunctionModalStep,
 } from "@/pages/functions/components/create/types";
-import { FUNCTION_CONTRACT_KIND_TO_LABEL_MAP } from "@/pages/functions/constants";
-import { FunctionContractSide } from "@/pages/functions/types";
-import { decodeFunctionArrowFields, getFunctionCurrentVersion } from "@/pages/functions/utils";
+import {
+  FUNCTION_CONTRACT_KIND_TO_LABEL_MAP,
+  FUNCTION_SOURCE_KIND_TO_LABEL_MAP,
+} from "@/pages/functions/constants";
+import { FunctionContractSide, FunctionSourceKind } from "@/pages/functions/types";
+import {
+  createFunctionSourceStarter,
+  decodeFunctionArrowFields,
+  decodeFunctionSourceFiles,
+  encodeFunctionSourceFile,
+  getFunctionRuntime,
+} from "@/pages/functions/utils";
 
 import { formatMemory, formatMillis } from "@/utils/format";
 import { formatJson } from "@/utils/json";
 
-export const createInitialCreateFunctionModalState = (
-  alchemyFunction: AlchemyFunction | undefined,
-): CreateFunctionModalState => {
-  const state = CREATE_FUNCTION_MODAL_DEFAULT_STATE;
-  if (!alchemyFunction) return state;
-  const spec = (getFunctionCurrentVersion(alchemyFunction) ?? alchemyFunction.versions[0])?.spec;
+export interface CreateFunctionModalSeed {
+  alchemyFunction: AlchemyFunction | undefined;
+  version: FunctionVersion | undefined;
+  runtimes: Runtime[];
+  limits: SourceLimits | undefined;
+}
+
+export const createInitialCreateFunctionModalState = ({
+  alchemyFunction,
+  version,
+  runtimes,
+  limits,
+}: CreateFunctionModalSeed): CreateFunctionModalState => {
+  const spec = version?.spec;
   const contract = spec?.contract?.kind;
+  const runtime = getFunctionRuntime(runtimes, spec?.image) ?? runtimes[0];
+  const contractKind = contract?.case ?? "jsonSchema";
+  const starterFiles = runtime ? createFunctionSourceStarter(runtime, contractKind) : [];
+  const sourceFiles = spec?.source ? decodeFunctionSourceFiles(spec.source.files) : starterFiles;
+  const state: CreateFunctionModalState = {
+    ...CREATE_FUNCTION_MODAL_DEFAULT_STATE,
+    runtimes,
+    limits,
+    runtime: runtime?.id ?? "",
+    sourceFiles,
+    sourceFile: sourceFiles[0]?.path ?? "",
+  };
+  if (!alchemyFunction) return state;
   return {
     ...state,
     mode: CreateFunctionModalMode.VERSION,
     functionId: alchemyFunction.id,
-    step: CreateFunctionModalStep.RUNTIME,
+    step: CreateFunctionModalStep.SOURCE,
     name: alchemyFunction.name,
     isNameTouched: true,
     description: alchemyFunction.description,
-    image: spec?.image ?? "",
+    sourceKind: spec?.source ? FunctionSourceKind.SOURCE : FunctionSourceKind.IMAGE,
+    image: spec?.source ? "" : (spec?.image ?? ""),
+    isSourceTouched: !!spec?.source,
     command: spec?.command ?? [],
     env: Object.entries(spec?.env ?? {}).map(([key, value]) => ({ key, value })),
-    contractKind: contract?.case ?? "jsonSchema",
+    contractKind,
     schemaTexts:
       contract?.case === "jsonSchema"
         ? {
@@ -68,6 +110,45 @@ export const createInitialCreateFunctionModalState = (
     memoryMib: spec?.resources?.memoryMib || state.memoryMib,
     timeoutMs: spec?.timeoutMs ? Number(spec.timeoutMs) : state.timeoutMs,
   };
+};
+
+export const getCreateFunctionModalRuntime = (state: CreateFunctionModalState) =>
+  state.runtimes.find((runtime) => runtime.id === state.runtime);
+
+export const getCreateFunctionModalSteps = (
+  mode: CreateFunctionModalMode,
+  sourceKind: FunctionSourceKind,
+) =>
+  CREATE_FUNCTION_MODAL_STEPS.filter(
+    (step) =>
+      !CREATE_FUNCTION_MODAL_MODE_TO_SKIPPED_STEPS_MAP[mode].includes(step) &&
+      !CREATE_FUNCTION_MODAL_SOURCE_KIND_TO_SKIPPED_STEPS_MAP[sourceKind].includes(step),
+  );
+
+const getSourceHints = (state: CreateFunctionModalState) =>
+  match(state.sourceKind)
+    .with(FunctionSourceKind.IMAGE, () =>
+      CREATE_FUNCTION_MODAL_IMAGE_PATTERN.test(state.image.trim())
+        ? []
+        : ["Enter an OCI image reference, such as ghcr.io/acme/enrich:1.4.0"],
+    )
+    .with(FunctionSourceKind.SOURCE, () => [])
+    .exhaustive();
+
+const getCodeHints = (state: CreateFunctionModalState) => {
+  const bytes = state.sourceFiles.reduce(
+    (total, file) => total + encodeFunctionSourceFile(file.content).byteLength,
+    0,
+  );
+  return [
+    state.sourceFiles.some((file) => !file.content.trim()) ? "Every file needs content" : undefined,
+    state.limits && state.sourceFiles.length > state.limits.maxFiles
+      ? `At most ${state.limits.maxFiles} files`
+      : undefined,
+    state.limits && bytes > Number(state.limits.maxBytes)
+      ? `At most ${formatBytes(Number(state.limits.maxBytes), { binary: true })} of source`
+      : undefined,
+  ].filter((hint): hint is string => hint !== undefined);
 };
 
 const getContractHints = (
@@ -108,11 +189,8 @@ export const getCreateFunctionModalStepHints = (
 ) =>
   match(state.step)
     .with(CreateFunctionModalStep.DETAILS, () => (nameError ? [nameError] : []))
-    .with(CreateFunctionModalStep.RUNTIME, () =>
-      CREATE_FUNCTION_MODAL_IMAGE_PATTERN.test(state.image.trim())
-        ? []
-        : ["Enter an OCI image reference, such as ghcr.io/acme/enrich:1.4.0"],
-    )
+    .with(CreateFunctionModalStep.SOURCE, () => getSourceHints(state))
+    .with(CreateFunctionModalStep.CODE, () => getCodeHints(state))
     .with(CreateFunctionModalStep.CONTRACT, () => getContractHints(state, schemaErrors))
     .with(CreateFunctionModalStep.RESOURCES, () => getResourcesHints(state))
     .exhaustive();
@@ -123,7 +201,16 @@ export const getCreateFunctionModalStepSummary = (
 ) =>
   match(step)
     .with(CreateFunctionModalStep.DETAILS, () => state.name)
-    .with(CreateFunctionModalStep.RUNTIME, () => state.image.split("/").pop() ?? state.image)
+    .with(CreateFunctionModalStep.SOURCE, () =>
+      [
+        FUNCTION_SOURCE_KIND_TO_LABEL_MAP[state.sourceKind],
+        match(state.sourceKind)
+          .with(FunctionSourceKind.IMAGE, () => state.image.split("/").pop() ?? state.image)
+          .with(FunctionSourceKind.SOURCE, () => getCreateFunctionModalRuntime(state)?.label ?? "")
+          .exhaustive(),
+      ].join(", "),
+    )
+    .with(CreateFunctionModalStep.CODE, () => state.sourceFiles.map((file) => file.path).join(", "))
     .with(
       CreateFunctionModalStep.CONTRACT,
       () => FUNCTION_CONTRACT_KIND_TO_LABEL_MAP[state.contractKind],

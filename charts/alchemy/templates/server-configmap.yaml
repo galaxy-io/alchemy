@@ -16,6 +16,11 @@ data:
   LOG_LEVEL: {{ .Values.server.logLevel | quote }}
   LOG_FORMAT: {{ .Values.server.logFormat | quote }}
   # Function logs
-  FUNCTION_LOGS_BUCKET: {{ .Values.functionLogs.bucket | quote }}
-  FUNCTION_LOGS_RETENTION: {{ .Values.functionLogs.retention | quote }}
-  FUNCTION_LOGS_MAX_BYTES: {{ int64 .Values.functionLogs.maxBytes | quote }}
+  LOGS_BUCKET: {{ .Values.functionLogs.bucket | quote }}
+  LOGS_RETENTION: {{ .Values.functionLogs.retention | quote }}
+  LOGS_MAX_BYTES: {{ int64 .Values.functionLogs.maxBytes | quote }}
+  # Artifacts
+  ARTIFACTS_BUCKET: {{ .Values.artifacts.bucket | quote }}
+  # Runtimes
+  RUNTIME_IMAGE_PREFIX: {{ .Values.runtimes.imagePrefix | quote }}
+  RUNTIME_ICON_BASE_URL: {{ .Values.runtimes.iconBaseUrl | quote }}

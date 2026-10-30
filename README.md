@@ -26,11 +26,12 @@ brew bundle
 
 Firecracker needs KVM, which Docker Desktop does not provide. On macOS the KVM host is a Lima VM with nested virtualization (Apple M3 or later, macOS 15 or later), and `just vm` creates it on first run.
 
-Start PostgreSQL and NATS, start the VM, then run Alchemy:
+Start PostgreSQL, NATS, RustFS, the object store for logs and artifacts, and a registry for the runtime images, then start the VM, build the images and run Alchemy:
 
 ```sh
 just infra
 just vm
+just images
 just dev
 ```
 
@@ -42,6 +43,19 @@ When you are finished, stop the local infrastructure with:
 just vm down
 just infra down
 ```
+
+## Writing a function
+
+A function is an OCI image whose entrypoint reads its input on stdin and writes its output on stdout. Alchemy publishes a runtime image per language with the interpreter and the Arrow library in it, so a function in Python or TypeScript is a handler and a two line Dockerfile:
+
+```Dockerfile
+FROM ghcr.io/galaxy-io/alchemy/runtime/python:3.13
+COPY handler.py /app/
+```
+
+The runtimes are `runtime/python:3.13`, `runtime/node:24` and `runtime/static:13`, a distroless Debian 13 for a function that compiles to one static binary, as the [Go and Rust examples](examples/embed) do. They are built from [`runtimes/`](runtimes). Any other image whose entrypoint speaks stdin and stdout works too.
+
+A function on a runtime image needs no image of its own. A version whose spec carries `source` files, such as `handler.py`, is built from them: Alchemy keeps the files in its artifacts bucket and lays them over the runtime at `/app`. The files can use the standard library and the Arrow library the runtime ships, nothing is installed.
 
 ## Deploying Alchemy
 

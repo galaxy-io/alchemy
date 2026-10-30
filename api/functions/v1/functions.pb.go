@@ -82,6 +82,8 @@ func (FunctionVersionStatus) EnumDescriptor() ([]byte, []int) {
 type FunctionSpec struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// image is an OCI reference, e.g. ghcr.io/galaxy-io/enrich-company:1.4.0.
+	// With source set it is the runtime the files land on, such as
+	// ghcr.io/galaxy-io/alchemy/runtime/python:3.13.
 	Image string `protobuf:"bytes,1,opt,name=image,proto3" json:"image,omitempty"`
 	// command is the process to run, as an argv. Empty means the image's own
 	// Entrypoint + Cmd.
@@ -93,7 +95,10 @@ type FunctionSpec struct {
 	Resources *Resources         `protobuf:"bytes,6,opt,name=resources,proto3" json:"resources,omitempty"`
 	// timeout_ms bounds a single invocation's run time, measured from the
 	// moment input is handed to the function. Zero takes the server default.
-	TimeoutMs     int64 `protobuf:"varint,7,opt,name=timeout_ms,json=timeoutMs,proto3" json:"timeout_ms,omitempty"`
+	TimeoutMs int64 `protobuf:"varint,7,opt,name=timeout_ms,json=timeoutMs,proto3" json:"timeout_ms,omitempty"`
+	// source makes the version a function built from source: files extracted
+	// over image under /app, where the runtime images look for the handler.
+	Source        *Source `protobuf:"bytes,8,opt,name=source,proto3" json:"source,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -177,6 +182,480 @@ func (x *FunctionSpec) GetTimeoutMs() int64 {
 	return 0
 }
 
+func (x *FunctionSpec) GetSource() *Source {
+	if x != nil {
+		return x.Source
+	}
+	return nil
+}
+
+// Source is the files of a function built from source. A request carries
+// their content; the server keeps them as an archive in the artifacts bucket
+// and the version's spec names the archive and lists the files, with their
+// content again on GetFunctionVersion. A spec that names an archive and
+// carries no content, such as a version's own spec sent back to build it
+// again, reuses the archive.
+type Source struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Files         []*SourceFile          `protobuf:"bytes,1,rep,name=files,proto3" json:"files,omitempty"`
+	Layer         *SourceLayer           `protobuf:"bytes,2,opt,name=layer,proto3" json:"layer,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *Source) Reset() {
+	*x = Source{}
+	mi := &file_functions_v1_functions_proto_msgTypes[1]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *Source) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*Source) ProtoMessage() {}
+
+func (x *Source) ProtoReflect() protoreflect.Message {
+	mi := &file_functions_v1_functions_proto_msgTypes[1]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use Source.ProtoReflect.Descriptor instead.
+func (*Source) Descriptor() ([]byte, []int) {
+	return file_functions_v1_functions_proto_rawDescGZIP(), []int{1}
+}
+
+func (x *Source) GetFiles() []*SourceFile {
+	if x != nil {
+		return x.Files
+	}
+	return nil
+}
+
+func (x *Source) GetLayer() *SourceLayer {
+	if x != nil {
+		return x.Layer
+	}
+	return nil
+}
+
+type SourceFile struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// path is relative to /app, e.g. handler.py.
+	Path    string `protobuf:"bytes,1,opt,name=path,proto3" json:"path,omitempty"`
+	Content []byte `protobuf:"bytes,2,opt,name=content,proto3" json:"content,omitempty"`
+	// size is the content's length, set by the server.
+	Size          int64 `protobuf:"varint,3,opt,name=size,proto3" json:"size,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SourceFile) Reset() {
+	*x = SourceFile{}
+	mi := &file_functions_v1_functions_proto_msgTypes[2]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SourceFile) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SourceFile) ProtoMessage() {}
+
+func (x *SourceFile) ProtoReflect() protoreflect.Message {
+	mi := &file_functions_v1_functions_proto_msgTypes[2]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SourceFile.ProtoReflect.Descriptor instead.
+func (*SourceFile) Descriptor() ([]byte, []int) {
+	return file_functions_v1_functions_proto_rawDescGZIP(), []int{2}
+}
+
+func (x *SourceFile) GetPath() string {
+	if x != nil {
+		return x.Path
+	}
+	return ""
+}
+
+func (x *SourceFile) GetContent() []byte {
+	if x != nil {
+		return x.Content
+	}
+	return nil
+}
+
+func (x *SourceFile) GetSize() int64 {
+	if x != nil {
+		return x.Size
+	}
+	return 0
+}
+
+// SourceLayer is the archive of a Source's files in the artifacts bucket.
+type SourceLayer struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	Key   string                 `protobuf:"bytes,1,opt,name=key,proto3" json:"key,omitempty"`
+	// sha256 is the archive's content digest, in hex.
+	Sha256        string `protobuf:"bytes,2,opt,name=sha256,proto3" json:"sha256,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SourceLayer) Reset() {
+	*x = SourceLayer{}
+	mi := &file_functions_v1_functions_proto_msgTypes[3]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SourceLayer) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SourceLayer) ProtoMessage() {}
+
+func (x *SourceLayer) ProtoReflect() protoreflect.Message {
+	mi := &file_functions_v1_functions_proto_msgTypes[3]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SourceLayer.ProtoReflect.Descriptor instead.
+func (*SourceLayer) Descriptor() ([]byte, []int) {
+	return file_functions_v1_functions_proto_rawDescGZIP(), []int{3}
+}
+
+func (x *SourceLayer) GetKey() string {
+	if x != nil {
+		return x.Key
+	}
+	return ""
+}
+
+func (x *SourceLayer) GetSha256() string {
+	if x != nil {
+		return x.Sha256
+	}
+	return ""
+}
+
+// Runtime is an image a function built from source lands on, with what a
+// client needs to offer it: the handler the image runs and a starter for it.
+type Runtime struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// id names the runtime in a request, e.g. python.
+	Id string `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	// label is the runtime's name for people, e.g. Python 3.13.
+	Label string `protobuf:"bytes,2,opt,name=label,proto3" json:"label,omitempty"`
+	// image is the reference a source spec sets as spec.image.
+	Image string `protobuf:"bytes,3,opt,name=image,proto3" json:"image,omitempty"`
+	// handler_path is the file under /app the image runs, e.g. handler.py.
+	HandlerPath   string           `protobuf:"bytes,4,opt,name=handler_path,json=handlerPath,proto3" json:"handler_path,omitempty"`
+	DarkIconUrl   string           `protobuf:"bytes,5,opt,name=dark_icon_url,json=darkIconUrl,proto3" json:"dark_icon_url,omitempty"`
+	LightIconUrl  string           `protobuf:"bytes,6,opt,name=light_icon_url,json=lightIconUrl,proto3" json:"light_icon_url,omitempty"`
+	Starters      *RuntimeStarters `protobuf:"bytes,7,opt,name=starters,proto3" json:"starters,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *Runtime) Reset() {
+	*x = Runtime{}
+	mi := &file_functions_v1_functions_proto_msgTypes[4]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *Runtime) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*Runtime) ProtoMessage() {}
+
+func (x *Runtime) ProtoReflect() protoreflect.Message {
+	mi := &file_functions_v1_functions_proto_msgTypes[4]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use Runtime.ProtoReflect.Descriptor instead.
+func (*Runtime) Descriptor() ([]byte, []int) {
+	return file_functions_v1_functions_proto_rawDescGZIP(), []int{4}
+}
+
+func (x *Runtime) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
+}
+
+func (x *Runtime) GetLabel() string {
+	if x != nil {
+		return x.Label
+	}
+	return ""
+}
+
+func (x *Runtime) GetImage() string {
+	if x != nil {
+		return x.Image
+	}
+	return ""
+}
+
+func (x *Runtime) GetHandlerPath() string {
+	if x != nil {
+		return x.HandlerPath
+	}
+	return ""
+}
+
+func (x *Runtime) GetDarkIconUrl() string {
+	if x != nil {
+		return x.DarkIconUrl
+	}
+	return ""
+}
+
+func (x *Runtime) GetLightIconUrl() string {
+	if x != nil {
+		return x.LightIconUrl
+	}
+	return ""
+}
+
+func (x *Runtime) GetStarters() *RuntimeStarters {
+	if x != nil {
+		return x.Starters
+	}
+	return nil
+}
+
+// RuntimeStarters are handlers that read one input and write one output, per
+// contract kind, for a function to start from.
+type RuntimeStarters struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	JsonSchema    string                 `protobuf:"bytes,1,opt,name=json_schema,json=jsonSchema,proto3" json:"json_schema,omitempty"`
+	Arrow         string                 `protobuf:"bytes,2,opt,name=arrow,proto3" json:"arrow,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *RuntimeStarters) Reset() {
+	*x = RuntimeStarters{}
+	mi := &file_functions_v1_functions_proto_msgTypes[5]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RuntimeStarters) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RuntimeStarters) ProtoMessage() {}
+
+func (x *RuntimeStarters) ProtoReflect() protoreflect.Message {
+	mi := &file_functions_v1_functions_proto_msgTypes[5]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RuntimeStarters.ProtoReflect.Descriptor instead.
+func (*RuntimeStarters) Descriptor() ([]byte, []int) {
+	return file_functions_v1_functions_proto_rawDescGZIP(), []int{5}
+}
+
+func (x *RuntimeStarters) GetJsonSchema() string {
+	if x != nil {
+		return x.JsonSchema
+	}
+	return ""
+}
+
+func (x *RuntimeStarters) GetArrow() string {
+	if x != nil {
+		return x.Arrow
+	}
+	return ""
+}
+
+// SourceLimits bound a Source.
+type SourceLimits struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	MaxFiles      int32                  `protobuf:"varint,1,opt,name=max_files,json=maxFiles,proto3" json:"max_files,omitempty"`
+	MaxBytes      int64                  `protobuf:"varint,2,opt,name=max_bytes,json=maxBytes,proto3" json:"max_bytes,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SourceLimits) Reset() {
+	*x = SourceLimits{}
+	mi := &file_functions_v1_functions_proto_msgTypes[6]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SourceLimits) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SourceLimits) ProtoMessage() {}
+
+func (x *SourceLimits) ProtoReflect() protoreflect.Message {
+	mi := &file_functions_v1_functions_proto_msgTypes[6]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SourceLimits.ProtoReflect.Descriptor instead.
+func (*SourceLimits) Descriptor() ([]byte, []int) {
+	return file_functions_v1_functions_proto_rawDescGZIP(), []int{6}
+}
+
+func (x *SourceLimits) GetMaxFiles() int32 {
+	if x != nil {
+		return x.MaxFiles
+	}
+	return 0
+}
+
+func (x *SourceLimits) GetMaxBytes() int64 {
+	if x != nil {
+		return x.MaxBytes
+	}
+	return 0
+}
+
+type ListRuntimesRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListRuntimesRequest) Reset() {
+	*x = ListRuntimesRequest{}
+	mi := &file_functions_v1_functions_proto_msgTypes[7]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListRuntimesRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListRuntimesRequest) ProtoMessage() {}
+
+func (x *ListRuntimesRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_functions_v1_functions_proto_msgTypes[7]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListRuntimesRequest.ProtoReflect.Descriptor instead.
+func (*ListRuntimesRequest) Descriptor() ([]byte, []int) {
+	return file_functions_v1_functions_proto_rawDescGZIP(), []int{7}
+}
+
+type ListRuntimesResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Runtimes      []*Runtime             `protobuf:"bytes,1,rep,name=runtimes,proto3" json:"runtimes,omitempty"`
+	Limits        *SourceLimits          `protobuf:"bytes,2,opt,name=limits,proto3" json:"limits,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListRuntimesResponse) Reset() {
+	*x = ListRuntimesResponse{}
+	mi := &file_functions_v1_functions_proto_msgTypes[8]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListRuntimesResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListRuntimesResponse) ProtoMessage() {}
+
+func (x *ListRuntimesResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_functions_v1_functions_proto_msgTypes[8]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListRuntimesResponse.ProtoReflect.Descriptor instead.
+func (*ListRuntimesResponse) Descriptor() ([]byte, []int) {
+	return file_functions_v1_functions_proto_rawDescGZIP(), []int{8}
+}
+
+func (x *ListRuntimesResponse) GetRuntimes() []*Runtime {
+	if x != nil {
+		return x.Runtimes
+	}
+	return nil
+}
+
+func (x *ListRuntimesResponse) GetLimits() *SourceLimits {
+	if x != nil {
+		return x.Limits
+	}
+	return nil
+}
+
 // FunctionVersion is an immutable, buildable version of a function. The
 // contract is part of the version, so it never changes underneath a caller
 // that pins one. version increases monotonically per function. Lifecycle
@@ -205,7 +684,7 @@ type FunctionVersion struct {
 
 func (x *FunctionVersion) Reset() {
 	*x = FunctionVersion{}
-	mi := &file_functions_v1_functions_proto_msgTypes[1]
+	mi := &file_functions_v1_functions_proto_msgTypes[9]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -217,7 +696,7 @@ func (x *FunctionVersion) String() string {
 func (*FunctionVersion) ProtoMessage() {}
 
 func (x *FunctionVersion) ProtoReflect() protoreflect.Message {
-	mi := &file_functions_v1_functions_proto_msgTypes[1]
+	mi := &file_functions_v1_functions_proto_msgTypes[9]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -230,7 +709,7 @@ func (x *FunctionVersion) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use FunctionVersion.ProtoReflect.Descriptor instead.
 func (*FunctionVersion) Descriptor() ([]byte, []int) {
-	return file_functions_v1_functions_proto_rawDescGZIP(), []int{1}
+	return file_functions_v1_functions_proto_rawDescGZIP(), []int{9}
 }
 
 func (x *FunctionVersion) GetId() string {
@@ -339,7 +818,7 @@ type Function struct {
 
 func (x *Function) Reset() {
 	*x = Function{}
-	mi := &file_functions_v1_functions_proto_msgTypes[2]
+	mi := &file_functions_v1_functions_proto_msgTypes[10]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -351,7 +830,7 @@ func (x *Function) String() string {
 func (*Function) ProtoMessage() {}
 
 func (x *Function) ProtoReflect() protoreflect.Message {
-	mi := &file_functions_v1_functions_proto_msgTypes[2]
+	mi := &file_functions_v1_functions_proto_msgTypes[10]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -364,7 +843,7 @@ func (x *Function) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Function.ProtoReflect.Descriptor instead.
 func (*Function) Descriptor() ([]byte, []int) {
-	return file_functions_v1_functions_proto_rawDescGZIP(), []int{2}
+	return file_functions_v1_functions_proto_rawDescGZIP(), []int{10}
 }
 
 func (x *Function) GetTenantId() string {
@@ -450,7 +929,7 @@ type CreateFunctionRequest struct {
 
 func (x *CreateFunctionRequest) Reset() {
 	*x = CreateFunctionRequest{}
-	mi := &file_functions_v1_functions_proto_msgTypes[3]
+	mi := &file_functions_v1_functions_proto_msgTypes[11]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -462,7 +941,7 @@ func (x *CreateFunctionRequest) String() string {
 func (*CreateFunctionRequest) ProtoMessage() {}
 
 func (x *CreateFunctionRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_functions_v1_functions_proto_msgTypes[3]
+	mi := &file_functions_v1_functions_proto_msgTypes[11]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -475,7 +954,7 @@ func (x *CreateFunctionRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CreateFunctionRequest.ProtoReflect.Descriptor instead.
 func (*CreateFunctionRequest) Descriptor() ([]byte, []int) {
-	return file_functions_v1_functions_proto_rawDescGZIP(), []int{3}
+	return file_functions_v1_functions_proto_rawDescGZIP(), []int{11}
 }
 
 func (x *CreateFunctionRequest) GetName() string {
@@ -509,7 +988,7 @@ type CreateFunctionResponse struct {
 
 func (x *CreateFunctionResponse) Reset() {
 	*x = CreateFunctionResponse{}
-	mi := &file_functions_v1_functions_proto_msgTypes[4]
+	mi := &file_functions_v1_functions_proto_msgTypes[12]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -521,7 +1000,7 @@ func (x *CreateFunctionResponse) String() string {
 func (*CreateFunctionResponse) ProtoMessage() {}
 
 func (x *CreateFunctionResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_functions_v1_functions_proto_msgTypes[4]
+	mi := &file_functions_v1_functions_proto_msgTypes[12]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -534,7 +1013,7 @@ func (x *CreateFunctionResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CreateFunctionResponse.ProtoReflect.Descriptor instead.
 func (*CreateFunctionResponse) Descriptor() ([]byte, []int) {
-	return file_functions_v1_functions_proto_rawDescGZIP(), []int{4}
+	return file_functions_v1_functions_proto_rawDescGZIP(), []int{12}
 }
 
 func (x *CreateFunctionResponse) GetFunction() *Function {
@@ -562,7 +1041,7 @@ type UpdateFunctionRequest struct {
 
 func (x *UpdateFunctionRequest) Reset() {
 	*x = UpdateFunctionRequest{}
-	mi := &file_functions_v1_functions_proto_msgTypes[5]
+	mi := &file_functions_v1_functions_proto_msgTypes[13]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -574,7 +1053,7 @@ func (x *UpdateFunctionRequest) String() string {
 func (*UpdateFunctionRequest) ProtoMessage() {}
 
 func (x *UpdateFunctionRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_functions_v1_functions_proto_msgTypes[5]
+	mi := &file_functions_v1_functions_proto_msgTypes[13]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -587,7 +1066,7 @@ func (x *UpdateFunctionRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UpdateFunctionRequest.ProtoReflect.Descriptor instead.
 func (*UpdateFunctionRequest) Descriptor() ([]byte, []int) {
-	return file_functions_v1_functions_proto_rawDescGZIP(), []int{5}
+	return file_functions_v1_functions_proto_rawDescGZIP(), []int{13}
 }
 
 func (x *UpdateFunctionRequest) GetFunctionId() string {
@@ -620,7 +1099,7 @@ type UpdateFunctionResponse struct {
 
 func (x *UpdateFunctionResponse) Reset() {
 	*x = UpdateFunctionResponse{}
-	mi := &file_functions_v1_functions_proto_msgTypes[6]
+	mi := &file_functions_v1_functions_proto_msgTypes[14]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -632,7 +1111,7 @@ func (x *UpdateFunctionResponse) String() string {
 func (*UpdateFunctionResponse) ProtoMessage() {}
 
 func (x *UpdateFunctionResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_functions_v1_functions_proto_msgTypes[6]
+	mi := &file_functions_v1_functions_proto_msgTypes[14]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -645,7 +1124,7 @@ func (x *UpdateFunctionResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UpdateFunctionResponse.ProtoReflect.Descriptor instead.
 func (*UpdateFunctionResponse) Descriptor() ([]byte, []int) {
-	return file_functions_v1_functions_proto_rawDescGZIP(), []int{6}
+	return file_functions_v1_functions_proto_rawDescGZIP(), []int{14}
 }
 
 func (x *UpdateFunctionResponse) GetFunction() *Function {
@@ -665,7 +1144,7 @@ type GetFunctionRequest struct {
 
 func (x *GetFunctionRequest) Reset() {
 	*x = GetFunctionRequest{}
-	mi := &file_functions_v1_functions_proto_msgTypes[7]
+	mi := &file_functions_v1_functions_proto_msgTypes[15]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -677,7 +1156,7 @@ func (x *GetFunctionRequest) String() string {
 func (*GetFunctionRequest) ProtoMessage() {}
 
 func (x *GetFunctionRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_functions_v1_functions_proto_msgTypes[7]
+	mi := &file_functions_v1_functions_proto_msgTypes[15]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -690,7 +1169,7 @@ func (x *GetFunctionRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetFunctionRequest.ProtoReflect.Descriptor instead.
 func (*GetFunctionRequest) Descriptor() ([]byte, []int) {
-	return file_functions_v1_functions_proto_rawDescGZIP(), []int{7}
+	return file_functions_v1_functions_proto_rawDescGZIP(), []int{15}
 }
 
 func (x *GetFunctionRequest) GetId() string {
@@ -716,7 +1195,7 @@ type GetFunctionResponse struct {
 
 func (x *GetFunctionResponse) Reset() {
 	*x = GetFunctionResponse{}
-	mi := &file_functions_v1_functions_proto_msgTypes[8]
+	mi := &file_functions_v1_functions_proto_msgTypes[16]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -728,7 +1207,7 @@ func (x *GetFunctionResponse) String() string {
 func (*GetFunctionResponse) ProtoMessage() {}
 
 func (x *GetFunctionResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_functions_v1_functions_proto_msgTypes[8]
+	mi := &file_functions_v1_functions_proto_msgTypes[16]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -741,7 +1220,7 @@ func (x *GetFunctionResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetFunctionResponse.ProtoReflect.Descriptor instead.
 func (*GetFunctionResponse) Descriptor() ([]byte, []int) {
-	return file_functions_v1_functions_proto_rawDescGZIP(), []int{8}
+	return file_functions_v1_functions_proto_rawDescGZIP(), []int{16}
 }
 
 func (x *GetFunctionResponse) GetFunction() *Function {
@@ -761,7 +1240,7 @@ type ListFunctionsRequest struct {
 
 func (x *ListFunctionsRequest) Reset() {
 	*x = ListFunctionsRequest{}
-	mi := &file_functions_v1_functions_proto_msgTypes[9]
+	mi := &file_functions_v1_functions_proto_msgTypes[17]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -773,7 +1252,7 @@ func (x *ListFunctionsRequest) String() string {
 func (*ListFunctionsRequest) ProtoMessage() {}
 
 func (x *ListFunctionsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_functions_v1_functions_proto_msgTypes[9]
+	mi := &file_functions_v1_functions_proto_msgTypes[17]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -786,7 +1265,7 @@ func (x *ListFunctionsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListFunctionsRequest.ProtoReflect.Descriptor instead.
 func (*ListFunctionsRequest) Descriptor() ([]byte, []int) {
-	return file_functions_v1_functions_proto_rawDescGZIP(), []int{9}
+	return file_functions_v1_functions_proto_rawDescGZIP(), []int{17}
 }
 
 func (x *ListFunctionsRequest) GetPagination() *PaginationRequest {
@@ -813,7 +1292,7 @@ type ListFunctionsResponse struct {
 
 func (x *ListFunctionsResponse) Reset() {
 	*x = ListFunctionsResponse{}
-	mi := &file_functions_v1_functions_proto_msgTypes[10]
+	mi := &file_functions_v1_functions_proto_msgTypes[18]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -825,7 +1304,7 @@ func (x *ListFunctionsResponse) String() string {
 func (*ListFunctionsResponse) ProtoMessage() {}
 
 func (x *ListFunctionsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_functions_v1_functions_proto_msgTypes[10]
+	mi := &file_functions_v1_functions_proto_msgTypes[18]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -838,7 +1317,7 @@ func (x *ListFunctionsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListFunctionsResponse.ProtoReflect.Descriptor instead.
 func (*ListFunctionsResponse) Descriptor() ([]byte, []int) {
-	return file_functions_v1_functions_proto_rawDescGZIP(), []int{10}
+	return file_functions_v1_functions_proto_rawDescGZIP(), []int{18}
 }
 
 func (x *ListFunctionsResponse) GetFunctions() []*Function {
@@ -864,7 +1343,7 @@ type DeleteFunctionRequest struct {
 
 func (x *DeleteFunctionRequest) Reset() {
 	*x = DeleteFunctionRequest{}
-	mi := &file_functions_v1_functions_proto_msgTypes[11]
+	mi := &file_functions_v1_functions_proto_msgTypes[19]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -876,7 +1355,7 @@ func (x *DeleteFunctionRequest) String() string {
 func (*DeleteFunctionRequest) ProtoMessage() {}
 
 func (x *DeleteFunctionRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_functions_v1_functions_proto_msgTypes[11]
+	mi := &file_functions_v1_functions_proto_msgTypes[19]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -889,7 +1368,7 @@ func (x *DeleteFunctionRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DeleteFunctionRequest.ProtoReflect.Descriptor instead.
 func (*DeleteFunctionRequest) Descriptor() ([]byte, []int) {
-	return file_functions_v1_functions_proto_rawDescGZIP(), []int{11}
+	return file_functions_v1_functions_proto_rawDescGZIP(), []int{19}
 }
 
 func (x *DeleteFunctionRequest) GetId() string {
@@ -907,7 +1386,7 @@ type DeleteFunctionResponse struct {
 
 func (x *DeleteFunctionResponse) Reset() {
 	*x = DeleteFunctionResponse{}
-	mi := &file_functions_v1_functions_proto_msgTypes[12]
+	mi := &file_functions_v1_functions_proto_msgTypes[20]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -919,7 +1398,7 @@ func (x *DeleteFunctionResponse) String() string {
 func (*DeleteFunctionResponse) ProtoMessage() {}
 
 func (x *DeleteFunctionResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_functions_v1_functions_proto_msgTypes[12]
+	mi := &file_functions_v1_functions_proto_msgTypes[20]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -932,7 +1411,7 @@ func (x *DeleteFunctionResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DeleteFunctionResponse.ProtoReflect.Descriptor instead.
 func (*DeleteFunctionResponse) Descriptor() ([]byte, []int) {
-	return file_functions_v1_functions_proto_rawDescGZIP(), []int{12}
+	return file_functions_v1_functions_proto_rawDescGZIP(), []int{20}
 }
 
 // CreateFunctionVersion adds a new immutable version. It becomes the
@@ -947,7 +1426,7 @@ type CreateFunctionVersionRequest struct {
 
 func (x *CreateFunctionVersionRequest) Reset() {
 	*x = CreateFunctionVersionRequest{}
-	mi := &file_functions_v1_functions_proto_msgTypes[13]
+	mi := &file_functions_v1_functions_proto_msgTypes[21]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -959,7 +1438,7 @@ func (x *CreateFunctionVersionRequest) String() string {
 func (*CreateFunctionVersionRequest) ProtoMessage() {}
 
 func (x *CreateFunctionVersionRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_functions_v1_functions_proto_msgTypes[13]
+	mi := &file_functions_v1_functions_proto_msgTypes[21]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -972,7 +1451,7 @@ func (x *CreateFunctionVersionRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CreateFunctionVersionRequest.ProtoReflect.Descriptor instead.
 func (*CreateFunctionVersionRequest) Descriptor() ([]byte, []int) {
-	return file_functions_v1_functions_proto_rawDescGZIP(), []int{13}
+	return file_functions_v1_functions_proto_rawDescGZIP(), []int{21}
 }
 
 func (x *CreateFunctionVersionRequest) GetFunctionId() string {
@@ -998,7 +1477,7 @@ type CreateFunctionVersionResponse struct {
 
 func (x *CreateFunctionVersionResponse) Reset() {
 	*x = CreateFunctionVersionResponse{}
-	mi := &file_functions_v1_functions_proto_msgTypes[14]
+	mi := &file_functions_v1_functions_proto_msgTypes[22]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1010,7 +1489,7 @@ func (x *CreateFunctionVersionResponse) String() string {
 func (*CreateFunctionVersionResponse) ProtoMessage() {}
 
 func (x *CreateFunctionVersionResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_functions_v1_functions_proto_msgTypes[14]
+	mi := &file_functions_v1_functions_proto_msgTypes[22]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1023,7 +1502,7 @@ func (x *CreateFunctionVersionResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CreateFunctionVersionResponse.ProtoReflect.Descriptor instead.
 func (*CreateFunctionVersionResponse) Descriptor() ([]byte, []int) {
-	return file_functions_v1_functions_proto_rawDescGZIP(), []int{14}
+	return file_functions_v1_functions_proto_rawDescGZIP(), []int{22}
 }
 
 func (x *CreateFunctionVersionResponse) GetVersion() *FunctionVersion {
@@ -1043,7 +1522,7 @@ type GetFunctionVersionRequest struct {
 
 func (x *GetFunctionVersionRequest) Reset() {
 	*x = GetFunctionVersionRequest{}
-	mi := &file_functions_v1_functions_proto_msgTypes[15]
+	mi := &file_functions_v1_functions_proto_msgTypes[23]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1055,7 +1534,7 @@ func (x *GetFunctionVersionRequest) String() string {
 func (*GetFunctionVersionRequest) ProtoMessage() {}
 
 func (x *GetFunctionVersionRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_functions_v1_functions_proto_msgTypes[15]
+	mi := &file_functions_v1_functions_proto_msgTypes[23]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1068,7 +1547,7 @@ func (x *GetFunctionVersionRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetFunctionVersionRequest.ProtoReflect.Descriptor instead.
 func (*GetFunctionVersionRequest) Descriptor() ([]byte, []int) {
-	return file_functions_v1_functions_proto_rawDescGZIP(), []int{15}
+	return file_functions_v1_functions_proto_rawDescGZIP(), []int{23}
 }
 
 func (x *GetFunctionVersionRequest) GetFunctionId() string {
@@ -1094,7 +1573,7 @@ type GetFunctionVersionResponse struct {
 
 func (x *GetFunctionVersionResponse) Reset() {
 	*x = GetFunctionVersionResponse{}
-	mi := &file_functions_v1_functions_proto_msgTypes[16]
+	mi := &file_functions_v1_functions_proto_msgTypes[24]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1106,7 +1585,7 @@ func (x *GetFunctionVersionResponse) String() string {
 func (*GetFunctionVersionResponse) ProtoMessage() {}
 
 func (x *GetFunctionVersionResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_functions_v1_functions_proto_msgTypes[16]
+	mi := &file_functions_v1_functions_proto_msgTypes[24]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1119,7 +1598,7 @@ func (x *GetFunctionVersionResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetFunctionVersionResponse.ProtoReflect.Descriptor instead.
 func (*GetFunctionVersionResponse) Descriptor() ([]byte, []int) {
-	return file_functions_v1_functions_proto_rawDescGZIP(), []int{16}
+	return file_functions_v1_functions_proto_rawDescGZIP(), []int{24}
 }
 
 func (x *GetFunctionVersionResponse) GetVersion() *FunctionVersion {
@@ -1139,7 +1618,7 @@ type ListFunctionVersionsRequest struct {
 
 func (x *ListFunctionVersionsRequest) Reset() {
 	*x = ListFunctionVersionsRequest{}
-	mi := &file_functions_v1_functions_proto_msgTypes[17]
+	mi := &file_functions_v1_functions_proto_msgTypes[25]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1151,7 +1630,7 @@ func (x *ListFunctionVersionsRequest) String() string {
 func (*ListFunctionVersionsRequest) ProtoMessage() {}
 
 func (x *ListFunctionVersionsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_functions_v1_functions_proto_msgTypes[17]
+	mi := &file_functions_v1_functions_proto_msgTypes[25]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1164,7 +1643,7 @@ func (x *ListFunctionVersionsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListFunctionVersionsRequest.ProtoReflect.Descriptor instead.
 func (*ListFunctionVersionsRequest) Descriptor() ([]byte, []int) {
-	return file_functions_v1_functions_proto_rawDescGZIP(), []int{17}
+	return file_functions_v1_functions_proto_rawDescGZIP(), []int{25}
 }
 
 func (x *ListFunctionVersionsRequest) GetFunctionId() string {
@@ -1191,7 +1670,7 @@ type ListFunctionVersionsResponse struct {
 
 func (x *ListFunctionVersionsResponse) Reset() {
 	*x = ListFunctionVersionsResponse{}
-	mi := &file_functions_v1_functions_proto_msgTypes[18]
+	mi := &file_functions_v1_functions_proto_msgTypes[26]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1203,7 +1682,7 @@ func (x *ListFunctionVersionsResponse) String() string {
 func (*ListFunctionVersionsResponse) ProtoMessage() {}
 
 func (x *ListFunctionVersionsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_functions_v1_functions_proto_msgTypes[18]
+	mi := &file_functions_v1_functions_proto_msgTypes[26]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1216,7 +1695,7 @@ func (x *ListFunctionVersionsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListFunctionVersionsResponse.ProtoReflect.Descriptor instead.
 func (*ListFunctionVersionsResponse) Descriptor() ([]byte, []int) {
-	return file_functions_v1_functions_proto_rawDescGZIP(), []int{18}
+	return file_functions_v1_functions_proto_rawDescGZIP(), []int{26}
 }
 
 func (x *ListFunctionVersionsResponse) GetVersions() []*FunctionVersion {
@@ -1237,7 +1716,7 @@ var File_functions_v1_functions_proto protoreflect.FileDescriptor
 
 const file_functions_v1_functions_proto_rawDesc = "" +
 	"\n" +
-	"\x1cfunctions/v1/functions.proto\x12\ffunctions.v1\x1a\x19functions/v1/common.proto\x1a\x1dfunctions/v1/pagination.proto\"\xf5\x02\n" +
+	"\x1cfunctions/v1/functions.proto\x12\ffunctions.v1\x1a\x19functions/v1/common.proto\x1a\x1dfunctions/v1/pagination.proto\"\xa3\x03\n" +
 	"\fFunctionSpec\x12\x14\n" +
 	"\x05image\x18\x01 \x01(\tR\x05image\x12\x18\n" +
 	"\acommand\x18\x02 \x03(\tR\acommand\x125\n" +
@@ -1246,10 +1725,41 @@ const file_functions_v1_functions_proto_rawDesc = "" +
 	"\bcontract\x18\x05 \x01(\v2\x16.functions.v1.ContractR\bcontract\x125\n" +
 	"\tresources\x18\x06 \x01(\v2\x17.functions.v1.ResourcesR\tresources\x12\x1d\n" +
 	"\n" +
-	"timeout_ms\x18\a \x01(\x03R\ttimeoutMs\x1a6\n" +
+	"timeout_ms\x18\a \x01(\x03R\ttimeoutMs\x12,\n" +
+	"\x06source\x18\b \x01(\v2\x14.functions.v1.SourceR\x06source\x1a6\n" +
 	"\bEnvEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
-	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\xce\x03\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"i\n" +
+	"\x06Source\x12.\n" +
+	"\x05files\x18\x01 \x03(\v2\x18.functions.v1.SourceFileR\x05files\x12/\n" +
+	"\x05layer\x18\x02 \x01(\v2\x19.functions.v1.SourceLayerR\x05layer\"N\n" +
+	"\n" +
+	"SourceFile\x12\x12\n" +
+	"\x04path\x18\x01 \x01(\tR\x04path\x12\x18\n" +
+	"\acontent\x18\x02 \x01(\fR\acontent\x12\x12\n" +
+	"\x04size\x18\x03 \x01(\x03R\x04size\"7\n" +
+	"\vSourceLayer\x12\x10\n" +
+	"\x03key\x18\x01 \x01(\tR\x03key\x12\x16\n" +
+	"\x06sha256\x18\x02 \x01(\tR\x06sha256\"\xed\x01\n" +
+	"\aRuntime\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\x12\x14\n" +
+	"\x05label\x18\x02 \x01(\tR\x05label\x12\x14\n" +
+	"\x05image\x18\x03 \x01(\tR\x05image\x12!\n" +
+	"\fhandler_path\x18\x04 \x01(\tR\vhandlerPath\x12\"\n" +
+	"\rdark_icon_url\x18\x05 \x01(\tR\vdarkIconUrl\x12$\n" +
+	"\x0elight_icon_url\x18\x06 \x01(\tR\flightIconUrl\x129\n" +
+	"\bstarters\x18\a \x01(\v2\x1d.functions.v1.RuntimeStartersR\bstarters\"H\n" +
+	"\x0fRuntimeStarters\x12\x1f\n" +
+	"\vjson_schema\x18\x01 \x01(\tR\n" +
+	"jsonSchema\x12\x14\n" +
+	"\x05arrow\x18\x02 \x01(\tR\x05arrow\"H\n" +
+	"\fSourceLimits\x12\x1b\n" +
+	"\tmax_files\x18\x01 \x01(\x05R\bmaxFiles\x12\x1b\n" +
+	"\tmax_bytes\x18\x02 \x01(\x03R\bmaxBytes\"\x15\n" +
+	"\x13ListRuntimesRequest\"}\n" +
+	"\x14ListRuntimesResponse\x121\n" +
+	"\bruntimes\x18\x01 \x03(\v2\x15.functions.v1.RuntimeR\bruntimes\x122\n" +
+	"\x06limits\x18\x02 \x01(\v2\x1a.functions.v1.SourceLimitsR\x06limits\"\xce\x03\n" +
 	"\x0fFunctionVersion\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x18\n" +
 	"\aversion\x18\x02 \x01(\x03R\aversion\x12\x1d\n" +
@@ -1354,63 +1864,77 @@ func file_functions_v1_functions_proto_rawDescGZIP() []byte {
 }
 
 var file_functions_v1_functions_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_functions_v1_functions_proto_msgTypes = make([]protoimpl.MessageInfo, 20)
+var file_functions_v1_functions_proto_msgTypes = make([]protoimpl.MessageInfo, 28)
 var file_functions_v1_functions_proto_goTypes = []any{
 	(FunctionVersionStatus)(0),            // 0: functions.v1.FunctionVersionStatus
 	(*FunctionSpec)(nil),                  // 1: functions.v1.FunctionSpec
-	(*FunctionVersion)(nil),               // 2: functions.v1.FunctionVersion
-	(*Function)(nil),                      // 3: functions.v1.Function
-	(*CreateFunctionRequest)(nil),         // 4: functions.v1.CreateFunctionRequest
-	(*CreateFunctionResponse)(nil),        // 5: functions.v1.CreateFunctionResponse
-	(*UpdateFunctionRequest)(nil),         // 6: functions.v1.UpdateFunctionRequest
-	(*UpdateFunctionResponse)(nil),        // 7: functions.v1.UpdateFunctionResponse
-	(*GetFunctionRequest)(nil),            // 8: functions.v1.GetFunctionRequest
-	(*GetFunctionResponse)(nil),           // 9: functions.v1.GetFunctionResponse
-	(*ListFunctionsRequest)(nil),          // 10: functions.v1.ListFunctionsRequest
-	(*ListFunctionsResponse)(nil),         // 11: functions.v1.ListFunctionsResponse
-	(*DeleteFunctionRequest)(nil),         // 12: functions.v1.DeleteFunctionRequest
-	(*DeleteFunctionResponse)(nil),        // 13: functions.v1.DeleteFunctionResponse
-	(*CreateFunctionVersionRequest)(nil),  // 14: functions.v1.CreateFunctionVersionRequest
-	(*CreateFunctionVersionResponse)(nil), // 15: functions.v1.CreateFunctionVersionResponse
-	(*GetFunctionVersionRequest)(nil),     // 16: functions.v1.GetFunctionVersionRequest
-	(*GetFunctionVersionResponse)(nil),    // 17: functions.v1.GetFunctionVersionResponse
-	(*ListFunctionVersionsRequest)(nil),   // 18: functions.v1.ListFunctionVersionsRequest
-	(*ListFunctionVersionsResponse)(nil),  // 19: functions.v1.ListFunctionVersionsResponse
-	nil,                                   // 20: functions.v1.FunctionSpec.EnvEntry
-	(InvocationProtocol)(0),               // 21: functions.v1.InvocationProtocol
-	(*Contract)(nil),                      // 22: functions.v1.Contract
-	(*Resources)(nil),                     // 23: functions.v1.Resources
-	(*PaginationRequest)(nil),             // 24: functions.v1.PaginationRequest
-	(*PaginationResponse)(nil),            // 25: functions.v1.PaginationResponse
+	(*Source)(nil),                        // 2: functions.v1.Source
+	(*SourceFile)(nil),                    // 3: functions.v1.SourceFile
+	(*SourceLayer)(nil),                   // 4: functions.v1.SourceLayer
+	(*Runtime)(nil),                       // 5: functions.v1.Runtime
+	(*RuntimeStarters)(nil),               // 6: functions.v1.RuntimeStarters
+	(*SourceLimits)(nil),                  // 7: functions.v1.SourceLimits
+	(*ListRuntimesRequest)(nil),           // 8: functions.v1.ListRuntimesRequest
+	(*ListRuntimesResponse)(nil),          // 9: functions.v1.ListRuntimesResponse
+	(*FunctionVersion)(nil),               // 10: functions.v1.FunctionVersion
+	(*Function)(nil),                      // 11: functions.v1.Function
+	(*CreateFunctionRequest)(nil),         // 12: functions.v1.CreateFunctionRequest
+	(*CreateFunctionResponse)(nil),        // 13: functions.v1.CreateFunctionResponse
+	(*UpdateFunctionRequest)(nil),         // 14: functions.v1.UpdateFunctionRequest
+	(*UpdateFunctionResponse)(nil),        // 15: functions.v1.UpdateFunctionResponse
+	(*GetFunctionRequest)(nil),            // 16: functions.v1.GetFunctionRequest
+	(*GetFunctionResponse)(nil),           // 17: functions.v1.GetFunctionResponse
+	(*ListFunctionsRequest)(nil),          // 18: functions.v1.ListFunctionsRequest
+	(*ListFunctionsResponse)(nil),         // 19: functions.v1.ListFunctionsResponse
+	(*DeleteFunctionRequest)(nil),         // 20: functions.v1.DeleteFunctionRequest
+	(*DeleteFunctionResponse)(nil),        // 21: functions.v1.DeleteFunctionResponse
+	(*CreateFunctionVersionRequest)(nil),  // 22: functions.v1.CreateFunctionVersionRequest
+	(*CreateFunctionVersionResponse)(nil), // 23: functions.v1.CreateFunctionVersionResponse
+	(*GetFunctionVersionRequest)(nil),     // 24: functions.v1.GetFunctionVersionRequest
+	(*GetFunctionVersionResponse)(nil),    // 25: functions.v1.GetFunctionVersionResponse
+	(*ListFunctionVersionsRequest)(nil),   // 26: functions.v1.ListFunctionVersionsRequest
+	(*ListFunctionVersionsResponse)(nil),  // 27: functions.v1.ListFunctionVersionsResponse
+	nil,                                   // 28: functions.v1.FunctionSpec.EnvEntry
+	(InvocationProtocol)(0),               // 29: functions.v1.InvocationProtocol
+	(*Contract)(nil),                      // 30: functions.v1.Contract
+	(*Resources)(nil),                     // 31: functions.v1.Resources
+	(*PaginationRequest)(nil),             // 32: functions.v1.PaginationRequest
+	(*PaginationResponse)(nil),            // 33: functions.v1.PaginationResponse
 }
 var file_functions_v1_functions_proto_depIdxs = []int32{
-	20, // 0: functions.v1.FunctionSpec.env:type_name -> functions.v1.FunctionSpec.EnvEntry
-	21, // 1: functions.v1.FunctionSpec.protocol:type_name -> functions.v1.InvocationProtocol
-	22, // 2: functions.v1.FunctionSpec.contract:type_name -> functions.v1.Contract
-	23, // 3: functions.v1.FunctionSpec.resources:type_name -> functions.v1.Resources
-	1,  // 4: functions.v1.FunctionVersion.spec:type_name -> functions.v1.FunctionSpec
-	0,  // 5: functions.v1.FunctionVersion.status:type_name -> functions.v1.FunctionVersionStatus
-	2,  // 6: functions.v1.Function.current_version:type_name -> functions.v1.FunctionVersion
-	2,  // 7: functions.v1.Function.versions:type_name -> functions.v1.FunctionVersion
-	1,  // 8: functions.v1.CreateFunctionRequest.spec:type_name -> functions.v1.FunctionSpec
-	3,  // 9: functions.v1.CreateFunctionResponse.function:type_name -> functions.v1.Function
-	2,  // 10: functions.v1.CreateFunctionResponse.version:type_name -> functions.v1.FunctionVersion
-	3,  // 11: functions.v1.UpdateFunctionResponse.function:type_name -> functions.v1.Function
-	3,  // 12: functions.v1.GetFunctionResponse.function:type_name -> functions.v1.Function
-	24, // 13: functions.v1.ListFunctionsRequest.pagination:type_name -> functions.v1.PaginationRequest
-	3,  // 14: functions.v1.ListFunctionsResponse.functions:type_name -> functions.v1.Function
-	25, // 15: functions.v1.ListFunctionsResponse.pagination:type_name -> functions.v1.PaginationResponse
-	1,  // 16: functions.v1.CreateFunctionVersionRequest.spec:type_name -> functions.v1.FunctionSpec
-	2,  // 17: functions.v1.CreateFunctionVersionResponse.version:type_name -> functions.v1.FunctionVersion
-	2,  // 18: functions.v1.GetFunctionVersionResponse.version:type_name -> functions.v1.FunctionVersion
-	24, // 19: functions.v1.ListFunctionVersionsRequest.pagination:type_name -> functions.v1.PaginationRequest
-	2,  // 20: functions.v1.ListFunctionVersionsResponse.versions:type_name -> functions.v1.FunctionVersion
-	25, // 21: functions.v1.ListFunctionVersionsResponse.pagination:type_name -> functions.v1.PaginationResponse
-	22, // [22:22] is the sub-list for method output_type
-	22, // [22:22] is the sub-list for method input_type
-	22, // [22:22] is the sub-list for extension type_name
-	22, // [22:22] is the sub-list for extension extendee
-	0,  // [0:22] is the sub-list for field type_name
+	28, // 0: functions.v1.FunctionSpec.env:type_name -> functions.v1.FunctionSpec.EnvEntry
+	29, // 1: functions.v1.FunctionSpec.protocol:type_name -> functions.v1.InvocationProtocol
+	30, // 2: functions.v1.FunctionSpec.contract:type_name -> functions.v1.Contract
+	31, // 3: functions.v1.FunctionSpec.resources:type_name -> functions.v1.Resources
+	2,  // 4: functions.v1.FunctionSpec.source:type_name -> functions.v1.Source
+	3,  // 5: functions.v1.Source.files:type_name -> functions.v1.SourceFile
+	4,  // 6: functions.v1.Source.layer:type_name -> functions.v1.SourceLayer
+	6,  // 7: functions.v1.Runtime.starters:type_name -> functions.v1.RuntimeStarters
+	5,  // 8: functions.v1.ListRuntimesResponse.runtimes:type_name -> functions.v1.Runtime
+	7,  // 9: functions.v1.ListRuntimesResponse.limits:type_name -> functions.v1.SourceLimits
+	1,  // 10: functions.v1.FunctionVersion.spec:type_name -> functions.v1.FunctionSpec
+	0,  // 11: functions.v1.FunctionVersion.status:type_name -> functions.v1.FunctionVersionStatus
+	10, // 12: functions.v1.Function.current_version:type_name -> functions.v1.FunctionVersion
+	10, // 13: functions.v1.Function.versions:type_name -> functions.v1.FunctionVersion
+	1,  // 14: functions.v1.CreateFunctionRequest.spec:type_name -> functions.v1.FunctionSpec
+	11, // 15: functions.v1.CreateFunctionResponse.function:type_name -> functions.v1.Function
+	10, // 16: functions.v1.CreateFunctionResponse.version:type_name -> functions.v1.FunctionVersion
+	11, // 17: functions.v1.UpdateFunctionResponse.function:type_name -> functions.v1.Function
+	11, // 18: functions.v1.GetFunctionResponse.function:type_name -> functions.v1.Function
+	32, // 19: functions.v1.ListFunctionsRequest.pagination:type_name -> functions.v1.PaginationRequest
+	11, // 20: functions.v1.ListFunctionsResponse.functions:type_name -> functions.v1.Function
+	33, // 21: functions.v1.ListFunctionsResponse.pagination:type_name -> functions.v1.PaginationResponse
+	1,  // 22: functions.v1.CreateFunctionVersionRequest.spec:type_name -> functions.v1.FunctionSpec
+	10, // 23: functions.v1.CreateFunctionVersionResponse.version:type_name -> functions.v1.FunctionVersion
+	10, // 24: functions.v1.GetFunctionVersionResponse.version:type_name -> functions.v1.FunctionVersion
+	32, // 25: functions.v1.ListFunctionVersionsRequest.pagination:type_name -> functions.v1.PaginationRequest
+	10, // 26: functions.v1.ListFunctionVersionsResponse.versions:type_name -> functions.v1.FunctionVersion
+	33, // 27: functions.v1.ListFunctionVersionsResponse.pagination:type_name -> functions.v1.PaginationResponse
+	28, // [28:28] is the sub-list for method output_type
+	28, // [28:28] is the sub-list for method input_type
+	28, // [28:28] is the sub-list for extension type_name
+	28, // [28:28] is the sub-list for extension extendee
+	0,  // [0:28] is the sub-list for field type_name
 }
 
 func init() { file_functions_v1_functions_proto_init() }
@@ -1426,7 +1950,7 @@ func file_functions_v1_functions_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_functions_v1_functions_proto_rawDesc), len(file_functions_v1_functions_proto_rawDesc)),
 			NumEnums:      1,
-			NumMessages:   20,
+			NumMessages:   28,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

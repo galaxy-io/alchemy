@@ -9,5 +9,6 @@ export enum FunctionWorkbenchFile {
 
 export interface FunctionWorkbenchState {
   text: string;
+  sources: Record<string, string>;
   response: InvokeResponse | undefined;
 }

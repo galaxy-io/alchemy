@@ -22,6 +22,10 @@ service FunctionsService {
   rpc GetFunctionVersion(GetFunctionVersionRequest) returns (GetFunctionVersionResponse);
   rpc ListFunctionVersions(ListFunctionVersionsRequest) returns (ListFunctionVersionsResponse);
 
+  // Runtimes a function can be built from source on, with a starter handler
+  // for each, and the limits a source is held to.
+  rpc ListRuntimes(ListRuntimesRequest) returns (ListRuntimesResponse);
+
   // Invocation; validate input, run one version against it, validate output.
   // An RPC error means the function did not produce a result: the request was
   // rejected (unknown function, input violates the contract, no capacity) or

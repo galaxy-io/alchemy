@@ -26,9 +26,6 @@ import {
   HOSTS_INSTANCES_TABLE_COLUMN_WIDTH_VERSION,
 } from "@/pages/hosts/components/table/constants";
 
-import { useAlchemySearchUpdate } from "@/module/hooks";
-import type { AlchemyLayoutSearch } from "@/module/schemas";
-
 import { formatCount, formatMemory, formatVersion } from "@/utils/format";
 
 const renderMono = (value: string) => (
@@ -94,26 +91,16 @@ interface HostsInstancesTableProps {
   instances: Instance[];
 }
 
-const HostsInstancesTable: FC<HostsInstancesTableProps> = ({ instances }) => {
-  const updateSearch = useAlchemySearchUpdate<AlchemyLayoutSearch>();
-
-  const handleRowClick = (instance: Instance) => {
-    if (!instance.invocationId) return;
-    void updateSearch((prev) => ({ ...prev, invocationId: instance.invocationId }));
-  };
-
-  return (
-    <Flex direction={FlexDirection.COLUMN} grow={1} basis={0} minHeight={0} fillWidth>
-      <InfiniteTable<Instance>
-        ariaLabel="Instances"
-        columns={HOSTS_INSTANCES_TABLE_COLUMNS}
-        data={instances}
-        getRowId={(instance) => instance.id}
-        onRowClick={handleRowClick}
-        emptyState={<EmptyLayout icon={CpuIcon} header="No instances" />}
-      />
-    </Flex>
-  );
-};
+const HostsInstancesTable: FC<HostsInstancesTableProps> = ({ instances }) => (
+  <Flex direction={FlexDirection.COLUMN} grow={1} basis={0} minHeight={0} fillWidth>
+    <InfiniteTable<Instance>
+      ariaLabel="Instances"
+      columns={HOSTS_INSTANCES_TABLE_COLUMNS}
+      data={instances}
+      getRowId={(instance) => instance.id}
+      emptyState={<EmptyLayout icon={CpuIcon} header="No instances" />}
+    />
+  </Flex>
+);
 
 export default HostsInstancesTable;

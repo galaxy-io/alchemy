@@ -1,8 +1,8 @@
 {
-  "name": "embed",
+  "name": "alchemy-runtime-node",
   "private": true,
   "type": "module",
   "dependencies": {
-    "apache-arrow": "^21.0.0"
+    "apache-arrow": "21.0.0"
   }
 }

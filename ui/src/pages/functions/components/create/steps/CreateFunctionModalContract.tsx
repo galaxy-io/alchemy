@@ -2,7 +2,7 @@ import type { FC } from "react";
 
 import { match } from "ts-pattern";
 
-import ToggleInput, { type ToggleOption } from "@galaxy-io/dls/inputs/ToggleInput";
+import ToggleInput, { ToggleInputSize, type ToggleOption } from "@galaxy-io/dls/inputs/ToggleInput";
 import Divider from "@galaxy-io/dls/layout/Divider";
 import Flex, { FlexDirection } from "@galaxy-io/dls/layout/Flex";
 
@@ -36,9 +36,10 @@ const CreateFunctionModalContract: FC = () => {
 
   return (
     <Flex direction={FlexDirection.COLUMN} grow={1} minHeight={0}>
-      <Flex padding={[12, 16]} shrink={0}>
+      <Flex padding={[8, 12]} shrink={0}>
         <ToggleInput
           ariaLabel="Contract kind"
+          size={ToggleInputSize.SMALL}
           options={CREATE_FUNCTION_MODAL_CONTRACT_KIND_OPTIONS}
           value={contractKind}
           onChange={setContractKind}

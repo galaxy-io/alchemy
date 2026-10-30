@@ -1,6 +1,6 @@
 import type { FC } from "react";
 
-import { ArrowLeftIcon, ImageBrokenIcon } from "@phosphor-icons/react";
+import { ArrowLeftIcon, CubeTransparentIcon } from "@phosphor-icons/react";
 
 import Button from "@galaxy-io/dls/buttons/Button";
 import ErrorLayout from "@galaxy-io/dls/layout/ErrorLayout";
@@ -11,12 +11,12 @@ import { AlchemyPath, createAlchemyHref } from "@/module/paths";
 
 const FunctionNotFoundPage: FC = () => (
   <ErrorLayout
-    icon={ImageBrokenIcon}
-    header="Image not found"
-    description="The image you are looking for does not exist"
+    icon={CubeTransparentIcon}
+    header="Function not found"
+    description="The function you are looking for does not exist"
     actions={
       <Button
-        label="Go back to images"
+        label="Go back to functions"
         icon={ArrowLeftIcon}
         href={createAlchemyHref(AlchemyPath.FUNCTIONS)}
         as={RouterLink}

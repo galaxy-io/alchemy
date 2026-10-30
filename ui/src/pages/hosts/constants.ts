@@ -3,7 +3,7 @@ import type { RoleColor } from "@galaxy-io/dls/theme/tokens/types";
 
 import { InstanceStatus } from "@/gen/functions/v1/host_pb";
 
-export const HOSTS_CARD_WIDTH = 520;
+export const HOSTS_CARD_WIDTH = 480;
 export const HOSTS_SECTION_HEADER_HEIGHT = 40;
 export const HOSTS_CARD_STATS_COLUMNS = "repeat(4, minmax(0, 1fr))";
 export const HOSTS_SLOT_HEIGHT = 20;

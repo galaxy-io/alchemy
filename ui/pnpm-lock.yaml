@@ -170,6 +170,9 @@ importers:
 
   .:
     dependencies:
+      '@linaria/core':
+        specifier: ^7.0.0
+        version: 7.0.0
       '@linaria/react':
         specifier: ^7.0.1
         version: 7.0.1(react@18.3.1)
@@ -223,8 +226,8 @@ importers:
         specifier: ^2.1.0
         version: 2.2.0(@bufbuild/protobuf@2.16.0)(@connectrpc/connect@2.2.0(@bufbuild/protobuf@2.16.0))
       '@galaxy-io/dls':
-        specifier: ^2.11.2
-        version: 2.11.2(50e1cb584994dbb51741323ed2c71c7d)
+        specifier: ^2.13.2
+        version: 2.13.2(50e1cb584994dbb51741323ed2c71c7d)
       '@lezer/highlight':
         specifier: ^1.2.3
         version: 1.2.5
@@ -717,8 +720,8 @@ packages:
   '@floating-ui/utils@0.2.12':
     resolution: {integrity: sha512-HpCo8tmWzLVad5s2d19EhAz5zqrrQ6s69qd6moPMQvkOuSwDT1YgRfWSVuc4ennqrgv3OHppiOGMQ7oC13yIww==}
 
-  '@galaxy-io/dls@2.11.2':
-    resolution: {integrity: sha512-QOIwrtYLMBcNAF0IXw7oEU2tP09CZAmGKYVL1Dv/5Lf7WD/t01djZRimu/RcDMvt4aqXwmUPzGo7Ez2L3ZqA1w==}
+  '@galaxy-io/dls@2.13.2':
+    resolution: {integrity: sha512-glxLrH2nV8Nkxiv0VDhn6+hznH+Op/a8PKTHLBBQ+FngBtkXv+hjAYFHidUf+grg/F855xqqshSEvj6vBAmvTA==}
     engines: {node: '>=22'}
     peerDependencies:
       '@babel/preset-react': ^7.24.0
@@ -2662,7 +2665,7 @@ snapshots:
 
   '@floating-ui/utils@0.2.12': {}
 
-  '@galaxy-io/dls@2.11.2(50e1cb584994dbb51741323ed2c71c7d)':
+  '@galaxy-io/dls@2.13.2(50e1cb584994dbb51741323ed2c71c7d)':
     dependencies:
       '@floating-ui/react': 0.27.20(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
       '@linaria/core': 7.0.0

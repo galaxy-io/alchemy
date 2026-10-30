@@ -17,6 +17,7 @@ const FunctionSettingsPageRuntime: FC = () => {
         ariaLabel="Runtime"
         data={createFunctionSpecJson(spec)}
         defaultExpandedDepth={FUNCTION_SETTINGS_PAGE_RUNTIME_EXPANDED_DEPTH}
+        canCopy
       />
     </Widget>
   );

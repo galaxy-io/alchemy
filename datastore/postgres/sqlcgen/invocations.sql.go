@@ -108,9 +108,9 @@ WITH r AS (
 INSERT INTO invocations (id, tenant_id, function_id, version, status, start_kind, acquire_us, run_us, total_us,
                          error, platform_error, input_bytes, output_bytes, instance_id, idempotency_key, host, created_by_user_id,
                          created_at, started_at, ended_at)
-SELECT id, tenant_id, function_id, version, status::invocation_status, nullif(start_kind, '')::start_kind,
-       acquire_us, run_us, total_us, nullif(error, '')::jsonb, platform_error, input_bytes, output_bytes, instance_id, idempotency_key, host,
-       u.id, created_at, started_at, ended_at
+SELECT r.id, r.tenant_id, r.function_id, r.version, r.status::invocation_status, nullif(r.start_kind, '')::start_kind,
+       r.acquire_us, r.run_us, r.total_us, nullif(r.error, '')::jsonb, r.platform_error, r.input_bytes, r.output_bytes, r.instance_id,
+       r.idempotency_key, r.host, u.id, r.created_at, r.started_at, r.ended_at
 FROM r
 LEFT JOIN users u ON u.id = nullif(r.created_by_user_id, '')::uuid
 ON CONFLICT (id) DO UPDATE SET
