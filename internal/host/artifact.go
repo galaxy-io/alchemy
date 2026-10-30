@@ -64,6 +64,7 @@ func toProto(tenantID string, a *driver.Artifact, layers []*hostv1.Layer, c *fun
 // fromProto is the driver's view of a wire artifact.
 func fromProto(p *hostv1.Artifact) *driver.Artifact {
 	return &driver.Artifact{
+		ID:          p.GetId(),
 		Image:       p.GetImage(),
 		Digest:      p.GetDigest(),
 		Layers:      layerDigests(p.GetLayers()),

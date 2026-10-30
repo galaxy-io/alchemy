@@ -33,5 +33,5 @@ spec:
       metadata:
         url: "http://{{ include "alchemy.server.fullname" . }}.{{ include "alchemy.namespace" . }}.svc:{{ .Values.server.service.port }}/scaling"
         valueLocation: demand
-        targetValue: {{ max 1 (div (mul .Values.host.maxConcurrency $scaling.targetUtilization) 100) | quote }}
+        targetValue: {{ max 1 (div (mul .Values.host.maxInstances $scaling.targetUtilization) 100) | quote }}
 {{- end }}

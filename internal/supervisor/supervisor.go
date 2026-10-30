@@ -93,6 +93,7 @@ func (s *Service) Invoke(ctx context.Context, req *connect.Request[supervisorv1.
 		s.mu.Unlock()
 	}()
 
+	resume(req.Msg.GetHostTimeMs())
 	result, err := s.exec(ctx, req.Msg, logStream{stream})
 	if err != nil {
 		return err

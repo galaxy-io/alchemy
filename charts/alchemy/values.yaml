@@ -187,7 +187,7 @@ host:
     minReplicas: 1
     # -- Most hosts.
     maxReplicas: 10
-    # -- Percent of each host's `maxConcurrency` slots to keep busy. Lower
+    # -- Percent of each host's `maxInstances` to keep busy. Lower
     # leaves more headroom for bursts.
     targetUtilization: 75
     # -- Seconds between KEDA's reads of `/scaling`.
@@ -209,20 +209,26 @@ host:
   # -- Affinity for hosts, merged with the built-in anti-affinity that keeps one host per node.
   affinity: {}
 
-  # -- Invocations allowed to hold an instance at once (`--max-concurrency`).
-  maxConcurrency: 8
-  # -- Guest memory in MiB the host may commit across busy and warm instances
-  # (`--memory-mib`). 0 means no limit. Guest memory is charged to the host
-  # pod, so `resources.limits.memory` must leave room for it. When set and
-  # `resources` names no memory request or limit, it is the pod's memory request.
-  memoryMiB: 0
+  # -- Instances a host runs at once, busy and warm together (`MAX_INSTANCES`).
+  maxInstances: 8
+  # -- Guest memory in MiB the host may commit across its instances
+  # (`MEMORY_BUDGET_MIB`). 0 means no limit. Guest memory is charged to the
+  # host pod, so `resources.limits.memory` must leave room for it. When set
+  # and `resources` names no memory request or limit, it is the pod's memory
+  # request.
+  memoryBudgetMiB: 0
   # -- How long a finished instance stays booted for the next invocation
-  # (`--warm-ttl`). `0s` cold boots every invocation.
-  warmTTL: 5m
-  # -- Idle instances kept booted per function before any invocation arrives (`--prewarm`).
-  prewarm: 0
-  # -- Keep the guest serial console on (`--console`). Observable, slower boot.
-  console: false
+  # (`WARM_INSTANCE_TTL`). `0s` starts every invocation afresh.
+  warmInstanceTTL: 5m
+  # -- Idle instances kept booted per function before any invocation arrives (`PREWARM_COUNT`).
+  prewarmCount: 0
+  snapshots:
+    # -- Snapshot every version after its build and restore it per invocation
+    # instead of booting a kernel (`SNAPSHOTS_ENABLED`).
+    enabled: true
+  console:
+    # -- Keep the guest serial console on (`CONSOLE_ENABLED`). Observable, slower boot.
+    enabled: false
 
   # -- Host log level: `debug`, `info`, `warn` or `error`.
   logLevel: info

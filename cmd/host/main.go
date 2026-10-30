@@ -47,22 +47,24 @@ func run(log *slog.Logger) error {
 	cfg := host.DefaultConfig()
 	cfg.Name = envOr("HOST_NAME", hostname)
 	fcCfg := firecracker.Config{
-		FirecrackerBin: envOr("FIRECRACKER", "/usr/local/bin/firecracker"),
-		JailerBin:      envOr("JAILER", "/usr/local/bin/jailer"),
-		Kernel:         os.Getenv("KERNEL"),
-		SupervisorBin:  envOr("SUPERVISOR", filepath.Join(filepath.Dir(os.Args[0]), "supervisor")),
+		FirecrackerBin: envOr("FIRECRACKER_BIN", "/usr/local/bin/firecracker"),
+		JailerBin:      envOr("JAILER_BIN", "/usr/local/bin/jailer"),
+		Kernel:         os.Getenv("KERNEL_IMAGE"),
+		SupervisorBin:  envOr("SUPERVISOR_BIN", filepath.Join(filepath.Dir(os.Args[0]), "supervisor")),
 		DataDir:        envOr("DATA_DIR", "/var/lib/alchemy"),
 		UIDBase:        100000,
 		Console:        true,
 		Keychain:       registry.Keychain(registry.AWS(), registry.GCP()),
+		Snapshots:      true,
 	}
 	if err := errors.Join(
-		envParse("MAX_CONCURRENCY", &cfg.MaxConcurrency, strconv.Atoi),
-		envParse("MEMORY_MIB", &cfg.MemoryMiB, parseInt64),
-		envParse("WARM_TTL", &cfg.WarmTTL, time.ParseDuration),
-		envParse("PREWARM", &cfg.Prewarm, strconv.Atoi),
+		envParse("MAX_INSTANCES", &cfg.MaxConcurrency, strconv.Atoi),
+		envParse("MEMORY_BUDGET_MIB", &cfg.MemoryMiB, parseInt64),
+		envParse("WARM_INSTANCE_TTL", &cfg.WarmTTL, time.ParseDuration),
+		envParse("PREWARM_COUNT", &cfg.Prewarm, strconv.Atoi),
 		envParse("UID_BASE", &fcCfg.UIDBase, strconv.Atoi),
-		envParse("CONSOLE", &fcCfg.Console, strconv.ParseBool),
+		envParse("CONSOLE_ENABLED", &fcCfg.Console, strconv.ParseBool),
+		envParse("SNAPSHOTS_ENABLED", &fcCfg.Snapshots, strconv.ParseBool),
 	); err != nil {
 		return err
 	}

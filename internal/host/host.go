@@ -219,6 +219,10 @@ func (h *Host) handleBuild(ctx context.Context, data []byte) proto.Message {
 		return &hostv1.BuildResponse{Result: &hostv1.BuildResponse_Error{Error: &hostv1.Error{Code: "internal", Message: err.Error()}}, BuildLog: err.Error()}
 	}
 	artifact := toProto(req.GetTenantId(), built, req.GetLayers(), req.GetSpec().GetContract())
+	if err := h.driver.Snapshot(ctx, fromProto(artifact)); err != nil {
+		h.log.Warn("snapshot failed", "artifact_id", artifact.GetId(), "err", err)
+		return &hostv1.BuildResponse{Result: &hostv1.BuildResponse_Error{Error: &hostv1.Error{Code: "internal", Message: "snapshot: " + err.Error()}}, BuildLog: err.Error()}
+	}
 	h.serve(artifact)
 	h.prewarm(artifact)
 	h.log.Info("build ready", "artifact_id", artifact.GetId(), "digest", artifact.GetDigest(), "took", time.Since(start).Round(time.Millisecond))
