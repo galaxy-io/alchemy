@@ -12,3 +12,13 @@ export enum FunctionContractSide {
   INPUT = "INPUT",
   OUTPUT = "OUTPUT",
 }
+
+export enum FunctionSourceKind {
+  SOURCE = "SOURCE",
+  IMAGE = "IMAGE",
+}
+
+export interface FunctionSourceFile {
+  path: string;
+  content: string;
+}

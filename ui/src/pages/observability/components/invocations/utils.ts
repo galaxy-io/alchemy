@@ -1,7 +1,9 @@
 import { create } from "@bufbuild/protobuf";
 
 import type { BarChartGroupDatum } from "@galaxy-io/dls/charts/BarChart";
+import type { ChartSelection } from "@galaxy-io/dls/charts/types";
 
+import { InvocationStatus } from "@/gen/functions/v1/invocations_pb";
 import {
   Metric,
   MetricDimension,
@@ -62,4 +64,13 @@ export const mapTimeseriesToInvocationsGroups = (
       },
     ],
   }));
+};
+
+export const mapChartSelectionToInvocationsFilter = (selection: ChartSelection | undefined) => {
+  const status = mapWireTokenToInvocationStatus(selection?.seriesKey ?? "");
+  return {
+    invocationsBucket:
+      selection?.categoryKey === undefined ? undefined : BigInt(selection.categoryKey),
+    invocationsStatus: status === InvocationStatus.UNSPECIFIED ? undefined : status,
+  };
 };

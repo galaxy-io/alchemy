@@ -4,7 +4,6 @@ import { InvocationStatus } from "@/gen/functions/v1/invocations_pb";
 
 import { InvocationsTimeframe } from "@/components/invocations/types";
 
-import { FunctionWorkbenchFile } from "@/pages/functions/workbench/types";
 import { ObservabilityTrafficFill } from "@/pages/observability/types";
 
 import { Flow } from "@/module/types";
@@ -26,6 +25,8 @@ export type AlchemyLayoutSearch = z.infer<typeof alchemyLayoutSearchSchema>;
 export const observabilitySearchSchema = z.object({
   timeframe: z.enum(InvocationsTimeframe).optional().catch(undefined),
   traffic: z.enum(ObservabilityTrafficFill).optional().catch(undefined),
+  invocationsBucket: z.coerce.bigint().positive().optional().catch(undefined),
+  invocationsStatus: z.enum(InvocationStatus).optional().catch(undefined),
 });
 
 export type ObservabilitySearch = z.infer<typeof observabilitySearchSchema>;
@@ -48,7 +49,7 @@ export const invocationsSearchSchema = z.object({
 export type InvocationsSearch = z.infer<typeof invocationsSearchSchema>;
 
 export const functionWorkbenchSearchSchema = z.object({
-  file: z.enum(FunctionWorkbenchFile).optional().catch(undefined),
+  file: z.string().optional().catch(undefined),
 });
 
 export type FunctionWorkbenchSearch = z.infer<typeof functionWorkbenchSearchSchema>;

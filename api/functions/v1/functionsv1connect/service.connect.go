@@ -57,6 +57,9 @@ const (
 	// FunctionsServiceListFunctionVersionsProcedure is the fully-qualified name of the
 	// FunctionsService's ListFunctionVersions RPC.
 	FunctionsServiceListFunctionVersionsProcedure = "/functions.v1.FunctionsService/ListFunctionVersions"
+	// FunctionsServiceListRuntimesProcedure is the fully-qualified name of the FunctionsService's
+	// ListRuntimes RPC.
+	FunctionsServiceListRuntimesProcedure = "/functions.v1.FunctionsService/ListRuntimes"
 	// FunctionsServiceInvokeProcedure is the fully-qualified name of the FunctionsService's Invoke RPC.
 	FunctionsServiceInvokeProcedure = "/functions.v1.FunctionsService/Invoke"
 	// FunctionsServiceGetInvocationProcedure is the fully-qualified name of the FunctionsService's
@@ -95,6 +98,9 @@ type FunctionsServiceClient interface {
 	CreateFunctionVersion(context.Context, *connect.Request[v1.CreateFunctionVersionRequest]) (*connect.Response[v1.CreateFunctionVersionResponse], error)
 	GetFunctionVersion(context.Context, *connect.Request[v1.GetFunctionVersionRequest]) (*connect.Response[v1.GetFunctionVersionResponse], error)
 	ListFunctionVersions(context.Context, *connect.Request[v1.ListFunctionVersionsRequest]) (*connect.Response[v1.ListFunctionVersionsResponse], error)
+	// Runtimes a function can be built from source on, with a starter handler
+	// for each, and the limits a source is held to.
+	ListRuntimes(context.Context, *connect.Request[v1.ListRuntimesRequest]) (*connect.Response[v1.ListRuntimesResponse], error)
 	// Invocation; validate input, run one version against it, validate output.
 	// An RPC error means the function did not produce a result: the request was
 	// rejected (unknown function, input violates the contract, no capacity) or
@@ -174,6 +180,12 @@ func NewFunctionsServiceClient(httpClient connect.HTTPClient, baseURL string, op
 			connect.WithSchema(functionsServiceMethods.ByName("ListFunctionVersions")),
 			connect.WithClientOptions(opts...),
 		),
+		listRuntimes: connect.NewClient[v1.ListRuntimesRequest, v1.ListRuntimesResponse](
+			httpClient,
+			baseURL+FunctionsServiceListRuntimesProcedure,
+			connect.WithSchema(functionsServiceMethods.ByName("ListRuntimes")),
+			connect.WithClientOptions(opts...),
+		),
 		invoke: connect.NewClient[v1.InvokeRequest, v1.InvokeResponse](
 			httpClient,
 			baseURL+FunctionsServiceInvokeProcedure,
@@ -235,6 +247,7 @@ type functionsServiceClient struct {
 	createFunctionVersion *connect.Client[v1.CreateFunctionVersionRequest, v1.CreateFunctionVersionResponse]
 	getFunctionVersion    *connect.Client[v1.GetFunctionVersionRequest, v1.GetFunctionVersionResponse]
 	listFunctionVersions  *connect.Client[v1.ListFunctionVersionsRequest, v1.ListFunctionVersionsResponse]
+	listRuntimes          *connect.Client[v1.ListRuntimesRequest, v1.ListRuntimesResponse]
 	invoke                *connect.Client[v1.InvokeRequest, v1.InvokeResponse]
 	getInvocation         *connect.Client[v1.GetInvocationRequest, v1.GetInvocationResponse]
 	listInvocations       *connect.Client[v1.ListInvocationsRequest, v1.ListInvocationsResponse]
@@ -283,6 +296,11 @@ func (c *functionsServiceClient) GetFunctionVersion(ctx context.Context, req *co
 // ListFunctionVersions calls functions.v1.FunctionsService.ListFunctionVersions.
 func (c *functionsServiceClient) ListFunctionVersions(ctx context.Context, req *connect.Request[v1.ListFunctionVersionsRequest]) (*connect.Response[v1.ListFunctionVersionsResponse], error) {
 	return c.listFunctionVersions.CallUnary(ctx, req)
+}
+
+// ListRuntimes calls functions.v1.FunctionsService.ListRuntimes.
+func (c *functionsServiceClient) ListRuntimes(ctx context.Context, req *connect.Request[v1.ListRuntimesRequest]) (*connect.Response[v1.ListRuntimesResponse], error) {
+	return c.listRuntimes.CallUnary(ctx, req)
 }
 
 // Invoke calls functions.v1.FunctionsService.Invoke.
@@ -338,6 +356,9 @@ type FunctionsServiceHandler interface {
 	CreateFunctionVersion(context.Context, *connect.Request[v1.CreateFunctionVersionRequest]) (*connect.Response[v1.CreateFunctionVersionResponse], error)
 	GetFunctionVersion(context.Context, *connect.Request[v1.GetFunctionVersionRequest]) (*connect.Response[v1.GetFunctionVersionResponse], error)
 	ListFunctionVersions(context.Context, *connect.Request[v1.ListFunctionVersionsRequest]) (*connect.Response[v1.ListFunctionVersionsResponse], error)
+	// Runtimes a function can be built from source on, with a starter handler
+	// for each, and the limits a source is held to.
+	ListRuntimes(context.Context, *connect.Request[v1.ListRuntimesRequest]) (*connect.Response[v1.ListRuntimesResponse], error)
 	// Invocation; validate input, run one version against it, validate output.
 	// An RPC error means the function did not produce a result: the request was
 	// rejected (unknown function, input violates the contract, no capacity) or
@@ -413,6 +434,12 @@ func NewFunctionsServiceHandler(svc FunctionsServiceHandler, opts ...connect.Han
 		connect.WithSchema(functionsServiceMethods.ByName("ListFunctionVersions")),
 		connect.WithHandlerOptions(opts...),
 	)
+	functionsServiceListRuntimesHandler := connect.NewUnaryHandler(
+		FunctionsServiceListRuntimesProcedure,
+		svc.ListRuntimes,
+		connect.WithSchema(functionsServiceMethods.ByName("ListRuntimes")),
+		connect.WithHandlerOptions(opts...),
+	)
 	functionsServiceInvokeHandler := connect.NewUnaryHandler(
 		FunctionsServiceInvokeProcedure,
 		svc.Invoke,
@@ -479,6 +506,8 @@ func NewFunctionsServiceHandler(svc FunctionsServiceHandler, opts ...connect.Han
 			functionsServiceGetFunctionVersionHandler.ServeHTTP(w, r)
 		case FunctionsServiceListFunctionVersionsProcedure:
 			functionsServiceListFunctionVersionsHandler.ServeHTTP(w, r)
+		case FunctionsServiceListRuntimesProcedure:
+			functionsServiceListRuntimesHandler.ServeHTTP(w, r)
 		case FunctionsServiceInvokeProcedure:
 			functionsServiceInvokeHandler.ServeHTTP(w, r)
 		case FunctionsServiceGetInvocationProcedure:
@@ -534,6 +563,10 @@ func (UnimplementedFunctionsServiceHandler) GetFunctionVersion(context.Context, 
 
 func (UnimplementedFunctionsServiceHandler) ListFunctionVersions(context.Context, *connect.Request[v1.ListFunctionVersionsRequest]) (*connect.Response[v1.ListFunctionVersionsResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("functions.v1.FunctionsService.ListFunctionVersions is not implemented"))
+}
+
+func (UnimplementedFunctionsServiceHandler) ListRuntimes(context.Context, *connect.Request[v1.ListRuntimesRequest]) (*connect.Response[v1.ListRuntimesResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("functions.v1.FunctionsService.ListRuntimes is not implemented"))
 }
 
 func (UnimplementedFunctionsServiceHandler) Invoke(context.Context, *connect.Request[v1.InvokeRequest]) (*connect.Response[v1.InvokeResponse], error) {

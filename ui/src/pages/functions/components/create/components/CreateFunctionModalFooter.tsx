@@ -58,7 +58,7 @@ const CreateFunctionModalFooter: FC<CreateFunctionModalFooterProps> = ({ onClose
     setSubmitting(false);
     toast({
       header: "Create failed",
-      description: getErrorMessage(error, "Failed to create image"),
+      description: getErrorMessage(error, "Failed to create function"),
       variant: ToastVariant.ERROR,
     });
   };
@@ -69,7 +69,7 @@ const CreateFunctionModalFooter: FC<CreateFunctionModalFooterProps> = ({ onClose
     createFunction(mapCreateFunctionModalStateToRequest(state, spec), {
       onSuccess: ({ function: created, version }) => {
         if (!created) return;
-        toast({ header: "Image created", variant: ToastVariant.SUCCESS });
+        toast({ header: "Function created", variant: ToastVariant.SUCCESS });
         handleCreated(created.id, version?.version ?? 1n);
       },
       onError: handleError,

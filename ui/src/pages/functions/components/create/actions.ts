@@ -1,14 +1,25 @@
+import type { Runtime } from "@/gen/functions/v1/functions_pb";
+
 import type {
   CreateFunctionModalArrowField,
   CreateFunctionModalState,
   CreateFunctionModalStep,
 } from "@/pages/functions/components/create/types";
-import type { FunctionContractKind, FunctionContractSide } from "@/pages/functions/types";
+import type {
+  FunctionContractKind,
+  FunctionContractSide,
+  FunctionSourceFile,
+  FunctionSourceKind,
+} from "@/pages/functions/types";
 
 export enum CreateFunctionModalActionType {
   SET_NAME = "SET_NAME",
   SET_DESCRIPTION = "SET_DESCRIPTION",
+  SET_SOURCE_KIND = "SET_SOURCE_KIND",
   SET_IMAGE = "SET_IMAGE",
+  SET_RUNTIME = "SET_RUNTIME",
+  SET_SOURCE_FILE = "SET_SOURCE_FILE",
+  SET_SOURCE_FILE_CONTENT = "SET_SOURCE_FILE_CONTENT",
   SET_COMMAND = "SET_COMMAND",
   SET_ENV = "SET_ENV",
   SET_CONTRACT_KIND = "SET_CONTRACT_KIND",
@@ -35,9 +46,29 @@ export interface SetDescriptionAction {
   payload: CreateFunctionModalState["description"];
 }
 
+export interface SetSourceKindAction {
+  type: CreateFunctionModalActionType.SET_SOURCE_KIND;
+  payload: FunctionSourceKind;
+}
+
 export interface SetImageAction {
   type: CreateFunctionModalActionType.SET_IMAGE;
   payload: CreateFunctionModalState["image"];
+}
+
+export interface SetRuntimeAction {
+  type: CreateFunctionModalActionType.SET_RUNTIME;
+  payload: Runtime["id"];
+}
+
+export interface SetSourceFileAction {
+  type: CreateFunctionModalActionType.SET_SOURCE_FILE;
+  payload: FunctionSourceFile["path"];
+}
+
+export interface SetSourceFileContentAction {
+  type: CreateFunctionModalActionType.SET_SOURCE_FILE_CONTENT;
+  payload: FunctionSourceFile;
 }
 
 export interface SetCommandAction {
@@ -115,7 +146,11 @@ export interface SetSubmittingAction {
 export type CreateFunctionModalAction =
   | SetNameAction
   | SetDescriptionAction
+  | SetSourceKindAction
   | SetImageAction
+  | SetRuntimeAction
+  | SetSourceFileAction
+  | SetSourceFileContentAction
   | SetCommandAction
   | SetEnvAction
   | SetContractKindAction

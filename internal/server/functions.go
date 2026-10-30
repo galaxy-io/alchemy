@@ -28,7 +28,7 @@ func (s *Service) CreateFunction(ctx context.Context, req *connect.Request[funct
 	if err != nil {
 		return nil, err
 	}
-	spec, err := s.prepareSpec(req.Msg.GetSpec())
+	spec, err := s.prepareSpec(ctx, req.Msg.GetSpec())
 	if err != nil {
 		return nil, err
 	}
@@ -123,7 +123,7 @@ func (s *Service) DeleteFunction(ctx context.Context, req *connect.Request[funct
 
 // CreateFunctionVersion adds an immutable version and starts building it.
 func (s *Service) CreateFunctionVersion(ctx context.Context, req *connect.Request[functionsv1.CreateFunctionVersionRequest]) (*connect.Response[functionsv1.CreateFunctionVersionResponse], error) {
-	spec, err := s.prepareSpec(req.Msg.GetSpec())
+	spec, err := s.prepareSpec(ctx, req.Msg.GetSpec())
 	if err != nil {
 		return nil, err
 	}
@@ -137,13 +137,18 @@ func (s *Service) CreateFunctionVersion(ctx context.Context, req *connect.Reques
 	return connect.NewResponse(&functionsv1.CreateFunctionVersionResponse{Version: versionProto(v)}), nil
 }
 
-// GetFunctionVersion returns one version, including its build status.
+// GetFunctionVersion returns one version, including its build status and,
+// for a function built from source, the content of its files.
 func (s *Service) GetFunctionVersion(ctx context.Context, req *connect.Request[functionsv1.GetFunctionVersionRequest]) (*connect.Response[functionsv1.GetFunctionVersionResponse], error) {
 	v, err := s.version(ctx, req.Msg.GetFunctionId(), req.Msg.GetVersion())
 	if err != nil {
 		return nil, err
 	}
-	return connect.NewResponse(&functionsv1.GetFunctionVersionResponse{Version: versionProto(v)}), nil
+	version := versionProto(v)
+	if err := s.fillSource(ctx, version.GetSpec()); err != nil {
+		return nil, connect.NewError(connect.CodeInternal, err)
+	}
+	return connect.NewResponse(&functionsv1.GetFunctionVersionResponse{Version: version}), nil
 }
 
 // ListFunctionVersions pages through a function's versions, newest first.
@@ -230,7 +235,7 @@ func (s *Service) build(v *sqlcgen.FunctionVersion) {
 	var buildLog string
 	start := time.Now()
 	if err == nil {
-		artifact, buildLog, err = s.requestBuild(ctx, v.FunctionID, v.TenantID, spec, nil)
+		artifact, buildLog, err = s.requestBuild(ctx, v.FunctionID, v.TenantID, spec, sourceLayers(spec))
 	}
 
 	finish := sqlcgen.FinishFunctionVersionBuildParams{ID: v.ID, BuildStartedAt: v.BuildStartedAt, BuildLog: buildLog}
@@ -306,9 +311,10 @@ func (s *Service) requestBuild(ctx context.Context, functionID, tenantID string,
 	return nil, last.resp.GetBuildLog(), errors.New(last.resp.GetError().GetMessage())
 }
 
-// prepareSpec validates a spec, fills in server defaults and checks that
-// its contract compiles. The returned spec is a copy.
-func (s *Service) prepareSpec(in *functionsv1.FunctionSpec) (*functionsv1.FunctionSpec, error) {
+// prepareSpec validates a spec, fills in server defaults, checks that its
+// contract compiles and puts its source, if any, in the artifacts bucket.
+// The returned spec is a copy.
+func (s *Service) prepareSpec(ctx context.Context, in *functionsv1.FunctionSpec) (*functionsv1.FunctionSpec, error) {
 	invalid := func(format string, args ...any) error {
 		return connect.NewError(connect.CodeInvalidArgument, fmt.Errorf(format, args...))
 	}
@@ -348,6 +354,9 @@ func (s *Service) prepareSpec(in *functionsv1.FunctionSpec) (*functionsv1.Functi
 	}
 	if spec.GetResources().GetMemoryMib() == 0 {
 		spec.Resources.MemoryMib = s.cfg.DefaultMemMiB
+	}
+	if err := s.takeSource(ctx, spec); err != nil {
+		return nil, err
 	}
 	return spec, nil
 }

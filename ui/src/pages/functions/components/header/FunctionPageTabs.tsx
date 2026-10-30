@@ -32,7 +32,7 @@ const FunctionPageTabs: FC = () => {
 
   return (
     <Tabs
-      ariaLabel="Image"
+      ariaLabel="Function"
       as={RouterLink}
       items={items}
       value={activeTab}

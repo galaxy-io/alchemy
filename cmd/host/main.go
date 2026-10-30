@@ -41,7 +41,7 @@ func run(log *slog.Logger) error {
 	hostname, _ := os.Hostname()
 	natsURL := envOr("NATS_URL", "nats://localhost:4223")
 	// Empty keeps function logs on NATS only.
-	logsBucket := os.Getenv("FUNCTION_LOGS_BUCKET")
+	logsBucket := os.Getenv("LOGS_BUCKET")
 	// Empty means builds with layers fail.
 	artifactsBucket := os.Getenv("ARTIFACTS_BUCKET")
 	cfg := host.DefaultConfig()

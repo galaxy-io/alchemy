@@ -69,12 +69,12 @@ const FunctionSettingsPageGeneral: FC<FunctionSettingsPageGeneralProps> = ({ alc
       }),
       {
         onSuccess: () => {
-          toast({ header: "Image saved", variant: ToastVariant.SUCCESS });
+          toast({ header: "Function saved", variant: ToastVariant.SUCCESS });
         },
         onError: (error) => {
           toast({
             header: "Save failed",
-            description: getErrorMessage(error, "Failed to save image"),
+            description: getErrorMessage(error, "Failed to save function"),
             variant: ToastVariant.ERROR,
           });
         },
