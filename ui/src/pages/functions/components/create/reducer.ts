@@ -25,11 +25,14 @@ import {
   type CreateFunctionModalState,
   CreateFunctionModalStep,
 } from "@/pages/functions/components/create/types";
-import { getCreateFunctionModalSteps } from "@/pages/functions/components/create/utils";
+import {
+  getCreateFunctionModalRuntime,
+  getCreateFunctionModalSteps,
+} from "@/pages/functions/components/create/utils";
 import { createFunctionSourceStarter } from "@/pages/functions/utils";
 
 function regenerateStarter(state: CreateFunctionModalState): CreateFunctionModalState {
-  const runtime = state.runtimes.find((candidate) => candidate.id === state.runtime);
+  const runtime = getCreateFunctionModalRuntime(state);
   if (state.isSourceTouched || !runtime) return state;
   const sourceFiles = createFunctionSourceStarter(runtime, state.contractKind);
   return { ...state, sourceFiles, sourceFile: sourceFiles[0]?.path ?? state.sourceFile };

@@ -1,7 +1,12 @@
 import type { FC } from "react";
 
-import Alert, { AlertVariant } from "@galaxy-io/dls/feedback/Alert";
-import Flex, { AlignItems, FlexDirection, JustifyContent } from "@galaxy-io/dls/layout/Flex";
+import { PlayIcon } from "@phosphor-icons/react";
+
+import { ButtonSize, ButtonVariant } from "@galaxy-io/dls/buttons/Button";
+import CopyButton from "@galaxy-io/dls/buttons/CopyButton";
+import Box from "@galaxy-io/dls/layout/Box";
+import EmptyLayout, { EmptyLayoutSize } from "@galaxy-io/dls/layout/EmptyLayout";
+import Flex, { AlignItems } from "@galaxy-io/dls/layout/Flex";
 import Link from "@galaxy-io/dls/links/Link";
 import CodeBlock, { CodeBlockLanguage } from "@galaxy-io/dls/text/CodeBlock";
 import Text, { TextSize, TextVariant } from "@galaxy-io/dls/text/Text";
@@ -11,13 +16,10 @@ import Flasher from "@galaxy-io/dls/transform/Flasher";
 import type { Contract } from "@/gen/functions/v1/common_pb";
 import type { InvokeResponse } from "@/gen/functions/v1/invocations_pb";
 
-import { FUNCTION_ERROR_KIND_TO_LABEL_MAP } from "@/components/invocations/constants";
-import InvocationError from "@/components/invocations/InvocationError";
-import InvocationLogs from "@/components/invocations/InvocationLogs";
-import InvocationPhaseBar from "@/components/invocations/InvocationPhaseBar";
-import InvocationStatus from "@/components/invocations/InvocationStatus";
+import InvocationLogsSplit from "@/components/invocations/InvocationLogsSplit";
+import InvocationOutcome from "@/components/invocations/InvocationOutcome";
 
-import { FUNCTION_WORKBENCH_RESULT_ID_LENGTH } from "@/pages/functions/workbench/constants";
+import { FUNCTION_WORKBENCH_RESULT_STORAGE_KEY } from "@/pages/functions/workbench/constants";
 import { decodeFunctionWorkbenchOutput } from "@/pages/functions/workbench/utils";
 
 import { useAlchemySearchUpdate } from "@/module/hooks";
@@ -46,17 +48,21 @@ const FunctionWorkbenchResult: FC<FunctionWorkbenchResultProps> = ({
   });
   const invocation = data?.invocation;
 
+  if (!invocation && !isRunning && !isLoading) {
+    return (
+      <EmptyLayout size={EmptyLayoutSize.SMALL} icon={PlayIcon} header="Run to see the output" />
+    );
+  }
+
   if (!invocation) {
-    return isRunning || isLoading ? (
-      <Flasher isFlashing>
-        <Text size={TextSize.CAPTION} family={FontFamily.MONO} variant={TextVariant.TERTIARY}>
-          Acquiring an instance...
-        </Text>
-      </Flasher>
-    ) : (
-      <Text size={TextSize.BODY_SM} variant={TextVariant.TERTIARY}>
-        Run to see the output
-      </Text>
+    return (
+      <Box padding={16}>
+        <Flasher isFlashing>
+          <Text size={TextSize.CAPTION} family={FontFamily.MONO} variant={TextVariant.TERTIARY}>
+            Acquiring an instance...
+          </Text>
+        </Flasher>
+      </Box>
     );
   }
 
@@ -64,26 +70,29 @@ const FunctionWorkbenchResult: FC<FunctionWorkbenchResultProps> = ({
     response?.result.case === "output"
       ? decodeFunctionWorkbenchOutput(response.result.value, contract)
       : undefined;
-  const { error } = invocation;
 
   return (
-    <Flex direction={FlexDirection.COLUMN} gap={12}>
-      <Flex justifyContent={JustifyContent.SPACE_BETWEEN} alignItems={AlignItems.CENTER}>
-        <InvocationStatus invocation={invocation} />
+    <InvocationLogsSplit
+      id="function-workbench-result"
+      storageKey={FUNCTION_WORKBENCH_RESULT_STORAGE_KEY}
+      invocationId={invocation.id}
+    >
+      <Flex alignItems={AlignItems.CENTER} gap={8} minWidth={0}>
         <Link
           onClick={() => void updateSearch((prev) => ({ ...prev, invocationId: invocation.id }))}
         >
-          <Text size={TextSize.CAPTION} family={FontFamily.MONO}>
-            {invocation.id.slice(0, FUNCTION_WORKBENCH_RESULT_ID_LENGTH)}
+          <Text size={TextSize.BODY_SM} family={FontFamily.MONO} lineClamp={1}>
+            {invocation.id}
           </Text>
         </Link>
+        <CopyButton
+          value={invocation.id}
+          ariaLabel="Copy invocation ID"
+          variant={ButtonVariant.TERTIARY}
+          size={ButtonSize.X_SMALL}
+        />
       </Flex>
-      {invocation.stats && <InvocationPhaseBar stats={invocation.stats} />}
-      {error && (
-        <Alert variant={AlertVariant.ERROR} header={FUNCTION_ERROR_KIND_TO_LABEL_MAP[error.kind]}>
-          <InvocationError error={error} />
-        </Alert>
-      )}
+      <InvocationOutcome invocation={invocation} />
       {output !== undefined && (
         <CodeBlock
           label="Output"
@@ -92,8 +101,7 @@ const FunctionWorkbenchResult: FC<FunctionWorkbenchResultProps> = ({
           canCopy
         />
       )}
-      <InvocationLogs invocationId={invocation.id} />
-    </Flex>
+    </InvocationLogsSplit>
   );
 };
 

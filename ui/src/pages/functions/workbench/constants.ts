@@ -6,16 +6,15 @@ import type { TreeItem } from "@galaxy-io/dls/tree/Tree";
 import { FunctionWorkbenchFile } from "@/pages/functions/workbench/types";
 
 export const FUNCTION_WORKBENCH_STORAGE_KEY = "alchemy:workbench";
+export const FUNCTION_WORKBENCH_RESULT_STORAGE_KEY = "alchemy:workbench-result";
 
 export const FUNCTION_WORKBENCH_FILES_DEFAULT_WIDTH = 200;
 export const FUNCTION_WORKBENCH_FILES_MIN_WIDTH = 140;
 export const FUNCTION_WORKBENCH_FILES_MAX_WIDTH = 320;
 
-export const FUNCTION_WORKBENCH_RESULT_DEFAULT_WIDTH = 400;
-export const FUNCTION_WORKBENCH_RESULT_MIN_WIDTH = 300;
+export const FUNCTION_WORKBENCH_RESULT_DEFAULT_WIDTH = 450;
+export const FUNCTION_WORKBENCH_RESULT_MIN_WIDTH = 450;
 export const FUNCTION_WORKBENCH_RESULT_MAX_WIDTH = 640;
-
-export const FUNCTION_WORKBENCH_RESULT_ID_LENGTH = 14;
 
 export const FUNCTION_WORKBENCH_DEFAULT_INPUT: JsonValue = {};
 

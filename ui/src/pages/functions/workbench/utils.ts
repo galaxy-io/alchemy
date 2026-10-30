@@ -36,6 +36,11 @@ export const getFunctionWorkbenchSourcePath = (id: string) =>
     ? id.slice(FUNCTION_WORKBENCH_SOURCE_PREFIX.length)
     : undefined;
 
+export const isFunctionWorkbenchSourceFile = (id: string) => {
+  const path = getFunctionWorkbenchSourcePath(id);
+  return !!path && !path.endsWith("/");
+};
+
 export const createFunctionWorkbenchSourceId = (path: string) =>
   `${FUNCTION_WORKBENCH_SOURCE_PREFIX}${path}`;
 

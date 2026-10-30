@@ -97,13 +97,11 @@ func DefaultConfig() Config {
 type Service struct {
 	functionsv1connect.UnimplementedFunctionsServiceHandler
 
-	cfg   Config
-	store *postgres.Store
-	bus   *bus.Bus
-	logs  *blob.Bucket // nil when function logs are kept on the bus only
-	// artifacts holds the layers builds extract over an image, such as the
-	// files of a function built from source. nil means image functions only.
-	artifacts *blob.Bucket
+	cfg       Config
+	store     *postgres.Store
+	bus       *bus.Bus
+	logs      *blob.Bucket // nil when function logs are kept on the bus only
+	artifacts *blob.Bucket // nil when functions are built from images only
 	log       *slog.Logger
 	tenant    string
 	tracker   *invocationTracker // invocations this server holds
@@ -129,7 +127,8 @@ type compiledVersion struct {
 }
 
 // New returns a service backed by store and b, reading function logs from
-// logBucket when there is one. It sets up the bus's streams, starts
+// logBucket and keeping the files of functions built from source in
+// artifactBucket, either of which may be nil. It sets up the bus's streams, starts
 // listening to hosts and other servers, and starts writing invocation
 // records.
 func New(ctx context.Context, cfg Config, store *postgres.Store, b *bus.Bus, logBucket, artifactBucket *blob.Bucket, log *slog.Logger) (*Service, error) {

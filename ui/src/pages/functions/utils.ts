@@ -12,6 +12,7 @@ import {
   FunctionSpecSchema,
   type FunctionVersion,
   type Runtime,
+  type SourceFile,
   SourceSchema,
 } from "@/gen/functions/v1/functions_pb";
 
@@ -19,6 +20,7 @@ import {
   FUNCTION_NAME_PATTERN,
   FUNCTION_PROTOCOL_TO_TOKEN_MAP,
   FUNCTION_SOURCE_EXTENSION_TO_LANGUAGE_MAP,
+  FUNCTION_SOURCE_EXTENSION_TO_RUNTIME_ID_MAP,
 } from "@/pages/functions/constants";
 import type {
   FunctionArrowField,
@@ -104,9 +106,16 @@ export const getFunctionRuntimeIconUrl = (
     .with(GalaxyTheme.LIGHT, () => runtime.lightIconUrl)
     .exhaustive();
 
+const getFunctionSourceExtension = (path: string) => path.split(".").pop() ?? "";
+
 export const getFunctionSourceLanguage = (path: string): CodeEditorLanguage =>
-  FUNCTION_SOURCE_EXTENSION_TO_LANGUAGE_MAP[path.split(".").pop() ?? ""] ??
+  FUNCTION_SOURCE_EXTENSION_TO_LANGUAGE_MAP[getFunctionSourceExtension(path)] ??
   CodeEditorLanguage.PLAIN;
+
+export const getFunctionSourceRuntime = (runtimes: Runtime[], path: string) => {
+  const id = FUNCTION_SOURCE_EXTENSION_TO_RUNTIME_ID_MAP[getFunctionSourceExtension(path)];
+  return runtimes.find((runtime) => runtime.id === id);
+};
 
 export const decodeFunctionSourceFile = (content: Uint8Array) => new TextDecoder().decode(content);
 
@@ -125,10 +134,16 @@ export const createFunctionSourceStarter = (
   },
 ];
 
-export const createFunctionSourceSpec = (spec: FunctionSpec, files: FunctionSourceFile[]) => {
-  const next = clone(FunctionSpecSchema, spec);
-  next.source = create(SourceSchema, {
+export const decodeFunctionSourceFiles = (files: SourceFile[]): FunctionSourceFile[] =>
+  files.map(({ path, content }) => ({ path, content: decodeFunctionSourceFile(content) }));
+
+export const createFunctionSource = (files: FunctionSourceFile[]) =>
+  create(SourceSchema, {
     files: files.map(({ path, content }) => ({ path, content: encodeFunctionSourceFile(content) })),
   });
+
+export const createFunctionSourceSpec = (spec: FunctionSpec, files: FunctionSourceFile[]) => {
+  const next = clone(FunctionSpecSchema, spec);
+  next.source = createFunctionSource(files);
   return next;
 };

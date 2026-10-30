@@ -3,13 +3,10 @@ import type { FC } from "react";
 import { match } from "ts-pattern";
 
 import Box, { BoxVariant } from "@galaxy-io/dls/layout/Box";
-import Divider from "@galaxy-io/dls/layout/Divider";
-import Flex, { FlexDirection, FlexVariant } from "@galaxy-io/dls/layout/Flex";
-import FlexItem from "@galaxy-io/dls/layout/FlexItem";
+import Flex, { FlexDirection } from "@galaxy-io/dls/layout/Flex";
 import PendingLayout from "@galaxy-io/dls/layout/PendingLayout";
 import ScrollArea from "@galaxy-io/dls/layout/ScrollArea";
-import Modal, { ModalSize } from "@galaxy-io/dls/modal/Modal";
-import { Orientation, Radius } from "@galaxy-io/dls/theme/enums";
+import Modal from "@galaxy-io/dls/modal/Modal";
 
 import type { Function as AlchemyFunction } from "@/gen/functions/v1/functions_pb";
 
@@ -77,30 +74,21 @@ const CreateFunctionModalContent: FC<CreateFunctionModalContentProps> = ({ isOpe
   return (
     <Modal
       isOpen={isOpen}
-      size={ModalSize.X_LARGE}
+      isFullscreen
       header={CREATE_FUNCTION_MODAL_MODE_TO_HEADER_MAP[mode]}
       subheader={mode === CreateFunctionModalMode.VERSION ? name : undefined}
       isDismissable={!isSubmitting}
+      sidebar={<CreateFunctionModalSidebar />}
       footer={<CreateFunctionModalFooter onClose={onClose} />}
+      hasDividers
+      isFlush
       onOpenChange={(open) => {
         if (!open) onClose();
       }}
     >
-      <Flex
-        height="100%"
-        variant={FlexVariant.PRIMARY}
-        hasBorder
-        radius={Radius.LG}
-        overflow="hidden"
-      >
-        <CreateFunctionModalSidebar />
-        <Divider orientation={Orientation.VERTICAL} />
-        <FlexItem grow={1} basis={0} minWidth={0}>
-          <Box variant={BoxVariant.BASE} height="100%">
-            {renderBody()}
-          </Box>
-        </FlexItem>
-      </Flex>
+      <Box variant={BoxVariant.BASE} height="100%">
+        {renderBody()}
+      </Box>
     </Modal>
   );
 };
@@ -138,8 +126,14 @@ const CreateFunctionModal: FC<CreateFunctionModalProps> = ({ isOpen, functionId,
     return (
       <Modal
         isOpen={isOpen}
-        size={ModalSize.MEDIUM}
-        header="New version"
+        isFullscreen
+        header={
+          CREATE_FUNCTION_MODAL_MODE_TO_HEADER_MAP[
+            functionId ? CreateFunctionModalMode.VERSION : CreateFunctionModalMode.FUNCTION
+          ]
+        }
+        hasDividers
+        isFlush
         onOpenChange={(open) => {
           if (!open) onClose();
         }}

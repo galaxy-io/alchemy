@@ -25,6 +25,8 @@ export type AlchemyLayoutSearch = z.infer<typeof alchemyLayoutSearchSchema>;
 export const observabilitySearchSchema = z.object({
   timeframe: z.enum(InvocationsTimeframe).optional().catch(undefined),
   traffic: z.enum(ObservabilityTrafficFill).optional().catch(undefined),
+  invocationsBucket: z.coerce.bigint().positive().optional().catch(undefined),
+  invocationsStatus: z.enum(InvocationStatus).optional().catch(undefined),
 });
 
 export type ObservabilitySearch = z.infer<typeof observabilitySearchSchema>;

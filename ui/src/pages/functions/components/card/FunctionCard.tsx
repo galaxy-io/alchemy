@@ -6,6 +6,7 @@ import { ChipSize } from "@galaxy-io/dls/chips/Chip";
 import Box from "@galaxy-io/dls/layout/Box";
 import Flex, { AlignItems, FlexDirection } from "@galaxy-io/dls/layout/Flex";
 import Text, { TextSize, TextVariant } from "@galaxy-io/dls/text/Text";
+import { EMPTY_VALUE } from "@galaxy-io/dls/utils/format";
 import Widget from "@galaxy-io/dls/widget/Widget";
 
 import type { Function as AlchemyFunction } from "@/gen/functions/v1/functions_pb";
@@ -51,8 +52,12 @@ const FunctionCard: FC<FunctionCardProps> = ({ alchemyFunction, metrics }) => {
     >
       <Flex direction={FlexDirection.COLUMN} gap={12}>
         <Box minHeight={FUNCTION_CARD_DESCRIPTION_HEIGHT}>
-          <Text size={TextSize.BODY_SM} variant={TextVariant.SECONDARY} lineClamp={2}>
-            {alchemyFunction.description}
+          <Text
+            size={TextSize.BODY_SM}
+            variant={alchemyFunction.description ? TextVariant.SECONDARY : TextVariant.TERTIARY}
+            lineClamp={2}
+          >
+            {alchemyFunction.description || EMPTY_VALUE}
           </Text>
         </Box>
         <Flex alignItems={AlignItems.END} gap={24}>

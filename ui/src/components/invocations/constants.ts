@@ -1,8 +1,9 @@
 import { ChartPalette } from "@galaxy-io/dls/charts/types";
+import { AlertVariant } from "@galaxy-io/dls/feedback/Alert";
 import type { Space } from "@galaxy-io/dls/theme/enums";
 import type { PaletteColor, RoleColor } from "@galaxy-io/dls/theme/tokens/types";
 
-import { FunctionErrorKind, InvocationStatus, StartKind } from "@/gen/functions/v1/invocations_pb";
+import { InvocationStatus, StartKind } from "@/gen/functions/v1/invocations_pb";
 import { MetricGranularity } from "@/gen/metrics/v1/metrics_pb";
 
 import {
@@ -67,7 +68,7 @@ export const INVOCATION_STATUS_TO_HUE_MAP: Record<InvocationStatus, RoleColor | 
   [InvocationStatus.FAILED]: "error",
   [InvocationStatus.ERRORED]: "warning",
   [InvocationStatus.CANCELED]: undefined,
-  [InvocationStatus.REJECTED]: "warning",
+  [InvocationStatus.REJECTED]: "purple",
 };
 
 export const INVOCATION_STATUS_TO_CHART_PALETTE_MAP: Record<InvocationStatus, ChartPalette> = {
@@ -79,7 +80,19 @@ export const INVOCATION_STATUS_TO_CHART_PALETTE_MAP: Record<InvocationStatus, Ch
   [InvocationStatus.FAILED]: ChartPalette.ERROR,
   [InvocationStatus.ERRORED]: ChartPalette.WARNING,
   [InvocationStatus.CANCELED]: ChartPalette.SECONDARY,
-  [InvocationStatus.REJECTED]: ChartPalette.ORANGE,
+  [InvocationStatus.REJECTED]: ChartPalette.PURPLE,
+};
+
+export const INVOCATION_STATUS_TO_ALERT_VARIANT_MAP: Record<InvocationStatus, AlertVariant> = {
+  [InvocationStatus.UNSPECIFIED]: AlertVariant.PRIMARY,
+  [InvocationStatus.PENDING]: AlertVariant.PRIMARY,
+  [InvocationStatus.STARTING]: AlertVariant.PRIMARY,
+  [InvocationStatus.RUNNING]: AlertVariant.PRIMARY,
+  [InvocationStatus.SUCCEEDED]: AlertVariant.SUCCESS,
+  [InvocationStatus.FAILED]: AlertVariant.ERROR,
+  [InvocationStatus.ERRORED]: AlertVariant.WARNING,
+  [InvocationStatus.CANCELED]: AlertVariant.PRIMARY,
+  [InvocationStatus.REJECTED]: AlertVariant.WARNING,
 };
 
 export const INVOCATION_STATUS_TO_WIRE_TOKEN_MAP: Record<InvocationStatus, string> = {
@@ -134,15 +147,6 @@ export const START_KIND_TO_WIRE_TOKEN_MAP: Record<StartKind, string> = {
   [StartKind.WARM]: "warm",
 };
 
-export const FUNCTION_ERROR_KIND_TO_LABEL_MAP: Record<FunctionErrorKind, string> = {
-  [FunctionErrorKind.UNSPECIFIED]: "Unknown",
-  [FunctionErrorKind.RAISED]: "Raised",
-  [FunctionErrorKind.CRASHED]: "Crashed",
-  [FunctionErrorKind.TIMEOUT]: "Timed out",
-  [FunctionErrorKind.OUTPUT_INVALID]: "Output invalid",
-  [FunctionErrorKind.INPUT_INVALID]: "Input invalid",
-};
-
 export const INVOCATIONS_TABLE_COLUMN_WIDTH_STATUS = 140;
 export const INVOCATIONS_TABLE_COLUMN_MIN_WIDTH_FUNCTION = 200;
 export const INVOCATIONS_TABLE_COLUMN_MIN_WIDTH_INVOCATION = 160;
@@ -183,6 +187,9 @@ export const INVOCATION_PHASE_TO_HUE_MAP: Record<InvocationPhase, PaletteColor |
 export const INVOCATION_STATUS_REASON_ICON_SIZE = 14;
 
 export const INVOCATION_LOGS_HEADER_HEIGHT = 32;
-export const INVOCATION_LOGS_MAX_HEIGHT = 320;
+export const INVOCATION_LOGS_INSET: Space = 16;
 export const INVOCATION_LOGS_ESTIMATED_LINE_HEIGHT = 18;
 export const INVOCATION_LOGS_LINE_GAP: Space = 2;
+
+export const INVOCATION_LOGS_SPLIT_LOGS_DEFAULT_HEIGHT = 280;
+export const INVOCATION_LOGS_SPLIT_LOGS_MIN_HEIGHT = 96;

@@ -7,7 +7,7 @@ import {
   InvocationProtocol,
   type JsonSchemaContract,
 } from "@/gen/functions/v1/common_pb";
-import { FunctionVersionStatus } from "@/gen/functions/v1/functions_pb";
+import { FunctionVersionStatus, type Runtime } from "@/gen/functions/v1/functions_pb";
 
 import {
   type FunctionContractKind,
@@ -74,4 +74,11 @@ export const FUNCTION_SOURCE_EXTENSION_TO_LANGUAGE_MAP: Record<string, CodeEdito
   toml: CodeEditorLanguage.TOML,
   yaml: CodeEditorLanguage.YAML,
   yml: CodeEditorLanguage.YAML,
+};
+
+export const FUNCTION_SOURCE_EXTENSION_TO_RUNTIME_ID_MAP: Record<string, Runtime["id"]> = {
+  py: "python",
+  ts: "node",
+  js: "node",
+  mjs: "node",
 };
