@@ -32,17 +32,30 @@ func snapshotGeneration(cfg Config) (string, error) {
 	}
 	h.Write(out)
 	for _, path := range []string{cfg.Kernel, cfg.SupervisorBin} {
-		f, err := os.Open(path)
-		if err != nil {
-			return "", err
-		}
-		_, err = io.Copy(h, f)
-		_ = f.Close()
-		if err != nil {
+		if err := hashFile(h, path); err != nil {
 			return "", err
 		}
 	}
 	return hex.EncodeToString(h.Sum(nil))[:16], nil
+}
+
+// fileID is a short digest of the file at path.
+func fileID(path string) (string, error) {
+	h := sha256.New()
+	if err := hashFile(h, path); err != nil {
+		return "", err
+	}
+	return hex.EncodeToString(h.Sum(nil))[:12], nil
+}
+
+func hashFile(h io.Writer, path string) error {
+	f, err := os.Open(path)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = f.Close() }()
+	_, err = io.Copy(h, f)
+	return err
 }
 
 // snapshotsDir holds this generation's snapshots, one directory per
@@ -133,13 +146,6 @@ func (d *Driver) Snapshot(ctx context.Context, a *driver.Artifact) error {
 // snapshot pauses the microVM and has Firecracker write a full snapshot
 // into the jail.
 func (s *instance) snapshot(ctx context.Context) error {
-	dir := s.jail.host(filepath.Dir(jailVMState))
-	if err := os.Mkdir(dir, 0o700); err != nil {
-		return err
-	}
-	if err := os.Chown(dir, s.uid, s.uid); err != nil {
-		return err
-	}
 	fc := newAPI(s.jail.host(jailAPISocket))
 	if err := fc.patch(ctx, "/vm", map[string]any{"state": "Paused"}); err != nil {
 		return s.failed(err)

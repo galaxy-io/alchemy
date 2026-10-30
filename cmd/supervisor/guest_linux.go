@@ -47,8 +47,9 @@ func initGuest() error {
 // overlayLayers makes the layer drive the top of the root filesystem: the
 // drive and the image are the lower directories of a read-only overlay,
 // which becomes the root. Everything is staged on a tmpfs that the old root
-// takes with it when it is detached. Without the drive the root is the
-// image alone.
+// takes with it when it is detached, the kernel's /dev among it, so devtmpfs
+// is mounted again on the new root. Without the drive the root is the image
+// alone.
 func overlayLayers() error {
 	if _, err := os.Stat(layersDevice); errors.Is(err, os.ErrNotExist) {
 		return nil
@@ -80,7 +81,13 @@ func overlayLayers() error {
 	if err := unix.Unmount(".", unix.MNT_DETACH); err != nil {
 		return fmt.Errorf("detach old root: %w", err)
 	}
-	return unix.Chdir("/")
+	if err := unix.Chdir("/"); err != nil {
+		return err
+	}
+	if err := unix.Mount("devtmpfs", "/dev", "devtmpfs", unix.MS_NOSUID, "mode=755"); err != nil {
+		return fmt.Errorf("mount /dev: %w", err)
+	}
+	return nil
 }
 
 func listenVsock(port uint32) (net.Listener, error) {

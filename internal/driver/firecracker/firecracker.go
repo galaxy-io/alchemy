@@ -81,6 +81,9 @@ type Driver struct {
 	// generation names the snapshot cache for this Firecracker, kernel and
 	// supervisor, which a snapshot is only good for.
 	generation string
+	// supervisorID names the supervisor build inside every root filesystem
+	// this driver makes, so a new supervisor means new drives.
+	supervisorID string
 }
 
 // New checks that the host runs as root with KVM usable and the configured
@@ -109,12 +112,18 @@ func New(cfg Config, log *slog.Logger) (*Driver, error) {
 	if d.generation, err = snapshotGeneration(cfg); err != nil {
 		return nil, fmt.Errorf("snapshot generation: %w", err)
 	}
+	if d.supervisorID, err = fileID(cfg.SupervisorBin); err != nil {
+		return nil, fmt.Errorf("supervisor: %w", err)
+	}
 	for _, dir := range []string{d.rootfsDir(), d.layersDir(), d.snapshotsDir(), filepath.Join(cfg.DataDir, "jail")} {
 		if err := os.MkdirAll(dir, 0o750); err != nil {
 			return nil, err
 		}
 	}
 	if err := d.dropStaleSnapshots(); err != nil {
+		return nil, err
+	}
+	if err := d.dropStaleRootfs(); err != nil {
 		return nil, err
 	}
 	if err := installFile(cfg.Kernel, d.kernel(), 0o444); err != nil {

@@ -207,6 +207,6 @@ const (
 	jailLayers    = "/layers.ext4"
 	// A restore reads the snapshot from here; a snapshot is written here
 	// by Firecracker, which can only write inside its jail.
-	jailVMState = "/snapshot/vmstate"
-	jailMemory  = "/snapshot/mem"
+	jailVMState = "/vmstate"
+	jailMemory  = "/mem"
 )
