@@ -148,9 +148,10 @@ type jail struct {
 }
 
 // newJail creates the chroot ahead of the jailer, owned by uid, and
-// hard-links the kernel and rootfs into it. The jail is returned even on
-// error, so the caller can remove what was made.
-func (d *Driver) newJail(id string, uid int, rootfs string) (*jail, error) {
+// hard-links the kernel, the rootfs and the layer drive, when there is one,
+// into it. The jail is returned even on error, so the caller can remove
+// what was made.
+func (d *Driver) newJail(id string, uid int, rootfs, layers string) (*jail, error) {
 	j := &jail{dir: filepath.Join(d.cfg.DataDir, "jail", jailExec, id)}
 	j.root = filepath.Join(j.dir, "root")
 	if err := os.MkdirAll(j.root, 0o700); err != nil {
@@ -159,7 +160,11 @@ func (d *Driver) newJail(id string, uid int, rootfs string) (*jail, error) {
 	if err := os.Chown(j.root, uid, uid); err != nil {
 		return j, err
 	}
-	for src, dst := range map[string]string{d.kernel(): jailKernel, rootfs: jailRootfs} {
+	links := map[string]string{d.kernel(): jailKernel, rootfs: jailRootfs}
+	if layers != "" {
+		links[layers] = jailLayers
+	}
+	for src, dst := range links {
 		if err := os.Link(src, j.host(dst)); err != nil {
 			return j, fmt.Errorf("link %s into jail: %w", src, err)
 		}
@@ -202,4 +207,5 @@ const (
 	jailVsock     = "/v.sock"
 	jailKernel    = "/vmlinux"
 	jailRootfs    = "/rootfs.ext4"
+	jailLayers    = "/layers.ext4"
 )

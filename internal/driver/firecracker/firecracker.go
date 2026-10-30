@@ -98,7 +98,7 @@ func New(cfg Config, log *slog.Logger) (*Driver, error) {
 	if err := os.RemoveAll(filepath.Join(cfg.DataDir, "jail")); err != nil {
 		return nil, err
 	}
-	for _, dir := range []string{d.rootfsDir(), filepath.Join(cfg.DataDir, "jail")} {
+	for _, dir := range []string{d.rootfsDir(), d.layersDir(), filepath.Join(cfg.DataDir, "jail")} {
 		if err := os.MkdirAll(dir, 0o750); err != nil {
 			return nil, err
 		}
@@ -126,6 +126,9 @@ func (d *Driver) firecracker() string { return filepath.Join(d.cfg.DataDir, jail
 // rootfsDir holds built root filesystems, keyed by image digest.
 func (d *Driver) rootfsDir() string { return filepath.Join(d.cfg.DataDir, "rootfs") }
 
+// layersDir holds built layer drives, keyed by the layers' digests.
+func (d *Driver) layersDir() string { return filepath.Join(d.cfg.DataDir, "layers") }
+
 // installFile copies src to dst with mode, which no microVM uid may write.
 // The copy is renamed into place, so an interrupted one never leaves a
 // partial file at dst.
@@ -152,7 +155,7 @@ func (d *Driver) Acquire(ctx context.Context, a *driver.Artifact) (driver.Instan
 		return nil, none, err
 	}
 	sb := &instance{driver: d, id: hex.EncodeToString(raw), uid: uid}
-	if sb.jail, err = d.newJail(sb.id, uid, d.rootfsPath(a.Digest, a.Layers)); err != nil {
+	if sb.jail, err = d.newJail(sb.id, uid, d.rootfsPath(a.Digest), d.layersPath(a.Layers)); err != nil {
 		sb.Release(context.WithoutCancel(ctx))
 		return nil, none, err
 	}
@@ -217,13 +220,26 @@ func (s *instance) boot(ctx context.Context, a *driver.Artifact) error {
 	}{
 		{"/boot-source", map[string]any{"kernel_image_path": jailKernel, "boot_args": bootArgs}},
 		{"/drives/rootfs", map[string]any{"drive_id": "rootfs", "path_on_host": jailRootfs, "is_root_device": true, "is_read_only": true}},
+	}
+	// The layer drive is the second one, /dev/vdb in the guest, where init
+	// looks for it.
+	if len(a.Layers) > 0 {
+		steps = append(steps, struct {
+			path string
+			body any
+		}{"/drives/layers", map[string]any{"drive_id": "layers", "path_on_host": jailLayers, "is_root_device": false, "is_read_only": true}})
+	}
+	steps = append(steps, []struct {
+		path string
+		body any
+	}{
 		{"/machine-config", map[string]any{"vcpu_count": a.VCPUs, "mem_size_mib": a.MemoryMiB}},
 		{"/vsock", map[string]any{"guest_cid": guestCID, "uds_path": jailVsock}},
 		// virtio-rng: without it the guest's RNG takes seconds to seed and
 		// anything that calls getrandom early (OpenSSL, Node) blocks.
 		{"/entropy", map[string]any{}},
 		{"/actions", map[string]any{"action_type": "InstanceStart"}},
-	}
+	}...)
 	for _, step := range steps {
 		if err := fc.put(ctx, step.path, step.body); err != nil {
 			return s.failed(err)
@@ -315,17 +331,25 @@ func (s *instance) Release(context.Context) {
 	}
 }
 
-// Info reports the Firecracker version, the kernel, and the rootfs cache.
+// Info reports the Firecracker version, the kernel, and the drive cache:
+// the images it holds, and the bytes of their root filesystems and of the
+// layer drives.
 func (d *Driver) Info(ctx context.Context) driver.HostInfo {
 	info := driver.HostInfo{Kernel: d.cfg.Kernel}
 	if out, err := exec.CommandContext(ctx, d.cfg.FirecrackerBin, "--version").Output(); err == nil { //nolint:gosec // operator-configured path
 		info.FirecrackerVersion = strings.TrimSpace(strings.SplitN(string(out), "\n", 2)[0])
 	}
-	if entries, err := os.ReadDir(d.rootfsDir()); err == nil {
+	for _, dir := range []string{d.rootfsDir(), d.layersDir()} {
+		entries, err := os.ReadDir(dir)
+		if err != nil {
+			continue
+		}
 		for _, e := range entries {
 			if fi, err := e.Info(); err == nil && !fi.IsDir() && strings.HasSuffix(e.Name(), ".ext4") {
 				info.RootfsCacheBytes += fi.Size()
-				info.RootfsCacheImages++
+				if dir == d.rootfsDir() {
+					info.RootfsCacheImages++
+				}
 			}
 		}
 	}

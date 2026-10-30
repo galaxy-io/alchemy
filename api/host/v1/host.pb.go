@@ -29,9 +29,9 @@ const (
 // id keys instances and the invoke subject: it hashes everything that makes
 // two instances interchangeable, including the tenant, so two functions with
 // the same image but different env never share a warm instance. The contract
-// is not in it: an instance can run any input. The rootfs cache is keyed by
-// the image digest and the layers' digests alone, since those are
-// content-addressed.
+// is not in it: an instance can run any input. The drive cache is keyed by
+// the image digest for the root filesystem and by the layers' digests for
+// the layer drive, since those are content-addressed.
 type Artifact struct {
 	state    protoimpl.MessageState `protogen:"open.v1"`
 	Id       string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
@@ -184,7 +184,7 @@ type Layer struct {
 	// key is the archive's key in the artifacts bucket.
 	Key string `protobuf:"bytes,1,opt,name=key,proto3" json:"key,omitempty"`
 	// sha256 is the archive's content digest, in hex. The build checks it, and
-	// it keys the rootfs cache along with the image digest.
+	// it keys the layer drive the guest lays over its root filesystem.
 	Sha256        string `protobuf:"bytes,2,opt,name=sha256,proto3" json:"sha256,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
