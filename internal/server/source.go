@@ -58,6 +58,11 @@ func (s *Service) takeSource(ctx context.Context, spec *functionsv1.FunctionSpec
 		if layer.GetKey() == "" || layer.GetSha256() == "" {
 			return invalid("spec.source.files carry no content and spec.source.layer names no archive")
 		}
+		// The key is derived from the digest under this tenant, so a spec
+		// can only name a layer this tenant stored.
+		if layer.GetKey() != s.layerKey(layer.GetSha256()) {
+			return invalid("spec.source.layer %q is not this tenant's archive for its digest", layer.GetKey())
+		}
 		found, err := s.artifacts.Exists(ctx, layer.GetKey())
 		if err != nil {
 			return connect.NewError(connect.CodeInternal, fmt.Errorf("artifacts bucket: %w", err))
@@ -69,7 +74,7 @@ func (s *Service) takeSource(ctx context.Context, spec *functionsv1.FunctionSpec
 	}
 
 	archive, sum := packSource(src.GetFiles())
-	key := s.tenant + "/layers/" + sum + ".tar"
+	key := s.layerKey(sum)
 	found, err := s.artifacts.Exists(ctx, key)
 	if err != nil {
 		return connect.NewError(connect.CodeInternal, fmt.Errorf("artifacts bucket: %w", err))
@@ -85,6 +90,12 @@ func (s *Service) takeSource(ctx context.Context, spec *functionsv1.FunctionSpec
 		f.Content = nil
 	}
 	return nil
+}
+
+// layerKey is where a source archive with the given digest lives in the
+// artifacts bucket, under the tenant that stored it.
+func (s *Service) layerKey(sum string) string {
+	return s.tenant + "/layers/" + sum + ".tar"
 }
 
 // validateSourceFiles checks the files' count, size and paths. A path is
