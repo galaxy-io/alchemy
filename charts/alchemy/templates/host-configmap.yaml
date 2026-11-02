@@ -16,6 +16,8 @@ data:
   # Eviction
   KEPT_VERSIONS: {{ .Values.host.eviction.keptVersions | quote }}
   VERSION_IDLE_TTL: {{ .Values.host.eviction.versionIdleTTL | quote }}
+  # Secrets
+  SECRETS_REFRESH_INTERVAL: {{ .Values.host.secretsRefreshInterval | quote }}
   # Observability
   LOG_LEVEL: {{ .Values.host.logLevel | quote }}
   LOG_FORMAT: {{ .Values.host.logFormat | quote }}

@@ -16,6 +16,8 @@ host_artifacts_bucket := replace(ARTIFACTS_BUCKET, "localhost", "host.lima.inter
 registry := "localhost:5001"
 host_registry := "192.168.5.2:5001"
 export RUNTIME_IMAGE_PREFIX := env("RUNTIME_IMAGE_PREFIX", host_registry + "/galaxy-io/alchemy/runtime")
+# tenant secrets are encrypted at rest with this key, a fixed one for dev
+export ENCRYPTION_KEY := env("ENCRYPTION_KEY", "ZGV2LW9ubHktYWxjaGVteS1lbmNyeXB0aW9uLWtleSE=")
 # text logs read better in a terminal; the chart defaults to json
 export LOG_FORMAT := env("LOG_FORMAT", "text")
 export LOG_LEVEL := env("LOG_LEVEL", "info")

@@ -13,6 +13,7 @@ import {
   CREATE_FUNCTION_MODAL_CONTRACT_SIDE_TO_LABEL_MAP,
   CREATE_FUNCTION_MODAL_CONTRACT_SIDES,
   CREATE_FUNCTION_MODAL_DEFAULT_STATE,
+  CREATE_FUNCTION_MODAL_ENV_NAME_PATTERN,
   CREATE_FUNCTION_MODAL_IMAGE_PATTERN,
   CREATE_FUNCTION_MODAL_MEMORY_MIB_MAX,
   CREATE_FUNCTION_MODAL_MEMORY_MIB_MIN,
@@ -26,6 +27,7 @@ import {
 } from "@/pages/functions/components/create/constants";
 import {
   type CreateFunctionModalDerivedState,
+  type CreateFunctionModalEnvEntry,
   CreateFunctionModalMode,
   type CreateFunctionModalState,
   CreateFunctionModalStep,
@@ -86,7 +88,15 @@ export const createInitialCreateFunctionModalState = ({
     image: spec?.source ? "" : (spec?.image ?? ""),
     isSourceTouched: !!spec?.source,
     command: spec?.command ?? [],
-    env: Object.entries(spec?.env ?? {}).map(([key, value]) => ({ key, value })),
+    env: [
+      ...Object.entries(spec?.env ?? {}).map(([key, value]) =>
+        createCreateFunctionModalEnvEntry({ key, value }),
+      ),
+      ...Object.keys(spec?.secrets ?? {}).map((key) =>
+        createCreateFunctionModalEnvEntry({ key, isSecret: true }),
+      ),
+    ],
+    secretNames: spec?.secrets ?? {},
     contractKind,
     schemaTexts:
       contract?.case === "jsonSchema"
@@ -125,15 +135,33 @@ export const getCreateFunctionModalSteps = (
       !CREATE_FUNCTION_MODAL_SOURCE_KIND_TO_SKIPPED_STEPS_MAP[sourceKind].includes(step),
   );
 
-const getSourceHints = (state: CreateFunctionModalState) =>
-  match(state.sourceKind)
+const getEnvHints = (state: CreateFunctionModalState) => {
+  const names = state.env.map((entry) => entry.key.trim());
+  return [
+    names.some((name) => !name) ? "Every variable needs a name" : undefined,
+    names.some((name) => name && !CREATE_FUNCTION_MODAL_ENV_NAME_PATTERN.test(name))
+      ? "A variable name is letters, digits and underscores, not starting with a digit"
+      : undefined,
+    new Set(names).size !== names.length ? "Variable names must be unique" : undefined,
+    state.env.some(
+      (entry) => entry.isSecret && !entry.value && !state.secretNames[entry.key.trim()],
+    )
+      ? "Every secret needs a value"
+      : undefined,
+  ].filter((hint) => hint !== undefined);
+};
+
+const getSourceHints = (state: CreateFunctionModalState) => [
+  ...match(state.sourceKind)
     .with(FunctionSourceKind.IMAGE, () =>
       CREATE_FUNCTION_MODAL_IMAGE_PATTERN.test(state.image.trim())
         ? []
         : ["Enter an OCI image reference, such as ghcr.io/acme/enrich:1.4.0"],
     )
     .with(FunctionSourceKind.SOURCE, () => [])
-    .exhaustive();
+    .exhaustive(),
+  ...getEnvHints(state),
+];
 
 const getCodeHints = (state: CreateFunctionModalState) => {
   const bytes = state.sourceFiles.reduce(
@@ -221,3 +249,13 @@ export const getCreateFunctionModalStepSummary = (
         `${state.vcpus} vCPU, ${formatMemory(state.memoryMib)}, ${formatMillis(state.timeoutMs)}`,
     )
     .exhaustive();
+
+export const createCreateFunctionModalEnvEntry = (
+  entry: Partial<Omit<CreateFunctionModalEnvEntry, "id">> = {},
+): CreateFunctionModalEnvEntry => ({
+  id: crypto.randomUUID(),
+  key: "",
+  value: "",
+  isSecret: false,
+  ...entry,
+});

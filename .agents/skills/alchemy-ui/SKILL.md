@@ -47,6 +47,8 @@ The create wizard (`flow=CREATE_FUNCTION`, `components/create/`) is a fullscreen
 
 `?version=` on a function page selects the version the heading, workbench, contract and runtime show, and expands that row on Versions.
 
+**Environment and secrets are one widget.** On the Choose source step, under the source, a collapsible Environment `Widget` (`CreateFunctionModalEnv`) with a count `Chip` and one Add `Menu` (Variable or Secret, each with a one-line description) in its `actions`, over rows of name and value at `InputSize.SMALL` in a `Grid` (`CREATE_FUNCTION_MODAL_ENV_COLUMNS`). It is open only while it has rows: with none it stays collapsed with no caret, so it never expands onto an empty body, and Add opens it. A secret row is a `PasswordInput`, masked with the show toggle, which is what marks it, and on a new version a stored secret shows "Leave blank to keep current value" and sends only its reference. Plain rows go to `spec.env`, secret rows with a value to the request's `secret_values`. A secret's value is never shown anywhere after it is entered: the Versions details do not mention secrets, and the spec JSON on Settings holds references only. Advanced below it holds Command alone. Never add a second list for secrets, a per-row toggle, a `.env` paste or a bulk editor.
+
 ## The module surface
 
 | What | Names |

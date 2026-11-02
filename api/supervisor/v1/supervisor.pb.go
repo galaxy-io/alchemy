@@ -255,7 +255,11 @@ type InvokeRequest struct {
 	// restored from a snapshot resumes with the wall clock of the moment the
 	// snapshot was taken; the supervisor sets the guest clock from this before
 	// running the function.
-	HostTimeMs    int64 `protobuf:"varint,4,opt,name=host_time_ms,json=hostTimeMs,proto3" json:"host_time_ms,omitempty"`
+	HostTimeMs int64 `protobuf:"varint,4,opt,name=host_time_ms,json=hostTimeMs,proto3" json:"host_time_ms,omitempty"`
+	// env is set on the function process for this invocation, over the
+	// environment Start gave it: the secrets the version names, fetched for
+	// the host after any restore, so they are never in a snapshot.
+	Env           map[string]string `protobuf:"bytes,5,rep,name=env,proto3" json:"env,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -316,6 +320,13 @@ func (x *InvokeRequest) GetHostTimeMs() int64 {
 		return x.HostTimeMs
 	}
 	return 0
+}
+
+func (x *InvokeRequest) GetEnv() map[string]string {
+	if x != nil {
+		return x.Env
+	}
+	return nil
 }
 
 // Failure is mapped by the host onto functions.v1.FunctionError. type is the
@@ -581,14 +592,18 @@ const file_supervisor_v1_supervisor_proto_rawDesc = "" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
 	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"(\n" +
 	"\rStartResponse\x12\x17\n" +
-	"\ainit_us\x18\x01 \x01(\x03R\x06initUs\"\x8b\x01\n" +
+	"\ainit_us\x18\x01 \x01(\x03R\x06initUs\"\xfc\x01\n" +
 	"\rInvokeRequest\x12#\n" +
 	"\rinvocation_id\x18\x01 \x01(\tR\finvocationId\x12\x14\n" +
 	"\x05input\x18\x02 \x01(\fR\x05input\x12\x1d\n" +
 	"\n" +
 	"timeout_ms\x18\x03 \x01(\x03R\ttimeoutMs\x12 \n" +
 	"\fhost_time_ms\x18\x04 \x01(\x03R\n" +
-	"hostTimeMs\"\x84\x01\n" +
+	"hostTimeMs\x127\n" +
+	"\x03env\x18\x05 \x03(\v2%.supervisor.v1.InvokeRequest.EnvEntryR\x03env\x1a6\n" +
+	"\bEnvEntry\x12\x10\n" +
+	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\x84\x01\n" +
 	"\aFailure\x12.\n" +
 	"\x04kind\x18\x01 \x01(\x0e2\x1a.supervisor.v1.FailureKindR\x04kind\x12\x18\n" +
 	"\amessage\x18\x02 \x01(\tR\amessage\x12\x12\n" +
@@ -627,7 +642,7 @@ func file_supervisor_v1_supervisor_proto_rawDescGZIP() []byte {
 }
 
 var file_supervisor_v1_supervisor_proto_enumTypes = make([]protoimpl.EnumInfo, 2)
-var file_supervisor_v1_supervisor_proto_msgTypes = make([]protoimpl.MessageInfo, 7)
+var file_supervisor_v1_supervisor_proto_msgTypes = make([]protoimpl.MessageInfo, 8)
 var file_supervisor_v1_supervisor_proto_goTypes = []any{
 	(Protocol)(0),          // 0: supervisor.v1.Protocol
 	(FailureKind)(0),       // 1: supervisor.v1.FailureKind
@@ -638,18 +653,20 @@ var file_supervisor_v1_supervisor_proto_goTypes = []any{
 	(*InvokeResult)(nil),   // 6: supervisor.v1.InvokeResult
 	(*InvokeResponse)(nil), // 7: supervisor.v1.InvokeResponse
 	nil,                    // 8: supervisor.v1.StartRequest.EnvEntry
+	nil,                    // 9: supervisor.v1.InvokeRequest.EnvEntry
 }
 var file_supervisor_v1_supervisor_proto_depIdxs = []int32{
 	8, // 0: supervisor.v1.StartRequest.env:type_name -> supervisor.v1.StartRequest.EnvEntry
 	0, // 1: supervisor.v1.StartRequest.protocol:type_name -> supervisor.v1.Protocol
-	1, // 2: supervisor.v1.Failure.kind:type_name -> supervisor.v1.FailureKind
-	5, // 3: supervisor.v1.InvokeResult.failure:type_name -> supervisor.v1.Failure
-	6, // 4: supervisor.v1.InvokeResponse.result:type_name -> supervisor.v1.InvokeResult
-	5, // [5:5] is the sub-list for method output_type
-	5, // [5:5] is the sub-list for method input_type
-	5, // [5:5] is the sub-list for extension type_name
-	5, // [5:5] is the sub-list for extension extendee
-	0, // [0:5] is the sub-list for field type_name
+	9, // 2: supervisor.v1.InvokeRequest.env:type_name -> supervisor.v1.InvokeRequest.EnvEntry
+	1, // 3: supervisor.v1.Failure.kind:type_name -> supervisor.v1.FailureKind
+	5, // 4: supervisor.v1.InvokeResult.failure:type_name -> supervisor.v1.Failure
+	6, // 5: supervisor.v1.InvokeResponse.result:type_name -> supervisor.v1.InvokeResult
+	6, // [6:6] is the sub-list for method output_type
+	6, // [6:6] is the sub-list for method input_type
+	6, // [6:6] is the sub-list for extension type_name
+	6, // [6:6] is the sub-list for extension extendee
+	0, // [0:6] is the sub-list for field type_name
 }
 
 func init() { file_supervisor_v1_supervisor_proto_init() }
@@ -671,7 +688,7 @@ func file_supervisor_v1_supervisor_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_supervisor_v1_supervisor_proto_rawDesc), len(file_supervisor_v1_supervisor_proto_rawDesc)),
 			NumEnums:      2,
-			NumMessages:   7,
+			NumMessages:   8,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

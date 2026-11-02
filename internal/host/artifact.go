@@ -18,6 +18,8 @@ import (
 // that went into it. Every version is its own artifact, with its own
 // instances and snapshot, even when its spec matches another's. The image
 // digest is in it rather than the tag, so a moved tag is a new artifact.
+// Secrets are in it by name only: the values are fetched per invocation and
+// never part of the artifact.
 func artifactID(a *hostv1.Artifact) string {
 	var sb strings.Builder
 	fmt.Fprintf(&sb, "%s\x00%s\x00%d\x00", a.GetTenantId(), a.GetFunctionId(), a.GetVersion())
@@ -35,6 +37,10 @@ func artifactID(a *hostv1.Artifact) string {
 	for _, l := range a.GetLayers() {
 		sb.WriteString(l.GetSha256())
 		sb.WriteByte(0)
+	}
+	sb.WriteByte(1)
+	for _, k := range slices.Sorted(maps.Keys(a.GetSecrets())) {
+		fmt.Fprintf(&sb, "%s=%s\x00", k, a.GetSecrets()[k])
 	}
 	sum := sha256.Sum256([]byte(sb.String()))
 	return hex.EncodeToString(sum[:16])
@@ -59,6 +65,7 @@ func toProto(req *hostv1.BuildRequest, a *driver.Artifact) *hostv1.Artifact {
 		MemoryMib:   a.MemoryMiB,
 		Layers:      req.GetLayers(),
 		Contract:    req.GetSpec().GetContract(),
+		Secrets:     req.GetSpec().GetSecrets(),
 	}
 	p.Id = artifactID(p)
 	return p

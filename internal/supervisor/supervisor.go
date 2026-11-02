@@ -12,6 +12,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"sort"
 	"strings"
 	"sync"
@@ -117,7 +118,11 @@ func (s *Service) exec(ctx context.Context, req *supervisorv1.InvokeRequest, log
 	// Resolve the command against the function's PATH, not this process's:
 	// as PID 1 the supervisor has no useful environment of its own.
 	cmd := exec.CommandContext(runCtx, lookPath(s.argv[0], s.env), s.argv[1:]...) //nolint:gosec // running the function is the job
-	cmd.Env = s.env
+	// The invocation's env comes last, so it wins over Start's.
+	cmd.Env = slices.Clone(s.env)
+	for k, v := range req.GetEnv() {
+		cmd.Env = append(cmd.Env, k+"="+v)
+	}
 	cmd.Dir = s.dir
 	cmd.Stdin = bytes.NewReader(req.GetInput())
 	cmd.Stdout = stdout

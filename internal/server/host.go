@@ -43,6 +43,7 @@ func (s *Service) listen() error {
 		{bus.ServerHeartbeatWildcard, s.onServerHeartbeat, false},
 		{bus.ServerStateSubject(s.cfg.Name), s.onInvocationState, false},
 		{bus.ServerInvocationsSubject, s.handleActiveInvocations, true},
+		{bus.ServerSecretsSubject, s.handleSecrets, true},
 	}
 	for _, sb := range subs {
 		var sub *bus.Subscription
