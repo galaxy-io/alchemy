@@ -24,6 +24,9 @@ const (
 	// ServerSecretsSubject is where hosts ask any server for the values of
 	// a function's secrets.
 	ServerSecretsSubject = "server.secrets"
+	// HostSecretsInvalidateSubject is where a server tells every host to drop
+	// cached values for rotated secrets. It fans out, so no queue group.
+	HostSecretsInvalidateSubject = "host.secrets.invalidate"
 )
 
 // HostInvokeSubject is where host name takes invocations.

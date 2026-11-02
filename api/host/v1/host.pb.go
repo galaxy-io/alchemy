@@ -327,6 +327,61 @@ func (x *SecretsResponse) GetError() *Error {
 	return nil
 }
 
+// SecretsInvalidate tells every host to drop its cached values for these
+// secret names, so a rotated value is refetched on the next invocation
+// instead of waiting out the refresh interval.
+type SecretsInvalidate struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	TenantId      string                 `protobuf:"bytes,1,opt,name=tenant_id,json=tenantId,proto3" json:"tenant_id,omitempty"`
+	Names         []string               `protobuf:"bytes,2,rep,name=names,proto3" json:"names,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SecretsInvalidate) Reset() {
+	*x = SecretsInvalidate{}
+	mi := &file_host_v1_host_proto_msgTypes[3]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SecretsInvalidate) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SecretsInvalidate) ProtoMessage() {}
+
+func (x *SecretsInvalidate) ProtoReflect() protoreflect.Message {
+	mi := &file_host_v1_host_proto_msgTypes[3]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SecretsInvalidate.ProtoReflect.Descriptor instead.
+func (*SecretsInvalidate) Descriptor() ([]byte, []int) {
+	return file_host_v1_host_proto_rawDescGZIP(), []int{3}
+}
+
+func (x *SecretsInvalidate) GetTenantId() string {
+	if x != nil {
+		return x.TenantId
+	}
+	return ""
+}
+
+func (x *SecretsInvalidate) GetNames() []string {
+	if x != nil {
+		return x.Names
+	}
+	return nil
+}
+
 // Layer is a tar archive, plain or gzipped, in the artifacts bucket that a
 // build extracts over its image. It is how files that are not in the image,
 // such as a function built from source, reach the root filesystem.
@@ -343,7 +398,7 @@ type Layer struct {
 
 func (x *Layer) Reset() {
 	*x = Layer{}
-	mi := &file_host_v1_host_proto_msgTypes[3]
+	mi := &file_host_v1_host_proto_msgTypes[4]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -355,7 +410,7 @@ func (x *Layer) String() string {
 func (*Layer) ProtoMessage() {}
 
 func (x *Layer) ProtoReflect() protoreflect.Message {
-	mi := &file_host_v1_host_proto_msgTypes[3]
+	mi := &file_host_v1_host_proto_msgTypes[4]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -368,7 +423,7 @@ func (x *Layer) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Layer.ProtoReflect.Descriptor instead.
 func (*Layer) Descriptor() ([]byte, []int) {
-	return file_host_v1_host_proto_rawDescGZIP(), []int{3}
+	return file_host_v1_host_proto_rawDescGZIP(), []int{4}
 }
 
 func (x *Layer) GetKey() string {
@@ -397,7 +452,7 @@ type Error struct {
 
 func (x *Error) Reset() {
 	*x = Error{}
-	mi := &file_host_v1_host_proto_msgTypes[4]
+	mi := &file_host_v1_host_proto_msgTypes[5]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -409,7 +464,7 @@ func (x *Error) String() string {
 func (*Error) ProtoMessage() {}
 
 func (x *Error) ProtoReflect() protoreflect.Message {
-	mi := &file_host_v1_host_proto_msgTypes[4]
+	mi := &file_host_v1_host_proto_msgTypes[5]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -422,7 +477,7 @@ func (x *Error) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Error.ProtoReflect.Descriptor instead.
 func (*Error) Descriptor() ([]byte, []int) {
-	return file_host_v1_host_proto_rawDescGZIP(), []int{4}
+	return file_host_v1_host_proto_rawDescGZIP(), []int{5}
 }
 
 func (x *Error) GetCode() string {
@@ -453,7 +508,7 @@ type BuildRequest struct {
 
 func (x *BuildRequest) Reset() {
 	*x = BuildRequest{}
-	mi := &file_host_v1_host_proto_msgTypes[5]
+	mi := &file_host_v1_host_proto_msgTypes[6]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -465,7 +520,7 @@ func (x *BuildRequest) String() string {
 func (*BuildRequest) ProtoMessage() {}
 
 func (x *BuildRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_host_v1_host_proto_msgTypes[5]
+	mi := &file_host_v1_host_proto_msgTypes[6]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -478,7 +533,7 @@ func (x *BuildRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use BuildRequest.ProtoReflect.Descriptor instead.
 func (*BuildRequest) Descriptor() ([]byte, []int) {
-	return file_host_v1_host_proto_rawDescGZIP(), []int{5}
+	return file_host_v1_host_proto_rawDescGZIP(), []int{6}
 }
 
 func (x *BuildRequest) GetTenantId() string {
@@ -531,7 +586,7 @@ type BuildResponse struct {
 
 func (x *BuildResponse) Reset() {
 	*x = BuildResponse{}
-	mi := &file_host_v1_host_proto_msgTypes[6]
+	mi := &file_host_v1_host_proto_msgTypes[7]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -543,7 +598,7 @@ func (x *BuildResponse) String() string {
 func (*BuildResponse) ProtoMessage() {}
 
 func (x *BuildResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_host_v1_host_proto_msgTypes[6]
+	mi := &file_host_v1_host_proto_msgTypes[7]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -556,7 +611,7 @@ func (x *BuildResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use BuildResponse.ProtoReflect.Descriptor instead.
 func (*BuildResponse) Descriptor() ([]byte, []int) {
-	return file_host_v1_host_proto_rawDescGZIP(), []int{6}
+	return file_host_v1_host_proto_rawDescGZIP(), []int{7}
 }
 
 func (x *BuildResponse) GetResult() isBuildResponse_Result {
@@ -637,7 +692,7 @@ type InvokeRequest struct {
 
 func (x *InvokeRequest) Reset() {
 	*x = InvokeRequest{}
-	mi := &file_host_v1_host_proto_msgTypes[7]
+	mi := &file_host_v1_host_proto_msgTypes[8]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -649,7 +704,7 @@ func (x *InvokeRequest) String() string {
 func (*InvokeRequest) ProtoMessage() {}
 
 func (x *InvokeRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_host_v1_host_proto_msgTypes[7]
+	mi := &file_host_v1_host_proto_msgTypes[8]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -662,7 +717,7 @@ func (x *InvokeRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use InvokeRequest.ProtoReflect.Descriptor instead.
 func (*InvokeRequest) Descriptor() ([]byte, []int) {
-	return file_host_v1_host_proto_rawDescGZIP(), []int{7}
+	return file_host_v1_host_proto_rawDescGZIP(), []int{8}
 }
 
 func (x *InvokeRequest) GetInvocation() *v1.Invocation {
@@ -743,7 +798,7 @@ type InvokeResponse struct {
 
 func (x *InvokeResponse) Reset() {
 	*x = InvokeResponse{}
-	mi := &file_host_v1_host_proto_msgTypes[8]
+	mi := &file_host_v1_host_proto_msgTypes[9]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -755,7 +810,7 @@ func (x *InvokeResponse) String() string {
 func (*InvokeResponse) ProtoMessage() {}
 
 func (x *InvokeResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_host_v1_host_proto_msgTypes[8]
+	mi := &file_host_v1_host_proto_msgTypes[9]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -768,7 +823,7 @@ func (x *InvokeResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use InvokeResponse.ProtoReflect.Descriptor instead.
 func (*InvokeResponse) Descriptor() ([]byte, []int) {
-	return file_host_v1_host_proto_rawDescGZIP(), []int{8}
+	return file_host_v1_host_proto_rawDescGZIP(), []int{9}
 }
 
 func (x *InvokeResponse) GetResult() isInvokeResponse_Result {
@@ -870,7 +925,7 @@ type InvocationEvent struct {
 
 func (x *InvocationEvent) Reset() {
 	*x = InvocationEvent{}
-	mi := &file_host_v1_host_proto_msgTypes[9]
+	mi := &file_host_v1_host_proto_msgTypes[10]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -882,7 +937,7 @@ func (x *InvocationEvent) String() string {
 func (*InvocationEvent) ProtoMessage() {}
 
 func (x *InvocationEvent) ProtoReflect() protoreflect.Message {
-	mi := &file_host_v1_host_proto_msgTypes[9]
+	mi := &file_host_v1_host_proto_msgTypes[10]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -895,7 +950,7 @@ func (x *InvocationEvent) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use InvocationEvent.ProtoReflect.Descriptor instead.
 func (*InvocationEvent) Descriptor() ([]byte, []int) {
-	return file_host_v1_host_proto_rawDescGZIP(), []int{9}
+	return file_host_v1_host_proto_rawDescGZIP(), []int{10}
 }
 
 func (x *InvocationEvent) GetInvocationId() string {
@@ -941,7 +996,7 @@ type DescribeRequest struct {
 
 func (x *DescribeRequest) Reset() {
 	*x = DescribeRequest{}
-	mi := &file_host_v1_host_proto_msgTypes[10]
+	mi := &file_host_v1_host_proto_msgTypes[11]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -953,7 +1008,7 @@ func (x *DescribeRequest) String() string {
 func (*DescribeRequest) ProtoMessage() {}
 
 func (x *DescribeRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_host_v1_host_proto_msgTypes[10]
+	mi := &file_host_v1_host_proto_msgTypes[11]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -966,7 +1021,7 @@ func (x *DescribeRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DescribeRequest.ProtoReflect.Descriptor instead.
 func (*DescribeRequest) Descriptor() ([]byte, []int) {
-	return file_host_v1_host_proto_rawDescGZIP(), []int{10}
+	return file_host_v1_host_proto_rawDescGZIP(), []int{11}
 }
 
 type DescribeResponse struct {
@@ -978,7 +1033,7 @@ type DescribeResponse struct {
 
 func (x *DescribeResponse) Reset() {
 	*x = DescribeResponse{}
-	mi := &file_host_v1_host_proto_msgTypes[11]
+	mi := &file_host_v1_host_proto_msgTypes[12]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -990,7 +1045,7 @@ func (x *DescribeResponse) String() string {
 func (*DescribeResponse) ProtoMessage() {}
 
 func (x *DescribeResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_host_v1_host_proto_msgTypes[11]
+	mi := &file_host_v1_host_proto_msgTypes[12]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1003,7 +1058,7 @@ func (x *DescribeResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DescribeResponse.ProtoReflect.Descriptor instead.
 func (*DescribeResponse) Descriptor() ([]byte, []int) {
-	return file_host_v1_host_proto_rawDescGZIP(), []int{11}
+	return file_host_v1_host_proto_rawDescGZIP(), []int{12}
 }
 
 func (x *DescribeResponse) GetHost() *v1.Host {
@@ -1021,7 +1076,7 @@ type ListInstancesRequest struct {
 
 func (x *ListInstancesRequest) Reset() {
 	*x = ListInstancesRequest{}
-	mi := &file_host_v1_host_proto_msgTypes[12]
+	mi := &file_host_v1_host_proto_msgTypes[13]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1033,7 +1088,7 @@ func (x *ListInstancesRequest) String() string {
 func (*ListInstancesRequest) ProtoMessage() {}
 
 func (x *ListInstancesRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_host_v1_host_proto_msgTypes[12]
+	mi := &file_host_v1_host_proto_msgTypes[13]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1046,7 +1101,7 @@ func (x *ListInstancesRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListInstancesRequest.ProtoReflect.Descriptor instead.
 func (*ListInstancesRequest) Descriptor() ([]byte, []int) {
-	return file_host_v1_host_proto_rawDescGZIP(), []int{12}
+	return file_host_v1_host_proto_rawDescGZIP(), []int{13}
 }
 
 type ListInstancesResponse struct {
@@ -1058,7 +1113,7 @@ type ListInstancesResponse struct {
 
 func (x *ListInstancesResponse) Reset() {
 	*x = ListInstancesResponse{}
-	mi := &file_host_v1_host_proto_msgTypes[13]
+	mi := &file_host_v1_host_proto_msgTypes[14]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1070,7 +1125,7 @@ func (x *ListInstancesResponse) String() string {
 func (*ListInstancesResponse) ProtoMessage() {}
 
 func (x *ListInstancesResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_host_v1_host_proto_msgTypes[13]
+	mi := &file_host_v1_host_proto_msgTypes[14]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1083,7 +1138,7 @@ func (x *ListInstancesResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListInstancesResponse.ProtoReflect.Descriptor instead.
 func (*ListInstancesResponse) Descriptor() ([]byte, []int) {
-	return file_host_v1_host_proto_rawDescGZIP(), []int{13}
+	return file_host_v1_host_proto_rawDescGZIP(), []int{14}
 }
 
 func (x *ListInstancesResponse) GetInstances() []*v1.Instance {
@@ -1106,7 +1161,7 @@ type Heartbeat struct {
 
 func (x *Heartbeat) Reset() {
 	*x = Heartbeat{}
-	mi := &file_host_v1_host_proto_msgTypes[14]
+	mi := &file_host_v1_host_proto_msgTypes[15]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1118,7 +1173,7 @@ func (x *Heartbeat) String() string {
 func (*Heartbeat) ProtoMessage() {}
 
 func (x *Heartbeat) ProtoReflect() protoreflect.Message {
-	mi := &file_host_v1_host_proto_msgTypes[14]
+	mi := &file_host_v1_host_proto_msgTypes[15]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1131,7 +1186,7 @@ func (x *Heartbeat) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Heartbeat.ProtoReflect.Descriptor instead.
 func (*Heartbeat) Descriptor() ([]byte, []int) {
-	return file_host_v1_host_proto_rawDescGZIP(), []int{14}
+	return file_host_v1_host_proto_rawDescGZIP(), []int{15}
 }
 
 func (x *Heartbeat) GetHost() *v1.Host {
@@ -1162,7 +1217,7 @@ type ArtifactState struct {
 
 func (x *ArtifactState) Reset() {
 	*x = ArtifactState{}
-	mi := &file_host_v1_host_proto_msgTypes[15]
+	mi := &file_host_v1_host_proto_msgTypes[16]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1174,7 +1229,7 @@ func (x *ArtifactState) String() string {
 func (*ArtifactState) ProtoMessage() {}
 
 func (x *ArtifactState) ProtoReflect() protoreflect.Message {
-	mi := &file_host_v1_host_proto_msgTypes[15]
+	mi := &file_host_v1_host_proto_msgTypes[16]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1187,7 +1242,7 @@ func (x *ArtifactState) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ArtifactState.ProtoReflect.Descriptor instead.
 func (*ArtifactState) Descriptor() ([]byte, []int) {
-	return file_host_v1_host_proto_rawDescGZIP(), []int{15}
+	return file_host_v1_host_proto_rawDescGZIP(), []int{16}
 }
 
 func (x *ArtifactState) GetId() string {
@@ -1225,7 +1280,7 @@ type ServerHeartbeat struct {
 
 func (x *ServerHeartbeat) Reset() {
 	*x = ServerHeartbeat{}
-	mi := &file_host_v1_host_proto_msgTypes[16]
+	mi := &file_host_v1_host_proto_msgTypes[17]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1237,7 +1292,7 @@ func (x *ServerHeartbeat) String() string {
 func (*ServerHeartbeat) ProtoMessage() {}
 
 func (x *ServerHeartbeat) ProtoReflect() protoreflect.Message {
-	mi := &file_host_v1_host_proto_msgTypes[16]
+	mi := &file_host_v1_host_proto_msgTypes[17]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1250,7 +1305,7 @@ func (x *ServerHeartbeat) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ServerHeartbeat.ProtoReflect.Descriptor instead.
 func (*ServerHeartbeat) Descriptor() ([]byte, []int) {
-	return file_host_v1_host_proto_rawDescGZIP(), []int{16}
+	return file_host_v1_host_proto_rawDescGZIP(), []int{17}
 }
 
 func (x *ServerHeartbeat) GetName() string {
@@ -1276,7 +1331,7 @@ type ActiveInvocationsRequest struct {
 
 func (x *ActiveInvocationsRequest) Reset() {
 	*x = ActiveInvocationsRequest{}
-	mi := &file_host_v1_host_proto_msgTypes[17]
+	mi := &file_host_v1_host_proto_msgTypes[18]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1288,7 +1343,7 @@ func (x *ActiveInvocationsRequest) String() string {
 func (*ActiveInvocationsRequest) ProtoMessage() {}
 
 func (x *ActiveInvocationsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_host_v1_host_proto_msgTypes[17]
+	mi := &file_host_v1_host_proto_msgTypes[18]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1301,7 +1356,7 @@ func (x *ActiveInvocationsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ActiveInvocationsRequest.ProtoReflect.Descriptor instead.
 func (*ActiveInvocationsRequest) Descriptor() ([]byte, []int) {
-	return file_host_v1_host_proto_rawDescGZIP(), []int{17}
+	return file_host_v1_host_proto_rawDescGZIP(), []int{18}
 }
 
 type ActiveInvocationsResponse struct {
@@ -1315,7 +1370,7 @@ type ActiveInvocationsResponse struct {
 
 func (x *ActiveInvocationsResponse) Reset() {
 	*x = ActiveInvocationsResponse{}
-	mi := &file_host_v1_host_proto_msgTypes[18]
+	mi := &file_host_v1_host_proto_msgTypes[19]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1327,7 +1382,7 @@ func (x *ActiveInvocationsResponse) String() string {
 func (*ActiveInvocationsResponse) ProtoMessage() {}
 
 func (x *ActiveInvocationsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_host_v1_host_proto_msgTypes[18]
+	mi := &file_host_v1_host_proto_msgTypes[19]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1340,7 +1395,7 @@ func (x *ActiveInvocationsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ActiveInvocationsResponse.ProtoReflect.Descriptor instead.
 func (*ActiveInvocationsResponse) Descriptor() ([]byte, []int) {
-	return file_host_v1_host_proto_rawDescGZIP(), []int{18}
+	return file_host_v1_host_proto_rawDescGZIP(), []int{19}
 }
 
 func (x *ActiveInvocationsResponse) GetInvocations() []*v1.Invocation {
@@ -1362,7 +1417,7 @@ type InvocationRecords struct {
 
 func (x *InvocationRecords) Reset() {
 	*x = InvocationRecords{}
-	mi := &file_host_v1_host_proto_msgTypes[19]
+	mi := &file_host_v1_host_proto_msgTypes[20]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1374,7 +1429,7 @@ func (x *InvocationRecords) String() string {
 func (*InvocationRecords) ProtoMessage() {}
 
 func (x *InvocationRecords) ProtoReflect() protoreflect.Message {
-	mi := &file_host_v1_host_proto_msgTypes[19]
+	mi := &file_host_v1_host_proto_msgTypes[20]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1387,7 +1442,7 @@ func (x *InvocationRecords) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use InvocationRecords.ProtoReflect.Descriptor instead.
 func (*InvocationRecords) Descriptor() ([]byte, []int) {
-	return file_host_v1_host_proto_rawDescGZIP(), []int{19}
+	return file_host_v1_host_proto_rawDescGZIP(), []int{20}
 }
 
 func (x *InvocationRecords) GetInvocations() []*v1.Invocation {
@@ -1440,7 +1495,10 @@ const file_host_v1_host_proto_rawDesc = "" +
 	"\x05error\x18\x02 \x01(\v2\x0e.host.v1.ErrorR\x05error\x1a9\n" +
 	"\vValuesEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
-	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"1\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"F\n" +
+	"\x11SecretsInvalidate\x12\x1b\n" +
+	"\ttenant_id\x18\x01 \x01(\tR\btenantId\x12\x14\n" +
+	"\x05names\x18\x02 \x03(\tR\x05names\"1\n" +
 	"\x05Layer\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x16\n" +
 	"\x06sha256\x18\x02 \x01(\tR\x06sha256\"5\n" +
@@ -1528,66 +1586,67 @@ func file_host_v1_host_proto_rawDescGZIP() []byte {
 	return file_host_v1_host_proto_rawDescData
 }
 
-var file_host_v1_host_proto_msgTypes = make([]protoimpl.MessageInfo, 23)
+var file_host_v1_host_proto_msgTypes = make([]protoimpl.MessageInfo, 24)
 var file_host_v1_host_proto_goTypes = []any{
 	(*Artifact)(nil),                  // 0: host.v1.Artifact
 	(*SecretsRequest)(nil),            // 1: host.v1.SecretsRequest
 	(*SecretsResponse)(nil),           // 2: host.v1.SecretsResponse
-	(*Layer)(nil),                     // 3: host.v1.Layer
-	(*Error)(nil),                     // 4: host.v1.Error
-	(*BuildRequest)(nil),              // 5: host.v1.BuildRequest
-	(*BuildResponse)(nil),             // 6: host.v1.BuildResponse
-	(*InvokeRequest)(nil),             // 7: host.v1.InvokeRequest
-	(*InvokeResponse)(nil),            // 8: host.v1.InvokeResponse
-	(*InvocationEvent)(nil),           // 9: host.v1.InvocationEvent
-	(*DescribeRequest)(nil),           // 10: host.v1.DescribeRequest
-	(*DescribeResponse)(nil),          // 11: host.v1.DescribeResponse
-	(*ListInstancesRequest)(nil),      // 12: host.v1.ListInstancesRequest
-	(*ListInstancesResponse)(nil),     // 13: host.v1.ListInstancesResponse
-	(*Heartbeat)(nil),                 // 14: host.v1.Heartbeat
-	(*ArtifactState)(nil),             // 15: host.v1.ArtifactState
-	(*ServerHeartbeat)(nil),           // 16: host.v1.ServerHeartbeat
-	(*ActiveInvocationsRequest)(nil),  // 17: host.v1.ActiveInvocationsRequest
-	(*ActiveInvocationsResponse)(nil), // 18: host.v1.ActiveInvocationsResponse
-	(*InvocationRecords)(nil),         // 19: host.v1.InvocationRecords
-	nil,                               // 20: host.v1.Artifact.EnvEntry
-	nil,                               // 21: host.v1.Artifact.SecretsEntry
-	nil,                               // 22: host.v1.SecretsResponse.ValuesEntry
-	(v1.InvocationProtocol)(0),        // 23: functions.v1.InvocationProtocol
-	(*v1.Contract)(nil),               // 24: functions.v1.Contract
-	(*v1.FunctionSpec)(nil),           // 25: functions.v1.FunctionSpec
-	(*v1.Invocation)(nil),             // 26: functions.v1.Invocation
-	(*v1.FunctionError)(nil),          // 27: functions.v1.FunctionError
-	(v1.StartKind)(0),                 // 28: functions.v1.StartKind
-	(v1.InvocationStatus)(0),          // 29: functions.v1.InvocationStatus
-	(*v1.Host)(nil),                   // 30: functions.v1.Host
-	(*v1.Instance)(nil),               // 31: functions.v1.Instance
+	(*SecretsInvalidate)(nil),         // 3: host.v1.SecretsInvalidate
+	(*Layer)(nil),                     // 4: host.v1.Layer
+	(*Error)(nil),                     // 5: host.v1.Error
+	(*BuildRequest)(nil),              // 6: host.v1.BuildRequest
+	(*BuildResponse)(nil),             // 7: host.v1.BuildResponse
+	(*InvokeRequest)(nil),             // 8: host.v1.InvokeRequest
+	(*InvokeResponse)(nil),            // 9: host.v1.InvokeResponse
+	(*InvocationEvent)(nil),           // 10: host.v1.InvocationEvent
+	(*DescribeRequest)(nil),           // 11: host.v1.DescribeRequest
+	(*DescribeResponse)(nil),          // 12: host.v1.DescribeResponse
+	(*ListInstancesRequest)(nil),      // 13: host.v1.ListInstancesRequest
+	(*ListInstancesResponse)(nil),     // 14: host.v1.ListInstancesResponse
+	(*Heartbeat)(nil),                 // 15: host.v1.Heartbeat
+	(*ArtifactState)(nil),             // 16: host.v1.ArtifactState
+	(*ServerHeartbeat)(nil),           // 17: host.v1.ServerHeartbeat
+	(*ActiveInvocationsRequest)(nil),  // 18: host.v1.ActiveInvocationsRequest
+	(*ActiveInvocationsResponse)(nil), // 19: host.v1.ActiveInvocationsResponse
+	(*InvocationRecords)(nil),         // 20: host.v1.InvocationRecords
+	nil,                               // 21: host.v1.Artifact.EnvEntry
+	nil,                               // 22: host.v1.Artifact.SecretsEntry
+	nil,                               // 23: host.v1.SecretsResponse.ValuesEntry
+	(v1.InvocationProtocol)(0),        // 24: functions.v1.InvocationProtocol
+	(*v1.Contract)(nil),               // 25: functions.v1.Contract
+	(*v1.FunctionSpec)(nil),           // 26: functions.v1.FunctionSpec
+	(*v1.Invocation)(nil),             // 27: functions.v1.Invocation
+	(*v1.FunctionError)(nil),          // 28: functions.v1.FunctionError
+	(v1.StartKind)(0),                 // 29: functions.v1.StartKind
+	(v1.InvocationStatus)(0),          // 30: functions.v1.InvocationStatus
+	(*v1.Host)(nil),                   // 31: functions.v1.Host
+	(*v1.Instance)(nil),               // 32: functions.v1.Instance
 }
 var file_host_v1_host_proto_depIdxs = []int32{
-	20, // 0: host.v1.Artifact.env:type_name -> host.v1.Artifact.EnvEntry
-	23, // 1: host.v1.Artifact.protocol:type_name -> functions.v1.InvocationProtocol
-	3,  // 2: host.v1.Artifact.layers:type_name -> host.v1.Layer
-	24, // 3: host.v1.Artifact.contract:type_name -> functions.v1.Contract
-	21, // 4: host.v1.Artifact.secrets:type_name -> host.v1.Artifact.SecretsEntry
-	22, // 5: host.v1.SecretsResponse.values:type_name -> host.v1.SecretsResponse.ValuesEntry
-	4,  // 6: host.v1.SecretsResponse.error:type_name -> host.v1.Error
-	25, // 7: host.v1.BuildRequest.spec:type_name -> functions.v1.FunctionSpec
-	3,  // 8: host.v1.BuildRequest.layers:type_name -> host.v1.Layer
+	21, // 0: host.v1.Artifact.env:type_name -> host.v1.Artifact.EnvEntry
+	24, // 1: host.v1.Artifact.protocol:type_name -> functions.v1.InvocationProtocol
+	4,  // 2: host.v1.Artifact.layers:type_name -> host.v1.Layer
+	25, // 3: host.v1.Artifact.contract:type_name -> functions.v1.Contract
+	22, // 4: host.v1.Artifact.secrets:type_name -> host.v1.Artifact.SecretsEntry
+	23, // 5: host.v1.SecretsResponse.values:type_name -> host.v1.SecretsResponse.ValuesEntry
+	5,  // 6: host.v1.SecretsResponse.error:type_name -> host.v1.Error
+	26, // 7: host.v1.BuildRequest.spec:type_name -> functions.v1.FunctionSpec
+	4,  // 8: host.v1.BuildRequest.layers:type_name -> host.v1.Layer
 	0,  // 9: host.v1.BuildResponse.artifact:type_name -> host.v1.Artifact
-	4,  // 10: host.v1.BuildResponse.error:type_name -> host.v1.Error
-	26, // 11: host.v1.InvokeRequest.invocation:type_name -> functions.v1.Invocation
+	5,  // 10: host.v1.BuildResponse.error:type_name -> host.v1.Error
+	27, // 11: host.v1.InvokeRequest.invocation:type_name -> functions.v1.Invocation
 	0,  // 12: host.v1.InvokeRequest.artifact:type_name -> host.v1.Artifact
-	27, // 13: host.v1.InvokeResponse.function_error:type_name -> functions.v1.FunctionError
-	4,  // 14: host.v1.InvokeResponse.error:type_name -> host.v1.Error
-	28, // 15: host.v1.InvokeResponse.start_kind:type_name -> functions.v1.StartKind
-	29, // 16: host.v1.InvocationEvent.status:type_name -> functions.v1.InvocationStatus
-	28, // 17: host.v1.InvocationEvent.start_kind:type_name -> functions.v1.StartKind
-	30, // 18: host.v1.DescribeResponse.host:type_name -> functions.v1.Host
-	31, // 19: host.v1.ListInstancesResponse.instances:type_name -> functions.v1.Instance
-	30, // 20: host.v1.Heartbeat.host:type_name -> functions.v1.Host
-	15, // 21: host.v1.Heartbeat.artifacts:type_name -> host.v1.ArtifactState
-	26, // 22: host.v1.ActiveInvocationsResponse.invocations:type_name -> functions.v1.Invocation
-	26, // 23: host.v1.InvocationRecords.invocations:type_name -> functions.v1.Invocation
+	28, // 13: host.v1.InvokeResponse.function_error:type_name -> functions.v1.FunctionError
+	5,  // 14: host.v1.InvokeResponse.error:type_name -> host.v1.Error
+	29, // 15: host.v1.InvokeResponse.start_kind:type_name -> functions.v1.StartKind
+	30, // 16: host.v1.InvocationEvent.status:type_name -> functions.v1.InvocationStatus
+	29, // 17: host.v1.InvocationEvent.start_kind:type_name -> functions.v1.StartKind
+	31, // 18: host.v1.DescribeResponse.host:type_name -> functions.v1.Host
+	32, // 19: host.v1.ListInstancesResponse.instances:type_name -> functions.v1.Instance
+	31, // 20: host.v1.Heartbeat.host:type_name -> functions.v1.Host
+	16, // 21: host.v1.Heartbeat.artifacts:type_name -> host.v1.ArtifactState
+	27, // 22: host.v1.ActiveInvocationsResponse.invocations:type_name -> functions.v1.Invocation
+	27, // 23: host.v1.InvocationRecords.invocations:type_name -> functions.v1.Invocation
 	24, // [24:24] is the sub-list for method output_type
 	24, // [24:24] is the sub-list for method input_type
 	24, // [24:24] is the sub-list for extension type_name
@@ -1600,11 +1659,11 @@ func file_host_v1_host_proto_init() {
 	if File_host_v1_host_proto != nil {
 		return
 	}
-	file_host_v1_host_proto_msgTypes[6].OneofWrappers = []any{
+	file_host_v1_host_proto_msgTypes[7].OneofWrappers = []any{
 		(*BuildResponse_Artifact)(nil),
 		(*BuildResponse_Error)(nil),
 	}
-	file_host_v1_host_proto_msgTypes[8].OneofWrappers = []any{
+	file_host_v1_host_proto_msgTypes[9].OneofWrappers = []any{
 		(*InvokeResponse_Output)(nil),
 		(*InvokeResponse_FunctionError)(nil),
 		(*InvokeResponse_Error)(nil),
@@ -1615,7 +1674,7 @@ func file_host_v1_host_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_host_v1_host_proto_rawDesc), len(file_host_v1_host_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   23,
+			NumMessages:   24,
 			NumExtensions: 0,
 			NumServices:   0,
 		},
