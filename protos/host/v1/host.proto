@@ -100,6 +100,14 @@ message SecretsResponse {
   Error error = 2;
 }
 
+// SecretsInvalidate tells every host to drop its cached values for these
+// secret names, so a rotated value is refetched on the next invocation
+// instead of waiting out the refresh interval.
+message SecretsInvalidate {
+  string tenant_id = 1;
+  repeated string names = 2;
+}
+
 // Layer is a tar archive, plain or gzipped, in the artifacts bucket that a
 // build extracts over its image. It is how files that are not in the image,
 // such as a function built from source, reach the root filesystem.

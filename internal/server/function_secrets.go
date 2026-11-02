@@ -11,6 +11,7 @@ import (
 	"connectrpc.com/connect"
 	"google.golang.org/protobuf/proto"
 
+	"github.com/galaxy-io/alchemy/internal/bus"
 	"github.com/galaxy-io/alchemy/internal/secret"
 
 	functionsv1 "github.com/galaxy-io/alchemy/api/functions/v1"
@@ -60,6 +61,7 @@ func (s *Service) storeSecretValues(ctx context.Context, functionID string, spec
 	if s.secrets == nil {
 		return connect.NewError(connect.CodeFailedPrecondition, errors.New("the server has no secret provider, so secret_values cannot be used"))
 	}
+	var written []string
 	for _, variable := range slices.Sorted(maps.Keys(values)) {
 		if !envName.MatchString(variable) {
 			return connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("secret_values: %q is not an environment variable name", variable))
@@ -78,8 +80,23 @@ func (s *Service) storeSecretValues(ctx context.Context, functionID string, spec
 			spec.Secrets = make(map[string]string)
 		}
 		spec.Secrets[variable] = name
+		written = append(written, name)
 	}
+	s.invalidateSecrets(written)
 	return nil
+}
+
+// invalidateSecrets tells every host to drop its cached values for names, so
+// a rotated value takes effect on the next invocation. It is best effort; the
+// refresh interval is the backstop.
+func (s *Service) invalidateSecrets(names []string) {
+	if len(names) == 0 {
+		return
+	}
+	msg := &hostv1.SecretsInvalidate{TenantId: s.tenant, Names: names}
+	if err := s.bus.Publish(bus.HostSecretsInvalidateSubject, msg); err != nil {
+		s.log.Warn("invalidate secrets", "err", err)
+	}
 }
 
 // handleSecrets answers a host's request for a function's secret values,
