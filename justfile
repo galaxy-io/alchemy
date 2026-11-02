@@ -72,7 +72,7 @@ host count="3" memory="512" warm="5m" prewarm="0": build-linux
       for i in $(seq 1 {{ count }}); do \
         sudo systemd-run --scope --quiet -p Delegate=yes -- env LOG_FORMAT={{ LOG_FORMAT }} LOG_LEVEL={{ LOG_LEVEL }} \
           NATS_URL="{{ host_nats_url }}" LOGS_BUCKET="{{ host_logs_bucket }}" ARTIFACTS_BUCKET="{{ host_artifacts_bucket }}" \
-          HOST_NAME=host-$i DATA_DIR=/var/lib/alchemy/host-$i UID_BASE=$((100000 * i)) \
+          HOST_NAME=host-$i DATA_DIR=/var/lib/alchemy/host-$i UID_BASE=$((10000000 * i)) \
           MEMORY_BUDGET_MIB={{ memory }} WARM_INSTANCE_TTL={{ warm }} PREWARM_COUNT={{ prewarm }} bin/linux-arm64/host 2>&1 | sed -u "s/^/[host-$i] /" & \
       done; wait'
 

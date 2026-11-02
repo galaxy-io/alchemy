@@ -94,16 +94,16 @@ type FunctionSpec struct {
 	// secrets names the tenant's secrets the function receives in its
 	// environment, variable name to secret name. The values are fetched by
 	// the host at invocation and never stored with the version.
-	Secrets   map[string]string  `protobuf:"bytes,9,rep,name=secrets,proto3" json:"secrets,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
-	Protocol  InvocationProtocol `protobuf:"varint,4,opt,name=protocol,proto3,enum=functions.v1.InvocationProtocol" json:"protocol,omitempty"`
-	Contract  *Contract          `protobuf:"bytes,5,opt,name=contract,proto3" json:"contract,omitempty"`
-	Resources *Resources         `protobuf:"bytes,6,opt,name=resources,proto3" json:"resources,omitempty"`
+	Secrets   map[string]string  `protobuf:"bytes,4,rep,name=secrets,proto3" json:"secrets,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
+	Protocol  InvocationProtocol `protobuf:"varint,5,opt,name=protocol,proto3,enum=functions.v1.InvocationProtocol" json:"protocol,omitempty"`
+	Contract  *Contract          `protobuf:"bytes,6,opt,name=contract,proto3" json:"contract,omitempty"`
+	Resources *Resources         `protobuf:"bytes,7,opt,name=resources,proto3" json:"resources,omitempty"`
 	// timeout_ms bounds a single invocation's run time, measured from the
 	// moment input is handed to the function. Zero takes the server default.
-	TimeoutMs int64 `protobuf:"varint,7,opt,name=timeout_ms,json=timeoutMs,proto3" json:"timeout_ms,omitempty"`
+	TimeoutMs int64 `protobuf:"varint,8,opt,name=timeout_ms,json=timeoutMs,proto3" json:"timeout_ms,omitempty"`
 	// source makes the version a function built from source: files extracted
 	// over image under /app, where the runtime images look for the handler.
-	Source        *Source `protobuf:"bytes,8,opt,name=source,proto3" json:"source,omitempty"`
+	Source        *Source `protobuf:"bytes,9,opt,name=source,proto3" json:"source,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1754,13 +1754,13 @@ const file_functions_v1_functions_proto_rawDesc = "" +
 	"\x05image\x18\x01 \x01(\tR\x05image\x12\x18\n" +
 	"\acommand\x18\x02 \x03(\tR\acommand\x125\n" +
 	"\x03env\x18\x03 \x03(\v2#.functions.v1.FunctionSpec.EnvEntryR\x03env\x12A\n" +
-	"\asecrets\x18\t \x03(\v2'.functions.v1.FunctionSpec.SecretsEntryR\asecrets\x12<\n" +
-	"\bprotocol\x18\x04 \x01(\x0e2 .functions.v1.InvocationProtocolR\bprotocol\x122\n" +
-	"\bcontract\x18\x05 \x01(\v2\x16.functions.v1.ContractR\bcontract\x125\n" +
-	"\tresources\x18\x06 \x01(\v2\x17.functions.v1.ResourcesR\tresources\x12\x1d\n" +
+	"\asecrets\x18\x04 \x03(\v2'.functions.v1.FunctionSpec.SecretsEntryR\asecrets\x12<\n" +
+	"\bprotocol\x18\x05 \x01(\x0e2 .functions.v1.InvocationProtocolR\bprotocol\x122\n" +
+	"\bcontract\x18\x06 \x01(\v2\x16.functions.v1.ContractR\bcontract\x125\n" +
+	"\tresources\x18\a \x01(\v2\x17.functions.v1.ResourcesR\tresources\x12\x1d\n" +
 	"\n" +
-	"timeout_ms\x18\a \x01(\x03R\ttimeoutMs\x12,\n" +
-	"\x06source\x18\b \x01(\v2\x14.functions.v1.SourceR\x06source\x1a6\n" +
+	"timeout_ms\x18\b \x01(\x03R\ttimeoutMs\x12,\n" +
+	"\x06source\x18\t \x01(\v2\x14.functions.v1.SourceR\x06source\x1a6\n" +
 	"\bEnvEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
 	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\x1a:\n" +

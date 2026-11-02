@@ -32,16 +32,16 @@ message FunctionSpec {
   // secrets names the tenant's secrets the function receives in its
   // environment, variable name to secret name. The values are fetched by
   // the host at invocation and never stored with the version.
-  map<string, string> secrets = 9;
-  InvocationProtocol protocol = 4;
-  Contract contract = 5;
-  Resources resources = 6;
+  map<string, string> secrets = 4;
+  InvocationProtocol protocol = 5;
+  Contract contract = 6;
+  Resources resources = 7;
   // timeout_ms bounds a single invocation's run time, measured from the
   // moment input is handed to the function. Zero takes the server default.
-  int64 timeout_ms = 7;
+  int64 timeout_ms = 8;
   // source makes the version a function built from source: files extracted
   // over image under /app, where the runtime images look for the handler.
-  Source source = 8;
+  Source source = 9;
 }
 
 // Source is the files of a function built from source. A request carries

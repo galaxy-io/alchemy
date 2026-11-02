@@ -133,12 +133,12 @@ message Invocation {
   int64 output_bytes = 14;
   // instance_id names the microVM that served it, while it exists.
   string instance_id = 15;
-  string created_by_user_id = 17;
+  string created_by_user_id = 16;
   // idempotency_key is the caller's key, when the call carried one.
-  string idempotency_key = 18;
+  string idempotency_key = 17;
   // host is the host the invocation was sent to, empty when none took
   // it. Set by the server when it sends it and by the host in its record.
-  string host = 19;
+  string host = 18;
 }
 
 message GetInvocationRequest {
@@ -157,10 +157,10 @@ message ListInvocationsRequest {
   // Empty lists match everything.
   repeated string function_ids = 1;
   repeated InvocationStatus statuses = 2;
-  repeated StartKind start_kinds = 6;
-  PaginationRequest pagination = 3;
-  int64 since_ms = 4;
-  int64 until_ms = 5;
+  repeated StartKind start_kinds = 3;
+  PaginationRequest pagination = 4;
+  int64 since_ms = 5;
+  int64 until_ms = 6;
 }
 
 message ListInvocationsResponse {

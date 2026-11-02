@@ -135,8 +135,29 @@ func (d *Driver) dropStaleRootfs() error {
 		if strings.HasSuffix(e.Name(), "."+d.supervisorID+".ext4") {
 			continue
 		}
-		if err := os.Remove(filepath.Join(d.rootfsDir(), e.Name())); err != nil {
+		if err := os.RemoveAll(filepath.Join(d.rootfsDir(), e.Name())); err != nil {
 			return err
+		}
+	}
+	return nil
+}
+
+// dropPartial removes what builds and snapshots a previous run did not
+// finish: their work directories start with a dot and are renamed into
+// place only when complete.
+func dropPartial(dirs ...string) error {
+	for _, dir := range dirs {
+		entries, err := os.ReadDir(dir)
+		if err != nil {
+			return err
+		}
+		for _, e := range entries {
+			if !strings.HasPrefix(e.Name(), ".") {
+				continue
+			}
+			if err := os.RemoveAll(filepath.Join(dir, e.Name())); err != nil {
+				return err
+			}
 		}
 	}
 	return nil

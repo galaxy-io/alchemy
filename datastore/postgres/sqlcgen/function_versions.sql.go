@@ -48,13 +48,14 @@ const claimStaleFunctionVersionBuilds = `-- name: ClaimStaleFunctionVersionBuild
 UPDATE function_versions v SET build_started_at = now()
 FROM functions f
 WHERE f.id = v.function_id AND NOT f.is_deleted
-  AND v.status = 'building' AND coalesce(v.build_started_at, v.created_at) < now() - $1::interval
+  AND v.status = 'building'
+  AND (v.build_started_at IS NULL OR v.build_started_at < now() - $1::interval)
 RETURNING v.id, v.tenant_id, v.function_id, v.version, v.spec, v.status, v.status_message, v.image_digest, v.rootfs_bytes, v.artifact_id, v.artifact, v.build_log, v.build_started_at, v.build_ended_at, v.created_by_user_id, v.created_at
 `
 
-// Takes over builds whose server is gone: never claimed, or claimed longer
-// ago than a build may run. The new build_started_at fences the old
-// builder's result.
+// Takes over builds no server is running: unclaimed, or claimed longer ago
+// than a build may run. The new build_started_at fences the old builder's
+// result.
 func (q *Queries) ClaimStaleFunctionVersionBuilds(ctx context.Context, stale pgtype.Interval) ([]*FunctionVersion, error) {
 	rows, err := q.db.Query(ctx, claimStaleFunctionVersionBuilds, stale)
 	if err != nil {
@@ -393,4 +394,21 @@ func (q *Queries) ListFunctionVersions(ctx context.Context, arg ListFunctionVers
 		return nil, err
 	}
 	return items, nil
+}
+
+const releaseFunctionVersionBuild = `-- name: ReleaseFunctionVersionBuild :exec
+UPDATE function_versions SET build_started_at = NULL
+WHERE id = $1 AND status = 'building' AND build_started_at = $2
+`
+
+type ReleaseFunctionVersionBuildParams struct {
+	ID             string
+	BuildStartedAt pgtype.Timestamptz
+}
+
+// Gives up a claim, for another server to take the build, unless the build
+// was taken over since.
+func (q *Queries) ReleaseFunctionVersionBuild(ctx context.Context, arg ReleaseFunctionVersionBuildParams) error {
+	_, err := q.db.Exec(ctx, releaseFunctionVersionBuild, arg.ID, arg.BuildStartedAt)
+	return err
 }

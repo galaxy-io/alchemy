@@ -58,7 +58,8 @@ type Config struct {
 	// and one jail per running microVM. It must be one filesystem, since
 	// jails hard-link the kernel and rootfs.
 	DataDir string
-	// UIDBase is the first of the uids microVMs run as, one each.
+	// UIDBase is the first of the uids microVMs run as, one each. It sits
+	// above the subordinate uid ranges rootless containers use.
 	UIDBase int
 	// Console keeps the guest's serial console on and logs it. It makes
 	// boots observable and slower.
@@ -105,6 +106,11 @@ func New(cfg Config, log *slog.Logger) (*Driver, error) {
 	}
 
 	d := &Driver{cfg: cfg, log: log, uids: newUIDs(cfg.UIDBase)}
+	// A microVM a previous run left behind would share a uid with the next
+	// one handed out.
+	if n := killMicroVMs(cfg.UIDBase, uidRange); n > 0 {
+		log.Warn("killed microVMs a previous run left", "processes", n)
+	}
 	// Jails left by a previous run belong to microVMs that are gone.
 	if err := os.RemoveAll(filepath.Join(cfg.DataDir, "jail")); err != nil {
 		return nil, err
@@ -124,6 +130,9 @@ func New(cfg Config, log *slog.Logger) (*Driver, error) {
 		return nil, err
 	}
 	if err := d.dropStaleRootfs(); err != nil {
+		return nil, err
+	}
+	if err := dropPartial(d.layersDir(), d.snapshotsDir()); err != nil {
 		return nil, err
 	}
 	if err := installFile(cfg.Kernel, d.kernel(), 0o444); err != nil {

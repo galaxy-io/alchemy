@@ -115,6 +115,44 @@ func setupCgroups() (string, error) {
 	return strings.TrimPrefix(filepath.Join(rel, "vms"), "/"), nil
 }
 
+// killMicroVMs SIGKILLs every firecracker process whose real uid is in
+// [base, base+n), and returns how many it signalled.
+func killMicroVMs(base, n int) int {
+	entries, err := os.ReadDir("/proc")
+	if err != nil {
+		return 0
+	}
+	killed := 0
+	for _, e := range entries {
+		pid, err := strconv.Atoi(e.Name())
+		if err != nil {
+			continue
+		}
+		status, err := os.ReadFile("/proc/" + e.Name() + "/status")
+		if err != nil {
+			continue
+		}
+		var name string
+		uid := -1
+		for line := range strings.Lines(string(status)) {
+			fields := strings.Fields(line)
+			if len(fields) < 2 {
+				continue
+			}
+			switch fields[0] {
+			case "Name:":
+				name = fields[1]
+			case "Uid:":
+				uid, _ = strconv.Atoi(fields[1])
+			}
+		}
+		if name == "firecracker" && uid >= base && uid < base+n && syscall.Kill(pid, syscall.SIGKILL) == nil {
+			killed++
+		}
+	}
+	return killed
+}
+
 // enableCPU hands the cpu controller to dir's children.
 func enableCPU(dir string) error {
 	if err := os.WriteFile(filepath.Join(dir, "cgroup.subtree_control"), []byte("+cpu"), 0); err != nil {

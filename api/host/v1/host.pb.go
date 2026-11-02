@@ -206,12 +206,15 @@ func (x *Artifact) GetSecrets() map[string]string {
 
 // SecretsRequest asks a server for the values of a function's secrets, for
 // a host the function is placed on.
+// SecretsRequest asks for the values of secrets a version names in
+// spec.secrets. Names the version does not name are refused.
 type SecretsRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Host          string                 `protobuf:"bytes,1,opt,name=host,proto3" json:"host,omitempty"`
 	TenantId      string                 `protobuf:"bytes,2,opt,name=tenant_id,json=tenantId,proto3" json:"tenant_id,omitempty"`
 	FunctionId    string                 `protobuf:"bytes,3,opt,name=function_id,json=functionId,proto3" json:"function_id,omitempty"`
-	Names         []string               `protobuf:"bytes,4,rep,name=names,proto3" json:"names,omitempty"`
+	Version       int64                  `protobuf:"varint,4,opt,name=version,proto3" json:"version,omitempty"`
+	Names         []string               `protobuf:"bytes,5,rep,name=names,proto3" json:"names,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -265,6 +268,13 @@ func (x *SecretsRequest) GetFunctionId() string {
 		return x.FunctionId
 	}
 	return ""
+}
+
+func (x *SecretsRequest) GetVersion() int64 {
+	if x != nil {
+		return x.Version
+	}
+	return 0
 }
 
 func (x *SecretsRequest) GetNames() []string {
@@ -1483,13 +1493,14 @@ const file_host_v1_host_proto_rawDesc = "" +
 	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\x1a:\n" +
 	"\fSecretsEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
-	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"x\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\x92\x01\n" +
 	"\x0eSecretsRequest\x12\x12\n" +
 	"\x04host\x18\x01 \x01(\tR\x04host\x12\x1b\n" +
 	"\ttenant_id\x18\x02 \x01(\tR\btenantId\x12\x1f\n" +
 	"\vfunction_id\x18\x03 \x01(\tR\n" +
-	"functionId\x12\x14\n" +
-	"\x05names\x18\x04 \x03(\tR\x05names\"\xb0\x01\n" +
+	"functionId\x12\x18\n" +
+	"\aversion\x18\x04 \x01(\x03R\aversion\x12\x14\n" +
+	"\x05names\x18\x05 \x03(\tR\x05names\"\xb0\x01\n" +
 	"\x0fSecretsResponse\x12<\n" +
 	"\x06values\x18\x01 \x03(\v2$.host.v1.SecretsResponse.ValuesEntryR\x06values\x12$\n" +
 	"\x05error\x18\x02 \x01(\v2\x0e.host.v1.ErrorR\x05error\x1a9\n" +

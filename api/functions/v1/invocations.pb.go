@@ -585,12 +585,12 @@ type Invocation struct {
 	OutputBytes   int64                  `protobuf:"varint,14,opt,name=output_bytes,json=outputBytes,proto3" json:"output_bytes,omitempty"`
 	// instance_id names the microVM that served it, while it exists.
 	InstanceId      string `protobuf:"bytes,15,opt,name=instance_id,json=instanceId,proto3" json:"instance_id,omitempty"`
-	CreatedByUserId string `protobuf:"bytes,17,opt,name=created_by_user_id,json=createdByUserId,proto3" json:"created_by_user_id,omitempty"`
+	CreatedByUserId string `protobuf:"bytes,16,opt,name=created_by_user_id,json=createdByUserId,proto3" json:"created_by_user_id,omitempty"`
 	// idempotency_key is the caller's key, when the call carried one.
-	IdempotencyKey string `protobuf:"bytes,18,opt,name=idempotency_key,json=idempotencyKey,proto3" json:"idempotency_key,omitempty"`
+	IdempotencyKey string `protobuf:"bytes,17,opt,name=idempotency_key,json=idempotencyKey,proto3" json:"idempotency_key,omitempty"`
 	// host is the host the invocation was sent to, empty when none took
 	// it. Set by the server when it sends it and by the host in its record.
-	Host          string `protobuf:"bytes,19,opt,name=host,proto3" json:"host,omitempty"`
+	Host          string `protobuf:"bytes,18,opt,name=host,proto3" json:"host,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -848,10 +848,10 @@ type ListInvocationsRequest struct {
 	// Empty lists match everything.
 	FunctionIds   []string           `protobuf:"bytes,1,rep,name=function_ids,json=functionIds,proto3" json:"function_ids,omitempty"`
 	Statuses      []InvocationStatus `protobuf:"varint,2,rep,packed,name=statuses,proto3,enum=functions.v1.InvocationStatus" json:"statuses,omitempty"`
-	StartKinds    []StartKind        `protobuf:"varint,6,rep,packed,name=start_kinds,json=startKinds,proto3,enum=functions.v1.StartKind" json:"start_kinds,omitempty"`
-	Pagination    *PaginationRequest `protobuf:"bytes,3,opt,name=pagination,proto3" json:"pagination,omitempty"`
-	SinceMs       int64              `protobuf:"varint,4,opt,name=since_ms,json=sinceMs,proto3" json:"since_ms,omitempty"`
-	UntilMs       int64              `protobuf:"varint,5,opt,name=until_ms,json=untilMs,proto3" json:"until_ms,omitempty"`
+	StartKinds    []StartKind        `protobuf:"varint,3,rep,packed,name=start_kinds,json=startKinds,proto3,enum=functions.v1.StartKind" json:"start_kinds,omitempty"`
+	Pagination    *PaginationRequest `protobuf:"bytes,4,opt,name=pagination,proto3" json:"pagination,omitempty"`
+	SinceMs       int64              `protobuf:"varint,5,opt,name=since_ms,json=sinceMs,proto3" json:"since_ms,omitempty"`
+	UntilMs       int64              `protobuf:"varint,6,opt,name=until_ms,json=untilMs,proto3" json:"until_ms,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1263,9 +1263,9 @@ const file_functions_v1_invocations_proto_rawDesc = "" +
 	"\foutput_bytes\x18\x0e \x01(\x03R\voutputBytes\x12\x1f\n" +
 	"\vinstance_id\x18\x0f \x01(\tR\n" +
 	"instanceId\x12+\n" +
-	"\x12created_by_user_id\x18\x11 \x01(\tR\x0fcreatedByUserId\x12'\n" +
-	"\x0fidempotency_key\x18\x12 \x01(\tR\x0eidempotencyKey\x12\x12\n" +
-	"\x04host\x18\x13 \x01(\tR\x04host\"&\n" +
+	"\x12created_by_user_id\x18\x10 \x01(\tR\x0fcreatedByUserId\x12'\n" +
+	"\x0fidempotency_key\x18\x11 \x01(\tR\x0eidempotencyKey\x12\x12\n" +
+	"\x04host\x18\x12 \x01(\tR\x04host\"&\n" +
 	"\x14GetInvocationRequest\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\"Q\n" +
 	"\x15GetInvocationResponse\x128\n" +
@@ -1275,13 +1275,13 @@ const file_functions_v1_invocations_proto_rawDesc = "" +
 	"\x16ListInvocationsRequest\x12!\n" +
 	"\ffunction_ids\x18\x01 \x03(\tR\vfunctionIds\x12:\n" +
 	"\bstatuses\x18\x02 \x03(\x0e2\x1e.functions.v1.InvocationStatusR\bstatuses\x128\n" +
-	"\vstart_kinds\x18\x06 \x03(\x0e2\x17.functions.v1.StartKindR\n" +
+	"\vstart_kinds\x18\x03 \x03(\x0e2\x17.functions.v1.StartKindR\n" +
 	"startKinds\x12?\n" +
 	"\n" +
-	"pagination\x18\x03 \x01(\v2\x1f.functions.v1.PaginationRequestR\n" +
+	"pagination\x18\x04 \x01(\v2\x1f.functions.v1.PaginationRequestR\n" +
 	"pagination\x12\x19\n" +
-	"\bsince_ms\x18\x04 \x01(\x03R\asinceMs\x12\x19\n" +
-	"\buntil_ms\x18\x05 \x01(\x03R\auntilMs\"\x97\x01\n" +
+	"\bsince_ms\x18\x05 \x01(\x03R\asinceMs\x12\x19\n" +
+	"\buntil_ms\x18\x06 \x01(\x03R\auntilMs\"\x97\x01\n" +
 	"\x17ListInvocationsResponse\x12:\n" +
 	"\vinvocations\x18\x01 \x03(\v2\x18.functions.v1.InvocationR\vinvocations\x12@\n" +
 	"\n" +
