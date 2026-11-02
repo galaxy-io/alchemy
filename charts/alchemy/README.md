@@ -20,13 +20,13 @@ Hosts tolerate that taint by default (`host.tolerations`).
 
 Hosts run as privileged containers with the node's `/dev/kvm` mounted. Privilege is what isolates the microVMs: each one runs under Firecracker's jailer, chrooted into its own directory, in its own cgroup capped at its vCPUs, and as its own unprivileged uid. The node needs cgroup v2.
 
-Guest memory and vCPUs count against the host pod. Set `host.resources.limits` to cover `host.memoryMiB` and the host process on top of it.
+Guest memory and vCPUs count against the host pod. Set `host.resources.limits` to cover `host.memoryBudgetMiB` and the host process on top of it.
 
 ## Autoscaling hosts
 
 With `host.autoscaling.enabled`, a [KEDA](https://keda.sh) `ScaledObject` sizes the host Deployment instead of `host.replicas`. KEDA must already be installed in the cluster.
 
-KEDA reads `/scaling` on the server every `host.autoscaling.pollingInterval` seconds. Its `demand` is the slots busy across hosts plus the invocations waiting because every host is full. Hosts are set to `demand` divided by `host.autoscaling.targetUtilization` percent of `host.maxConcurrency`, between `minReplicas` and `maxReplicas`. With 8 slots at 75%, 24 slots of demand means 4 hosts.
+KEDA reads `/scaling` on the server every `host.autoscaling.pollingInterval` seconds. Its `demand` is the slots busy across hosts plus the invocations waiting because every host is full. Hosts are set to `demand` divided by `host.autoscaling.targetUtilization` percent of `host.maxInstances`, between `minReplicas` and `maxReplicas`. With 8 slots at 75%, 24 slots of demand means 4 hosts.
 
 Hosts are added straight away. They are removed one per minute once demand has stayed low for `scaleDownStabilizationSeconds`, and each drains its microVMs first.
 
@@ -34,12 +34,13 @@ A new host only runs once it has a KVM node. Run a node autoscaler such as Karpe
 
 ## Runtime configuration
 
-Alchemy needs a PostgreSQL DSN and a NATS URL. NATS must accept 64MB messages (`max_payload: 64MB`) and have JetStream enabled with file storage, which keeps recent function logs and invocation records no server has written yet. You can supply both through an existing Secret:
+Alchemy needs a PostgreSQL DSN, a NATS URL and an encryption key for tenant secrets, a base64 AES key the server encrypts them with before they reach PostgreSQL. NATS must accept 64MB messages (`max_payload: 64MB`) and have JetStream enabled with file storage, which keeps recent function logs and invocation records no server has written yet. You can supply all three through an existing Secret:
 
 ```sh
 kubectl create secret generic alchemy-runtime \
   --from-literal=PERSISTENCE_DSN='postgresql://USER:PASSWORD@HOST:5432/alchemy?sslmode=require' \
-  --from-literal=NATS_URL='nats://nats.example.com:4222'
+  --from-literal=NATS_URL='nats://nats.example.com:4222' \
+  --from-literal=ENCRYPTION_KEY="$(openssl rand -base64 32)"
 
 helm upgrade --install alchemy charts/alchemy --set existingSecret=alchemy-runtime
 ```

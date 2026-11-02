@@ -27,14 +27,21 @@ import (
 	"github.com/galaxy-io/alchemy/internal/driver"
 )
 
+// guestDirs are the directories every rootfs has for init: the mount points
+// it mounts over and the supervisor's directory.
+var guestDirs = []string{"dev", "proc", "sys", "tmp", "run", "sbin"}
+
 // supervisorPath is where the supervisor lives inside every rootfs; the
 // kernel is told to start it as init.
 const supervisorPath = "/sbin/supervisor"
 
-// Build resolves the image in its registry, flattens it and the layers into
-// a read-only ext4 root filesystem with the supervisor inside, and caches
-// that by the image digest and the layers' digests. No container daemon is
-// involved; Firecracker only sees the ext4 file.
+// Build resolves the image in its registry and makes two read-only drives
+// for it: the image flattened into an ext4 root filesystem with the
+// supervisor inside, cached by the image digest and shared by every version
+// on that image, and, when there are layers, a second ext4 holding the
+// layers alone, cached by their digests. The guest overlays the second on
+// the first. No container daemon is involved; Firecracker only sees the
+// ext4 files.
 func (d *Driver) Build(ctx context.Context, spec *functionsv1.FunctionSpec, layers []driver.Layer) (*driver.Artifact, error) {
 	ref, err := name.ParseReference(spec.GetImage())
 	if err != nil {
@@ -76,27 +83,30 @@ func (d *Driver) Build(ctx context.Context, spec *functionsv1.FunctionSpec, laye
 	// The digest the reference resolved to (the index for a multi-arch
 	// image): pulling repo@digest later gets the same image back.
 	digest := desc.Digest.String()
-
+	rootfs := d.rootfsPath(digest)
+	if _, err := os.Stat(rootfs); err != nil {
+		if err := d.buildRootfs(ctx, img, rootfs); err != nil {
+			return nil, fmt.Errorf("build rootfs: %w", err)
+		}
+	}
 	layerDigests := make([]string, len(layers))
 	for i, l := range layers {
 		layerDigests[i] = l.SHA256
 	}
-	rootfs := d.rootfsPath(digest, layerDigests)
-	if _, err := os.Stat(rootfs); err != nil {
-		if err := d.buildRootfs(ctx, img, layers, rootfs); err != nil {
-			return nil, fmt.Errorf("build rootfs: %w", err)
+	drive := d.layersPath(layerDigests)
+	if drive != "" {
+		if _, err := os.Stat(drive); err != nil {
+			if err := d.buildLayers(ctx, layers, drive); err != nil {
+				return nil, fmt.Errorf("build layers: %w", err)
+			}
 		}
-	}
-	var rootfsBytes int64
-	if fi, err := os.Stat(rootfs); err == nil {
-		rootfsBytes = fi.Size()
 	}
 
 	return &driver.Artifact{
 		Image:       rootfs,
 		Digest:      digest,
 		Layers:      layerDigests,
-		RootfsBytes: rootfsBytes,
+		RootfsBytes: fileSize(rootfs) + fileSize(drive),
 		Argv:        argv,
 		Env:         env,
 		WorkingDir:  conf.WorkingDir,
@@ -106,30 +116,125 @@ func (d *Driver) Build(ctx context.Context, spec *functionsv1.FunctionSpec, laye
 	}, nil
 }
 
-// rootfsPath is where the rootfs for an image digest with layers is cached
-// on this host.
-// Acquire finds the rootfs here rather than through Artifact.Image: the
-// artifact is stored by the server and handed to every host, so a path one
-// host wrote means nothing on another, or on the same host after its data
-// dir moves.
-func (d *Driver) rootfsPath(digest string, layers []string) string {
-	key := digest
-	if len(layers) > 0 {
-		h := sha256.New()
-		h.Write([]byte(digest))
-		for _, l := range layers {
-			h.Write([]byte{0})
-			h.Write([]byte(l))
-		}
-		key = "layered:" + hex.EncodeToString(h.Sum(nil))
-	}
-	return filepath.Join(d.rootfsDir(), strings.ReplaceAll(key, ":", "-")+".ext4")
+// rootfsPath is where the root filesystem for an image digest, with this
+// driver's supervisor in it, is cached on this host. Acquire finds the
+// drives here rather than through Artifact.Image: the artifact is stored by
+// the server and handed to every host, so a path one host wrote means
+// nothing on another, or on the same host after its data dir moves.
+func (d *Driver) rootfsPath(digest string) string {
+	return filepath.Join(d.rootfsDir(), strings.ReplaceAll(digest, ":", "-")+"."+d.supervisorID+".ext4")
 }
 
-// buildRootfs flattens the image's layers and then layers into a directory,
-// adds the supervisor and the mount points init needs, and packs it into an
-// ext4 image with mke2fs -d, which needs neither root nor a loop device.
-func (d *Driver) buildRootfs(ctx context.Context, img v1.Image, layers []driver.Layer, out string) error {
+// dropStaleRootfs removes root filesystems built with another supervisor.
+func (d *Driver) dropStaleRootfs() error {
+	entries, err := os.ReadDir(d.rootfsDir())
+	if err != nil {
+		return err
+	}
+	for _, e := range entries {
+		if strings.HasSuffix(e.Name(), "."+d.supervisorID+".ext4") {
+			continue
+		}
+		if err := os.Remove(filepath.Join(d.rootfsDir(), e.Name())); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// layersPath is where the drive holding these layers, in order, is cached
+// on this host, or "" when there are none.
+func (d *Driver) layersPath(layers []string) string {
+	if len(layers) == 0 {
+		return ""
+	}
+	h := sha256.New()
+	for _, l := range layers {
+		h.Write([]byte(l))
+		h.Write([]byte{0})
+	}
+	return filepath.Join(d.layersDir(), hex.EncodeToString(h.Sum(nil))+".ext4")
+}
+
+// buildRootfs flattens the image into a directory, adds the supervisor and
+// the mount points init needs, and packs it into an ext4 image.
+func (d *Driver) buildRootfs(ctx context.Context, img v1.Image, out string) error {
+	return d.buildDrive(ctx, out, rootfsSlackMiB, func(root string) error {
+		// Extract applies the image's layers in order, whiteouts included,
+		// as one tar stream of the final filesystem.
+		image := mutate.Extract(img)
+		defer func() { _ = image.Close() }()
+		if err := extract(ctx, root, image); err != nil {
+			return fmt.Errorf("extract image: %w", err)
+		}
+		if err := d.installSupervisor(root); err != nil {
+			return fmt.Errorf("install supervisor: %w", err)
+		}
+		return nil
+	})
+}
+
+// buildLayers extracts the layers in order into a directory and packs it
+// into an ext4 image, for the guest to lay over its root.
+func (d *Driver) buildLayers(ctx context.Context, layers []driver.Layer, out string) error {
+	return d.buildDrive(ctx, out, layersSlackMiB, func(root string) error {
+		readers := make([]*layerReader, len(layers))
+		streams := make([]io.Reader, len(layers))
+		for i, l := range layers {
+			readers[i] = &layerReader{ctx: ctx, layer: l}
+			streams[i] = readers[i]
+		}
+		defer func() {
+			for _, r := range readers {
+				r.close()
+			}
+		}()
+		if err := extract(ctx, root, streams...); err != nil {
+			return fmt.Errorf("extract layers: %w", err)
+		}
+		return checkLayers(root)
+	})
+}
+
+// checkLayers rejects extracted layers that would shadow what the guest
+// takes from the image once the drive is laid over it: the supervisor, and
+// the directories init mounts over. Anything other than a directory at one
+// of those paths hides the image's directory in the overlay.
+func checkLayers(dir string) error {
+	for _, d := range guestDirs {
+		fi, err := os.Lstat(filepath.Join(dir, d))
+		if errors.Is(err, os.ErrNotExist) {
+			continue
+		}
+		if err != nil {
+			return err
+		}
+		if !fi.IsDir() {
+			return fmt.Errorf("layers replace /%s with a non-directory", d)
+		}
+	}
+	// sbin, if present, is a real directory, so this cannot follow a link.
+	_, err := os.Lstat(filepath.Join(dir, strings.TrimPrefix(supervisorPath, "/")))
+	if err == nil {
+		return fmt.Errorf("layers replace %s", supervisorPath)
+	}
+	if !errors.Is(err, os.ErrNotExist) {
+		return err
+	}
+	return nil
+}
+
+// Room left in a drive beyond its files, in MiB: the root filesystem gets
+// enough for a runtime's caches, a layer drive only ext4's own overhead.
+const (
+	rootfsSlackMiB = 64
+	layersSlackMiB = 4
+)
+
+// buildDrive has fill populate a fresh directory next to out, then packs it
+// into an ext4 image at out with mke2fs -d, which needs neither root nor a
+// loop device, with slack MiB to spare.
+func (d *Driver) buildDrive(ctx context.Context, out string, slack int64, fill func(root string) error) error {
 	if err := os.MkdirAll(filepath.Dir(out), 0o750); err != nil {
 		return err
 	}
@@ -139,56 +244,27 @@ func (d *Driver) buildRootfs(ctx context.Context, img v1.Image, layers []driver.
 	}
 	defer func() { _ = os.RemoveAll(work) }()
 	root := filepath.Join(work, "root")
-	if err := os.Mkdir(root, 0o755); err != nil { //nolint:gosec // becomes the guest's /
+	if err := os.Mkdir(root, 0o755); err != nil { //nolint:gosec // becomes a guest filesystem
 		return err
 	}
-
-	// Extract applies the image's layers in order, whiteouts included, as one
-	// tar stream of the final filesystem. The extra layers follow in the same
-	// stream, so one tar process extracts everything: tar defers creating
-	// symlinks until the end, which keeps a symlink in the image from steering
-	// a layer's files outside root. --ignore-zeros reads past the end of each
-	// archive into the next.
-	image := mutate.Extract(img)
-	defer func() { _ = image.Close() }()
-	streams := []io.Reader{image}
-	readers := make([]*layerReader, len(layers))
-	for i, l := range layers {
-		readers[i] = &layerReader{ctx: ctx, layer: l}
-		streams = append(streams, readers[i])
-	}
-	defer func() {
-		for _, r := range readers {
-			r.close()
-		}
-	}()
-	untar := exec.CommandContext(ctx, "tar", "--extract", "--ignore-zeros", "--directory", root, //nolint:gosec // root is a fresh temp dir
-		"--exclude=dev/*", "--no-same-owner")
-	untar.Stdin = io.MultiReader(streams...)
-	var tarErr bytes.Buffer
-	untar.Stderr = &tarErr
-	if err := untar.Run(); err != nil {
-		return fmt.Errorf("extract image: %w: %s", err, bytes.TrimSpace(tarErr.Bytes()))
-	}
-
-	if err := d.installSupervisor(root); err != nil {
-		return fmt.Errorf("install supervisor: %w", err)
+	if err := fill(root); err != nil {
+		return err
 	}
 
 	size, err := dirSizeMiB(root)
 	if err != nil {
 		return err
 	}
-	// Two builds of the same image may run at once; each writes its own file
+	// Two builds of the same drive may run at once; each writes its own file
 	// and the rename makes one of them the result.
-	f, err := os.CreateTemp(filepath.Dir(out), ".rootfs-*.ext4")
+	f, err := os.CreateTemp(filepath.Dir(out), ".drive-*.ext4")
 	if err != nil {
 		return err
 	}
 	tmp := f.Name()
 	_ = f.Close()
 	mkfs := exec.CommandContext(ctx, "mke2fs", "-q", "-F", "-t", "ext4", "-m", "0", //nolint:gosec // paths are ours
-		"-E", "root_owner=0:0", "-d", root, tmp, fmt.Sprintf("%dM", size+64))
+		"-E", "root_owner=0:0", "-d", root, tmp, fmt.Sprintf("%dM", size+slack))
 	if msg, err := mkfs.CombinedOutput(); err != nil {
 		_ = os.Remove(tmp)
 		return fmt.Errorf("mke2fs: %w: %s", err, bytes.TrimSpace(msg))
@@ -202,6 +278,34 @@ func (d *Driver) buildRootfs(ctx context.Context, img v1.Image, layers []driver.
 	return os.Rename(tmp, out)
 }
 
+// extract unpacks tar streams into root, in order, as one tar process:
+// --ignore-zeros reads past the end of each archive into the next, and tar
+// defers creating symlinks until the end, which keeps a symlink in one
+// archive from steering a later archive's files outside root.
+func extract(ctx context.Context, root string, streams ...io.Reader) error {
+	untar := exec.CommandContext(ctx, "tar", "--extract", "--ignore-zeros", "--directory", root, //nolint:gosec // root is a fresh temp dir
+		"--exclude=dev/*", "--no-same-owner")
+	untar.Stdin = io.MultiReader(streams...)
+	var tarErr bytes.Buffer
+	untar.Stderr = &tarErr
+	if err := untar.Run(); err != nil {
+		return fmt.Errorf("%w: %s", err, bytes.TrimSpace(tarErr.Bytes()))
+	}
+	return nil
+}
+
+// fileSize is the size of the file at path, or 0 when there is none.
+func fileSize(path string) int64 {
+	if path == "" {
+		return 0
+	}
+	fi, err := os.Stat(path)
+	if err != nil {
+		return 0
+	}
+	return fi.Size()
+}
+
 // installSupervisor adds the mount points init needs and the supervisor to
 // an extracted image. The image is untrusted and the host runs as root, so
 // every write goes through an os.Root: a symlink in the image that points
@@ -213,7 +317,7 @@ func (d *Driver) installSupervisor(dir string) error {
 		return err
 	}
 	defer func() { _ = root.Close() }()
-	for _, mount := range []string{"dev", "proc", "sys", "tmp", "run", "sbin"} {
+	for _, mount := range guestDirs {
 		if err := root.MkdirAll(mount, 0o755); err != nil { //nolint:gosec // guest filesystem; mount points must be world-searchable
 			return err
 		}

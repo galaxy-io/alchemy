@@ -63,7 +63,7 @@ Kubernetes with Helm is the recommended way to run Alchemy in production. Hosts 
 
 ## How it works
 
-A function is an OCI image plus a contract, a JSON Schema or an Arrow schema for its input and output. Alchemy builds the image into a root filesystem once, boots a Firecracker microVM per invocation, checks every input and output against the contract, and keeps every invocation's record and logs.
+A function is an OCI image plus a contract, a JSON Schema or an Arrow schema for its input and output. Alchemy builds the image into a root filesystem once, boots it once and snapshots the microVM, restores that snapshot per invocation, checks every input and output against the contract, and keeps every invocation's record and logs.
 
 The server accepts functions and invocations over its API and places each function on a few hosts. Hosts own the KVM machines, build root filesystems and run the microVMs, and a supervisor inside each guest runs the function. PostgreSQL stores functions, versions and finished invocations, and NATS carries everything between servers and hosts, so any number of servers run side by side and the database is never on the invocation path.
 

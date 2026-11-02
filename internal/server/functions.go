@@ -40,6 +40,9 @@ func (s *Service) CreateFunction(ctx context.Context, req *connect.Request[funct
 	if err != nil {
 		return nil, storeError(err, "a function named %q already exists", name)
 	}
+	if err := s.storeSecretValues(ctx, fn.ID, spec, req.Msg.GetSecretValues()); err != nil {
+		return nil, err
+	}
 	v, err := s.addVersion(ctx, fn.ID, spec)
 	if err != nil {
 		return nil, err
@@ -129,6 +132,9 @@ func (s *Service) CreateFunctionVersion(ctx context.Context, req *connect.Reques
 	}
 	if _, err := s.store.GetFunction(ctx, sqlcgen.GetFunctionParams{TenantID: s.tenant, ID: req.Msg.GetFunctionId()}); err != nil {
 		return nil, notFound(err, "function %q not found", req.Msg.GetFunctionId())
+	}
+	if err := s.storeSecretValues(ctx, req.Msg.GetFunctionId(), spec, req.Msg.GetSecretValues()); err != nil {
+		return nil, err
 	}
 	v, err := s.addVersion(ctx, req.Msg.GetFunctionId(), spec)
 	if err != nil {
@@ -235,7 +241,7 @@ func (s *Service) build(v *sqlcgen.FunctionVersion) {
 	var buildLog string
 	start := time.Now()
 	if err == nil {
-		artifact, buildLog, err = s.requestBuild(ctx, v.FunctionID, v.TenantID, spec, sourceLayers(spec))
+		artifact, buildLog, err = s.requestBuild(ctx, v, spec, sourceLayers(spec))
 	}
 
 	finish := sqlcgen.FinishFunctionVersionBuildParams{ID: v.ID, BuildStartedAt: v.BuildStartedAt, BuildLog: buildLog}
@@ -275,8 +281,8 @@ func (s *Service) build(v *sqlcgen.FunctionVersion) {
 // first artifact to come back with its build log; the other hosts finish on
 // their own and report it in their heartbeats. Hosts cache by image and
 // layer digests, so a rebuild of a known image is a cache hit.
-func (s *Service) requestBuild(ctx context.Context, functionID, tenantID string, spec *functionsv1.FunctionSpec, layers []*hostv1.Layer) (*hostv1.Artifact, string, error) {
-	hosts := s.placedHosts(functionID)
+func (s *Service) requestBuild(ctx context.Context, v *sqlcgen.FunctionVersion, spec *functionsv1.FunctionSpec, layers []*hostv1.Layer) (*hostv1.Artifact, string, error) {
+	hosts := s.placedHosts(v.FunctionID)
 	if len(hosts) == 0 {
 		return nil, "", errNoHosts
 	}
@@ -287,7 +293,7 @@ func (s *Service) requestBuild(ctx context.Context, functionID, tenantID string,
 		err  error
 	}
 	results := make(chan result, len(hosts))
-	req := &hostv1.BuildRequest{TenantId: tenantID, Spec: spec, Layers: layers}
+	req := &hostv1.BuildRequest{TenantId: v.TenantID, FunctionId: v.FunctionID, Version: v.Version, Spec: spec, Layers: layers}
 	for _, name := range hosts {
 		s.tasks.Go(func() {
 			resp := &hostv1.BuildResponse{}
@@ -335,6 +341,9 @@ func (s *Service) prepareSpec(ctx context.Context, in *functionsv1.FunctionSpec)
 	}
 	if _, err := contract.Compile(spec.GetContract()); err != nil {
 		return nil, invalid("spec.%w", err)
+	}
+	if err := s.checkSecrets(ctx, spec); err != nil {
+		return nil, err
 	}
 
 	switch timeout := time.Duration(spec.GetTimeoutMs()) * time.Millisecond; {

@@ -21,6 +21,10 @@ data:
   LOGS_MAX_BYTES: {{ int64 .Values.functionLogs.maxBytes | quote }}
   # Artifacts
   ARTIFACTS_BUCKET: {{ .Values.artifacts.bucket | quote }}
+  # Secrets
+  {{- with .Values.secrets.datastore.encryptionKeyId }}
+  ENCRYPTION_KEY_ID: {{ . | quote }}
+  {{- end }}
   # Runtimes
   RUNTIME_IMAGE_PREFIX: {{ .Values.runtimes.imagePrefix | quote }}
   RUNTIME_ICON_BASE_URL: {{ .Values.runtimes.iconBaseUrl | quote }}

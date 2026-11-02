@@ -154,7 +154,7 @@ func (s *Service) buildOnHost(ctx context.Context, name string, cv *compiledVers
 	ctx, cancel := context.WithTimeout(ctx, s.cfg.BuildTimeout)
 	defer cancel()
 	resp := &hostv1.BuildResponse{}
-	req := &hostv1.BuildRequest{TenantId: cv.row.TenantID, Spec: cv.pinnedSpec(), Layers: cv.artifact.GetLayers()}
+	req := &hostv1.BuildRequest{TenantId: cv.row.TenantID, FunctionId: cv.row.FunctionID, Version: cv.row.Version, Spec: cv.pinnedSpec(), Layers: cv.artifact.GetLayers()}
 	if err := s.bus.Request(ctx, bus.HostBuildSubject(name), req, resp); err != nil {
 		return nil, err
 	}

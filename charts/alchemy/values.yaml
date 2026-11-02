@@ -22,6 +22,17 @@ podLabels: {}
 # reads both; hosts read only `NATS_URL`.
 existingSecret: ""
 
+secrets:
+  datastore:
+    # -- Base64 AES key the server encrypts tenant secrets with before storing
+    # them in PostgreSQL, kept in the chart-created Secret as `ENCRYPTION_KEY`.
+    # Required for the secrets API unless `existingSecret` carries it; without
+    # it the API is off.
+    encryptionKey: ""
+    # -- Id stored with each secret for the key that encrypted it
+    # (`ENCRYPTION_KEY_ID`). Change it when rotating the key.
+    encryptionKeyId: ""
+
 persistence:
   postgresql:
     # -- PostgreSQL connection string stored in the chart-created Secret as `PERSISTENCE_DSN`.
@@ -187,7 +198,7 @@ host:
     minReplicas: 1
     # -- Most hosts.
     maxReplicas: 10
-    # -- Percent of each host's `maxConcurrency` slots to keep busy. Lower
+    # -- Percent of each host's `maxInstances` to keep busy. Lower
     # leaves more headroom for bursts.
     targetUtilization: 75
     # -- Seconds between KEDA's reads of `/scaling`.
@@ -209,20 +220,36 @@ host:
   # -- Affinity for hosts, merged with the built-in anti-affinity that keeps one host per node.
   affinity: {}
 
-  # -- Invocations allowed to hold an instance at once (`--max-concurrency`).
-  maxConcurrency: 8
-  # -- Guest memory in MiB the host may commit across busy and warm instances
-  # (`--memory-mib`). 0 means no limit. Guest memory is charged to the host
-  # pod, so `resources.limits.memory` must leave room for it. When set and
-  # `resources` names no memory request or limit, it is the pod's memory request.
-  memoryMiB: 0
+  # -- Instances a host runs at once, busy and warm together (`MAX_INSTANCES`).
+  maxInstances: 8
+  # -- Guest memory in MiB the host may commit across its instances
+  # (`MEMORY_BUDGET_MIB`). 0 means no limit. Guest memory is charged to the
+  # host pod, so `resources.limits.memory` must leave room for it. When set
+  # and `resources` names no memory request or limit, it is the pod's memory
+  # request.
+  memoryBudgetMiB: 0
   # -- How long a finished instance stays booted for the next invocation
-  # (`--warm-ttl`). `0s` cold boots every invocation.
-  warmTTL: 5m
-  # -- Idle instances kept booted per function before any invocation arrives (`--prewarm`).
-  prewarm: 0
-  # -- Keep the guest serial console on (`--console`). Observable, slower boot.
-  console: false
+  # (`WARM_INSTANCE_TTL`). `0s` starts every invocation afresh.
+  warmInstanceTTL: 5m
+  # -- Idle instances kept booted per function before any invocation arrives (`PREWARM_COUNT`).
+  prewarmCount: 0
+  snapshots:
+    # -- Snapshot every version after its build and restore it per invocation
+    # instead of booting a kernel (`SNAPSHOTS_ENABLED`).
+    enabled: true
+  console:
+    # -- Keep the guest serial console on (`CONSOLE_ENABLED`). Observable, slower boot.
+    enabled: false
+  eviction:
+    # -- Newest versions of each function a host keeps built whatever their use (`KEPT_VERSIONS`).
+    keptVersions: 2
+    # -- How long an older version goes without an invocation before the host
+    # drops its snapshot and drives (`VERSION_IDLE_TTL`). `0s` keeps every version.
+    versionIdleTTL: 24h
+  # -- How long a host uses a fetched secret value before asking a server for
+  # it again (`SECRETS_REFRESH_INTERVAL`). A rotated secret reaches functions
+  # within this.
+  secretsRefreshInterval: 5m
 
   # -- Host log level: `debug`, `info`, `warn` or `error`.
   logLevel: info

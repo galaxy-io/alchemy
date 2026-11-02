@@ -13,6 +13,8 @@ import (
 // Artifact is a built function version: everything needed to start a instance
 // for it without consulting the spec again.
 type Artifact struct {
+	// ID is the host's id for the artifact, which keys its snapshot.
+	ID string
 	// Image is the immutable reference the instance runs.
 	Image string
 	// Digest is reported as FunctionVersion.image_digest.
@@ -34,8 +36,16 @@ type Driver interface {
 	// Build prepares everything needed to start a instance for spec, with
 	// layers extracted over its image in order.
 	Build(ctx context.Context, spec *functionsv1.FunctionSpec, layers []Layer) (*Artifact, error)
+	// Snapshot boots a once, starts it and keeps its state, so Acquire
+	// restores it instead of booting. A driver without snapshots does
+	// nothing.
+	Snapshot(ctx context.Context, a *Artifact) error
 	// Acquire returns a started instance ready to take one invocation.
 	Acquire(ctx context.Context, a *Artifact) (Instance, functionsv1.StartKind, error)
+	// Forget drops what was kept for a: its snapshot, and its drives unless
+	// an artifact in keep shares them. Running instances keep what they
+	// hold.
+	Forget(ctx context.Context, a *Artifact, keep []*Artifact) error
 	// Info describes the host-side pieces the driver runs with.
 	Info(ctx context.Context) HostInfo
 }

@@ -76,6 +76,7 @@ export const createFunctionSpecJson = (spec: FunctionSpec): JsonValue => ({
   image: spec.image,
   command: spec.command,
   env: spec.env,
+  secrets: spec.secrets,
   protocol: FUNCTION_PROTOCOL_TO_TOKEN_MAP[spec.protocol],
   resources: {
     vcpus: spec.resources?.vcpus ?? 0,
