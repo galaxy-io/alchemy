@@ -21,6 +21,9 @@ const (
 	// ServerInvocationsSubject is where every server answers with the
 	// invocations it holds.
 	ServerInvocationsSubject = "server.invocations"
+	// ServerSecretsSubject is where hosts ask any server for the values of
+	// a function's secrets.
+	ServerSecretsSubject = "server.secrets"
 )
 
 // HostInvokeSubject is where host name takes invocations.

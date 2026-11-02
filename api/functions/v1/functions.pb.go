@@ -88,8 +88,13 @@ type FunctionSpec struct {
 	// command is the process to run, as an argv. Empty means the image's own
 	// Entrypoint + Cmd.
 	Command []string `protobuf:"bytes,2,rep,name=command,proto3" json:"command,omitempty"`
-	// env is added on top of the image's Env. Not for secrets.
-	Env       map[string]string  `protobuf:"bytes,3,rep,name=env,proto3" json:"env,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
+	// env is added on top of the image's Env. Not for secrets: the values are
+	// part of the version and visible wherever it is.
+	Env map[string]string `protobuf:"bytes,3,rep,name=env,proto3" json:"env,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
+	// secrets names the tenant's secrets the function receives in its
+	// environment, variable name to secret name. The values are fetched by
+	// the host at invocation and never stored with the version.
+	Secrets   map[string]string  `protobuf:"bytes,9,rep,name=secrets,proto3" json:"secrets,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
 	Protocol  InvocationProtocol `protobuf:"varint,4,opt,name=protocol,proto3,enum=functions.v1.InvocationProtocol" json:"protocol,omitempty"`
 	Contract  *Contract          `protobuf:"bytes,5,opt,name=contract,proto3" json:"contract,omitempty"`
 	Resources *Resources         `protobuf:"bytes,6,opt,name=resources,proto3" json:"resources,omitempty"`
@@ -150,6 +155,13 @@ func (x *FunctionSpec) GetCommand() []string {
 func (x *FunctionSpec) GetEnv() map[string]string {
 	if x != nil {
 		return x.Env
+	}
+	return nil
+}
+
+func (x *FunctionSpec) GetSecrets() map[string]string {
+	if x != nil {
+		return x.Secrets
 	}
 	return nil
 }
@@ -919,10 +931,14 @@ func (x *Function) GetUpdatedByUserId() string {
 // CreateFunction creates the function and version 1 from spec. It returns as
 // soon as the version is accepted, in BUILDING.
 type CreateFunctionRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Name          string                 `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
-	Description   string                 `protobuf:"bytes,2,opt,name=description,proto3" json:"description,omitempty"`
-	Spec          *FunctionSpec          `protobuf:"bytes,3,opt,name=spec,proto3" json:"spec,omitempty"`
+	state       protoimpl.MessageState `protogen:"open.v1"`
+	Name        string                 `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
+	Description string                 `protobuf:"bytes,2,opt,name=description,proto3" json:"description,omitempty"`
+	Spec        *FunctionSpec          `protobuf:"bytes,3,opt,name=spec,proto3" json:"spec,omitempty"`
+	// secret_values are secrets to create for the function, variable name to
+	// value. Each is stored under the tenant, named after the function and
+	// the variable, and named in spec.secrets.
+	SecretValues  map[string]string `protobuf:"bytes,4,rep,name=secret_values,json=secretValues,proto3" json:"secret_values,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -974,6 +990,13 @@ func (x *CreateFunctionRequest) GetDescription() string {
 func (x *CreateFunctionRequest) GetSpec() *FunctionSpec {
 	if x != nil {
 		return x.Spec
+	}
+	return nil
+}
+
+func (x *CreateFunctionRequest) GetSecretValues() map[string]string {
+	if x != nil {
+		return x.SecretValues
 	}
 	return nil
 }
@@ -1417,9 +1440,11 @@ func (*DeleteFunctionResponse) Descriptor() ([]byte, []int) {
 // CreateFunctionVersion adds a new immutable version. It becomes the
 // function's current_version when it reaches READY.
 type CreateFunctionVersionRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	FunctionId    string                 `protobuf:"bytes,1,opt,name=function_id,json=functionId,proto3" json:"function_id,omitempty"`
-	Spec          *FunctionSpec          `protobuf:"bytes,2,opt,name=spec,proto3" json:"spec,omitempty"`
+	state      protoimpl.MessageState `protogen:"open.v1"`
+	FunctionId string                 `protobuf:"bytes,1,opt,name=function_id,json=functionId,proto3" json:"function_id,omitempty"`
+	Spec       *FunctionSpec          `protobuf:"bytes,2,opt,name=spec,proto3" json:"spec,omitempty"`
+	// secret_values are as in CreateFunctionRequest.
+	SecretValues  map[string]string `protobuf:"bytes,3,rep,name=secret_values,json=secretValues,proto3" json:"secret_values,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1464,6 +1489,13 @@ func (x *CreateFunctionVersionRequest) GetFunctionId() string {
 func (x *CreateFunctionVersionRequest) GetSpec() *FunctionSpec {
 	if x != nil {
 		return x.Spec
+	}
+	return nil
+}
+
+func (x *CreateFunctionVersionRequest) GetSecretValues() map[string]string {
+	if x != nil {
+		return x.SecretValues
 	}
 	return nil
 }
@@ -1716,11 +1748,12 @@ var File_functions_v1_functions_proto protoreflect.FileDescriptor
 
 const file_functions_v1_functions_proto_rawDesc = "" +
 	"\n" +
-	"\x1cfunctions/v1/functions.proto\x12\ffunctions.v1\x1a\x19functions/v1/common.proto\x1a\x1dfunctions/v1/pagination.proto\"\xa3\x03\n" +
+	"\x1cfunctions/v1/functions.proto\x12\ffunctions.v1\x1a\x19functions/v1/common.proto\x1a\x1dfunctions/v1/pagination.proto\"\xa2\x04\n" +
 	"\fFunctionSpec\x12\x14\n" +
 	"\x05image\x18\x01 \x01(\tR\x05image\x12\x18\n" +
 	"\acommand\x18\x02 \x03(\tR\acommand\x125\n" +
-	"\x03env\x18\x03 \x03(\v2#.functions.v1.FunctionSpec.EnvEntryR\x03env\x12<\n" +
+	"\x03env\x18\x03 \x03(\v2#.functions.v1.FunctionSpec.EnvEntryR\x03env\x12A\n" +
+	"\asecrets\x18\t \x03(\v2'.functions.v1.FunctionSpec.SecretsEntryR\asecrets\x12<\n" +
 	"\bprotocol\x18\x04 \x01(\x0e2 .functions.v1.InvocationProtocolR\bprotocol\x122\n" +
 	"\bcontract\x18\x05 \x01(\v2\x16.functions.v1.ContractR\bcontract\x125\n" +
 	"\tresources\x18\x06 \x01(\v2\x17.functions.v1.ResourcesR\tresources\x12\x1d\n" +
@@ -1728,6 +1761,9 @@ const file_functions_v1_functions_proto_rawDesc = "" +
 	"timeout_ms\x18\a \x01(\x03R\ttimeoutMs\x12,\n" +
 	"\x06source\x18\b \x01(\v2\x14.functions.v1.SourceR\x06source\x1a6\n" +
 	"\bEnvEntry\x12\x10\n" +
+	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\x1a:\n" +
+	"\fSecretsEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
 	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"i\n" +
 	"\x06Source\x12.\n" +
@@ -1788,11 +1824,15 @@ const file_functions_v1_functions_proto_rawDesc = "" +
 	"updated_at\x18\b \x01(\x03R\tupdatedAt\x12+\n" +
 	"\x12created_by_user_id\x18\t \x01(\tR\x0fcreatedByUserId\x12+\n" +
 	"\x12updated_by_user_id\x18\n" +
-	" \x01(\tR\x0fupdatedByUserId\"}\n" +
+	" \x01(\tR\x0fupdatedByUserId\"\x9a\x02\n" +
 	"\x15CreateFunctionRequest\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12 \n" +
 	"\vdescription\x18\x02 \x01(\tR\vdescription\x12.\n" +
-	"\x04spec\x18\x03 \x01(\v2\x1a.functions.v1.FunctionSpecR\x04spec\"\x85\x01\n" +
+	"\x04spec\x18\x03 \x01(\v2\x1a.functions.v1.FunctionSpecR\x04spec\x12Z\n" +
+	"\rsecret_values\x18\x04 \x03(\v25.functions.v1.CreateFunctionRequest.SecretValuesEntryR\fsecretValues\x1a?\n" +
+	"\x11SecretValuesEntry\x12\x10\n" +
+	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\x85\x01\n" +
 	"\x16CreateFunctionResponse\x122\n" +
 	"\bfunction\x18\x01 \x01(\v2\x16.functions.v1.FunctionR\bfunction\x127\n" +
 	"\aversion\x18\x02 \x01(\v2\x1d.functions.v1.FunctionVersionR\aversion\"n\n" +
@@ -1820,11 +1860,15 @@ const file_functions_v1_functions_proto_rawDesc = "" +
 	"pagination\"'\n" +
 	"\x15DeleteFunctionRequest\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\"\x18\n" +
-	"\x16DeleteFunctionResponse\"o\n" +
+	"\x16DeleteFunctionResponse\"\x93\x02\n" +
 	"\x1cCreateFunctionVersionRequest\x12\x1f\n" +
 	"\vfunction_id\x18\x01 \x01(\tR\n" +
 	"functionId\x12.\n" +
-	"\x04spec\x18\x02 \x01(\v2\x1a.functions.v1.FunctionSpecR\x04spec\"X\n" +
+	"\x04spec\x18\x02 \x01(\v2\x1a.functions.v1.FunctionSpecR\x04spec\x12a\n" +
+	"\rsecret_values\x18\x03 \x03(\v2<.functions.v1.CreateFunctionVersionRequest.SecretValuesEntryR\fsecretValues\x1a?\n" +
+	"\x11SecretValuesEntry\x12\x10\n" +
+	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"X\n" +
 	"\x1dCreateFunctionVersionResponse\x127\n" +
 	"\aversion\x18\x01 \x01(\v2\x1d.functions.v1.FunctionVersionR\aversion\"V\n" +
 	"\x19GetFunctionVersionRequest\x12\x1f\n" +
@@ -1864,7 +1908,7 @@ func file_functions_v1_functions_proto_rawDescGZIP() []byte {
 }
 
 var file_functions_v1_functions_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_functions_v1_functions_proto_msgTypes = make([]protoimpl.MessageInfo, 28)
+var file_functions_v1_functions_proto_msgTypes = make([]protoimpl.MessageInfo, 31)
 var file_functions_v1_functions_proto_goTypes = []any{
 	(FunctionVersionStatus)(0),            // 0: functions.v1.FunctionVersionStatus
 	(*FunctionSpec)(nil),                  // 1: functions.v1.FunctionSpec
@@ -1895,46 +1939,52 @@ var file_functions_v1_functions_proto_goTypes = []any{
 	(*ListFunctionVersionsRequest)(nil),   // 26: functions.v1.ListFunctionVersionsRequest
 	(*ListFunctionVersionsResponse)(nil),  // 27: functions.v1.ListFunctionVersionsResponse
 	nil,                                   // 28: functions.v1.FunctionSpec.EnvEntry
-	(InvocationProtocol)(0),               // 29: functions.v1.InvocationProtocol
-	(*Contract)(nil),                      // 30: functions.v1.Contract
-	(*Resources)(nil),                     // 31: functions.v1.Resources
-	(*PaginationRequest)(nil),             // 32: functions.v1.PaginationRequest
-	(*PaginationResponse)(nil),            // 33: functions.v1.PaginationResponse
+	nil,                                   // 29: functions.v1.FunctionSpec.SecretsEntry
+	nil,                                   // 30: functions.v1.CreateFunctionRequest.SecretValuesEntry
+	nil,                                   // 31: functions.v1.CreateFunctionVersionRequest.SecretValuesEntry
+	(InvocationProtocol)(0),               // 32: functions.v1.InvocationProtocol
+	(*Contract)(nil),                      // 33: functions.v1.Contract
+	(*Resources)(nil),                     // 34: functions.v1.Resources
+	(*PaginationRequest)(nil),             // 35: functions.v1.PaginationRequest
+	(*PaginationResponse)(nil),            // 36: functions.v1.PaginationResponse
 }
 var file_functions_v1_functions_proto_depIdxs = []int32{
 	28, // 0: functions.v1.FunctionSpec.env:type_name -> functions.v1.FunctionSpec.EnvEntry
-	29, // 1: functions.v1.FunctionSpec.protocol:type_name -> functions.v1.InvocationProtocol
-	30, // 2: functions.v1.FunctionSpec.contract:type_name -> functions.v1.Contract
-	31, // 3: functions.v1.FunctionSpec.resources:type_name -> functions.v1.Resources
-	2,  // 4: functions.v1.FunctionSpec.source:type_name -> functions.v1.Source
-	3,  // 5: functions.v1.Source.files:type_name -> functions.v1.SourceFile
-	4,  // 6: functions.v1.Source.layer:type_name -> functions.v1.SourceLayer
-	6,  // 7: functions.v1.Runtime.starters:type_name -> functions.v1.RuntimeStarters
-	5,  // 8: functions.v1.ListRuntimesResponse.runtimes:type_name -> functions.v1.Runtime
-	7,  // 9: functions.v1.ListRuntimesResponse.limits:type_name -> functions.v1.SourceLimits
-	1,  // 10: functions.v1.FunctionVersion.spec:type_name -> functions.v1.FunctionSpec
-	0,  // 11: functions.v1.FunctionVersion.status:type_name -> functions.v1.FunctionVersionStatus
-	10, // 12: functions.v1.Function.current_version:type_name -> functions.v1.FunctionVersion
-	10, // 13: functions.v1.Function.versions:type_name -> functions.v1.FunctionVersion
-	1,  // 14: functions.v1.CreateFunctionRequest.spec:type_name -> functions.v1.FunctionSpec
-	11, // 15: functions.v1.CreateFunctionResponse.function:type_name -> functions.v1.Function
-	10, // 16: functions.v1.CreateFunctionResponse.version:type_name -> functions.v1.FunctionVersion
-	11, // 17: functions.v1.UpdateFunctionResponse.function:type_name -> functions.v1.Function
-	11, // 18: functions.v1.GetFunctionResponse.function:type_name -> functions.v1.Function
-	32, // 19: functions.v1.ListFunctionsRequest.pagination:type_name -> functions.v1.PaginationRequest
-	11, // 20: functions.v1.ListFunctionsResponse.functions:type_name -> functions.v1.Function
-	33, // 21: functions.v1.ListFunctionsResponse.pagination:type_name -> functions.v1.PaginationResponse
-	1,  // 22: functions.v1.CreateFunctionVersionRequest.spec:type_name -> functions.v1.FunctionSpec
-	10, // 23: functions.v1.CreateFunctionVersionResponse.version:type_name -> functions.v1.FunctionVersion
-	10, // 24: functions.v1.GetFunctionVersionResponse.version:type_name -> functions.v1.FunctionVersion
-	32, // 25: functions.v1.ListFunctionVersionsRequest.pagination:type_name -> functions.v1.PaginationRequest
-	10, // 26: functions.v1.ListFunctionVersionsResponse.versions:type_name -> functions.v1.FunctionVersion
-	33, // 27: functions.v1.ListFunctionVersionsResponse.pagination:type_name -> functions.v1.PaginationResponse
-	28, // [28:28] is the sub-list for method output_type
-	28, // [28:28] is the sub-list for method input_type
-	28, // [28:28] is the sub-list for extension type_name
-	28, // [28:28] is the sub-list for extension extendee
-	0,  // [0:28] is the sub-list for field type_name
+	29, // 1: functions.v1.FunctionSpec.secrets:type_name -> functions.v1.FunctionSpec.SecretsEntry
+	32, // 2: functions.v1.FunctionSpec.protocol:type_name -> functions.v1.InvocationProtocol
+	33, // 3: functions.v1.FunctionSpec.contract:type_name -> functions.v1.Contract
+	34, // 4: functions.v1.FunctionSpec.resources:type_name -> functions.v1.Resources
+	2,  // 5: functions.v1.FunctionSpec.source:type_name -> functions.v1.Source
+	3,  // 6: functions.v1.Source.files:type_name -> functions.v1.SourceFile
+	4,  // 7: functions.v1.Source.layer:type_name -> functions.v1.SourceLayer
+	6,  // 8: functions.v1.Runtime.starters:type_name -> functions.v1.RuntimeStarters
+	5,  // 9: functions.v1.ListRuntimesResponse.runtimes:type_name -> functions.v1.Runtime
+	7,  // 10: functions.v1.ListRuntimesResponse.limits:type_name -> functions.v1.SourceLimits
+	1,  // 11: functions.v1.FunctionVersion.spec:type_name -> functions.v1.FunctionSpec
+	0,  // 12: functions.v1.FunctionVersion.status:type_name -> functions.v1.FunctionVersionStatus
+	10, // 13: functions.v1.Function.current_version:type_name -> functions.v1.FunctionVersion
+	10, // 14: functions.v1.Function.versions:type_name -> functions.v1.FunctionVersion
+	1,  // 15: functions.v1.CreateFunctionRequest.spec:type_name -> functions.v1.FunctionSpec
+	30, // 16: functions.v1.CreateFunctionRequest.secret_values:type_name -> functions.v1.CreateFunctionRequest.SecretValuesEntry
+	11, // 17: functions.v1.CreateFunctionResponse.function:type_name -> functions.v1.Function
+	10, // 18: functions.v1.CreateFunctionResponse.version:type_name -> functions.v1.FunctionVersion
+	11, // 19: functions.v1.UpdateFunctionResponse.function:type_name -> functions.v1.Function
+	11, // 20: functions.v1.GetFunctionResponse.function:type_name -> functions.v1.Function
+	35, // 21: functions.v1.ListFunctionsRequest.pagination:type_name -> functions.v1.PaginationRequest
+	11, // 22: functions.v1.ListFunctionsResponse.functions:type_name -> functions.v1.Function
+	36, // 23: functions.v1.ListFunctionsResponse.pagination:type_name -> functions.v1.PaginationResponse
+	1,  // 24: functions.v1.CreateFunctionVersionRequest.spec:type_name -> functions.v1.FunctionSpec
+	31, // 25: functions.v1.CreateFunctionVersionRequest.secret_values:type_name -> functions.v1.CreateFunctionVersionRequest.SecretValuesEntry
+	10, // 26: functions.v1.CreateFunctionVersionResponse.version:type_name -> functions.v1.FunctionVersion
+	10, // 27: functions.v1.GetFunctionVersionResponse.version:type_name -> functions.v1.FunctionVersion
+	35, // 28: functions.v1.ListFunctionVersionsRequest.pagination:type_name -> functions.v1.PaginationRequest
+	10, // 29: functions.v1.ListFunctionVersionsResponse.versions:type_name -> functions.v1.FunctionVersion
+	36, // 30: functions.v1.ListFunctionVersionsResponse.pagination:type_name -> functions.v1.PaginationResponse
+	31, // [31:31] is the sub-list for method output_type
+	31, // [31:31] is the sub-list for method input_type
+	31, // [31:31] is the sub-list for extension type_name
+	31, // [31:31] is the sub-list for extension extendee
+	0,  // [0:31] is the sub-list for field type_name
 }
 
 func init() { file_functions_v1_functions_proto_init() }
@@ -1950,7 +2000,7 @@ func file_functions_v1_functions_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_functions_v1_functions_proto_rawDesc), len(file_functions_v1_functions_proto_rawDesc)),
 			NumEnums:      1,
-			NumMessages:   28,
+			NumMessages:   31,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

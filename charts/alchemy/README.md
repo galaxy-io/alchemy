@@ -34,12 +34,13 @@ A new host only runs once it has a KVM node. Run a node autoscaler such as Karpe
 
 ## Runtime configuration
 
-Alchemy needs a PostgreSQL DSN and a NATS URL. NATS must accept 64MB messages (`max_payload: 64MB`) and have JetStream enabled with file storage, which keeps recent function logs and invocation records no server has written yet. You can supply both through an existing Secret:
+Alchemy needs a PostgreSQL DSN, a NATS URL and an encryption key for tenant secrets, a base64 AES key the server encrypts them with before they reach PostgreSQL. NATS must accept 64MB messages (`max_payload: 64MB`) and have JetStream enabled with file storage, which keeps recent function logs and invocation records no server has written yet. You can supply all three through an existing Secret:
 
 ```sh
 kubectl create secret generic alchemy-runtime \
   --from-literal=PERSISTENCE_DSN='postgresql://USER:PASSWORD@HOST:5432/alchemy?sslmode=require' \
-  --from-literal=NATS_URL='nats://nats.example.com:4222'
+  --from-literal=NATS_URL='nats://nats.example.com:4222' \
+  --from-literal=ENCRYPTION_KEY="$(openssl rand -base64 32)"
 
 helm upgrade --install alchemy charts/alchemy --set existingSecret=alchemy-runtime
 ```

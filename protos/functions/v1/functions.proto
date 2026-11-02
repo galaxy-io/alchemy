@@ -26,8 +26,13 @@ message FunctionSpec {
   // command is the process to run, as an argv. Empty means the image's own
   // Entrypoint + Cmd.
   repeated string command = 2;
-  // env is added on top of the image's Env. Not for secrets.
+  // env is added on top of the image's Env. Not for secrets: the values are
+  // part of the version and visible wherever it is.
   map<string, string> env = 3;
+  // secrets names the tenant's secrets the function receives in its
+  // environment, variable name to secret name. The values are fetched by
+  // the host at invocation and never stored with the version.
+  map<string, string> secrets = 9;
   InvocationProtocol protocol = 4;
   Contract contract = 5;
   Resources resources = 6;
@@ -147,6 +152,10 @@ message CreateFunctionRequest {
   string name = 1;
   string description = 2;
   FunctionSpec spec = 3;
+  // secret_values are secrets to create for the function, variable name to
+  // value. Each is stored under the tenant, named after the function and
+  // the variable, and named in spec.secrets.
+  map<string, string> secret_values = 4;
 }
 
 message CreateFunctionResponse {
@@ -194,6 +203,8 @@ message DeleteFunctionResponse {}
 message CreateFunctionVersionRequest {
   string function_id = 1;
   FunctionSpec spec = 2;
+  // secret_values are as in CreateFunctionRequest.
+  map<string, string> secret_values = 3;
 }
 
 message CreateFunctionVersionResponse {

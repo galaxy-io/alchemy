@@ -64,6 +64,7 @@ func run(log *slog.Logger) error {
 		envParse("PREWARM_COUNT", &cfg.Prewarm, strconv.Atoi),
 		envParse("KEPT_VERSIONS", &cfg.KeptVersions, strconv.Atoi),
 		envParse("VERSION_IDLE_TTL", &cfg.VersionIdleTTL, time.ParseDuration),
+		envParse("SECRETS_REFRESH_INTERVAL", &cfg.SecretsRefresh, time.ParseDuration),
 		envParse("UID_BASE", &fcCfg.UIDBase, strconv.Atoi),
 		envParse("CONSOLE_ENABLED", &fcCfg.Console, strconv.ParseBool),
 		envParse("SNAPSHOTS_ENABLED", &fcCfg.Snapshots, strconv.ParseBool),

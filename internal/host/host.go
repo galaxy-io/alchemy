@@ -62,8 +62,11 @@ type Config struct {
 	// idle for VersionIdleTTL: the host stops serving them and drops their
 	// snapshot and drives, and the next invocation builds again. 0 for the
 	// TTL keeps every version.
-	KeptVersions      int
-	VersionIdleTTL    time.Duration
+	KeptVersions   int
+	VersionIdleTTL time.Duration
+	// SecretsRefresh is how long a fetched secret value is used before the
+	// host asks a server for it again.
+	SecretsRefresh    time.Duration
 	BuildTimeout      time.Duration
 	HeartbeatInterval time.Duration
 }
@@ -75,6 +78,7 @@ func DefaultConfig() Config {
 		WarmTTL:           5 * time.Minute,
 		KeptVersions:      2,
 		VersionIdleTTL:    24 * time.Hour,
+		SecretsRefresh:    5 * time.Minute,
 		BuildTimeout:      5 * time.Minute,
 		HeartbeatInterval: 2 * time.Second,
 	}
@@ -99,6 +103,7 @@ type Host struct {
 
 	records   *recordQueue
 	contracts *contractCache
+	secrets   secretCache
 
 	mu        sync.Mutex
 	artifacts map[string]*hostv1.Artifact // built and ready to run, by id
@@ -125,6 +130,7 @@ func New(cfg Config, d driver.Driver, b *bus.Bus, logBucket, artifactBucket *blo
 		slots:      make(chan struct{}, cfg.MaxConcurrency),
 		records:    newRecordQueue(b, log),
 		contracts:  newContractCache(),
+		secrets:    secretCache{values: make(map[string]cachedSecret)},
 		background: bg,
 		stop:       stop,
 		artifacts:  make(map[string]*hostv1.Artifact),
@@ -407,12 +413,18 @@ func (h *Host) handleInvoke(ctx context.Context, data []byte) proto.Message {
 	timeout := time.Duration(req.GetTimeoutMs()) * time.Millisecond
 	runCtx, cancel := context.WithTimeout(ctx, timeout+supervisorGrace)
 	defer cancel()
+	secrets, rejected := h.invocationSecrets(runCtx, req.GetArtifact(), log)
+	if rejected != nil {
+		reusable = true
+		return rejected
+	}
 	fnLogs := h.functionLogs(req, log)
 	out, err := instance.Invoke(runCtx, &supervisorv1.InvokeRequest{
 		InvocationId: id,
 		Input:        input.Wire,
 		TimeoutMs:    timeout.Milliseconds(),
 		HostTimeMs:   time.Now().UnixMilli(),
+		Env:          secrets,
 	}, fnLogs)
 	fnLogs.end()
 	switch {

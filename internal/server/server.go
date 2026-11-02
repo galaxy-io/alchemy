@@ -16,6 +16,8 @@ import (
 	"gocloud.dev/blob"
 	"google.golang.org/protobuf/encoding/protojson"
 
+	"github.com/galaxy-io/alchemy/internal/secret"
+
 	functionsv1 "github.com/galaxy-io/alchemy/api/functions/v1"
 	"github.com/galaxy-io/alchemy/api/functions/v1/functionsv1connect"
 	hostv1 "github.com/galaxy-io/alchemy/api/host/v1"
@@ -100,8 +102,9 @@ type Service struct {
 	cfg       Config
 	store     *postgres.Store
 	bus       *bus.Bus
-	logs      *blob.Bucket // nil when function logs are kept on the bus only
-	artifacts *blob.Bucket // nil when functions are built from images only
+	logs      *blob.Bucket   // nil when function logs are kept on the bus only
+	artifacts *blob.Bucket   // nil when functions are built from images only
+	secrets   secret.Secrets // nil when the server has no secret provider
 	log       *slog.Logger
 	tenant    string
 	tracker   *invocationTracker // invocations this server holds
@@ -128,10 +131,11 @@ type compiledVersion struct {
 
 // New returns a service backed by store and b, reading function logs from
 // logBucket and keeping the files of functions built from source in
-// artifactBucket, either of which may be nil. It sets up the bus's streams, starts
+// artifactBucket, either of which may be nil, and keeping tenant secrets in
+// secrets, which may be nil too. It sets up the bus's streams, starts
 // listening to hosts and other servers, and starts writing invocation
 // records.
-func New(ctx context.Context, cfg Config, store *postgres.Store, b *bus.Bus, logBucket, artifactBucket *blob.Bucket, log *slog.Logger) (*Service, error) {
+func New(ctx context.Context, cfg Config, store *postgres.Store, b *bus.Bus, logBucket, artifactBucket *blob.Bucket, secrets secret.Secrets, log *slog.Logger) (*Service, error) {
 	bg, stop := context.WithCancel(context.Background())
 	s := &Service{
 		cfg:        cfg,
@@ -139,6 +143,7 @@ func New(ctx context.Context, cfg Config, store *postgres.Store, b *bus.Bus, log
 		bus:        b,
 		logs:       logBucket,
 		artifacts:  artifactBucket,
+		secrets:    secrets,
 		log:        log,
 		tenant:     postgres.DefaultTenantID,
 		tracker:    newTracker(),
