@@ -27,6 +27,10 @@ import (
 	"github.com/galaxy-io/alchemy/internal/driver"
 )
 
+// guestDirs are the directories every rootfs has for init: the mount points
+// it mounts over and the supervisor's directory.
+var guestDirs = []string{"dev", "proc", "sys", "tmp", "run", "sbin"}
+
 // supervisorPath is where the supervisor lives inside every rootfs; the
 // kernel is told to start it as init.
 const supervisorPath = "/sbin/supervisor"
@@ -188,8 +192,36 @@ func (d *Driver) buildLayers(ctx context.Context, layers []driver.Layer, out str
 		if err := extract(ctx, root, streams...); err != nil {
 			return fmt.Errorf("extract layers: %w", err)
 		}
-		return nil
+		return checkLayers(root)
 	})
+}
+
+// checkLayers rejects extracted layers that would shadow what the guest
+// takes from the image once the drive is laid over it: the supervisor, and
+// the directories init mounts over. Anything other than a directory at one
+// of those paths hides the image's directory in the overlay.
+func checkLayers(dir string) error {
+	for _, d := range guestDirs {
+		fi, err := os.Lstat(filepath.Join(dir, d))
+		if errors.Is(err, os.ErrNotExist) {
+			continue
+		}
+		if err != nil {
+			return err
+		}
+		if !fi.IsDir() {
+			return fmt.Errorf("layers replace /%s with a non-directory", d)
+		}
+	}
+	// sbin, if present, is a real directory, so this cannot follow a link.
+	_, err := os.Lstat(filepath.Join(dir, strings.TrimPrefix(supervisorPath, "/")))
+	if err == nil {
+		return fmt.Errorf("layers replace %s", supervisorPath)
+	}
+	if !errors.Is(err, os.ErrNotExist) {
+		return err
+	}
+	return nil
 }
 
 // Room left in a drive beyond its files, in MiB: the root filesystem gets
@@ -285,7 +317,7 @@ func (d *Driver) installSupervisor(dir string) error {
 		return err
 	}
 	defer func() { _ = root.Close() }()
-	for _, mount := range []string{"dev", "proc", "sys", "tmp", "run", "sbin"} {
+	for _, mount := range guestDirs {
 		if err := root.MkdirAll(mount, 0o755); err != nil { //nolint:gosec // guest filesystem; mount points must be world-searchable
 			return err
 		}

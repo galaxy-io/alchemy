@@ -100,6 +100,12 @@ type Host struct {
 	records   *recordQueue
 	contracts *contractCache
 
+	// drives orders builds against eviction. A build holds it shared from
+	// the driver's Build until it serves the artifact, and eviction holds it
+	// alone from choosing what to keep until Forget is done, so Forget never
+	// removes a drive a build has found and is about to serve.
+	drives sync.RWMutex
+
 	mu        sync.Mutex
 	artifacts map[string]*hostv1.Artifact // built and ready to run, by id
 	used      map[string]time.Time        // when each artifact was built or last invoked, by id
@@ -227,6 +233,8 @@ func (h *Host) handleBuild(ctx context.Context, data []byte) proto.Message {
 	if err != nil {
 		return buildError("failed_precondition", err)
 	}
+	h.drives.RLock()
+	defer h.drives.RUnlock()
 	built, err := h.driver.Build(ctx, req.GetSpec(), layers)
 	if err != nil {
 		h.log.Warn("build failed", "image", req.GetSpec().GetImage(), "err", err)
@@ -288,11 +296,16 @@ func (h *Host) serving(id string) bool {
 // evictVersions stops serving every artifact beyond a function's newest
 // KeptVersions that has gone VersionIdleTTL without an invocation, releases
 // its warm instances and drops what the driver kept for it. Busy instances
-// finish on what their jail holds.
+// finish on what their jail holds. While a build is running it waits for
+// the next tick rather than holding up the heartbeat.
 func (h *Host) evictVersions(now time.Time) {
 	if h.cfg.VersionIdleTTL <= 0 {
 		return
 	}
+	if !h.drives.TryLock() {
+		return
+	}
+	defer h.drives.Unlock()
 	cutoff := now.Add(-h.cfg.VersionIdleTTL)
 	h.mu.Lock()
 	byFunction := make(map[string][]*hostv1.Artifact)
