@@ -31,9 +31,11 @@ export interface CreateFunctionModalArrowField extends FunctionArrowField {
   id: string;
 }
 
-interface CreateFunctionModalEnvEntry {
+export interface CreateFunctionModalEnvEntry {
+  id: string;
   key: string;
   value: string;
+  isSecret: boolean;
 }
 
 export interface CreateFunctionModalState {
@@ -53,6 +55,7 @@ export interface CreateFunctionModalState {
   isSourceTouched: boolean;
   command: FunctionSpec["command"];
   env: CreateFunctionModalEnvEntry[];
+  secretNames: NonNullable<FunctionSpec["secrets"]>;
   contractKind: FunctionContractKind;
   schemaTexts: Record<FunctionContractSide, string>;
   arrowFields: Record<FunctionContractSide, CreateFunctionModalArrowField[]>;

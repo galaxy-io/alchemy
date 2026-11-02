@@ -2,7 +2,6 @@ import type { FC } from "react";
 
 import { match } from "ts-pattern";
 
-import KeyValueInput from "@galaxy-io/dls/inputs/KeyValueInput";
 import SelectInput, { type SelectOption } from "@galaxy-io/dls/inputs/SelectInput";
 import TagInput from "@galaxy-io/dls/inputs/TagInput";
 import TextInput from "@galaxy-io/dls/inputs/TextInput";
@@ -14,13 +13,14 @@ import {
   useCreateFunctionModalActions,
   useCreateFunctionModalState,
 } from "@/pages/functions/components/create/CreateFunctionModalProvider";
+import CreateFunctionModalEnv from "@/pages/functions/components/create/steps/components/CreateFunctionModalEnv";
 import CreateFunctionModalSourceKind from "@/pages/functions/components/create/steps/components/CreateFunctionModalSourceKind";
 import FunctionRuntimeIcon from "@/pages/functions/components/FunctionRuntimeIcon";
 import { FunctionSourceKind } from "@/pages/functions/types";
 
 const CreateFunctionModalSource: FC = () => {
-  const { sourceKind, image, runtimes, runtime, command, env } = useCreateFunctionModalState();
-  const { setImage, setRuntime, setCommand, setEnv } = useCreateFunctionModalActions();
+  const { sourceKind, image, runtimes, runtime, command } = useCreateFunctionModalState();
+  const { setImage, setRuntime, setCommand } = useCreateFunctionModalActions();
   const runtimeOptions: SelectOption[] = runtimes.map((candidate) => ({
     id: candidate.id,
     label: candidate.label,
@@ -58,18 +58,16 @@ const CreateFunctionModalSource: FC = () => {
           </Widget>
         ))
         .exhaustive()}
+      <CreateFunctionModalEnv />
       <Widget header="Advanced" isCollapsible defaultIsOpen={false}>
-        <Flex direction={FlexDirection.COLUMN} gap={12}>
-          <TagInput
-            label="Command"
-            labelTooltip="Empty uses the image's entrypoint"
-            placeholder="python, handler.py..."
-            value={command}
-            onChange={setCommand}
-            fillWidth
-          />
-          <KeyValueInput label="Environment" value={env} onChange={setEnv} fillWidth />
-        </Flex>
+        <TagInput
+          label="Command"
+          labelTooltip="Empty uses the image's entrypoint"
+          placeholder="python, handler.py..."
+          value={command}
+          onChange={setCommand}
+          fillWidth
+        />
       </Widget>
     </Flex>
   );
