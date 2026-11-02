@@ -4,7 +4,8 @@
 // init. Every microVM runs under the jailer (see jail.go). Linux with
 // /dev/kvm and cgroup v2 only, run as root.
 //
-// This is the cold-boot path: every Acquire boots a kernel. No snapshots yet.
+// An artifact with a snapshot (see snapshot.go) is restored on Acquire;
+// any other is booted from its kernel.
 package firecracker
 
 import (
@@ -15,6 +16,7 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"maps"
 	"net"
 	"net/http"
 	"os"
@@ -63,6 +65,9 @@ type Config struct {
 	Console bool
 	// Keychain finds credentials for pulling function images.
 	Keychain authn.Keychain
+	// Snapshots takes a snapshot of every artifact after its build and
+	// restores it on Acquire, instead of booting a kernel each time.
+	Snapshots bool
 }
 
 // Driver implements driver.Driver with Firecracker microVMs.
@@ -73,6 +78,12 @@ type Driver struct {
 	// parentCgroup is where the jailer creates each microVM's cgroup,
 	// relative to cgroupRoot.
 	parentCgroup string
+	// generation names the snapshot cache for this Firecracker, kernel and
+	// supervisor, which a snapshot is only good for.
+	generation string
+	// supervisorID names the supervisor build inside every root filesystem
+	// this driver makes, so a new supervisor means new drives.
+	supervisorID string
 }
 
 // New checks that the host runs as root with KVM usable and the configured
@@ -98,10 +109,22 @@ func New(cfg Config, log *slog.Logger) (*Driver, error) {
 	if err := os.RemoveAll(filepath.Join(cfg.DataDir, "jail")); err != nil {
 		return nil, err
 	}
-	for _, dir := range []string{d.rootfsDir(), d.layersDir(), filepath.Join(cfg.DataDir, "jail")} {
+	if d.generation, err = snapshotGeneration(cfg); err != nil {
+		return nil, fmt.Errorf("snapshot generation: %w", err)
+	}
+	if d.supervisorID, err = fileID(cfg.SupervisorBin); err != nil {
+		return nil, fmt.Errorf("supervisor: %w", err)
+	}
+	for _, dir := range []string{d.rootfsDir(), d.layersDir(), d.snapshotsDir(), filepath.Join(cfg.DataDir, "jail")} {
 		if err := os.MkdirAll(dir, 0o750); err != nil {
 			return nil, err
 		}
+	}
+	if err := d.dropStaleSnapshots(); err != nil {
+		return nil, err
+	}
+	if err := d.dropStaleRootfs(); err != nil {
+		return nil, err
 	}
 	if err := installFile(cfg.Kernel, d.kernel(), 0o444); err != nil {
 		return nil, fmt.Errorf("copy kernel into %s: %w", cfg.DataDir, err)
@@ -141,30 +164,55 @@ func installFile(src, dst string, mode os.FileMode) error {
 	return os.Rename(tmp, dst)
 }
 
-// Acquire boots a fresh microVM for a and returns it ready for one
-// invocation.
+// Acquire returns a microVM for a ready for one invocation: a's snapshot
+// restored when it has one, otherwise a fresh boot. A restore that fails
+// is logged and the microVM boots instead, so a stale snapshot costs time,
+// not the invocation.
 func (d *Driver) Acquire(ctx context.Context, a *driver.Artifact) (driver.Instance, functionsv1.StartKind, error) {
 	none := functionsv1.StartKind_START_KIND_UNSPECIFIED
-
-	raw := make([]byte, 8)
-	if _, err := rand.Read(raw); err != nil {
-		return nil, none, err
+	if snap := d.snapshotPath(a); snap != "" {
+		sb, err := d.start(ctx, a, map[string]string{
+			filepath.Join(snap, "vmstate"): jailVMState,
+			filepath.Join(snap, "mem"):     jailMemory,
+		}, (*instance).restore)
+		if err == nil {
+			return sb, functionsv1.StartKind_START_KIND_SNAPSHOT_RESTORE, nil
+		}
+		d.log.Warn("restore failed, booting instead", "artifact_id", a.ID, "err", err)
 	}
-	uid, err := d.uids.take()
+	sb, err := d.start(ctx, a, nil, (*instance).boot)
 	if err != nil {
 		return nil, none, err
 	}
-	sb := &instance{driver: d, id: hex.EncodeToString(raw), uid: uid}
-	if sb.jail, err = d.newJail(sb.id, uid, d.rootfsPath(a.Digest), d.layersPath(a.Layers)); err != nil {
-		sb.Release(context.WithoutCancel(ctx))
-		return nil, none, err
-	}
-
-	if err := sb.boot(ctx, a); err != nil {
-		sb.Release(context.WithoutCancel(ctx))
-		return nil, none, err
-	}
 	return sb, functionsv1.StartKind_START_KIND_COLD_BOOT, nil
+}
+
+// start makes a jail with a's drives and extra links in it, and brings the
+// microVM up with bring, which boots or restores. On error the jail is gone.
+func (d *Driver) start(ctx context.Context, a *driver.Artifact, extra map[string]string, bring func(*instance, context.Context, *driver.Artifact) error) (*instance, error) {
+	raw := make([]byte, 8)
+	if _, err := rand.Read(raw); err != nil {
+		return nil, err
+	}
+	uid, err := d.uids.take()
+	if err != nil {
+		return nil, err
+	}
+	links := map[string]string{d.rootfsPath(a.Digest): jailRootfs}
+	if layers := d.layersPath(a.Layers); layers != "" {
+		links[layers] = jailLayers
+	}
+	maps.Copy(links, extra)
+	sb := &instance{driver: d, id: hex.EncodeToString(raw), uid: uid}
+	if sb.jail, err = d.newJail(sb.id, uid, links); err != nil {
+		sb.Release(context.WithoutCancel(ctx))
+		return nil, err
+	}
+	if err := bring(sb, ctx, a); err != nil {
+		sb.Release(context.WithoutCancel(ctx))
+		return nil, err
+	}
+	return sb, nil
 }
 
 type instance struct {
@@ -179,15 +227,11 @@ type instance struct {
 	keepDir bool
 }
 
-// boot starts Firecracker in its jail, configures the microVM, starts it,
-// and waits for the supervisor to accept on vsock.
-func (s *instance) boot(ctx context.Context, a *driver.Artifact) error {
-	apiSock := s.jail.host(jailAPISocket)
-	vsockPath := s.jail.host(jailVsock)
-
+// launch starts Firecracker in its jail and waits for its API socket.
+func (s *instance) launch(ctx context.Context, a *driver.Artifact) (*api, error) {
 	logFile, err := os.Create(s.logPath())
 	if err != nil {
-		return err
+		return nil, err
 	}
 	defer func() { _ = logFile.Close() }()
 	// Without --daemonize the jailer execs into Firecracker, so this process
@@ -196,12 +240,22 @@ func (s *instance) boot(ctx context.Context, a *driver.Artifact) error {
 	s.process.Stdout = logFile
 	s.process.Stderr = logFile
 	if err := s.process.Start(); err != nil {
-		return fmt.Errorf("start jailer: %w", err)
+		return nil, fmt.Errorf("start jailer: %w", err)
 	}
+	apiSock := s.jail.host(jailAPISocket)
 	if err := waitForSocket(ctx, apiSock); err != nil {
-		return s.failed(fmt.Errorf("api socket: %w", err))
+		return nil, s.failed(fmt.Errorf("api socket: %w", err))
 	}
+	return newAPI(apiSock), nil
+}
 
+// boot configures the microVM, starts it, waits for the supervisor to
+// accept on vsock, and calls Start.
+func (s *instance) boot(ctx context.Context, a *driver.Artifact) error {
+	fc, err := s.launch(ctx, a)
+	if err != nil {
+		return err
+	}
 	bootArgs := "reboot=k panic=1 root=/dev/vda ro init=" + supervisorPath
 	if s.driver.cfg.Console {
 		bootArgs = "console=ttyS0 " + bootArgs
@@ -213,7 +267,6 @@ func (s *instance) boot(ctx context.Context, a *driver.Artifact) error {
 		// it also shaves the UART probe off the boot.
 		bootArgs = "8250.nr_uarts=0 " + bootArgs
 	}
-	fc := newAPI(apiSock)
 	steps := []struct {
 		path string
 		body any
@@ -248,19 +301,46 @@ func (s *instance) boot(ctx context.Context, a *driver.Artifact) error {
 
 	bootCtx, cancel := context.WithTimeout(ctx, bootTimeout)
 	defer cancel()
-	if err := waitForGuest(bootCtx, vsockPath, supervisorPort); err != nil {
+	if err := s.connect(bootCtx); err != nil {
+		return err
+	}
+	if _, err := s.client.Start(bootCtx, connect.NewRequest(a.StartRequest())); err != nil {
+		return s.failed(fmt.Errorf("supervisor start: %w", err))
+	}
+	return nil
+}
+
+// restore loads the snapshot linked into the jail and resumes the microVM,
+// which comes back with the supervisor started and listening.
+func (s *instance) restore(ctx context.Context, a *driver.Artifact) error {
+	fc, err := s.launch(ctx, a)
+	if err != nil {
+		return err
+	}
+	if err := fc.put(ctx, "/snapshot/load", map[string]any{
+		"snapshot_path": jailVMState,
+		"mem_backend":   map[string]any{"backend_type": "File", "backend_path": jailMemory},
+		"resume_vm":     true,
+	}); err != nil {
+		return s.failed(err)
+	}
+	restoreCtx, cancel := context.WithTimeout(ctx, bootTimeout)
+	defer cancel()
+	return s.connect(restoreCtx)
+}
+
+// connect waits for the supervisor to accept on vsock and makes its client.
+func (s *instance) connect(ctx context.Context) error {
+	vsockPath := s.jail.host(jailVsock)
+	if err := waitForGuest(ctx, vsockPath, supervisorPort); err != nil {
 		return s.failed(fmt.Errorf("supervisor did not come up: %w", err))
 	}
-
 	s.transport = &http.Transport{
 		DialContext: func(ctx context.Context, _, _ string) (net.Conn, error) {
 			return dialVsock(ctx, vsockPath, supervisorPort)
 		},
 	}
 	s.client = supervisorv1connect.NewSupervisorServiceClient(&http.Client{Transport: s.transport}, "http://supervisor")
-	if _, err := s.client.Start(bootCtx, connect.NewRequest(a.StartRequest())); err != nil {
-		return s.failed(fmt.Errorf("supervisor start: %w", err))
-	}
 	return nil
 }
 

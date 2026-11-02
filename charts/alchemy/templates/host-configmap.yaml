@@ -7,11 +7,17 @@ metadata:
     {{- include "alchemy.host.labels" . | nindent 4 }}
 data:
   # Capacity
-  MAX_CONCURRENCY: {{ .Values.host.maxConcurrency | quote }}
-  MEMORY_MIB: {{ int64 .Values.host.memoryMiB | quote }}
-  WARM_TTL: {{ .Values.host.warmTTL | quote }}
-  PREWARM: {{ .Values.host.prewarm | quote }}
-  CONSOLE: {{ .Values.host.console | quote }}
+  MAX_INSTANCES: {{ .Values.host.maxInstances | quote }}
+  MEMORY_BUDGET_MIB: {{ int64 .Values.host.memoryBudgetMiB | quote }}
+  WARM_INSTANCE_TTL: {{ .Values.host.warmInstanceTTL | quote }}
+  PREWARM_COUNT: {{ .Values.host.prewarmCount | quote }}
+  SNAPSHOTS_ENABLED: {{ .Values.host.snapshots.enabled | quote }}
+  CONSOLE_ENABLED: {{ .Values.host.console.enabled | quote }}
+  # Eviction
+  KEPT_VERSIONS: {{ .Values.host.eviction.keptVersions | quote }}
+  VERSION_IDLE_TTL: {{ .Values.host.eviction.versionIdleTTL | quote }}
+  # Secrets
+  SECRETS_REFRESH_INTERVAL: {{ .Values.host.secretsRefreshInterval | quote }}
   # Observability
   LOG_LEVEL: {{ .Values.host.logLevel | quote }}
   LOG_FORMAT: {{ .Values.host.logFormat | quote }}

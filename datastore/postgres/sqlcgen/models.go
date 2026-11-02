@@ -212,6 +212,18 @@ type Invocation struct {
 	EndedAt         pgtype.Timestamptz
 }
 
+type Secret struct {
+	ID         string
+	TenantID   string
+	Ref        string
+	Ciphertext []byte
+	Nonce      []byte
+	KeyID      string
+	Metadata   []byte
+	CreatedAt  pgtype.Timestamptz
+	UpdatedAt  pgtype.Timestamptz
+}
+
 type Tenant struct {
 	ID              string
 	Name            pgtype.Text

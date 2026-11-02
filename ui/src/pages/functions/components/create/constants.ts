@@ -189,6 +189,7 @@ export const CREATE_FUNCTION_MODAL_DEFAULT_STATE: CreateFunctionModalState = {
   isSourceTouched: false,
   command: [],
   env: [],
+  secretNames: {},
   contractKind: "jsonSchema",
   schemaTexts: {
     [FunctionContractSide.INPUT]: formatJson(CREATE_FUNCTION_MODAL_DEFAULT_SCHEMA),
@@ -200,3 +201,9 @@ export const CREATE_FUNCTION_MODAL_DEFAULT_STATE: CreateFunctionModalState = {
   timeoutMs: 30_000,
   isSubmitting: false,
 };
+
+export const CREATE_FUNCTION_MODAL_ENV_COLUMNS = "1fr 1fr 24px";
+export const CREATE_FUNCTION_MODAL_ENV_NAME_PATTERN = /^[A-Za-z_][A-Za-z0-9_]*$/;
+export const CREATE_FUNCTION_MODAL_ENV_KEPT_PLACEHOLDER = "Leave blank to keep current value";
+export const CREATE_FUNCTION_MODAL_VARIABLE_DESCRIPTION = "Plain text, stored with the version";
+export const CREATE_FUNCTION_MODAL_SECRET_DESCRIPTION = "Encrypted at rest, hidden once saved";

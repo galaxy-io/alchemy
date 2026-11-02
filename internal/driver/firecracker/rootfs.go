@@ -116,13 +116,30 @@ func (d *Driver) Build(ctx context.Context, spec *functionsv1.FunctionSpec, laye
 	}, nil
 }
 
-// rootfsPath is where the root filesystem for an image digest is cached on
-// this host. Acquire finds the drives here rather than through
-// Artifact.Image: the artifact is stored by the server and handed to every
-// host, so a path one host wrote means nothing on another, or on the same
-// host after its data dir moves.
+// rootfsPath is where the root filesystem for an image digest, with this
+// driver's supervisor in it, is cached on this host. Acquire finds the
+// drives here rather than through Artifact.Image: the artifact is stored by
+// the server and handed to every host, so a path one host wrote means
+// nothing on another, or on the same host after its data dir moves.
 func (d *Driver) rootfsPath(digest string) string {
-	return filepath.Join(d.rootfsDir(), strings.ReplaceAll(digest, ":", "-")+".ext4")
+	return filepath.Join(d.rootfsDir(), strings.ReplaceAll(digest, ":", "-")+"."+d.supervisorID+".ext4")
+}
+
+// dropStaleRootfs removes root filesystems built with another supervisor.
+func (d *Driver) dropStaleRootfs() error {
+	entries, err := os.ReadDir(d.rootfsDir())
+	if err != nil {
+		return err
+	}
+	for _, e := range entries {
+		if strings.HasSuffix(e.Name(), "."+d.supervisorID+".ext4") {
+			continue
+		}
+		if err := os.Remove(filepath.Join(d.rootfsDir(), e.Name())); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // layersPath is where the drive holding these layers, in order, is cached
@@ -142,7 +159,7 @@ func (d *Driver) layersPath(layers []string) string {
 // buildRootfs flattens the image into a directory, adds the supervisor and
 // the mount points init needs, and packs it into an ext4 image.
 func (d *Driver) buildRootfs(ctx context.Context, img v1.Image, out string) error {
-	return d.buildDrive(ctx, out, func(root string) error {
+	return d.buildDrive(ctx, out, rootfsSlackMiB, func(root string) error {
 		// Extract applies the image's layers in order, whiteouts included,
 		// as one tar stream of the final filesystem.
 		image := mutate.Extract(img)
@@ -160,7 +177,7 @@ func (d *Driver) buildRootfs(ctx context.Context, img v1.Image, out string) erro
 // buildLayers extracts the layers in order into a directory and packs it
 // into an ext4 image, for the guest to lay over its root.
 func (d *Driver) buildLayers(ctx context.Context, layers []driver.Layer, out string) error {
-	return d.buildDrive(ctx, out, func(root string) error {
+	return d.buildDrive(ctx, out, layersSlackMiB, func(root string) error {
 		readers := make([]*layerReader, len(layers))
 		streams := make([]io.Reader, len(layers))
 		for i, l := range layers {
@@ -207,10 +224,17 @@ func checkLayers(dir string) error {
 	return nil
 }
 
+// Room left in a drive beyond its files, in MiB: the root filesystem gets
+// enough for a runtime's caches, a layer drive only ext4's own overhead.
+const (
+	rootfsSlackMiB = 64
+	layersSlackMiB = 4
+)
+
 // buildDrive has fill populate a fresh directory next to out, then packs it
 // into an ext4 image at out with mke2fs -d, which needs neither root nor a
-// loop device.
-func (d *Driver) buildDrive(ctx context.Context, out string, fill func(root string) error) error {
+// loop device, with slack MiB to spare.
+func (d *Driver) buildDrive(ctx context.Context, out string, slack int64, fill func(root string) error) error {
 	if err := os.MkdirAll(filepath.Dir(out), 0o750); err != nil {
 		return err
 	}
@@ -240,7 +264,7 @@ func (d *Driver) buildDrive(ctx context.Context, out string, fill func(root stri
 	tmp := f.Name()
 	_ = f.Close()
 	mkfs := exec.CommandContext(ctx, "mke2fs", "-q", "-F", "-t", "ext4", "-m", "0", //nolint:gosec // paths are ours
-		"-E", "root_owner=0:0", "-d", root, tmp, fmt.Sprintf("%dM", size+64))
+		"-E", "root_owner=0:0", "-d", root, tmp, fmt.Sprintf("%dM", size+slack))
 	if msg, err := mkfs.CombinedOutput(); err != nil {
 		_ = os.Remove(tmp)
 		return fmt.Errorf("mke2fs: %w: %s", err, bytes.TrimSpace(msg))

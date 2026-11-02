@@ -19,9 +19,12 @@ import (
 
 	"gocloud.dev/blob"
 
+	"github.com/galaxy-io/alchemy/internal/secret"
+
 	"github.com/galaxy-io/alchemy/api/functions/v1/functionsv1connect"
 	"github.com/galaxy-io/alchemy/api/metrics/v1/metricsv1connect"
 	"github.com/galaxy-io/alchemy/cmd/internal/logger"
+	"github.com/galaxy-io/alchemy/cmd/internal/secrets"
 	"github.com/galaxy-io/alchemy/datastore/postgres"
 	"github.com/galaxy-io/alchemy/internal/bus"
 	"github.com/galaxy-io/alchemy/internal/logs"
@@ -93,7 +96,12 @@ func run(log *slog.Logger) error {
 		defer func() { _ = artifacts.Close() }()
 	}
 
-	svc, err := server.New(ctx, cfg, store, b, bucket, artifacts, log)
+	provider, err := secretProvider(store, log)
+	if err != nil {
+		return err
+	}
+
+	svc, err := server.New(ctx, cfg, store, b, bucket, artifacts, provider, log)
 	if err != nil {
 		return err
 	}
@@ -139,6 +147,19 @@ func run(log *slog.Logger) error {
 		return err
 	}
 	return nil
+}
+
+// secretProvider is where tenant secrets are kept, or nil with a warning
+// when the server has no key for them.
+func secretProvider(store *postgres.Store, log *slog.Logger) (secret.Secrets, error) {
+	provider, err := secrets.FromEnv(store.Secrets(), server.SecretScope)
+	if err != nil {
+		return nil, err
+	}
+	if provider == nil {
+		log.Warn("no secret provider: ENCRYPTION_KEY is unset, so the secrets API is off")
+	}
+	return provider, nil
 }
 
 func envOr(key, fallback string) string {

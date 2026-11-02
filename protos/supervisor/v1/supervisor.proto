@@ -47,6 +47,10 @@ message InvokeRequest {
   // snapshot was taken; the supervisor sets the guest clock from this before
   // running the function.
   int64 host_time_ms = 4;
+  // env is set on the function process for this invocation, over the
+  // environment Start gave it: the secrets the version names, fetched for
+  // the host after any restore, so they are never in a snapshot.
+  map<string, string> env = 5;
 }
 
 // Failure is mapped by the host onto functions.v1.FunctionError. type is the

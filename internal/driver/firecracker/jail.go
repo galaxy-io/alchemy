@@ -148,10 +148,10 @@ type jail struct {
 }
 
 // newJail creates the chroot ahead of the jailer, owned by uid, and
-// hard-links the kernel, the rootfs and the layer drive, when there is one,
+// hard-links the kernel and every file in links, host path to chroot path,
 // into it. The jail is returned even on error, so the caller can remove
 // what was made.
-func (d *Driver) newJail(id string, uid int, rootfs, layers string) (*jail, error) {
+func (d *Driver) newJail(id string, uid int, links map[string]string) (*jail, error) {
 	j := &jail{dir: filepath.Join(d.cfg.DataDir, "jail", jailExec, id)}
 	j.root = filepath.Join(j.dir, "root")
 	if err := os.MkdirAll(j.root, 0o700); err != nil {
@@ -160,10 +160,7 @@ func (d *Driver) newJail(id string, uid int, rootfs, layers string) (*jail, erro
 	if err := os.Chown(j.root, uid, uid); err != nil {
 		return j, err
 	}
-	links := map[string]string{d.kernel(): jailKernel, rootfs: jailRootfs}
-	if layers != "" {
-		links[layers] = jailLayers
-	}
+	links[d.kernel()] = jailKernel
 	for src, dst := range links {
 		if err := os.Link(src, j.host(dst)); err != nil {
 			return j, fmt.Errorf("link %s into jail: %w", src, err)
@@ -208,4 +205,8 @@ const (
 	jailKernel    = "/vmlinux"
 	jailRootfs    = "/rootfs.ext4"
 	jailLayers    = "/layers.ext4"
+	// A restore reads the snapshot from here; a snapshot is written here
+	// by Firecracker, which can only write inside its jail.
+	jailVMState = "/vmstate"
+	jailMemory  = "/mem"
 )

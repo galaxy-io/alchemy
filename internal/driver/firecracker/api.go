@@ -27,11 +27,19 @@ func newAPI(socket string) *api {
 }
 
 func (a *api) put(ctx context.Context, path string, body any) error {
+	return a.do(ctx, http.MethodPut, path, body)
+}
+
+func (a *api) patch(ctx context.Context, path string, body any) error {
+	return a.do(ctx, http.MethodPatch, path, body)
+}
+
+func (a *api) do(ctx context.Context, method, path string, body any) error {
 	raw, err := json.Marshal(body)
 	if err != nil {
 		return err
 	}
-	req, err := http.NewRequestWithContext(ctx, http.MethodPut, "http://firecracker"+path, bytes.NewReader(raw))
+	req, err := http.NewRequestWithContext(ctx, method, "http://firecracker"+path, bytes.NewReader(raw))
 	if err != nil {
 		return err
 	}
@@ -39,12 +47,12 @@ func (a *api) put(ctx context.Context, path string, body any) error {
 	req.Header.Set("Accept", "application/json")
 	resp, err := a.client.Do(req)
 	if err != nil {
-		return fmt.Errorf("PUT %s: %w", path, err)
+		return fmt.Errorf("%s %s: %w", method, path, err)
 	}
 	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode/100 != 2 {
 		msg, _ := io.ReadAll(io.LimitReader(resp.Body, 4096))
-		return fmt.Errorf("PUT %s: %s: %s", path, resp.Status, bytes.TrimSpace(msg))
+		return fmt.Errorf("%s %s: %s: %s", method, path, resp.Status, bytes.TrimSpace(msg))
 	}
 	return nil
 }

@@ -82,7 +82,7 @@ app.kubernetes.io/component: host
 
 {{- define "alchemy.host.resources" -}}
 {{- $resources := deepCopy .Values.host.resources -}}
-{{- $memoryMiB := int .Values.host.memoryMiB -}}
+{{- $memoryMiB := int .Values.host.memoryBudgetMiB -}}
 {{- if and (gt $memoryMiB 0) (not (dig "requests" "memory" "" $resources)) (not (dig "limits" "memory" "" $resources)) -}}
 {{- $_ := set $resources "requests" (merge (dict "memory" (printf "%dMi" $memoryMiB)) (dig "requests" (dict) $resources)) -}}
 {{- end -}}
