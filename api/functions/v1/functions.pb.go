@@ -935,9 +935,10 @@ type CreateFunctionRequest struct {
 	Name        string                 `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
 	Description string                 `protobuf:"bytes,2,opt,name=description,proto3" json:"description,omitempty"`
 	Spec        *FunctionSpec          `protobuf:"bytes,3,opt,name=spec,proto3" json:"spec,omitempty"`
-	// secret_values are secrets to create for the function, variable name to
-	// value. Each is stored under the tenant, named after the function and
-	// the variable, and named in spec.secrets.
+	// secret_values are secrets to create for this version, variable name to
+	// value. Each is stored under the tenant as a new secret of its own, so a
+	// later version never changes what this one reads, and named in
+	// spec.secrets.
 	SecretValues  map[string]string `protobuf:"bytes,4,rep,name=secret_values,json=secretValues,proto3" json:"secret_values,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache

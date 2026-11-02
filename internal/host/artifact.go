@@ -14,14 +14,16 @@ import (
 	"github.com/galaxy-io/alchemy/internal/driver"
 )
 
-// artifactID hashes everything that makes two instances interchangeable.
-// The tenant is in it so identical specs across tenants never share an
-// instance; the image digest rather than the tag so a moved tag is a new
-// artifact. Secrets are in it by name only: the values are fetched per
-// invocation and never part of the artifact.
+// artifactID hashes the version an artifact was built for and everything
+// that went into it. Every version is its own artifact, with its own
+// instances and snapshot, even when its spec matches another's. The image
+// digest is in it rather than the tag, so a moved tag is a new artifact.
+// Secrets are in it by name only: the values are fetched per invocation and
+// never part of the artifact.
 func artifactID(a *hostv1.Artifact) string {
 	var sb strings.Builder
-	fmt.Fprintf(&sb, "%s\x00%s\x00%s\x00", a.GetTenantId(), a.GetDigest(), a.GetWorkingDir())
+	fmt.Fprintf(&sb, "%s\x00%s\x00%d\x00", a.GetTenantId(), a.GetFunctionId(), a.GetVersion())
+	fmt.Fprintf(&sb, "%s\x00%s\x00", a.GetDigest(), a.GetWorkingDir())
 	fmt.Fprintf(&sb, "%d\x00%d\x00%d\x00", a.GetProtocol(), a.GetVcpus(), a.GetMemoryMib())
 	for _, arg := range a.GetArgv() {
 		sb.WriteString(arg)

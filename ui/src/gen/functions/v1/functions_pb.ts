@@ -497,9 +497,10 @@ export type CreateFunctionRequest = Message<"functions.v1.CreateFunctionRequest"
   spec?: FunctionSpec | undefined;
 
   /**
-   * secret_values are secrets to create for the function, variable name to
-   * value. Each is stored under the tenant, named after the function and
-   * the variable, and named in spec.secrets.
+   * secret_values are secrets to create for this version, variable name to
+   * value. Each is stored under the tenant as a new secret of its own, so a
+   * later version never changes what this one reads, and named in
+   * spec.secrets.
    *
    * @generated from field: map<string, string> secret_values = 4;
    */
