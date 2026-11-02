@@ -2,6 +2,8 @@ package server
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"maps"
@@ -50,9 +52,11 @@ func (s *Service) checkSecrets(ctx context.Context, spec *functionsv1.FunctionSp
 	return nil
 }
 
-// storeSecretValues creates a secret per value, named after the function
-// and the variable, and names each in spec.secrets. The spec is the
-// caller's copy.
+// storeSecretValues creates a secret per value and names each in
+// spec.secrets. The names are the function, a random suffix shared by this
+// version's values, and the variable: every version gets secrets of its
+// own, so a new version never changes what an older one reads. The spec is
+// the caller's copy.
 func (s *Service) storeSecretValues(ctx context.Context, functionID string, spec *functionsv1.FunctionSpec, values map[string]string) error {
 	if len(values) == 0 {
 		return nil
@@ -60,6 +64,11 @@ func (s *Service) storeSecretValues(ctx context.Context, functionID string, spec
 	if s.secrets == nil {
 		return connect.NewError(connect.CodeFailedPrecondition, errors.New("the server has no secret provider, so secret_values cannot be used"))
 	}
+	raw := make([]byte, 4)
+	if _, err := rand.Read(raw); err != nil {
+		return connect.NewError(connect.CodeInternal, err)
+	}
+	prefix := functionID + "." + hex.EncodeToString(raw) + "."
 	for _, variable := range slices.Sorted(maps.Keys(values)) {
 		if !envName.MatchString(variable) {
 			return connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("secret_values: %q is not an environment variable name", variable))
@@ -67,7 +76,7 @@ func (s *Service) storeSecretValues(ctx context.Context, functionID string, spec
 		if values[variable] == "" {
 			return connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("secret_values[%s]: value is required", variable))
 		}
-		name := functionID + "." + variable
+		name := prefix + variable
 		if !secretName.MatchString(name) {
 			return connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("secret_values: %q is too long for a secret name", variable))
 		}

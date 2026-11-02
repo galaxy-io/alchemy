@@ -16,7 +16,8 @@ const layersDevice = "/dev/vdb"
 
 // initGuest does the minimum an init process must do before anything else
 // can run. The root filesystem is the function's image, mounted read-only by
-// the kernel; /dev is devtmpfs, which the guest kernel mounts itself.
+// the kernel; /dev is devtmpfs, which the guest kernel mounts itself and
+// overlayLayers carries over to the new root.
 func initGuest() error {
 	if err := overlayLayers(); err != nil {
 		return fmt.Errorf("layers: %w", err)
@@ -47,9 +48,8 @@ func initGuest() error {
 // overlayLayers makes the layer drive the top of the root filesystem: the
 // drive and the image are the lower directories of a read-only overlay,
 // which becomes the root. Everything is staged on a tmpfs that the old root
-// takes with it when it is detached, the kernel's /dev among it, so devtmpfs
-// is mounted again on the new root. Without the drive the root is the image
-// alone.
+// takes with it when it is detached. Without the drive the root is the
+// image alone.
 func overlayLayers() error {
 	if _, err := os.Stat(layersDevice); errors.Is(err, os.ErrNotExist) {
 		return nil
@@ -70,6 +70,10 @@ func overlayLayers() error {
 	if err := unix.Mount("overlay", root, "overlay", unix.MS_RDONLY, "lowerdir="+lower+":/"); err != nil {
 		return fmt.Errorf("mount overlay: %w", err)
 	}
+	// Move the kernel's devtmpfs into the new root.
+	if err := unix.Mount("/dev", root+"/dev", "", unix.MS_MOVE, ""); err != nil {
+		return fmt.Errorf("move /dev: %w", err)
+	}
 	// pivot_root with the new root as put_old needs no scratch directory in
 	// the read-only overlay; the old root is then detached from under it.
 	if err := unix.Chdir(root); err != nil {
@@ -81,13 +85,7 @@ func overlayLayers() error {
 	if err := unix.Unmount(".", unix.MNT_DETACH); err != nil {
 		return fmt.Errorf("detach old root: %w", err)
 	}
-	if err := unix.Chdir("/"); err != nil {
-		return err
-	}
-	if err := unix.Mount("devtmpfs", "/dev", "devtmpfs", unix.MS_NOSUID, "mode=755"); err != nil {
-		return fmt.Errorf("mount /dev: %w", err)
-	}
-	return nil
+	return unix.Chdir("/")
 }
 
 func listenVsock(port uint32) (net.Listener, error) {
