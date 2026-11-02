@@ -80,6 +80,32 @@ message Artifact {
   // host ranks a function's artifacts by version when it evicts old ones.
   string function_id = 14;
   int64 version = 15;
+  // secrets names the tenant's secrets the function receives, variable
+  // name to secret name. The host fetches the values from a server.
+  map<string, string> secrets = 16;
+}
+
+// SecretsRequest asks a server for the values of a function's secrets, for
+// a host the function is placed on.
+message SecretsRequest {
+  string host = 1;
+  string tenant_id = 2;
+  string function_id = 3;
+  repeated string names = 4;
+}
+
+message SecretsResponse {
+  // values are by secret name.
+  map<string, string> values = 1;
+  Error error = 2;
+}
+
+// SecretsInvalidate tells every host to drop its cached values for these
+// secret names, so a rotated value is refetched on the next invocation
+// instead of waiting out the refresh interval.
+message SecretsInvalidate {
+  string tenant_id = 1;
+  repeated string names = 2;
 }
 
 // Layer is a tar archive, plain or gzipped, in the artifacts bucket that a

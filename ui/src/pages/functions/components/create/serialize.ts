@@ -46,8 +46,13 @@ export const mapCreateFunctionModalStateToSpec = (
       command: state.command,
       env: Object.fromEntries(
         state.env
-          .filter((entry) => entry.key.trim())
+          .filter((entry) => !entry.isSecret && entry.key.trim())
           .map((entry) => [entry.key.trim(), entry.value]),
+      ),
+      secrets: Object.fromEntries(
+        state.env
+          .filter((entry) => entry.isSecret && !entry.value && state.secretNames[entry.key.trim()])
+          .map((entry) => [entry.key.trim(), state.secretNames[entry.key.trim()]]),
       ),
       protocol: InvocationProtocol.EXEC,
       contract: mapCreateFunctionModalStateToContract(state),
@@ -59,6 +64,13 @@ export const mapCreateFunctionModalStateToSpec = (
   }
 };
 
+const mapCreateFunctionModalStateToSecretValues = (state: CreateFunctionModalState) =>
+  Object.fromEntries(
+    state.env
+      .filter((entry) => entry.isSecret && entry.key.trim() && entry.value)
+      .map((entry) => [entry.key.trim(), entry.value]),
+  );
+
 export const mapCreateFunctionModalStateToRequest = (
   state: CreateFunctionModalState,
   spec: FunctionSpec,
@@ -67,9 +79,16 @@ export const mapCreateFunctionModalStateToRequest = (
     name: state.name.trim(),
     description: state.description.trim(),
     spec,
+    secretValues: mapCreateFunctionModalStateToSecretValues(state),
   });
 
 export const mapCreateFunctionModalStateToVersionRequest = (
+  state: CreateFunctionModalState,
   functionId: AlchemyFunction["id"],
   spec: FunctionSpec,
-) => create(CreateFunctionVersionRequestSchema, { functionId, spec });
+) =>
+  create(CreateFunctionVersionRequestSchema, {
+    functionId,
+    spec,
+    secretValues: mapCreateFunctionModalStateToSecretValues(state),
+  });

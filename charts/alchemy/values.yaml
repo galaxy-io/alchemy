@@ -22,6 +22,17 @@ podLabels: {}
 # reads both; hosts read only `NATS_URL`.
 existingSecret: ""
 
+secrets:
+  datastore:
+    # -- Base64 AES key the server encrypts tenant secrets with before storing
+    # them in PostgreSQL, kept in the chart-created Secret as `ENCRYPTION_KEY`.
+    # Required for the secrets API unless `existingSecret` carries it; without
+    # it the API is off.
+    encryptionKey: ""
+    # -- Id stored with each secret for the key that encrypted it
+    # (`ENCRYPTION_KEY_ID`). Change it when rotating the key.
+    encryptionKeyId: ""
+
 persistence:
   postgresql:
     # -- PostgreSQL connection string stored in the chart-created Secret as `PERSISTENCE_DSN`.
@@ -235,6 +246,10 @@ host:
     # -- How long an older version goes without an invocation before the host
     # drops its snapshot and drives (`VERSION_IDLE_TTL`). `0s` keeps every version.
     versionIdleTTL: 24h
+  # -- How long a host uses a fetched secret value before asking a server for
+  # it again (`SECRETS_REFRESH_INTERVAL`). A rotated secret reaches functions
+  # within this.
+  secretsRefreshInterval: 5m
 
   # -- Host log level: `debug`, `info`, `warn` or `error`.
   logLevel: info

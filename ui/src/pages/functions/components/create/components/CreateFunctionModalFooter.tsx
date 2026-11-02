@@ -79,7 +79,7 @@ const CreateFunctionModalFooter: FC<CreateFunctionModalFooterProps> = ({ onClose
   const handleCreateVersion = () => {
     if (!spec || !functionId) return;
     setSubmitting(true);
-    createFunctionVersion(mapCreateFunctionModalStateToVersionRequest(functionId, spec), {
+    createFunctionVersion(mapCreateFunctionModalStateToVersionRequest(state, functionId, spec), {
       onSuccess: ({ version }) => {
         if (!version) return;
         toast({

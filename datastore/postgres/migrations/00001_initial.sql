@@ -114,6 +114,23 @@ CREATE INDEX invocations_tenant_created_idx ON invocations (tenant_id, created_a
 -- A caller's idempotency key and the invocation it started. Claimed by a
 -- server before the invocation runs, so two servers never run the same key
 -- twice, and marked with the host before the invocation is sent to it, so
+-- A tenant's secrets, encrypted by the server before they are stored: the
+-- row holds the ciphertext, its nonce and the id of the key that made it.
+-- ref is the secret's full reference, alchemy/<tenant>/<name>.
+CREATE TABLE secrets (
+  id                 UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+  tenant_id          UUID        NOT NULL REFERENCES tenants (id),
+  ref                TEXT        NOT NULL,
+  ciphertext         BYTEA       NOT NULL,
+  nonce              BYTEA       NOT NULL,
+  key_id             TEXT        NOT NULL,
+  metadata           JSONB       NOT NULL DEFAULT '{}',
+  created_at         TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at         TIMESTAMPTZ NOT NULL DEFAULT now(),
+  UNIQUE (tenant_id, ref),
+  UNIQUE (ref)
+);
+
 -- a claim with no host behind it is known never to have run. Rows expire
 -- after the server's idempotency window.
 CREATE TABLE idempotency_keys (
@@ -132,6 +149,7 @@ CREATE INDEX idempotency_keys_created_idx ON idempotency_keys (created_at);
 
 -- +goose Down
 DROP TABLE idempotency_keys;
+DROP TABLE secrets;
 DROP TABLE invocations;
 DROP TYPE start_kind;
 DROP TYPE invocation_status;

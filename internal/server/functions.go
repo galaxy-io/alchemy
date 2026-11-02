@@ -40,6 +40,9 @@ func (s *Service) CreateFunction(ctx context.Context, req *connect.Request[funct
 	if err != nil {
 		return nil, storeError(err, "a function named %q already exists", name)
 	}
+	if err := s.storeSecretValues(ctx, fn.ID, spec, req.Msg.GetSecretValues()); err != nil {
+		return nil, err
+	}
 	v, err := s.addVersion(ctx, fn.ID, spec)
 	if err != nil {
 		return nil, err
@@ -129,6 +132,9 @@ func (s *Service) CreateFunctionVersion(ctx context.Context, req *connect.Reques
 	}
 	if _, err := s.store.GetFunction(ctx, sqlcgen.GetFunctionParams{TenantID: s.tenant, ID: req.Msg.GetFunctionId()}); err != nil {
 		return nil, notFound(err, "function %q not found", req.Msg.GetFunctionId())
+	}
+	if err := s.storeSecretValues(ctx, req.Msg.GetFunctionId(), spec, req.Msg.GetSecretValues()); err != nil {
+		return nil, err
 	}
 	v, err := s.addVersion(ctx, req.Msg.GetFunctionId(), spec)
 	if err != nil {
@@ -335,6 +341,9 @@ func (s *Service) prepareSpec(ctx context.Context, in *functionsv1.FunctionSpec)
 	}
 	if _, err := contract.Compile(spec.GetContract()); err != nil {
 		return nil, invalid("spec.%w", err)
+	}
+	if err := s.checkSecrets(ctx, spec); err != nil {
+		return nil, err
 	}
 
 	switch timeout := time.Duration(spec.GetTimeoutMs()) * time.Millisecond; {
