@@ -87,10 +87,13 @@ message Artifact {
 
 // SecretsRequest asks a server for the values of a function's secrets, for
 // a host the function is placed on.
+// SecretsRequest asks for the values of secrets a version names in
+// spec.secrets. Names the version does not name are refused.
 message SecretsRequest {
   string host = 1;
   string tenant_id = 2;
   string function_id = 3;
+  int64 version = 5;
   repeated string names = 4;
 }
 

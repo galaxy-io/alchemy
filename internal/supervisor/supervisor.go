@@ -139,6 +139,17 @@ func (s *Service) exec(ctx context.Context, req *supervisorv1.InvokeRequest, log
 	start := time.Now()
 	err := cmd.Run()
 	result := &supervisorv1.InvokeResult{RunUs: time.Since(start).Microseconds()}
+	// Nothing the function started outlives the invocation: the next caller
+	// on a warm instance must not share the guest with it.
+	if cmd.Process != nil {
+		_ = syscall.Kill(-cmd.Process.Pid, syscall.SIGKILL)
+	}
+	sweep()
+	// A function that exited cleanly while a child it left still held its
+	// output open has finished: its output is complete.
+	if errors.Is(err, exec.ErrWaitDelay) && cmd.ProcessState != nil && cmd.ProcessState.Success() {
+		err = nil
+	}
 
 	var exitErr *exec.ExitError
 	switch {

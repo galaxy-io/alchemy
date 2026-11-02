@@ -52,7 +52,7 @@ func run(log *slog.Logger) error {
 		Kernel:         os.Getenv("KERNEL_IMAGE"),
 		SupervisorBin:  envOr("SUPERVISOR_BIN", filepath.Join(filepath.Dir(os.Args[0]), "supervisor")),
 		DataDir:        envOr("DATA_DIR", "/var/lib/alchemy"),
-		UIDBase:        100000,
+		UIDBase:        10_000_000,
 		Console:        true,
 		Keychain:       registry.Keychain(registry.AWS(), registry.GCP()),
 		Snapshots:      true,

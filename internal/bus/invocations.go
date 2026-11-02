@@ -2,12 +2,16 @@ package bus
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"time"
 
 	"github.com/nats-io/nats.go/jetstream"
 	"google.golang.org/protobuf/proto"
+
+	hostv1 "github.com/galaxy-io/alchemy/api/host/v1"
 )
 
 // Invocation records. Nothing is written about an invocation while it runs.
@@ -62,10 +66,12 @@ func (b *Bus) EnsureInvocationStream(ctx context.Context, cfg InvocationStreamCo
 	return nil
 }
 
-// PublishInvocations appends msg to the invocation stream on subject and waits for
-// the stream to have it.
-func (b *Bus) PublishInvocations(ctx context.Context, subject string, msg proto.Message) error {
-	data, err := proto.Marshal(msg)
+// PublishInvocations appends records to the invocation stream on subject
+// and waits for the stream to have them. The message id is the records'
+// ids, so a publish retried after the stream stored it but the
+// acknowledgement was lost is dropped as a duplicate.
+func (b *Bus) PublishInvocations(ctx context.Context, subject string, records *hostv1.InvocationRecords) error {
+	data, err := proto.Marshal(records)
 	if err != nil {
 		return err
 	}
@@ -73,7 +79,12 @@ func (b *Bus) PublishInvocations(ctx context.Context, subject string, msg proto.
 	if err != nil {
 		return err
 	}
-	if _, err := js.Publish(ctx, subject, data); err != nil {
+	h := sha256.New()
+	for _, inv := range records.GetInvocations() {
+		h.Write([]byte(inv.GetId()))
+		h.Write([]byte{0})
+	}
+	if _, err := js.Publish(ctx, subject, data, jetstream.WithMsgID(hex.EncodeToString(h.Sum(nil)))); err != nil {
 		return fmt.Errorf("bus: publish invocations: %w", err)
 	}
 	return nil

@@ -30,11 +30,20 @@ func compileArrow(c *functionsv1.ArrowContract) (*arrowContract, error) {
 	return &arrowContract{input: in, output: out}, nil
 }
 
+// newReader reads an IPC stream no part of which can declare more bytes
+// than the whole stream holds. Arrow allocates what a message declares
+// before reading it, so a few hostile bytes could otherwise make it allocate
+// hundreds of MiB.
+func newReader(raw []byte) (*ipc.Reader, error) {
+	limit := max(int64(len(raw)), 1)
+	return ipc.NewReader(bytes.NewReader(raw), ipc.WithMetadataSizeLimit(limit), ipc.WithBodySizeLimit(limit))
+}
+
 func parseSchema(raw []byte) (*arrow.Schema, error) {
 	if len(raw) == 0 {
 		return nil, errors.New("schema is required")
 	}
-	r, err := ipc.NewReader(bytes.NewReader(raw))
+	r, err := newReader(raw)
 	if err != nil {
 		return nil, fmt.Errorf("not an Arrow IPC schema: %w", err)
 	}
@@ -70,7 +79,7 @@ func (c *arrowContract) DecodeOutput(in *Input, out []byte) ([]byte, []*function
 // readBatch checks that raw is an IPC stream holding exactly one record batch
 // whose schema matches want, and returns the batch's row count.
 func readBatch(raw []byte, want *arrow.Schema, side string) (int64, []*functionsv1.ContractViolation) {
-	r, err := ipc.NewReader(bytes.NewReader(raw))
+	r, err := newReader(raw)
 	if err != nil {
 		return 0, []*functionsv1.ContractViolation{violation("", "", "%s is not an Arrow IPC stream: %v", side, err)}
 	}

@@ -244,6 +244,15 @@ func (s *Service) build(v *sqlcgen.FunctionVersion) {
 		artifact, buildLog, err = s.requestBuild(ctx, v, spec, sourceLayers(spec))
 	}
 
+	// A server stopping mid-build leaves the build to another, rather than
+	// failing the version for good.
+	if err != nil && s.background.Err() != nil {
+		if err := s.store.ReleaseFunctionVersionBuild(context.WithoutCancel(ctx), sqlcgen.ReleaseFunctionVersionBuildParams{ID: v.ID, BuildStartedAt: v.BuildStartedAt}); err != nil {
+			log.Warn("release build", "err", err)
+		}
+		log.Info("server stopping; build left for another server")
+		return
+	}
 	finish := sqlcgen.FinishFunctionVersionBuildParams{ID: v.ID, BuildStartedAt: v.BuildStartedAt, BuildLog: buildLog}
 	if err != nil {
 		finish.Status = sqlcgen.FunctionVersionStatusFailed

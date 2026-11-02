@@ -64,7 +64,7 @@ func (s *Service) writeRecords(ctx context.Context, recs []bus.Message) error {
 		if len(batch.invs) == 0 {
 			continue
 		}
-		if err := s.writeBatch(ctx, batch.invs, batch.override); err != nil {
+		if err := s.writeBatch(ctx, lastByID(batch.invs), batch.override); err != nil {
 			return err
 		}
 	}
@@ -98,14 +98,35 @@ func (s *Service) writeBatch(ctx context.Context, invs []*functionsv1.Invocation
 }
 
 // refused reports whether err is the database rejecting a statement for
-// what it says, not for when it was said: a data or constraint error.
+// what it says, not for when it was said: a cardinality, data or constraint
+// error.
 func refused(err error) bool {
 	var pgErr *pgconn.PgError
 	if !errors.As(err, &pgErr) {
 		return false
 	}
 	class := pgErr.Code[:2]
-	return class == "22" || class == "23"
+	return class == "21" || class == "22" || class == "23"
+}
+
+// lastByID keeps the last record of each invocation in invs, in order. A
+// statement that upserts one id twice is refused, and a host can publish a
+// record twice when it retries.
+func lastByID(invs []*functionsv1.Invocation) []*functionsv1.Invocation {
+	last := make(map[string]int, len(invs))
+	for i, inv := range invs {
+		last[inv.GetId()] = i
+	}
+	if len(last) == len(invs) {
+		return invs
+	}
+	out := make([]*functionsv1.Invocation, 0, len(last))
+	for i, inv := range invs {
+		if last[inv.GetId()] == i {
+			out = append(out, inv)
+		}
+	}
+	return out
 }
 
 // insertParams lays invocations out as the columns InsertInvocations takes.

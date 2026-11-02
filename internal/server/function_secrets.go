@@ -121,6 +121,16 @@ func (s *Service) handleSecrets(ctx context.Context, data []byte) proto.Message 
 	if req.GetTenantId() != s.tenant || !slices.Contains(s.placedHosts(req.GetFunctionId()), req.GetHost()) {
 		return &hostv1.SecretsResponse{Error: &hostv1.Error{Code: "permission_denied", Message: fmt.Sprintf("function %q is not placed on host %q", req.GetFunctionId(), req.GetHost())}}
 	}
+	// A host gets only the secrets the version it runs names.
+	named, err := s.versionSecrets(ctx, req.GetFunctionId(), req.GetVersion())
+	if err != nil {
+		return &hostv1.SecretsResponse{Error: &hostv1.Error{Code: "not_found", Message: err.Error()}}
+	}
+	for _, name := range req.GetNames() {
+		if !named[name] {
+			return &hostv1.SecretsResponse{Error: &hostv1.Error{Code: "permission_denied", Message: fmt.Sprintf("version %d of function %q does not name secret %q", req.GetVersion(), req.GetFunctionId(), name)}}
+		}
+	}
 	values := make(map[string]string, len(req.GetNames()))
 	for _, name := range req.GetNames() {
 		sec, err := s.secrets.Read(ctx, SecretScope.Ref(req.GetTenantId(), name))
@@ -130,4 +140,22 @@ func (s *Service) handleSecrets(ctx context.Context, data []byte) proto.Message 
 		values[name] = string(sec.Value)
 	}
 	return &hostv1.SecretsResponse{Values: values}
+}
+
+// versionSecrets is the set of secret names a version of one of this
+// tenant's functions names in spec.secrets.
+func (s *Service) versionSecrets(ctx context.Context, functionID string, version int64) (map[string]bool, error) {
+	row, err := s.version(ctx, functionID, version)
+	if err != nil {
+		return nil, err
+	}
+	spec, err := decodeSpec(row.Spec)
+	if err != nil {
+		return nil, err
+	}
+	named := make(map[string]bool, len(spec.GetSecrets()))
+	for _, name := range spec.GetSecrets() {
+		named[name] = true
+	}
+	return named, nil
 }

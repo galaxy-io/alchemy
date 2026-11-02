@@ -109,7 +109,7 @@ func (h *Host) fetchSecrets(ctx context.Context, a *hostv1.Artifact, names []str
 	ctx, cancel := context.WithTimeout(ctx, secretsFetchTimeout)
 	defer cancel()
 	resp := &hostv1.SecretsResponse{}
-	req := &hostv1.SecretsRequest{Host: h.cfg.Name, TenantId: a.GetTenantId(), FunctionId: a.GetFunctionId(), Names: names}
+	req := &hostv1.SecretsRequest{Host: h.cfg.Name, TenantId: a.GetTenantId(), FunctionId: a.GetFunctionId(), Version: a.GetVersion(), Names: names}
 	if err := h.bus.Request(ctx, bus.ServerSecretsSubject, req, resp); err != nil {
 		return nil, err
 	}

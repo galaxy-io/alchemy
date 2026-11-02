@@ -111,6 +111,10 @@ type Host struct {
 	// removes a drive a build has found and is about to serve.
 	drives sync.RWMutex
 
+	// handlers counts the bus handlers running. Shutdown waits for them
+	// before it waits for tasks, so no handler starts a task after that.
+	handlers sync.WaitGroup
+
 	mu        sync.Mutex
 	artifacts map[string]*hostv1.Artifact // built and ready to run, by id
 	used      map[string]time.Time        // when each artifact was built or last invoked, by id
@@ -154,22 +158,27 @@ func (h *Host) Run(ctx context.Context) error {
 	for _, s := range []struct {
 		subject, queue string
 		handler        bus.Handler
+		refused        proto.Message // the reply once the host is shutting down
 	}{
 		// The server places functions on hosts: it sends this host the builds
 		// and the invocations it chose it for.
-		{bus.HostBuildSubject(h.cfg.Name), "", h.handleBuild},
-		{bus.HostInvokeSubject(h.cfg.Name), "", h.handleInvoke},
-		{bus.DescribeSubject, "", h.handleDescribe},
-		{bus.InstancesSubject, "", h.handleInstances},
-		{bus.HostSecretsInvalidateSubject, "", h.handleSecretsInvalidate},
+		{bus.HostBuildSubject(h.cfg.Name), "", h.handleBuild, buildError("unavailable", errShuttingDown)},
+		{bus.HostInvokeSubject(h.cfg.Name), "", h.handleInvoke, invokeError("unavailable", errShuttingDown)},
+		{bus.DescribeSubject, "", h.handleDescribe, nil},
+		{bus.InstancesSubject, "", h.handleInstances, nil},
+		{bus.HostSecretsInvalidateSubject, "", h.handleSecretsInvalidate, nil},
 	} {
-		sub, err := h.bus.Serve(h.background, s.subject, s.queue, s.handler)
+		sub, err := h.bus.Serve(h.background, s.subject, s.queue, h.tracked(s.handler, s.refused))
 		if err != nil {
 			return err
 		}
 		subs = append(subs, sub)
 	}
-	h.tasks.Go(func() { h.records.run(h.background) })
+	// Records outlive the background context: invocations cancelled at
+	// shutdown still record how they ended.
+	records, stopRecords := context.WithCancel(context.WithoutCancel(h.background))
+	defer stopRecords()
+	h.tasks.Go(func() { h.records.run(records) })
 	h.log.Info("host serving", "slots", h.cfg.MaxConcurrency, "memory_mib", h.cfg.MemoryMiB, "warm_ttl", h.cfg.WarmTTL, "prewarm", h.cfg.Prewarm, "kept_versions", h.cfg.KeptVersions, "version_idle_ttl", h.cfg.VersionIdleTTL)
 
 	ticker := time.NewTicker(h.cfg.HeartbeatInterval)
@@ -185,12 +194,55 @@ func (h *Host) Run(ctx context.Context) error {
 			for _, s := range subs {
 				s.Unsubscribe()
 			}
-			h.drainWarm()
-			h.stop()
-			h.tasks.Wait()
+			h.shutdown(stopRecords)
 			return nil
 		}
 	}
+}
+
+var errShuttingDown = errors.New("host is shutting down")
+
+// shutdownGrace is how long in-flight builds and invocations get to finish
+// once the host stops taking work, inside the chart's termination grace.
+const shutdownGrace = 40 * time.Second
+
+// tracked counts handler's runs in h.handlers, so shutdown can wait for
+// them, and answers refused instead once the host is draining.
+func (h *Host) tracked(handler bus.Handler, refused proto.Message) bus.Handler {
+	return func(ctx context.Context, data []byte) proto.Message {
+		h.mu.Lock()
+		if h.draining {
+			h.mu.Unlock()
+			return refused
+		}
+		h.handlers.Add(1)
+		h.mu.Unlock()
+		defer h.handlers.Done()
+		return handler(ctx, data)
+	}
+}
+
+// shutdown stops taking work and releases the warm pool, gives in-flight
+// builds and invocations shutdownGrace to finish, then cancels them, so
+// every instance is released before Run returns and no microVM outlives
+// the host. stopRecords ends the record queue once every handler has
+// queued its record, and the queue publishes what is left.
+func (h *Host) shutdown(stopRecords context.CancelFunc) {
+	h.drainWarm()
+	done := make(chan struct{})
+	go func() {
+		h.handlers.Wait()
+		close(done)
+	}()
+	select {
+	case <-done:
+	case <-time.After(shutdownGrace):
+		h.log.Warn("shutdown grace over, cancelling in-flight work")
+	}
+	h.stop()
+	<-done
+	stopRecords()
+	h.tasks.Wait()
 }
 
 func (h *Host) heartbeat() {
@@ -635,14 +687,15 @@ func (h *Host) admit(a *hostv1.Artifact) (*liveInstance, error) {
 }
 
 // park returns live to the warm pool for its artifact. It reports false
-// when warm reuse is off, and the caller releases the instance instead.
+// when warm reuse is off, the host is draining or the artifact was evicted,
+// and the caller releases the instance instead.
 func (h *Host) park(live *liveInstance) bool {
 	if h.cfg.WarmTTL <= 0 {
 		return false
 	}
 	h.mu.Lock()
 	defer h.mu.Unlock()
-	if h.draining {
+	if _, served := h.artifacts[live.artifact.GetId()]; h.draining || !served {
 		return false
 	}
 	live.idle(time.Now())
@@ -754,7 +807,7 @@ func (h *Host) boot(live *liveInstance) {
 	live.ready(instance, kind, "")
 	h.mu.Lock()
 	defer h.mu.Unlock()
-	if h.draining {
+	if _, served := h.artifacts[id]; h.draining || !served {
 		live.releasing()
 		h.tasks.Go(func() {
 			h.kill(live)
