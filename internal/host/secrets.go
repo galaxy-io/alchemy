@@ -88,6 +88,22 @@ func (h *Host) invocationSecrets(ctx context.Context, a *hostv1.Artifact, log *s
 	return env, nil
 }
 
+// handleSecretsInvalidate drops this host's cached values for the named
+// secrets, so a rotated value is refetched on the next invocation.
+func (h *Host) handleSecretsInvalidate(_ context.Context, data []byte) proto.Message {
+	msg := &hostv1.SecretsInvalidate{}
+	if err := proto.Unmarshal(data, msg); err != nil {
+		h.log.Warn("invalidate secrets", "err", err)
+		return nil
+	}
+	h.secrets.mu.Lock()
+	for _, name := range msg.GetNames() {
+		delete(h.secrets.values, secretKey(msg.GetTenantId(), name))
+	}
+	h.secrets.mu.Unlock()
+	return nil
+}
+
 // fetchSecrets asks a server for names' values.
 func (h *Host) fetchSecrets(ctx context.Context, a *hostv1.Artifact, names []string) (map[string]string, error) {
 	ctx, cancel := context.WithTimeout(ctx, secretsFetchTimeout)

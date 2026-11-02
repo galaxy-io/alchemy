@@ -161,6 +161,7 @@ func (h *Host) Run(ctx context.Context) error {
 		{bus.HostInvokeSubject(h.cfg.Name), "", h.handleInvoke},
 		{bus.DescribeSubject, "", h.handleDescribe},
 		{bus.InstancesSubject, "", h.handleInstances},
+		{bus.HostSecretsInvalidateSubject, "", h.handleSecretsInvalidate},
 	} {
 		sub, err := h.bus.Serve(h.background, s.subject, s.queue, s.handler)
 		if err != nil {
