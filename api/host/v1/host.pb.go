@@ -213,8 +213,8 @@ type SecretsRequest struct {
 	Host          string                 `protobuf:"bytes,1,opt,name=host,proto3" json:"host,omitempty"`
 	TenantId      string                 `protobuf:"bytes,2,opt,name=tenant_id,json=tenantId,proto3" json:"tenant_id,omitempty"`
 	FunctionId    string                 `protobuf:"bytes,3,opt,name=function_id,json=functionId,proto3" json:"function_id,omitempty"`
-	Version       int64                  `protobuf:"varint,5,opt,name=version,proto3" json:"version,omitempty"`
-	Names         []string               `protobuf:"bytes,4,rep,name=names,proto3" json:"names,omitempty"`
+	Version       int64                  `protobuf:"varint,4,opt,name=version,proto3" json:"version,omitempty"`
+	Names         []string               `protobuf:"bytes,5,rep,name=names,proto3" json:"names,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1499,8 +1499,8 @@ const file_host_v1_host_proto_rawDesc = "" +
 	"\ttenant_id\x18\x02 \x01(\tR\btenantId\x12\x1f\n" +
 	"\vfunction_id\x18\x03 \x01(\tR\n" +
 	"functionId\x12\x18\n" +
-	"\aversion\x18\x05 \x01(\x03R\aversion\x12\x14\n" +
-	"\x05names\x18\x04 \x03(\tR\x05names\"\xb0\x01\n" +
+	"\aversion\x18\x04 \x01(\x03R\aversion\x12\x14\n" +
+	"\x05names\x18\x05 \x03(\tR\x05names\"\xb0\x01\n" +
 	"\x0fSecretsResponse\x12<\n" +
 	"\x06values\x18\x01 \x03(\v2$.host.v1.SecretsResponse.ValuesEntryR\x06values\x12$\n" +
 	"\x05error\x18\x02 \x01(\v2\x0e.host.v1.ErrorR\x05error\x1a9\n" +

@@ -93,8 +93,8 @@ message SecretsRequest {
   string host = 1;
   string tenant_id = 2;
   string function_id = 3;
-  int64 version = 5;
-  repeated string names = 4;
+  int64 version = 4;
+  repeated string names = 5;
 }
 
 message SecretsResponse {
