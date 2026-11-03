@@ -21,6 +21,7 @@ import {
   FUNCTION_PROTOCOL_TO_TOKEN_MAP,
   FUNCTION_SOURCE_EXTENSION_TO_LANGUAGE_MAP,
   FUNCTION_SOURCE_EXTENSION_TO_RUNTIME_ID_MAP,
+  FUNCTION_SOURCE_LANGUAGE_TO_EXTENSIONS_MAP,
 } from "@/pages/functions/constants";
 import type {
   FunctionArrowField,
@@ -98,6 +99,12 @@ export const getFunctionRuntime = (
   image: string | undefined,
 ): Runtime | undefined => runtimes.find((runtime) => runtime.image === image);
 
+export const getFunctionVersionRuntime = (
+  runtimes: Runtime[],
+  version: FunctionVersion | undefined,
+): Runtime | undefined =>
+  version?.spec?.source ? getFunctionRuntime(runtimes, version.spec.image) : undefined;
+
 export const getFunctionRuntimeIconUrl = (
   runtime: Runtime,
   theme: GalaxyTheme.DARK | GalaxyTheme.LIGHT,
@@ -112,6 +119,9 @@ const getFunctionSourceExtension = (path: string) => path.split(".").pop() ?? ""
 export const getFunctionSourceLanguage = (path: string): CodeEditorLanguage =>
   FUNCTION_SOURCE_EXTENSION_TO_LANGUAGE_MAP[getFunctionSourceExtension(path)] ??
   CodeEditorLanguage.PLAIN;
+
+export const getFunctionSourceExtensions = (path: string) =>
+  FUNCTION_SOURCE_LANGUAGE_TO_EXTENSIONS_MAP[getFunctionSourceLanguage(path)];
 
 export const getFunctionSourceRuntime = (runtimes: Runtime[], path: string) => {
   const id = FUNCTION_SOURCE_EXTENSION_TO_RUNTIME_ID_MAP[getFunctionSourceExtension(path)];
