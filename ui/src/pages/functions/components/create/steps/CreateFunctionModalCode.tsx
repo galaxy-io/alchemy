@@ -11,7 +11,7 @@ import {
 } from "@/pages/functions/components/create/CreateFunctionModalProvider";
 import FunctionCodeEditorFrame from "@/pages/functions/components/FunctionCodeEditorFrame";
 import FunctionSourceFileIcon from "@/pages/functions/components/FunctionSourceFileIcon";
-import { getFunctionSourceLanguage } from "@/pages/functions/utils";
+import { getFunctionSourceExtensions, getFunctionSourceLanguage } from "@/pages/functions/utils";
 
 const CreateFunctionModalCode: FC = () => {
   const { sourceFiles, sourceFile, runtimes } = useCreateFunctionModalState();
@@ -43,6 +43,7 @@ const CreateFunctionModalCode: FC = () => {
           key={file.path}
           ariaLabel={file.path}
           language={getFunctionSourceLanguage(file.path)}
+          extensions={getFunctionSourceExtensions(file.path)}
           value={file.content}
           onChange={(content) => setSourceFileContent({ path: file.path, content })}
           isGhost

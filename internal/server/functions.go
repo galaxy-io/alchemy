@@ -238,11 +238,16 @@ func (s *Service) build(v *sqlcgen.FunctionVersion) {
 		_, err = contract.Compile(spec.GetContract())
 	}
 	var artifact *hostv1.Artifact
-	var buildLog string
+	var layers []*hostv1.Layer
+	var compileLog, buildLog string
 	start := time.Now()
 	if err == nil {
-		artifact, buildLog, err = s.requestBuild(ctx, v, spec, sourceLayers(spec))
+		layers, compileLog, err = s.versionLayers(ctx, v, spec)
 	}
+	if err == nil {
+		artifact, buildLog, err = s.requestBuild(ctx, v, spec, layers)
+	}
+	buildLog = compileLog + buildLog
 
 	// A server stopping mid-build leaves the build to another, rather than
 	// failing the version for good.

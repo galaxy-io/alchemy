@@ -16,6 +16,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"strconv"
 	"strings"
 
 	"github.com/google/go-containerregistry/pkg/name"
@@ -272,7 +273,7 @@ func (d *Driver) buildDrive(ctx context.Context, out string, slack int64, fill f
 		return err
 	}
 
-	size, err := dirSizeMiB(root)
+	size, inodes, err := driveSize(root)
 	if err != nil {
 		return err
 	}
@@ -284,7 +285,7 @@ func (d *Driver) buildDrive(ctx context.Context, out string, slack int64, fill f
 	}
 	tmp := f.Name()
 	_ = f.Close()
-	mkfs := exec.CommandContext(ctx, "mke2fs", "-q", "-F", "-t", "ext4", "-m", "0", //nolint:gosec // paths are ours
+	mkfs := exec.CommandContext(ctx, "mke2fs", "-q", "-F", "-t", "ext4", "-m", "0", "-N", strconv.FormatInt(inodes, 10), //nolint:gosec // paths are ours
 		"-E", "root_owner=0:0", "-d", root, tmp, fmt.Sprintf("%dM", size+slack))
 	if msg, err := mkfs.CombinedOutput(); err != nil {
 		_ = os.Remove(tmp)
@@ -382,9 +383,17 @@ func copyFile(src, dst string, mode os.FileMode) error {
 	return out.Close()
 }
 
-func dirSizeMiB(dir string) (int64, error) {
-	var total int64
-	err := filepath.WalkDir(dir, func(_ string, d os.DirEntry, err error) error {
+// driveSize is how many MiB an ext4 drive holding dir needs, and how many
+// inodes. Every file and directory takes whole blocks and an inode, which
+// dominates for a tree of many small files such as a toolchain, and the
+// journal and block group metadata take a share of the whole.
+func driveSize(dir string) (mib, inodes int64, err error) {
+	const (
+		blockBytes = 4096
+		inodeBytes = 256
+	)
+	var blocks int64
+	err = filepath.WalkDir(dir, func(_ string, d os.DirEntry, err error) error {
 		if err != nil {
 			return err
 		}
@@ -392,10 +401,17 @@ func dirSizeMiB(dir string) (int64, error) {
 		if err != nil {
 			return err
 		}
-		total += info.Size()
+		inodes++
+		if info.Mode().IsRegular() || info.IsDir() {
+			blocks += (info.Size() + blockBytes - 1) / blockBytes
+		}
 		return nil
 	})
-	return total>>20 + 1, err
+	// A tenth for the journal and metadata, and room for more inodes than
+	// there are entries.
+	inodes += inodes/10 + 1024
+	need := blocks*blockBytes + inodes*inodeBytes
+	return (need+need/10)>>20 + 1, inodes, err
 }
 
 // layerReader reads a layer's archive, opened on first read, decompressed

@@ -23,9 +23,9 @@ Alchemy's `ui/` is a Galaxy app: the architecture the org's `galaxy-ui` skill de
 
 ## Screens
 
-The design reference is the `feat/examples` proof of concept: same screens, same density, same copy. The entity is a "function" in code and in the UI. A function runs from an OCI image of its own or from source files on a runtime image (`python:3.13`, `node:24`), and "image" in copy means the OCI image only.
+The design reference is the `feat/examples` proof of concept: same screens, same density, same copy. The entity is a "function" in code and in the UI. A function runs from an OCI image of its own or from source files on a runtime image (`python:3.13`, `node:24`, `go:1.27`, `rust:1.99`, the last two compiled on a host first), and "image" in copy means the OCI image only.
 
-**Widgets carry an icon.** Observability widgets take a Phosphor `icon` (Invocations `ChartBarIcon`, Latency `TimerIcon`, Traffic `CalendarDotsIcon`, History `ListIcon`), and entity cards reuse their nav item's icon (function cards `CubeIcon`, host cards `CpuIcon`). Settings sections have none. Counts beside a section label are a `TERTIARY` `X_SMALL` `Chip`.
+**Widgets carry an icon.** Observability widgets take a Phosphor `icon` (Invocations `ChartBarIcon`, Latency `TimerIcon`, Traffic `CalendarDotsIcon`, History `ListIcon`), and entity cards reuse their nav item's icon (function cards `CubeIcon`, or the runtime's logo beside the name when the current version is built from source, host cards `CpuIcon`). Settings sections have none. Counts beside a section label are a `TERTIARY` `X_SMALL` `Chip`.
 
 **Never join values with a middle dot (`·`) in UI copy.** Give each value its own slot: a table column, a `Stat`, a second row under a `Divider`, a second line in a tooltip, an Alert header over its body. A label that needs a qualifier is reworded ("Last 24 hours"). Grep `·` in `src/` before handing over.
 

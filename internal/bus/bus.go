@@ -35,6 +35,14 @@ func HostInvokeSubject(name string) string { return "host." + name + ".invoke" }
 // HostBuildSubject is where host name takes builds.
 func HostBuildSubject(name string) string { return "host." + name + ".build" }
 
+// HostCompileSubject is where host name takes compiles.
+func HostCompileSubject(name string) string { return "host." + name + ".compile" }
+
+// LayerDigestMetadata names the blob metadata a compiled layer carries its
+// sha256 under, so a server that finds the layer already compiled can name
+// it without reading it.
+const LayerDigestMetadata = "sha256"
+
 // HeartbeatSubject is where host name announces itself.
 func HeartbeatSubject(name string) string { return "host." + name + ".heartbeat" }
 
