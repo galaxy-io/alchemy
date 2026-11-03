@@ -7,7 +7,7 @@ import Text, { TextSize, TextVariant } from "@galaxy-io/dls/text/Text";
 import type { FunctionVersion } from "@/gen/functions/v1/functions_pb";
 
 import FunctionCodeEditorFrame from "@/pages/functions/components/FunctionCodeEditorFrame";
-import { getFunctionSourceLanguage } from "@/pages/functions/utils";
+import { getFunctionSourceExtensions, getFunctionSourceLanguage } from "@/pages/functions/utils";
 import { FUNCTION_WORKBENCH_FILE_TO_PATH_MAP } from "@/pages/functions/workbench/constants";
 import { FunctionWorkbenchFile } from "@/pages/functions/workbench/types";
 import {
@@ -46,6 +46,7 @@ const FunctionWorkbenchEditor: FC<FunctionWorkbenchEditorProps> = ({
             key={file}
             ariaLabel={path}
             language={getFunctionSourceLanguage(path)}
+            extensions={getFunctionSourceExtensions(path)}
             value={source ?? ""}
             onChange={(value) => onSourceChange(path, value)}
             isReadOnly={source === undefined}

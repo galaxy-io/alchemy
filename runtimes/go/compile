@@ -1,0 +1,20 @@
+#!/bin/sh
+# Compiles the Go files under /app and writes a tar holding app/handler to
+# stdout. Everything else goes to stderr, which is the build log.
+#
+# The root filesystem is read-only, so the module and the build cache are
+# overlaid with writable layers on /tmp.
+set -eu
+
+work=/tmp/compile
+for dir in module cache; do
+  mkdir -p "$work/$dir/upper" "$work/$dir/work"
+done
+mount -t overlay overlay -o "lowerdir=/opt/alchemy/module,upperdir=$work/module/upper,workdir=$work/module/work" /opt/alchemy/module
+mount -t overlay overlay -o "lowerdir=$GOCACHE,upperdir=$work/cache/upper,workdir=$work/cache/work" "$GOCACHE"
+
+cp -R /app/. /opt/alchemy/module/
+mkdir -p "$work/out/app"
+cd /opt/alchemy/module
+go build -ldflags='-s -w' -o "$work/out/app/handler" . >&2
+tar -C "$work/out" -cf - app

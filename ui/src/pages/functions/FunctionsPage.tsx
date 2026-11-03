@@ -24,11 +24,14 @@ import {
   createListFunctionsInput,
   useSuspenseListFunctionsInfiniteQuery,
 } from "@/api/queries/functions";
+import { useListRuntimesQuery } from "@/api/queries/runtimes";
 
 const FunctionsPage: FC = () => {
   const openFlow = useAlchemyFlowOpen();
   const search = useFunctionsSearch();
   const metricsById = useFunctionCardMetrics();
+  const { data: runtimesData } = useListRuntimesQuery();
+  const runtimes = runtimesData?.runtimes ?? [];
 
   const { data, hasNextPage, isFetchingNextPage, fetchNextPage } =
     useSuspenseListFunctionsInfiniteQuery({ input: createListFunctionsInput(search) });
@@ -76,6 +79,7 @@ const FunctionsPage: FC = () => {
                 key={alchemyFunction.id}
                 alchemyFunction={alchemyFunction}
                 metrics={metricsById.get(alchemyFunction.id)}
+                runtimes={runtimes}
               />
             ))}
           </Grid>
