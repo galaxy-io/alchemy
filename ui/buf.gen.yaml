@@ -6,6 +6,10 @@ inputs:
     exclude_paths:
       - ../protos/host
       - ../protos/supervisor
+  # AuthService, served by the identity module.
+  - git_repo: https://github.com/galaxy-io/modules.git
+    ref: identity/v0.1.0
+    subdir: identity/proto
 plugins:
   - local: protoc-gen-es
     out: src/gen

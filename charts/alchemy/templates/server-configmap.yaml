@@ -22,8 +22,55 @@ data:
   # Artifacts
   ARTIFACTS_BUCKET: {{ .Values.artifacts.bucket | quote }}
   # Secrets
+  {{- if eq .Values.secrets.type "datastore" }}
   {{- with .Values.secrets.datastore.encryptionKeyId }}
   ENCRYPTION_KEY_ID: {{ . | quote }}
+  {{- end }}
+  {{- else }}
+  SECRET_PROVIDER: {{ .Values.secrets.type | quote }}
+  {{- with .Values.secrets.prefix }}
+  SECRETS_PREFIX: {{ . | quote }}
+  {{- end }}
+  {{- end }}
+  {{- if eq .Values.secrets.type "aws-secrets-manager" }}
+  {{- with .Values.secrets.aws.region }}
+  AWS_REGION: {{ . | quote }}
+  {{- end }}
+  {{- end }}
+  {{- if eq .Values.secrets.type "gcp-secret-manager" }}
+  GCP_PROJECT_ID: {{ required "secrets.gcp.projectId is required for gcp-secret-manager" .Values.secrets.gcp.projectId | quote }}
+  GCP_REGION: {{ required "secrets.gcp.region is required for gcp-secret-manager" .Values.secrets.gcp.region | quote }}
+  {{- end }}
+  # Identity
+  {{- if .Values.auth.enabled }}
+  AUTH_PROVIDER: {{ .Values.auth.type | quote }}
+  {{- if eq .Values.auth.type "keycloak" }}
+  AUTH_ISSUER: {{ required "auth.keycloak.issuer is required for keycloak" .Values.auth.keycloak.issuer | quote }}
+  AUTH_CLIENT_ID: {{ .Values.auth.keycloak.clientId | quote }}
+  {{- with .Values.auth.keycloak.adminUser }}
+  AUTH_ADMIN_USERNAME: {{ . | quote }}
+  {{- end }}
+  {{- with .Values.auth.keycloak.bootstrap.clientId }}
+  AUTH_BOOTSTRAP_CLIENT_ID: {{ . | quote }}
+  {{- end }}
+  {{- else if eq .Values.auth.type "zitadel" }}
+  AUTH_ISSUER: {{ required "auth.zitadel.issuer is required for zitadel" .Values.auth.zitadel.issuer | quote }}
+  {{- else if eq .Values.auth.type "proxy" }}
+  {{- with .Values.auth.proxy.tenant }}
+  AUTH_PROXY_TENANT: {{ . | quote }}
+  {{- end }}
+  {{- else }}
+  {{- fail (printf "auth.type %q is not one of: keycloak, zitadel, proxy" .Values.auth.type) }}
+  {{- end }}
+  {{- with .Values.auth.bootstrap.tenant }}
+  AUTH_BOOTSTRAP_TENANT: {{ . | quote }}
+  {{- end }}
+  {{- with .Values.auth.bootstrap.adminEmail }}
+  AUTH_BOOTSTRAP_ADMIN_EMAIL: {{ . | quote }}
+  {{- end }}
+  {{- with .Values.auth.uiOrigin }}
+  AUTH_UI_ORIGIN: {{ . | quote }}
+  {{- end }}
   {{- end }}
   # Runtimes
   RUNTIME_IMAGE_PREFIX: {{ .Values.runtimes.imagePrefix | quote }}
