@@ -163,6 +163,7 @@ func (h *Host) Run(ctx context.Context) error {
 		// The server places functions on hosts: it sends this host the builds
 		// and the invocations it chose it for.
 		{bus.HostBuildSubject(h.cfg.Name), "", h.handleBuild, buildError("unavailable", errShuttingDown)},
+		{bus.HostCompileSubject(h.cfg.Name), "", h.handleCompile, compileError("unavailable", errShuttingDown)},
 		{bus.HostInvokeSubject(h.cfg.Name), "", h.handleInvoke, invokeError("unavailable", errShuttingDown)},
 		{bus.DescribeSubject, "", h.handleDescribe, nil},
 		{bus.InstancesSubject, "", h.handleInstances, nil},

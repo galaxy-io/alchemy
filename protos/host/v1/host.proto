@@ -17,6 +17,8 @@ import "functions/v1/invocations.proto";
 //                                has not built the artifact
 //   host.<name>.build            request/reply: that host builds, replies
 //                                with the Artifact
+//   host.<name>.compile          request/reply: that host compiles a
+//                                source, replies with the compiled Layer
 //   host.<name>.heartbeat        publish: a Heartbeat, periodically
 //   host.describe                request, scatter/gather: every host replies
 //                                with its Host
@@ -144,6 +146,29 @@ message BuildResponse {
     Error error = 2;
   }
   // build_log is the tail of the build's output.
+  string build_log = 3;
+}
+
+// CompileRequest turns a source into the layer a version runs: image boots
+// once with source under /app and writes a tar of the compiled files to
+// stdout. The host keeps the tar at key in the artifacts bucket.
+message CompileRequest {
+  string tenant_id = 1;
+  // image is the build image, e.g. .../runtime/go:1.27-build.
+  string image = 2;
+  Layer source = 3;
+  string key = 4;
+  int64 timeout_ms = 5;
+  uint32 vcpus = 6;
+  uint32 memory_mib = 7;
+}
+
+message CompileResponse {
+  oneof result {
+    Layer layer = 1;
+    Error error = 2;
+  }
+  // build_log is the tail of the compiler's output.
   string build_log = 3;
 }
 

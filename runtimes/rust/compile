@@ -1,0 +1,21 @@
+#!/bin/sh
+# Compiles the Rust files under /app and writes a tar holding app/handler to
+# stdout. Everything else goes to stderr, which is the build log.
+#
+# The root filesystem is read-only, so the crate, with its compiled
+# dependencies, and Cargo's home are overlaid with writable layers on /tmp.
+set -eu
+
+work=/tmp/compile
+for dir in crate cargo; do
+  mkdir -p "$work/$dir/upper" "$work/$dir/work"
+done
+mount -t overlay overlay -o "lowerdir=/opt/alchemy/crate,upperdir=$work/crate/upper,workdir=$work/crate/work" /opt/alchemy/crate
+mount -t overlay overlay -o "lowerdir=$CARGO_HOME,upperdir=$work/cargo/upper,workdir=$work/cargo/work" "$CARGO_HOME"
+
+cp -R /app/. /opt/alchemy/crate/
+mkdir -p "$work/out/app"
+cd /opt/alchemy/crate
+cargo build --release --offline >&2
+cp target/release/handler "$work/out/app/handler"
+tar -C "$work/out" -cf - app

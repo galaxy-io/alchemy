@@ -1,0 +1,42 @@
+package main
+
+import (
+	"fmt"
+	"os"
+
+	"github.com/apache/arrow-go/v18/arrow"
+	"github.com/apache/arrow-go/v18/arrow/ipc"
+)
+
+func handler(batch arrow.RecordBatch) (arrow.RecordBatch, error) {
+	batch.Retain()
+	return batch, nil
+}
+
+func main() {
+	reader, err := ipc.NewReader(os.Stdin)
+	if err != nil {
+		fail(err)
+	}
+	defer reader.Release()
+	if !reader.Next() {
+		fail(fmt.Errorf("input holds no record batch: %v", reader.Err()))
+	}
+	out, err := handler(reader.RecordBatch())
+	if err != nil {
+		fail(err)
+	}
+	defer out.Release()
+	w := ipc.NewWriter(os.Stdout, ipc.WithSchema(out.Schema()))
+	if err := w.Write(out); err != nil {
+		fail(err)
+	}
+	if err := w.Close(); err != nil {
+		fail(err)
+	}
+}
+
+func fail(err error) {
+	fmt.Fprintln(os.Stderr, err)
+	os.Exit(1)
+}

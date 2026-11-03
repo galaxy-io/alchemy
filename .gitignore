@@ -39,3 +39,6 @@ charts/alchemy/values-*.yaml
 
 # Local demo driver
 examples/embed/tool/
+
+# Cargo build output
+target/

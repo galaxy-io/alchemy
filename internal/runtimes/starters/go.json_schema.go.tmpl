@@ -1,0 +1,30 @@
+package main
+
+import (
+	"encoding/json"
+	"fmt"
+	"os"
+)
+
+func handler(event any) (any, error) {
+	return event, nil
+}
+
+func main() {
+	var event any
+	if err := json.NewDecoder(os.Stdin).Decode(&event); err != nil {
+		fail(err)
+	}
+	out, err := handler(event)
+	if err != nil {
+		fail(err)
+	}
+	if err := json.NewEncoder(os.Stdout).Encode(out); err != nil {
+		fail(err)
+	}
+}
+
+func fail(err error) {
+	fmt.Fprintln(os.Stderr, err)
+	os.Exit(1)
+}
