@@ -1,3 +1,6 @@
+import { indentUnit } from "@codemirror/language";
+import { EditorState, type Extension } from "@codemirror/state";
+
 import { ChipVariant } from "@galaxy-io/dls/chips/Chip";
 import { CodeEditorLanguage } from "@galaxy-io/dls/editor/CodeEditor";
 import type { RoleColor } from "@galaxy-io/dls/theme/tokens/types";
@@ -67,6 +70,8 @@ export const FUNCTION_SOURCE_KINDS = Object.values(FunctionSourceKind);
 export const FUNCTION_SOURCE_EXTENSION_TO_LANGUAGE_MAP: Record<string, CodeEditorLanguage> = {
   py: CodeEditorLanguage.PYTHON,
   ts: CodeEditorLanguage.TYPESCRIPT,
+  go: CodeEditorLanguage.GO,
+  rs: CodeEditorLanguage.RUST,
   js: CodeEditorLanguage.JAVASCRIPT,
   mjs: CodeEditorLanguage.JAVASCRIPT,
   json: CodeEditorLanguage.JSON,
@@ -76,9 +81,23 @@ export const FUNCTION_SOURCE_EXTENSION_TO_LANGUAGE_MAP: Record<string, CodeEdito
   yml: CodeEditorLanguage.YAML,
 };
 
+const FUNCTION_SOURCE_TAB_INDENT: Extension[] = [indentUnit.of("\t"), EditorState.tabSize.of(4)];
+
+const FUNCTION_SOURCE_FOUR_SPACE_INDENT: Extension[] = [indentUnit.of("    ")];
+
+export const FUNCTION_SOURCE_LANGUAGE_TO_EXTENSIONS_MAP: Partial<
+  Record<CodeEditorLanguage, Extension[]>
+> = {
+  [CodeEditorLanguage.GO]: FUNCTION_SOURCE_TAB_INDENT,
+  [CodeEditorLanguage.PYTHON]: FUNCTION_SOURCE_FOUR_SPACE_INDENT,
+  [CodeEditorLanguage.RUST]: FUNCTION_SOURCE_FOUR_SPACE_INDENT,
+};
+
 export const FUNCTION_SOURCE_EXTENSION_TO_RUNTIME_ID_MAP: Record<string, Runtime["id"]> = {
   py: "python",
   ts: "node",
   js: "node",
   mjs: "node",
+  go: "go",
+  rs: "rust",
 };

@@ -9,15 +9,16 @@ import Text, { TextSize, TextVariant } from "@galaxy-io/dls/text/Text";
 import { EMPTY_VALUE } from "@galaxy-io/dls/utils/format";
 import Widget from "@galaxy-io/dls/widget/Widget";
 
-import type { Function as AlchemyFunction } from "@/gen/functions/v1/functions_pb";
+import type { Function as AlchemyFunction, Runtime } from "@/gen/functions/v1/functions_pb";
 
 import Stat from "@/components/Stat";
 
 import { FUNCTION_CARD_DESCRIPTION_HEIGHT } from "@/pages/functions/components/card/constants";
+import FunctionCardHeader from "@/pages/functions/components/card/FunctionCardHeader";
 import FunctionCardRecentInvocations from "@/pages/functions/components/card/FunctionCardRecentInvocations";
 import type { FunctionCardMetrics } from "@/pages/functions/components/card/types";
 import FunctionVersionChip from "@/pages/functions/components/FunctionVersionChip";
-import { getFunctionCurrentVersion } from "@/pages/functions/utils";
+import { getFunctionCurrentVersion, getFunctionVersionRuntime } from "@/pages/functions/utils";
 
 import { useAlchemyNavigate } from "@/module/hooks";
 import { AlchemyPath } from "@/module/paths";
@@ -27,10 +28,13 @@ import { formatCount, formatMillis, formatRatio } from "@/utils/format";
 interface FunctionCardProps {
   alchemyFunction: AlchemyFunction;
   metrics: FunctionCardMetrics | undefined;
+  runtimes: Runtime[];
 }
 
-const FunctionCard: FC<FunctionCardProps> = ({ alchemyFunction, metrics }) => {
+const FunctionCard: FC<FunctionCardProps> = ({ alchemyFunction, metrics, runtimes }) => {
   const navigate = useAlchemyNavigate();
+  const currentVersion = getFunctionCurrentVersion(alchemyFunction);
+  const runtime = getFunctionVersionRuntime(runtimes, currentVersion);
 
   const handleOpen = () => {
     void navigate({ to: AlchemyPath.FUNCTION, params: { id: alchemyFunction.id } });
@@ -38,16 +42,18 @@ const FunctionCard: FC<FunctionCardProps> = ({ alchemyFunction, metrics }) => {
 
   return (
     <Widget
-      header={alchemyFunction.name}
-      icon={CubeIcon}
+      header={
+        runtime ? (
+          <FunctionCardHeader name={alchemyFunction.name} runtime={runtime} />
+        ) : (
+          alchemyFunction.name
+        )
+      }
+      icon={runtime ? undefined : CubeIcon}
+      ariaLabel={alchemyFunction.name}
       isInteractive
       onClick={handleOpen}
-      actions={
-        <FunctionVersionChip
-          version={getFunctionCurrentVersion(alchemyFunction)?.version}
-          size={ChipSize.X_SMALL}
-        />
-      }
+      actions={<FunctionVersionChip version={currentVersion?.version} size={ChipSize.X_SMALL} />}
       footer={<FunctionCardRecentInvocations functionId={alchemyFunction.id} />}
     >
       <Flex direction={FlexDirection.COLUMN} gap={12}>

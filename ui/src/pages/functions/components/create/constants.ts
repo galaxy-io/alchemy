@@ -162,7 +162,11 @@ export const CREATE_FUNCTION_MODAL_ARROW_TYPES = [
   "fixed_size_list<float32>[384]",
 ];
 
-const CREATE_FUNCTION_MODAL_DEFAULT_SCHEMA: JsonObject = { type: "object" };
+const CREATE_FUNCTION_MODAL_DEFAULT_SCHEMA: JsonObject = {
+  type: "object",
+  properties: { id: { type: "string" } },
+  required: ["id"],
+};
 
 const CREATE_FUNCTION_MODAL_DEFAULT_ARROW_FIELDS: Record<
   FunctionContractSide,
