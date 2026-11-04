@@ -55,7 +55,7 @@ const HostsPage: FC = () => {
           height={HOSTS_SECTION_HEADER_HEIGHT}
           shrink={0}
         >
-          <Text size={TextSize.BODY_SM} weight={TextWeight.MEDIUM}>
+          <Text size={TextSize.BODY_MD} weight={TextWeight.MEDIUM}>
             Instances
           </Text>
           <Chip

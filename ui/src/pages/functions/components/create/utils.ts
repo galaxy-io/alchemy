@@ -27,7 +27,6 @@ import {
 } from "@/pages/functions/components/create/constants";
 import {
   type CreateFunctionModalDerivedState,
-  type CreateFunctionModalEnvEntry,
   CreateFunctionModalMode,
   type CreateFunctionModalState,
   CreateFunctionModalStep,
@@ -88,14 +87,8 @@ export const createInitialCreateFunctionModalState = ({
     image: spec?.source ? "" : (spec?.image ?? ""),
     isSourceTouched: !!spec?.source,
     command: spec?.command ?? [],
-    env: [
-      ...Object.entries(spec?.env ?? {}).map(([key, value]) =>
-        createCreateFunctionModalEnvEntry({ key, value }),
-      ),
-      ...Object.keys(spec?.secrets ?? {}).map((key) =>
-        createCreateFunctionModalEnvEntry({ key, isSecret: true }),
-      ),
-    ],
+    variables: Object.entries(spec?.env ?? {}).map(([key, value]) => ({ key, value })),
+    secrets: Object.keys(spec?.secrets ?? {}).map((key) => ({ key, value: "" })),
     secretNames: spec?.secrets ?? {},
     contractKind,
     schemaTexts:
@@ -136,16 +129,15 @@ export const getCreateFunctionModalSteps = (
   );
 
 const getEnvHints = (state: CreateFunctionModalState) => {
-  const names = state.env.map((entry) => entry.key.trim());
+  const names = [...state.variables, ...state.secrets].map((pair) => pair.key.trim());
   return [
-    names.some((name) => !name) ? "Every variable needs a name" : undefined,
+    state.variables.some((pair) => !pair.key.trim()) ? "Every variable needs a name" : undefined,
+    state.secrets.some((pair) => !pair.key.trim()) ? "Every secret needs a name" : undefined,
     names.some((name) => name && !CREATE_FUNCTION_MODAL_ENV_NAME_PATTERN.test(name))
-      ? "A variable name is letters, digits and underscores, not starting with a digit"
+      ? "A name is letters, digits and underscores, not starting with a digit"
       : undefined,
-    new Set(names).size !== names.length ? "Variable names must be unique" : undefined,
-    state.env.some(
-      (entry) => entry.isSecret && !entry.value && !state.secretNames[entry.key.trim()],
-    )
+    new Set(names).size !== names.length ? "Variable and secret names must be unique" : undefined,
+    state.secrets.some((pair) => !pair.value && !state.secretNames[pair.key.trim()])
       ? "Every secret needs a value"
       : undefined,
   ].filter((hint) => hint !== undefined);
@@ -249,13 +241,3 @@ export const getCreateFunctionModalStepSummary = (
         `${state.vcpus} vCPU, ${formatMemory(state.memoryMib)}, ${formatMillis(state.timeoutMs)}`,
     )
     .exhaustive();
-
-export const createCreateFunctionModalEnvEntry = (
-  entry: Partial<Omit<CreateFunctionModalEnvEntry, "id">> = {},
-): CreateFunctionModalEnvEntry => ({
-  id: crypto.randomUUID(),
-  key: "",
-  value: "",
-  isSecret: false,
-  ...entry,
-});

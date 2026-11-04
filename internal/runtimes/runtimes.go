@@ -26,16 +26,17 @@ type Runtime struct {
 	// source before it lands on Tag, e.g. go:1.27-build.
 	BuildTag    string
 	HandlerPath string
+	Icon        string // the icon's name under the icon base URL
 	starter     string // the starter file's extension
 }
 
 // All lists the runtimes a source can be built on. The static runtime is
 // not among them: it runs a binary built elsewhere.
 var All = []Runtime{
-	{ID: "python", Label: "Python 3.13", Tag: "python:3.13", HandlerPath: "handler.py", starter: "py"},
-	{ID: "node", Label: "Node 24", Tag: "node:24", HandlerPath: "handler.ts", starter: "ts"},
-	{ID: "go", Label: "Go 1.27", Tag: "go:1.27", BuildTag: "go:1.27-build", HandlerPath: "main.go", starter: "go.tmpl"},
-	{ID: "rust", Label: "Rust 1.99", Tag: "rust:1.99", BuildTag: "rust:1.99-build", HandlerPath: "main.rs", starter: "rs"},
+	{ID: "python", Label: "Python 3.13", Tag: "python:3.13", HandlerPath: "handler.py", Icon: "python", starter: "py"},
+	{ID: "node", Label: "Node 24", Tag: "node:24", HandlerPath: "handler.ts", Icon: "typescript", starter: "ts"},
+	{ID: "go", Label: "Go 1.27", Tag: "go:1.27", BuildTag: "go:1.27-build", HandlerPath: "main.go", Icon: "go", starter: "go.tmpl"},
+	{ID: "rust", Label: "Rust 1.99", Tag: "rust:1.99", BuildTag: "rust:1.99-build", HandlerPath: "main.rs", Icon: "rust", starter: "rs"},
 }
 
 // BuildImage is the image that compiles a source landing on image, when
@@ -50,7 +51,7 @@ func BuildImage(imagePrefix, image string) string {
 }
 
 // List is the catalog in wire form: images under imagePrefix and icons
-// under iconBaseURL, named runtime-icon-<id>-<dark|light>.svg.
+// under iconBaseURL, named source-icon-<icon>-<dark|light>.svg.
 func List(imagePrefix, iconBaseURL string) []*functionsv1.Runtime {
 	out := make([]*functionsv1.Runtime, 0, len(All))
 	for _, r := range All {
@@ -59,8 +60,8 @@ func List(imagePrefix, iconBaseURL string) []*functionsv1.Runtime {
 			Label:        r.Label,
 			Image:        imagePrefix + "/" + r.Tag,
 			HandlerPath:  r.HandlerPath,
-			DarkIconUrl:  iconBaseURL + "/runtime-icon-" + r.ID + "-dark.svg",
-			LightIconUrl: iconBaseURL + "/runtime-icon-" + r.ID + "-light.svg",
+			DarkIconUrl:  iconBaseURL + "/source-icon-" + r.Icon + "-dark.svg",
+			LightIconUrl: iconBaseURL + "/source-icon-" + r.Icon + "-light.svg",
 			Starters: &functionsv1.RuntimeStarters{
 				JsonSchema: r.starterFor("json_schema"),
 				Arrow:      r.starterFor("arrow"),
