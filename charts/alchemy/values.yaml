@@ -314,6 +314,10 @@ host:
 
   # -- Instances a host runs at once, busy and warm together (`MAX_INSTANCES`).
   maxInstances: 8
+  # -- Invocations a host holds waiting for a slot once every instance is
+  # busy (`MAX_QUEUED`). Past it, the server tries another host or answers
+  # resource exhausted.
+  maxQueued: 16
   # -- Guest memory in MiB the host may commit across its instances
   # (`MEMORY_BUDGET_MIB`). 0 means no limit. Guest memory is charged to the
   # host pod, so `resources.limits.memory` must leave room for it. When set

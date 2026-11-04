@@ -81,7 +81,7 @@ type choice struct {
 
 // chooseHost picks the placed host for cv's artifact, leaving out skip: the
 // one with the most idle warm instances, else the one serving it with the
-// fewest busy slots, else the first placed host without it. It reports
+// fewest invocations busy or queued, else the first placed host without it. It reports
 // false when no placed host is left.
 func (s *Service) chooseHost(cv *compiledVersion, skip map[string]bool) (choice, bool) {
 	id := cv.artifact.GetId()
@@ -101,7 +101,7 @@ func (s *Service) chooseHost(cv *compiledVersion, skip map[string]bool) (choice,
 			}
 			continue
 		}
-		busy := k.host.GetSlotsInUse()
+		busy := k.host.GetSlotsInUse() + k.host.GetSlotsQueued()
 		if best == nil || st.GetIdle() > bestIdle || (st.GetIdle() == bestIdle && busy < bestBusy) {
 			best, bestIdle, bestBusy = &choice{host: name, built: true}, st.GetIdle(), busy
 		}

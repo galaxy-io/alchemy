@@ -9,6 +9,7 @@ data:
   INVOKE_ADDR: {{ printf ":%v" .Values.host.invokePort | quote }}
   # Capacity
   MAX_INSTANCES: {{ .Values.host.maxInstances | quote }}
+  MAX_QUEUED: {{ .Values.host.maxQueued | quote }}
   MEMORY_BUDGET_MIB: {{ int64 .Values.host.memoryBudgetMiB | quote }}
   WARM_INSTANCE_TTL: {{ .Values.host.warmInstanceTTL | quote }}
   PREWARM_COUNT: {{ .Values.host.prewarmCount | quote }}

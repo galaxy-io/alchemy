@@ -53,6 +53,8 @@ message Host {
   string kernel = 7;
   int64 rootfs_cache_bytes = 8;
   int32 rootfs_cache_images = 9;
+  // slots_queued is how many invocations wait for a slot.
+  int32 slots_queued = 10;
 }
 
 message ListHostsRequest {}

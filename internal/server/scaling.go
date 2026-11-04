@@ -15,8 +15,8 @@ type Scaling struct {
 	// SlotsInUse is what hosts last reported as busy.
 	SlotsInUse int `json:"slotsInUse"`
 	// Waiting is invocations accepted by any server that no host has
-	// started: almost all of them held because every host serving their
-	// artifact is full. They are demand no host has room for yet.
+	// started: almost all of them queued on a host with every slot busy.
+	// They are demand no host has room for yet.
 	Waiting int `json:"waiting"`
 	// Demand is SlotsInUse plus Waiting: the slots wanted right now.
 	Demand int `json:"demand"`

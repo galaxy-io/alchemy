@@ -26,7 +26,7 @@ Guest memory and vCPUs count against the host pod. Set `host.resources.limits` t
 
 With `host.autoscaling.enabled`, a [KEDA](https://keda.sh) `ScaledObject` sizes the host Deployment instead of `host.replicas`. KEDA must already be installed in the cluster.
 
-KEDA reads `/scaling` on the server every `host.autoscaling.pollingInterval` seconds. Its `demand` is the slots busy across hosts plus the invocations waiting because every host is full. Hosts are set to `demand` divided by `host.autoscaling.targetUtilization` percent of `host.maxInstances`, between `minReplicas` and `maxReplicas`. With 8 slots at 75%, 24 slots of demand means 4 hosts.
+KEDA reads `/scaling` on the server every `host.autoscaling.pollingInterval` seconds. Its `demand` is the slots busy across hosts plus the invocations queued on hosts for a slot. Hosts are set to `demand` divided by `host.autoscaling.targetUtilization` percent of `host.maxInstances`, between `minReplicas` and `maxReplicas`. With 8 slots at 75%, 24 slots of demand means 4 hosts.
 
 Hosts are added straight away. They are removed one per minute once demand has stayed low for `scaleDownStabilizationSeconds`, and each drains its microVMs first.
 

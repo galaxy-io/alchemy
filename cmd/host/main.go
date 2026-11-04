@@ -69,6 +69,7 @@ func run(log *slog.Logger) error {
 	}
 	if err := errors.Join(
 		envParse("MAX_INSTANCES", &cfg.MaxConcurrency, strconv.Atoi),
+		envParse("MAX_QUEUED", &cfg.MaxQueued, strconv.Atoi),
 		envParse("MEMORY_BUDGET_MIB", &cfg.MemoryMiB, parseInt64),
 		envParse("WARM_INSTANCE_TTL", &cfg.WarmTTL, time.ParseDuration),
 		envParse("PREWARM_COUNT", &cfg.Prewarm, strconv.Atoi),

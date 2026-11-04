@@ -201,6 +201,10 @@ message InvokeRequest {
   // output_key, when set, is where the host keeps the checked output in the
   // bucket, so a server can replay it for a retried call.
   string output_key = 8;
+  // queue_timeout_ms is how long the invocation may wait for a slot when
+  // every slot is busy. Past it, or with the host's queue full, the host
+  // answers resource_exhausted without running it. 0 never waits.
+  int64 queue_timeout_ms = 9;
 }
 
 // InvokeResponse is returned whenever the host took the input, including

@@ -308,8 +308,10 @@ type Host struct {
 	Kernel             string `protobuf:"bytes,7,opt,name=kernel,proto3" json:"kernel,omitempty"`
 	RootfsCacheBytes   int64  `protobuf:"varint,8,opt,name=rootfs_cache_bytes,json=rootfsCacheBytes,proto3" json:"rootfs_cache_bytes,omitempty"`
 	RootfsCacheImages  int32  `protobuf:"varint,9,opt,name=rootfs_cache_images,json=rootfsCacheImages,proto3" json:"rootfs_cache_images,omitempty"`
-	unknownFields      protoimpl.UnknownFields
-	sizeCache          protoimpl.SizeCache
+	// slots_queued is how many invocations wait for a slot.
+	SlotsQueued   int32 `protobuf:"varint,10,opt,name=slots_queued,json=slotsQueued,proto3" json:"slots_queued,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *Host) Reset() {
@@ -401,6 +403,13 @@ func (x *Host) GetRootfsCacheBytes() int64 {
 func (x *Host) GetRootfsCacheImages() int32 {
 	if x != nil {
 		return x.RootfsCacheImages
+	}
+	return 0
+}
+
+func (x *Host) GetSlotsQueued() int32 {
+	if x != nil {
+		return x.SlotsQueued
 	}
 	return 0
 }
@@ -593,7 +602,7 @@ const file_functions_v1_host_proto_rawDesc = "" +
 	"\vfunction_id\x18\x01 \x01(\tR\n" +
 	"functionId\"M\n" +
 	"\x15ListInstancesResponse\x124\n" +
-	"\tinstances\x18\x01 \x03(\v2\x16.functions.v1.InstanceR\tinstances\"\xd2\x02\n" +
+	"\tinstances\x18\x01 \x03(\v2\x16.functions.v1.InstanceR\tinstances\"\xf5\x02\n" +
 	"\x04Host\x12\x1a\n" +
 	"\bhostname\x18\x01 \x01(\tR\bhostname\x12\x1d\n" +
 	"\n" +
@@ -605,7 +614,9 @@ const file_functions_v1_host_proto_rawDesc = "" +
 	"\x13firecracker_version\x18\x06 \x01(\tR\x12firecrackerVersion\x12\x16\n" +
 	"\x06kernel\x18\a \x01(\tR\x06kernel\x12,\n" +
 	"\x12rootfs_cache_bytes\x18\b \x01(\x03R\x10rootfsCacheBytes\x12.\n" +
-	"\x13rootfs_cache_images\x18\t \x01(\x05R\x11rootfsCacheImages\"\x12\n" +
+	"\x13rootfs_cache_images\x18\t \x01(\x05R\x11rootfsCacheImages\x12!\n" +
+	"\fslots_queued\x18\n" +
+	" \x01(\x05R\vslotsQueued\"\x12\n" +
 	"\x10ListHostsRequest\"=\n" +
 	"\x11ListHostsResponse\x12(\n" +
 	"\x05hosts\x18\x01 \x03(\v2\x12.functions.v1.HostR\x05hosts\"\x10\n" +

@@ -1,8 +1,8 @@
 // Package host is the per-machine process: it builds artifacts, runs
-// instances and serves the invocations servers send it. It holds nothing durable
-// beyond the records of invocations it has not published yet; if it dies,
-// its instances die with it and the server records the invocations it was
-// serving as errored.
+// instances and serves the invocations servers send it. It holds nothing
+// durable beyond the records of invocations it has not published yet; if it
+// dies, its instances die with it and the server records the invocations it
+// was serving as errored.
 package host
 
 import (
@@ -17,6 +17,7 @@ import (
 	"slices"
 	"sort"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"connectrpc.com/connect"
@@ -48,6 +49,9 @@ type Config struct {
 	InvokeURL string
 	// MaxConcurrency is how many invocations may hold an instance at once.
 	MaxConcurrency int
+	// MaxQueued is how many more may wait for one of those slots, first come
+	// first served, each for as long as its server allows.
+	MaxQueued int
 	// MemoryMiB is the guest memory this host may commit across booting,
 	// busy and warm instances; 0 means no limit. Warm instances are evicted,
 	// least recently used first, to make room for a cold boot.
@@ -79,6 +83,7 @@ type Config struct {
 func DefaultConfig() Config {
 	return Config{
 		MaxConcurrency:    8,
+		MaxQueued:         16,
 		WarmTTL:           5 * time.Minute,
 		KeptVersions:      2,
 		VersionIdleTTL:    24 * time.Hour,
@@ -98,6 +103,10 @@ type Host struct {
 	log       *slog.Logger
 	startedAt time.Time
 	slots     chan struct{}
+	queued    atomic.Int32
+	// drain closes when the host starts draining, which turns away the
+	// invocations waiting for a slot.
+	drain chan struct{}
 
 	// background outlives any one request: instance teardown and the
 	// subscriptions run on it.
@@ -142,6 +151,7 @@ func New(cfg Config, d driver.Driver, b *bus.Bus, logBucket, artifactBucket *blo
 		log:        log,
 		startedAt:  time.Now(),
 		slots:      make(chan struct{}, cfg.MaxConcurrency),
+		drain:      make(chan struct{}),
 		records:    newRecordQueue(b, log),
 		contracts:  newContractCache(),
 		secrets:    secretCache{values: make(map[string]cachedSecret)},
@@ -232,6 +242,40 @@ func (h *Host) enter() bool {
 	}
 	h.handlers.Add(1)
 	return true
+}
+
+// takeSlot holds one of the host's slots for an invocation, waiting up to
+// wait behind the invocations that came first when every slot is busy. It
+// answers resource_exhausted when the queue is full or the wait runs out,
+// so the server tries another host, and unavailable once the host drains.
+// Either way nothing ran.
+func (h *Host) takeSlot(wait time.Duration) *hostv1.InvokeResponse {
+	select {
+	case h.slots <- struct{}{}:
+		return nil
+	default:
+	}
+	full := invokeError("resource_exhausted", errors.New("host is at capacity"))
+	if wait <= 0 {
+		return full
+	}
+	if h.queued.Add(1) > int32(h.cfg.MaxQueued) { //nolint:gosec // small
+		h.queued.Add(-1)
+		return full
+	}
+	defer h.queued.Add(-1)
+	timer := time.NewTimer(wait)
+	defer timer.Stop()
+	// Blocked senders are woken in the order they blocked, so the queue is
+	// first come first served.
+	select {
+	case h.slots <- struct{}{}:
+		return nil
+	case <-timer.C:
+		return invokeError("resource_exhausted", fmt.Errorf("no slot came free in %s", wait))
+	case <-h.drain:
+		return invokeError("unavailable", errShuttingDown)
+	}
 }
 
 // shutdown stops taking work and releases the warm pool, gives in-flight
@@ -454,12 +498,10 @@ func (h *Host) invoke(ctx context.Context, req *hostv1.InvokeRequest) *hostv1.In
 		return rejected
 	}
 
-	select {
-	case h.slots <- struct{}{}:
-		defer func() { <-h.slots }()
-	default:
-		return invokeError("resource_exhausted", errors.New("host is at capacity"))
+	if refused := h.takeSlot(time.Duration(req.GetQueueTimeoutMs()) * time.Millisecond); refused != nil {
+		return refused
 	}
+	defer func() { <-h.slots }()
 
 	h.publishState(req, functionsv1.InvocationStatus_INVOCATION_STATUS_STARTING, "", functionsv1.StartKind_START_KIND_UNSPECIFIED, 0)
 	live, err := h.admit(req.GetArtifact())
@@ -725,7 +767,10 @@ func (h *Host) park(live *liveInstance) bool {
 // drainWarm stops parking and releases every warm instance.
 func (h *Host) drainWarm() {
 	h.mu.Lock()
-	h.draining = true
+	if !h.draining {
+		h.draining = true
+		close(h.drain)
+	}
 	var all []*liveInstance
 	for _, idle := range h.warm {
 		all = append(all, idle...)
@@ -902,6 +947,7 @@ func (h *Host) describe() *functionsv1.Host {
 		StartedAt:          h.startedAt.UnixMilli(),
 		Slots:              int32(cap(h.slots)), //nolint:gosec // small
 		SlotsInUse:         int32(len(h.slots)), //nolint:gosec // small
+		SlotsQueued:        h.queued.Load(),
 		MemoryMibCommitted: committed,
 		FirecrackerVersion: info.FirecrackerVersion,
 		Kernel:             info.Kernel,

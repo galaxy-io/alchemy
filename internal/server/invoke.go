@@ -140,12 +140,12 @@ func (s *Service) run(ctx context.Context, start time.Time, inv *invocation, cv 
 // invokeOnHost sends the invocation to the host the placement picks, and
 // to the next one when that host turns out to be full, gone or unable to
 // build. When no placed host has the artifact, which happens after they all
-// restart, the first of them builds it before the invocation is sent. When
-// every placed host is full, the invocation waits up to capacityWait for a
-// slot, trying them all again with backoff.
+// restart, the first of them builds it before the invocation is sent. A
+// host with every slot busy queues the invocation for what is left of
+// queueWait, and answers full only when its queue is full or the wait runs
+// out.
 func (s *Service) invokeOnHost(ctx context.Context, inv *invocation, cv *compiledVersion, req *hostv1.InvokeRequest, timeout time.Duration) (*hostv1.InvokeResponse, error) {
-	wait := capacityBackoff
-	deadline := time.Now().Add(capacityWait)
+	deadline := time.Now().Add(queueWait)
 	skip := map[string]bool{}
 	var full *hostv1.InvokeResponse
 	var unbuilt error
@@ -157,17 +157,7 @@ func (s *Service) invokeOnHost(ctx context.Context, inv *invocation, cv *compile
 		case !ok && full == nil:
 			return nil, errNoHosts
 		case !ok:
-			if time.Now().Add(wait).After(deadline) {
-				return full, nil
-			}
-			select {
-			case <-ctx.Done():
-				return full, nil
-			case <-time.After(wait):
-			}
-			wait = min(wait*2, capacityBackoffMax)
-			clear(skip)
-			continue
+			return full, nil
 		}
 		if !c.built {
 			err := s.buildFor(ctx, inv, cv, c.host)
@@ -192,6 +182,7 @@ func (s *Service) invokeOnHost(ctx context.Context, inv *invocation, cv *compile
 		if err := inv.sentTo(ctx, c.host); err != nil {
 			return nil, err
 		}
+		req.QueueTimeoutMs = max(time.Until(deadline), 0).Milliseconds()
 		out, err := s.requestInvoke(ctx, c.host, req, timeout)
 		switch {
 		case errors.Is(err, errHostGone):
@@ -287,13 +278,9 @@ func (s *Service) hostClient(url string) hostv1connect.HostServiceClient {
 	)
 }
 
-// When every host serving an artifact is full, an invocation waits up to
-// capacityWait for a slot, polling with backoff.
-const (
-	capacityWait       = 30 * time.Second
-	capacityBackoff    = 25 * time.Millisecond
-	capacityBackoffMax = 500 * time.Millisecond
-)
+// queueWait is how long an invocation may wait in hosts' queues for a slot,
+// across every host it tries.
+const queueWait = 30 * time.Second
 
 // hostGrace is how long past the function's timeout the server waits for
 // a host's reply before treating the host as gone.
@@ -303,7 +290,7 @@ const hostGrace = 15 * time.Second
 // timeout once a host has its artifact: waiting for a slot, running it, and
 // the host's grace to reply.
 func invokeBudget(timeout time.Duration) time.Duration {
-	return capacityWait + timeout + hostGrace
+	return queueWait + timeout + hostGrace
 }
 
 func hostCode(code string) connect.Code {
