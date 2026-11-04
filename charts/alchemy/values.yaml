@@ -76,8 +76,8 @@ runtimes:
   # on: a runtime's image is `<imagePrefix>/python:3.13`.
   imagePrefix: ghcr.io/galaxy-io/alchemy/runtime
   # -- Where the runtimes' icons are served from, as
-  # `<iconBaseUrl>/runtime-icon-<runtime>-<dark|light>.svg`.
-  iconBaseUrl: https://cdn.getgalaxy.io/runtimes
+  # `<iconBaseUrl>/source-icon-<runtime>-<dark|light>.svg`.
+  iconBaseUrl: https://cdn.getgalaxy.io/sources
 
 server:
   image:

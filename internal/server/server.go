@@ -85,7 +85,7 @@ func DefaultConfig() Config {
 		InvocationRetention: 24 * time.Hour,
 		InvocationReplicas:  1,
 		RuntimeImagePrefix:  "ghcr.io/galaxy-io/alchemy/runtime",
-		RuntimeIconBaseURL:  "https://cdn.getgalaxy.io/runtimes",
+		RuntimeIconBaseURL:  "https://cdn.getgalaxy.io/sources",
 	}
 }
 
