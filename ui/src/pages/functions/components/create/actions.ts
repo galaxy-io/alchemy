@@ -21,7 +21,8 @@ export enum CreateFunctionModalActionType {
   SET_SOURCE_FILE = "SET_SOURCE_FILE",
   SET_SOURCE_FILE_CONTENT = "SET_SOURCE_FILE_CONTENT",
   SET_COMMAND = "SET_COMMAND",
-  SET_ENV = "SET_ENV",
+  SET_VARIABLES = "SET_VARIABLES",
+  SET_SECRETS = "SET_SECRETS",
   SET_CONTRACT_KIND = "SET_CONTRACT_KIND",
   SET_SCHEMA_TEXT = "SET_SCHEMA_TEXT",
   ADD_ARROW_FIELD = "ADD_ARROW_FIELD",
@@ -76,9 +77,14 @@ export interface SetCommandAction {
   payload: CreateFunctionModalState["command"];
 }
 
-export interface SetEnvAction {
-  type: CreateFunctionModalActionType.SET_ENV;
-  payload: CreateFunctionModalState["env"];
+export interface SetVariablesAction {
+  type: CreateFunctionModalActionType.SET_VARIABLES;
+  payload: CreateFunctionModalState["variables"];
+}
+
+export interface SetSecretsAction {
+  type: CreateFunctionModalActionType.SET_SECRETS;
+  payload: CreateFunctionModalState["secrets"];
 }
 
 export interface SetContractKindAction {
@@ -152,7 +158,8 @@ export type CreateFunctionModalAction =
   | SetSourceFileAction
   | SetSourceFileContentAction
   | SetCommandAction
-  | SetEnvAction
+  | SetVariablesAction
+  | SetSecretsAction
   | SetContractKindAction
   | SetSchemaTextAction
   | AddArrowFieldAction

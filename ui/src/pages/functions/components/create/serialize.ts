@@ -45,14 +45,14 @@ export const mapCreateFunctionModalStateToSpec = (
       source: isSource ? createFunctionSource(state.sourceFiles) : undefined,
       command: state.command,
       env: Object.fromEntries(
-        state.env
-          .filter((entry) => !entry.isSecret && entry.key.trim())
-          .map((entry) => [entry.key.trim(), entry.value]),
+        state.variables
+          .filter((pair) => pair.key.trim())
+          .map((pair) => [pair.key.trim(), pair.value]),
       ),
       secrets: Object.fromEntries(
-        state.env
-          .filter((entry) => entry.isSecret && !entry.value && state.secretNames[entry.key.trim()])
-          .map((entry) => [entry.key.trim(), state.secretNames[entry.key.trim()]]),
+        state.secrets
+          .filter((pair) => !pair.value && state.secretNames[pair.key.trim()])
+          .map((pair) => [pair.key.trim(), state.secretNames[pair.key.trim()]]),
       ),
       protocol: InvocationProtocol.EXEC,
       contract: mapCreateFunctionModalStateToContract(state),
@@ -66,9 +66,9 @@ export const mapCreateFunctionModalStateToSpec = (
 
 const mapCreateFunctionModalStateToSecretValues = (state: CreateFunctionModalState) =>
   Object.fromEntries(
-    state.env
-      .filter((entry) => entry.isSecret && entry.key.trim() && entry.value)
-      .map((entry) => [entry.key.trim(), entry.value]),
+    state.secrets
+      .filter((pair) => pair.key.trim() && pair.value)
+      .map((pair) => [pair.key.trim(), pair.value]),
   );
 
 export const mapCreateFunctionModalStateToRequest = (

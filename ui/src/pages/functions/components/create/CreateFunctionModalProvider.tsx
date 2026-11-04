@@ -85,8 +85,10 @@ export const useCreateFunctionModalActions = () => {
         dispatch({ type: CreateFunctionModalActionType.SET_SOURCE_FILE_CONTENT, payload }),
       setCommand: (payload: CreateFunctionModalState["command"]) =>
         dispatch({ type: CreateFunctionModalActionType.SET_COMMAND, payload }),
-      setEnv: (payload: CreateFunctionModalState["env"]) =>
-        dispatch({ type: CreateFunctionModalActionType.SET_ENV, payload }),
+      setVariables: (payload: CreateFunctionModalState["variables"]) =>
+        dispatch({ type: CreateFunctionModalActionType.SET_VARIABLES, payload }),
+      setSecrets: (payload: CreateFunctionModalState["secrets"]) =>
+        dispatch({ type: CreateFunctionModalActionType.SET_SECRETS, payload }),
       setContractKind: (payload: FunctionContractKind) =>
         dispatch({ type: CreateFunctionModalActionType.SET_CONTRACT_KIND, payload }),
       setSchemaText: (side: FunctionContractSide, text: string) =>

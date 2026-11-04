@@ -1,3 +1,5 @@
+import type { KeyValueInputPair } from "@galaxy-io/dls/inputs/KeyValueInput";
+
 import type { Resources } from "@/gen/functions/v1/common_pb";
 import type {
   Function as AlchemyFunction,
@@ -31,13 +33,6 @@ export interface CreateFunctionModalArrowField extends FunctionArrowField {
   id: string;
 }
 
-export interface CreateFunctionModalEnvEntry {
-  id: string;
-  key: string;
-  value: string;
-  isSecret: boolean;
-}
-
 export interface CreateFunctionModalState {
   mode: CreateFunctionModalMode;
   functionId: AlchemyFunction["id"] | undefined;
@@ -54,7 +49,8 @@ export interface CreateFunctionModalState {
   sourceFile: FunctionSourceFile["path"];
   isSourceTouched: boolean;
   command: FunctionSpec["command"];
-  env: CreateFunctionModalEnvEntry[];
+  variables: KeyValueInputPair[];
+  secrets: KeyValueInputPair[];
   secretNames: NonNullable<FunctionSpec["secrets"]>;
   contractKind: FunctionContractKind;
   schemaTexts: Record<FunctionContractSide, string>;

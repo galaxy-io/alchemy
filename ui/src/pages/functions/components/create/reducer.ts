@@ -7,17 +7,18 @@ import {
   type SetCommandAction,
   type SetContractKindAction,
   type SetDescriptionAction,
-  type SetEnvAction,
   type SetImageAction,
   type SetMemoryMibAction,
   type SetNameAction,
   type SetRuntimeAction,
   type SetSchemaTextAction,
+  type SetSecretsAction,
   type SetSourceFileAction,
   type SetSourceFileContentAction,
   type SetSourceKindAction,
   type SetSubmittingAction,
   type SetTimeoutMsAction,
+  type SetVariablesAction,
   type SetVcpusAction,
   type UpdateArrowFieldAction,
 } from "@/pages/functions/components/create/actions";
@@ -102,8 +103,18 @@ function setCommand(
   return { ...state, command: action.payload };
 }
 
-function setEnv(state: CreateFunctionModalState, action: SetEnvAction): CreateFunctionModalState {
-  return { ...state, env: action.payload };
+function setVariables(
+  state: CreateFunctionModalState,
+  action: SetVariablesAction,
+): CreateFunctionModalState {
+  return { ...state, variables: action.payload };
+}
+
+function setSecrets(
+  state: CreateFunctionModalState,
+  action: SetSecretsAction,
+): CreateFunctionModalState {
+  return { ...state, secrets: action.payload };
 }
 
 function setContractKind(
@@ -234,8 +245,10 @@ const createFunctionModalReducer = (
       return setSourceFileContent(state, action);
     case CreateFunctionModalActionType.SET_COMMAND:
       return setCommand(state, action);
-    case CreateFunctionModalActionType.SET_ENV:
-      return setEnv(state, action);
+    case CreateFunctionModalActionType.SET_VARIABLES:
+      return setVariables(state, action);
+    case CreateFunctionModalActionType.SET_SECRETS:
+      return setSecrets(state, action);
     case CreateFunctionModalActionType.SET_CONTRACT_KIND:
       return setContractKind(state, action);
     case CreateFunctionModalActionType.SET_SCHEMA_TEXT:

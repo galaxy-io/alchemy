@@ -55,7 +55,7 @@ const FunctionPageBanner: FC<FunctionPageBannerProps> = ({ alchemyFunction }) =>
       <Alert
         isBanner
         variant={AlertVariant.ERROR}
-        header={`${formatVersion(newest.version)} failed to build`}
+        header="Latest version failed to build"
         actions={viewBuildAction}
       >
         {newest.statusMessage}
