@@ -53,7 +53,7 @@ type claim struct {
 // claim that holds it.
 func (s *Service) claimKey(ctx context.Context, cv *compiledVersion, key, id string) (*claim, error) {
 	_, err := s.store.ClaimIdempotencyKey(ctx, sqlcgen.ClaimIdempotencyKeyParams{
-		TenantID: s.tenant, FunctionID: cv.row.FunctionID, Key: key, InvocationID: id, Server: s.cfg.Name, Window: s.window(),
+		TenantID: cv.row.TenantID, FunctionID: cv.row.FunctionID, Key: key, InvocationID: id, Server: s.cfg.Name, Window: s.window(),
 	})
 	if err == nil {
 		return nil, nil
@@ -74,7 +74,7 @@ func (s *Service) claimKey(ctx context.Context, cv *compiledVersion, key, id str
 
 // heldBy returns key's claim, or nil when there is none.
 func (s *Service) heldBy(ctx context.Context, cv *compiledVersion, key string) (*claim, error) {
-	row, err := s.store.GetIdempotencyKey(ctx, sqlcgen.GetIdempotencyKeyParams{TenantID: s.tenant, FunctionID: cv.row.FunctionID, Key: key})
+	row, err := s.store.GetIdempotencyKey(ctx, sqlcgen.GetIdempotencyKeyParams{TenantID: cv.row.TenantID, FunctionID: cv.row.FunctionID, Key: key})
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, nil
 	}
@@ -129,7 +129,7 @@ func (s *Service) replay(ctx context.Context, start time.Time, inv *invocation, 
 func (s *Service) takeOver(ctx context.Context, start time.Time, inv *invocation, cv *compiledVersion, raw []byte, held *claim) (*connect.Response[functionsv1.InvokeResponse], error) {
 	key := inv.accepted.GetIdempotencyKey()
 	n, err := s.store.TakeOverIdempotencyKey(ctx, sqlcgen.TakeOverIdempotencyKeyParams{
-		TenantID: s.tenant, FunctionID: cv.row.FunctionID, Key: key,
+		TenantID: cv.row.TenantID, FunctionID: cv.row.FunctionID, Key: key,
 		NewInvocationID: inv.accepted.GetId(), Server: s.cfg.Name, OldInvocationID: held.invocationID,
 	})
 	if err != nil {

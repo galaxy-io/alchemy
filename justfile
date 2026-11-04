@@ -3,15 +3,23 @@ set dotenv-load
 default:
     @just --list
 
-# start local infra (Postgres, NATS, RustFS, a registry) and make the buckets; `just infra down` stops it, `just infra down volumes` also drops the data
+# start local infra (Postgres, NATS, RustFS, a registry) and make the buckets; `just infra zitadel|keycloak` adds that provider, `just infra down [volumes]` stops everything
 infra mode="up" scope="":
     #!/usr/bin/env bash
     set -euo pipefail
     if [ "{{ mode }}" = down ]; then
-      docker --context default compose down {{ if scope == "volumes" { "-v" } else { "" } }}
+      docker --context default compose --profile zitadel --profile keycloak down {{ if scope == "volumes" { "-v" } else { "" } }}
       exit
     fi
-    docker --context default compose up -d --wait
+    # Zitadel writes its machine user's token here on first start
+    mkdir -p .zitadel
+    docker --context default compose {{ if mode == "up" { "" } else { "--profile " + mode } }} up -d --wait
+    # Keycloak's master realm refuses plain-http admin sign-ins from off the
+    # container, which is where the server creates alchemy's realm from.
+    if [ "{{ mode }}" = keycloak ]; then
+      docker --context default compose --profile keycloak exec -T keycloak sh -c \
+        '/opt/keycloak/bin/kcadm.sh config credentials --server http://localhost:8080 --realm master --user admin --password admin >/dev/null && /opt/keycloak/bin/kcadm.sh update realms/master -s sslRequired=NONE'
+    fi
     rc alias set alchemy http://localhost:9000 alchemy alchemy123 >/dev/null
     for i in $(seq 1 30); do rc ls alchemy/ >/dev/null 2>&1 && break; sleep 1; done
     # open to anonymous access, so nothing carries keys
@@ -51,13 +59,17 @@ host count="1" memory="512" warm="5m" prewarm="0": build-linux
     # old hosts drain before they exit, and must be gone before new ones share their data dirs
     limactl shell alchemy -- bash -c 'sudo pkill -f bin/linux-arm64/host; while pgrep -f bin/linux-arm64/host >/dev/null; do sleep 0.5; done' || true
     # the VM reaches compose on the Mac at host.lima.internal; the buckets are open to anonymous access
+    # the same NATS_URL as server; the VM reaches localhost at host.lima.internal
+    nats="${NATS_URL:-nats://localhost:4223}"
+    nats="${nats/localhost/host.lima.internal}"
+    nats="${nats/127.0.0.1/host.lima.internal}"
     limactl shell alchemy -- bash -c '
       cd "{{ justfile_directory() }}"
       bucket="endpoint=http://host.lima.internal:9000&region=us-east-1&use_path_style=true&anonymous=true"
       trap "kill 0" EXIT INT TERM HUP
       for i in $(seq 1 {{ count }}); do
         sudo systemd-run --scope --quiet -p Delegate=yes -- env \
-          NATS_URL="nats://host.lima.internal:4223" \
+          NATS_URL="'"$nats"'" \
           LOGS_BUCKET="s3://alchemy-logs?$bucket" \
           ARTIFACTS_BUCKET="s3://alchemy-artifacts?$bucket" \
           LOG_FORMAT=text LOG_LEVEL="${LOG_LEVEL:-info}" \
@@ -67,9 +79,25 @@ host count="1" memory="512" warm="5m" prewarm="0": build-linux
       done
       wait'
 
-# run server on the Mac on :8780 against compose (env overrides); it applies migrations on start
+# run server on the Mac on :8780 against compose (env overrides); it applies migrations on start; `just server zitadel|keycloak|proxy` turns auth on
 # hosts pull runtimes from the compose registry by the Mac's private address, which needs no TLS
-server:
+server mode="":
+    #!/usr/bin/env bash
+    set -euo pipefail
+    # the compose providers, which the server sets up on boot; proxy needs only AUTH_PROXY_TENANT, from the env
+    case "{{ mode }}" in
+      zitadel)
+        export AUTH_ISSUER="${AUTH_ISSUER:-http://localhost:8301}" \
+          AUTH_PAT="${AUTH_PAT:-$(cat .zitadel/pat 2>/dev/null)}" \
+          AUTH_UI_ORIGIN="${AUTH_UI_ORIGIN:-http://localhost:5173}" ;;
+      keycloak)
+        export AUTH_ISSUER="${AUTH_ISSUER:-http://localhost:8401/realms/alchemy}" \
+          AUTH_CLIENT_ID="${AUTH_CLIENT_ID:-alchemy}" \
+          AUTH_CLIENT_SECRET="${AUTH_CLIENT_SECRET:-alchemy}" \
+          AUTH_ADMIN_USERNAME="${AUTH_ADMIN_USERNAME:-admin}" \
+          AUTH_ADMIN_PASSWORD="${AUTH_ADMIN_PASSWORD:-admin}" \
+          AUTH_UI_ORIGIN="${AUTH_UI_ORIGIN:-http://localhost:5173}" ;;
+    esac
     PERSISTENCE_DSN="${PERSISTENCE_DSN:-postgresql://alchemy:alchemy@localhost:5435/alchemy?sslmode=disable}" \
     NATS_URL="${NATS_URL:-nats://localhost:4223}" \
     LOGS_BUCKET="${LOGS_BUCKET:-s3://alchemy-logs?endpoint=http://localhost:9000&region=us-east-1&use_path_style=true&anonymous=true}" \
@@ -78,19 +106,20 @@ server:
     ENCRYPTION_KEY="${ENCRYPTION_KEY:-ZGV2LW9ubHktYWxjaGVteS1lbmNyeXB0aW9uLWtleSE=}" \
     LOG_FORMAT="${LOG_FORMAT:-text}" \
     LOG_LEVEL="${LOG_LEVEL:-info}" \
+    AUTH_PROVIDER="${AUTH_PROVIDER:-{{ mode }}}" \
     go run ./cmd/server
 
 # run the UI dev server on :5173, proxying the API to server on :8780
 ui:
     cd ui && pnpm install && pnpm dev
 
-# run hosts, server and the UI together; Ctrl-C stops them all
-dev count="3" memory="512" warm="5m" prewarm="0":
+# run hosts, server and the UI together; `just dev zitadel|keycloak|proxy` turns auth on; Ctrl-C stops them all
+dev mode="" count="3" memory="512" warm="5m" prewarm="0":
     #!/usr/bin/env bash
     set -euo pipefail
     trap 'kill $(jobs -p) 2>/dev/null; limactl shell alchemy -- sudo pkill -f "bin/linux-arm64/host" 2>/dev/null || true' EXIT
     just host {{ count }} {{ memory }} {{ warm }} {{ prewarm }} &
-    just server &
+    just server {{ mode }} &
     until curl -sf http://localhost:8780/healthz > /dev/null 2>&1; do sleep 0.5; done
     just ui
 

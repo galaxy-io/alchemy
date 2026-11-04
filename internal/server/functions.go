@@ -24,6 +24,10 @@ const maxNameLen = 128
 
 // CreateFunction registers a function and starts building its first version.
 func (s *Service) CreateFunction(ctx context.Context, req *connect.Request[functionsv1.CreateFunctionRequest]) (*connect.Response[functionsv1.CreateFunctionResponse], error) {
+	tenant, err := tenantFromContext(ctx)
+	if err != nil {
+		return nil, err
+	}
 	name, err := validName(req.Msg.GetName())
 	if err != nil {
 		return nil, err
@@ -33,7 +37,7 @@ func (s *Service) CreateFunction(ctx context.Context, req *connect.Request[funct
 		return nil, err
 	}
 	fn, err := s.store.CreateFunction(ctx, sqlcgen.CreateFunctionParams{
-		TenantID:    s.tenant,
+		TenantID:    tenant,
 		Name:        name,
 		Description: req.Msg.GetDescription(),
 	})
@@ -55,12 +59,16 @@ func (s *Service) CreateFunction(ctx context.Context, req *connect.Request[funct
 
 // UpdateFunction changes a function's name and description.
 func (s *Service) UpdateFunction(ctx context.Context, req *connect.Request[functionsv1.UpdateFunctionRequest]) (*connect.Response[functionsv1.UpdateFunctionResponse], error) {
+	tenant, err := tenantFromContext(ctx)
+	if err != nil {
+		return nil, err
+	}
 	name, err := validName(req.Msg.GetName())
 	if err != nil {
 		return nil, err
 	}
 	fn, err := s.store.UpdateFunction(ctx, sqlcgen.UpdateFunctionParams{
-		TenantID:    s.tenant,
+		TenantID:    tenant,
 		ID:          req.Msg.GetFunctionId(),
 		Name:        name,
 		Description: req.Msg.GetDescription(),
@@ -74,7 +82,11 @@ func (s *Service) UpdateFunction(ctx context.Context, req *connect.Request[funct
 
 // GetFunction returns one function, with its versions on request.
 func (s *Service) GetFunction(ctx context.Context, req *connect.Request[functionsv1.GetFunctionRequest]) (*connect.Response[functionsv1.GetFunctionResponse], error) {
-	fn, err := s.store.GetFunction(ctx, sqlcgen.GetFunctionParams{TenantID: s.tenant, ID: req.Msg.GetId()})
+	tenant, err := tenantFromContext(ctx)
+	if err != nil {
+		return nil, err
+	}
+	fn, err := s.store.GetFunction(ctx, sqlcgen.GetFunctionParams{TenantID: tenant, ID: req.Msg.GetId()})
 	if err != nil {
 		return nil, notFound(err, "function %q not found", req.Msg.GetId())
 	}
@@ -91,16 +103,20 @@ func (s *Service) GetFunction(ctx context.Context, req *connect.Request[function
 // ListFunctions pages through functions, oldest first, optionally filtered
 // by name.
 func (s *Service) ListFunctions(ctx context.Context, req *connect.Request[functionsv1.ListFunctionsRequest]) (*connect.Response[functionsv1.ListFunctionsResponse], error) {
+	tenant, err := tenantFromContext(ctx)
+	if err != nil {
+		return nil, err
+	}
 	pg, err := pageFor(req.Msg.GetPagination())
 	if err != nil {
 		return nil, err
 	}
 	search := strings.TrimSpace(req.Msg.GetSearch())
-	rows, err := s.store.ListFunctions(ctx, sqlcgen.ListFunctionsParams{TenantID: s.tenant, Search: search, RowLimit: pg.limit, RowOffset: pg.offset})
+	rows, err := s.store.ListFunctions(ctx, sqlcgen.ListFunctionsParams{TenantID: tenant, Search: search, RowLimit: pg.limit, RowOffset: pg.offset})
 	if err != nil {
 		return nil, connect.NewError(connect.CodeInternal, err)
 	}
-	total, err := s.store.CountFunctions(ctx, sqlcgen.CountFunctionsParams{TenantID: s.tenant, Search: search})
+	total, err := s.store.CountFunctions(ctx, sqlcgen.CountFunctionsParams{TenantID: tenant, Search: search})
 	if err != nil {
 		return nil, connect.NewError(connect.CodeInternal, err)
 	}
@@ -114,7 +130,11 @@ func (s *Service) ListFunctions(ctx context.Context, req *connect.Request[functi
 
 // DeleteFunction removes a function, its versions and its invocations.
 func (s *Service) DeleteFunction(ctx context.Context, req *connect.Request[functionsv1.DeleteFunctionRequest]) (*connect.Response[functionsv1.DeleteFunctionResponse], error) {
-	n, err := s.store.DeleteFunction(ctx, sqlcgen.DeleteFunctionParams{TenantID: s.tenant, ID: req.Msg.GetId()})
+	tenant, err := tenantFromContext(ctx)
+	if err != nil {
+		return nil, err
+	}
+	n, err := s.store.DeleteFunction(ctx, sqlcgen.DeleteFunctionParams{TenantID: tenant, ID: req.Msg.GetId()})
 	if err != nil {
 		return nil, connect.NewError(connect.CodeInternal, err)
 	}
@@ -126,11 +146,15 @@ func (s *Service) DeleteFunction(ctx context.Context, req *connect.Request[funct
 
 // CreateFunctionVersion adds an immutable version and starts building it.
 func (s *Service) CreateFunctionVersion(ctx context.Context, req *connect.Request[functionsv1.CreateFunctionVersionRequest]) (*connect.Response[functionsv1.CreateFunctionVersionResponse], error) {
+	tenant, err := tenantFromContext(ctx)
+	if err != nil {
+		return nil, err
+	}
 	spec, err := s.prepareSpec(ctx, req.Msg.GetSpec())
 	if err != nil {
 		return nil, err
 	}
-	if _, err := s.store.GetFunction(ctx, sqlcgen.GetFunctionParams{TenantID: s.tenant, ID: req.Msg.GetFunctionId()}); err != nil {
+	if _, err := s.store.GetFunction(ctx, sqlcgen.GetFunctionParams{TenantID: tenant, ID: req.Msg.GetFunctionId()}); err != nil {
 		return nil, notFound(err, "function %q not found", req.Msg.GetFunctionId())
 	}
 	if err := s.storeSecretValues(ctx, req.Msg.GetFunctionId(), spec, req.Msg.GetSecretValues()); err != nil {
@@ -159,7 +183,11 @@ func (s *Service) GetFunctionVersion(ctx context.Context, req *connect.Request[f
 
 // ListFunctionVersions pages through a function's versions, newest first.
 func (s *Service) ListFunctionVersions(ctx context.Context, req *connect.Request[functionsv1.ListFunctionVersionsRequest]) (*connect.Response[functionsv1.ListFunctionVersionsResponse], error) {
-	if _, err := s.store.GetFunction(ctx, sqlcgen.GetFunctionParams{TenantID: s.tenant, ID: req.Msg.GetFunctionId()}); err != nil {
+	tenant, err := tenantFromContext(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if _, err := s.store.GetFunction(ctx, sqlcgen.GetFunctionParams{TenantID: tenant, ID: req.Msg.GetFunctionId()}); err != nil {
 		return nil, notFound(err, "function %q not found", req.Msg.GetFunctionId())
 	}
 	pg, err := pageFor(req.Msg.GetPagination())
@@ -183,7 +211,11 @@ func (s *Service) ListFunctionVersions(ctx context.Context, req *connect.Request
 
 // version loads one version of a tenant's function.
 func (s *Service) version(ctx context.Context, functionID string, n int64) (*sqlcgen.FunctionVersion, error) {
-	if _, err := s.store.GetFunction(ctx, sqlcgen.GetFunctionParams{TenantID: s.tenant, ID: functionID}); err != nil {
+	tenant, err := tenantFromContext(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if _, err := s.store.GetFunction(ctx, sqlcgen.GetFunctionParams{TenantID: tenant, ID: functionID}); err != nil {
 		return nil, notFound(err, "function %q not found", functionID)
 	}
 	v, err := s.store.GetFunctionVersion(ctx, sqlcgen.GetFunctionVersionParams{FunctionID: functionID, Version: n})
@@ -195,12 +227,16 @@ func (s *Service) version(ctx context.Context, functionID string, n int64) (*sql
 
 // addVersion inserts a BUILDING version and starts its build.
 func (s *Service) addVersion(ctx context.Context, functionID string, spec *functionsv1.FunctionSpec) (*sqlcgen.FunctionVersion, error) {
+	tenant, err := tenantFromContext(ctx)
+	if err != nil {
+		return nil, err
+	}
 	raw, err := protojson.Marshal(spec)
 	if err != nil {
 		return nil, connect.NewError(connect.CodeInternal, err)
 	}
 	v, err := s.store.CreateFunctionVersion(ctx, sqlcgen.CreateFunctionVersionParams{
-		TenantID:   s.tenant,
+		TenantID:   tenant,
 		FunctionID: functionID,
 		Spec:       raw,
 	})

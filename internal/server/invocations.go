@@ -24,9 +24,13 @@ func (s *Service) GetInvocation(ctx context.Context, req *connect.Request[functi
 // invocation finds one invocation: in the database, or on the server
 // holding it while it runs or until its record is written.
 func (s *Service) invocation(ctx context.Context, id string) (*functionsv1.Invocation, error) {
-	row, err := s.store.GetInvocation(ctx, sqlcgen.GetInvocationParams{TenantID: s.tenant, ID: id})
+	tenant, err := tenantFromContext(ctx)
+	if err != nil {
+		return nil, err
+	}
+	row, err := s.store.GetInvocation(ctx, sqlcgen.GetInvocationParams{TenantID: tenant, ID: id})
 	if errors.Is(err, pgx.ErrNoRows) {
-		if inv := s.trackedBy(ctx, id); inv != nil && inv.GetTenantId() == s.tenant {
+		if inv := s.trackedBy(ctx, id); inv != nil && inv.GetTenantId() == tenant {
 			return inv, nil
 		}
 	}
@@ -39,6 +43,10 @@ func (s *Service) invocation(ctx context.Context, id string) (*functionsv1.Invoc
 // ListInvocations pages through invocations, newest first, optionally
 // filtered by function and status.
 func (s *Service) ListInvocations(ctx context.Context, req *connect.Request[functionsv1.ListInvocationsRequest]) (*connect.Response[functionsv1.ListInvocationsResponse], error) {
+	tenant, err := tenantFromContext(ctx)
+	if err != nil {
+		return nil, err
+	}
 	pg, err := pageFor(req.Msg.GetPagination())
 	if err != nil {
 		return nil, err
@@ -66,14 +74,14 @@ func (s *Service) ListInvocations(ctx context.Context, req *connect.Request[func
 	since, until := nullMillis(req.Msg.GetSinceMs()), nullMillis(req.Msg.GetUntilMs())
 
 	rows, err := s.store.ListInvocations(ctx, sqlcgen.ListInvocationsParams{
-		TenantID: s.tenant, FunctionIds: functionIDs, Statuses: statuses, StartKinds: startKinds,
+		TenantID: tenant, FunctionIds: functionIDs, Statuses: statuses, StartKinds: startKinds,
 		Since: since, Until: until, RowLimit: pg.limit, RowOffset: pg.offset,
 	})
 	if err != nil {
 		return nil, connect.NewError(connect.CodeInternal, err)
 	}
 	total, err := s.store.CountInvocations(ctx, sqlcgen.CountInvocationsParams{
-		TenantID: s.tenant, FunctionIds: functionIDs, Statuses: statuses, StartKinds: startKinds,
+		TenantID: tenant, FunctionIds: functionIDs, Statuses: statuses, StartKinds: startKinds,
 		Since: since, Until: until,
 	})
 	if err != nil {
@@ -90,13 +98,17 @@ func (s *Service) ListInvocations(ctx context.Context, req *connect.Request[func
 // the client goes away. With should_replay, every active invocation is sent
 // first.
 func (s *Service) TailInvocations(ctx context.Context, req *connect.Request[functionsv1.TailInvocationsRequest], stream *connect.ServerStream[functionsv1.TailInvocationsResponse]) error {
+	tenant, err := tenantFromContext(ctx)
+	if err != nil {
+		return err
+	}
 	if req.Msg.GetShouldReplay() {
 		active, err := s.trackedAnywhere(ctx, req.Msg.GetFunctionId())
 		if err != nil {
 			return connect.NewError(connect.CodeUnavailable, err)
 		}
 		for _, inv := range active {
-			if terminal(inv.GetStatus()) || inv.GetTenantId() != s.tenant {
+			if terminal(inv.GetStatus()) || inv.GetTenantId() != tenant {
 				continue
 			}
 			if err := stream.Send(&functionsv1.TailInvocationsResponse{
@@ -107,7 +119,7 @@ func (s *Service) TailInvocations(ctx context.Context, req *connect.Request[func
 		}
 	}
 	return s.tail(ctx, req.Msg.GetFunctionId(), func(inv *functionsv1.Invocation) error {
-		if inv.GetTenantId() != s.tenant {
+		if inv.GetTenantId() != tenant {
 			return nil
 		}
 		return stream.Send(&functionsv1.TailInvocationsResponse{

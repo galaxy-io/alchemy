@@ -18,11 +18,23 @@ commonLabels: {}
 # -- Labels added to the server and host pods.
 podLabels: {}
 
-# -- Existing runtime Secret with `PERSISTENCE_DSN` and `NATS_URL`. The server
-# reads both; hosts read only `NATS_URL`.
+# -- Existing runtime Secret with `PERSISTENCE_DSN` and `NATS_URL`, plus
+# `ENCRYPTION_KEY` and the `auth` credentials when they are used. The server
+# reads all of it; hosts read only `NATS_URL`.
 existingSecret: ""
 
 secrets:
+  # -- Secret storage provider: `datastore`, `aws-secrets-manager` or
+  # `gcp-secret-manager`. `datastore` keeps secrets in PostgreSQL and emits no
+  # `SECRET_PROVIDER`. The others use the SDK's default credentials, such as
+  # the server's IRSA role or workload identity.
+  type: datastore
+
+  # -- Root name external secret stores give every secret (`SECRETS_PREFIX`).
+  # Defaults to `alchemy`: AWS names secrets `alchemy/<tenant>/...` and GCP
+  # `alchemy-<hash>`, and a prefix replaces that word. Unused by datastore.
+  prefix: ""
+
   datastore:
     # -- Base64 AES key the server encrypts tenant secrets with before storing
     # them in PostgreSQL, kept in the chart-created Secret as `ENCRYPTION_KEY`.
@@ -32,6 +44,83 @@ secrets:
     # -- Id stored with each secret for the key that encrypted it
     # (`ENCRYPTION_KEY_ID`). Change it when rotating the key.
     encryptionKeyId: ""
+
+  aws:
+    # -- AWS region for Secrets Manager (`AWS_REGION`). Leave empty to use the
+    # SDK default chain.
+    region: ""
+
+  gcp:
+    # -- GCP project holding Secret Manager secrets (`GCP_PROJECT_ID`).
+    # Required when `secrets.type` is `gcp-secret-manager`.
+    projectId: ""
+    # -- GCP region holding Secret Manager secrets (`GCP_REGION`).
+    # Required when `secrets.type` is `gcp-secret-manager`.
+    region: ""
+
+auth:
+  # -- Enable authentication. Disabled leaves the API unauthenticated and every
+  # request in the default tenant.
+  enabled: false
+
+  # -- Identity provider: `keycloak`, `zitadel` or `proxy`. `proxy` trusts
+  # identity headers from a gateway that signs people in.
+  type: keycloak
+
+  bootstrap:
+    # -- Tenant converged on every boot (`AUTH_BOOTSTRAP_TENANT`).
+    tenant: ""
+    # -- Person who administers the tenant (`AUTH_BOOTSTRAP_ADMIN_EMAIL`),
+    # created on boot with `adminPassword` and left alone once it exists.
+    # Closes sign-up: people join by invitation.
+    adminEmail: ""
+    # -- That person's initial password, kept in the chart-created Secret as
+    # `AUTH_BOOTSTRAP_ADMIN_PASSWORD`. With `existingSecret`, supply it there.
+    adminPassword: ""
+
+  # -- Origin the UI is served from (`AUTH_UI_ORIGIN`), normally the ingress
+  # host. An https origin marks the session cookie Secure.
+  uiOrigin: ""
+
+  keycloak:
+    # -- Realm URL, `https://<host>/realms/<realm>` (`AUTH_ISSUER`). Must match
+    # what the realm advertises. Keycloak 26 or newer.
+    # @default -- required when `auth.type=keycloak`
+    issuer: ""
+    # -- Alchemy's confidential client (`AUTH_CLIENT_ID`).
+    clientId: alchemy
+    # -- The client's secret, kept in the chart-created Secret as
+    # `AUTH_CLIENT_SECRET`. With `existingSecret`, supply it there.
+    clientSecret: ""
+    # -- Master-realm admin (`AUTH_ADMIN_USERNAME`). With `adminPassword` the
+    # server creates the realm and client on boot.
+    adminUser: ""
+    # -- Master-realm admin password, kept in the chart-created Secret as
+    # `AUTH_ADMIN_PASSWORD`.
+    adminPassword: ""
+    bootstrap:
+      # -- Admin service account on `auth.bootstrap.tenant`, so an SDK works
+      # before anyone signs in (`AUTH_BOOTSTRAP_CLIENT_ID`). Set with
+      # `clientSecret` or not at all.
+      clientId: ""
+      # -- Its secret, kept in the chart-created Secret as
+      # `AUTH_BOOTSTRAP_CLIENT_SECRET`.
+      clientSecret: ""
+
+  zitadel:
+    # -- Zitadel base URL (`AUTH_ISSUER`). Must equal the issuer Zitadel
+    # advertises.
+    # @default -- required when `auth.type=zitadel`
+    issuer: ""
+    # -- Machine-user personal access token with instance rights, kept in the
+    # chart-created Secret as `AUTH_PAT`. With `existingSecret`, supply it
+    # there.
+    pat: ""
+
+  proxy:
+    # -- The one gateway tenant this deployment serves (`AUTH_PROXY_TENANT`).
+    # Empty accepts any tenant the gateway names.
+    tenant: ""
 
 persistence:
   postgresql:

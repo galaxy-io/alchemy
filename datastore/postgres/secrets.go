@@ -7,7 +7,8 @@ import (
 
 	"github.com/jackc/pgx/v5"
 
-	"github.com/galaxy-io/alchemy/internal/secret"
+	"github.com/galaxy-io/modules/secret"
+	"github.com/galaxy-io/modules/secret/datastore"
 
 	"github.com/galaxy-io/alchemy/datastore/postgres/sqlcgen"
 )
@@ -19,13 +20,13 @@ type SecretStore struct {
 	q *sqlcgen.Queries
 }
 
-var _ secret.Store = (*SecretStore)(nil)
+var _ datastore.Store = (*SecretStore)(nil)
 
 // Secrets returns the secrets table for the datastore provider.
 func (s *Store) Secrets() *SecretStore { return &SecretStore{q: s.Queries} }
 
 // Put inserts the row or replaces the one at its tenant and ref.
-func (st *SecretStore) Put(ctx context.Context, r secret.Row) error {
+func (st *SecretStore) Put(ctx context.Context, r datastore.Row) error {
 	if err := owned(r.Tenant, r.Ref); err != nil {
 		return err
 	}
@@ -36,7 +37,7 @@ func (st *SecretStore) Put(ctx context.Context, r secret.Row) error {
 
 // Replace updates the row at its tenant and ref, reporting false when
 // there is none.
-func (st *SecretStore) Replace(ctx context.Context, r secret.Row) (bool, error) {
+func (st *SecretStore) Replace(ctx context.Context, r datastore.Row) (bool, error) {
 	if err := owned(r.Tenant, r.Ref); err != nil {
 		return false, err
 	}
@@ -48,18 +49,18 @@ func (st *SecretStore) Replace(ctx context.Context, r secret.Row) (bool, error) 
 
 // Get returns the tenant's row at ref, wrapping secret.ErrNotFound when
 // there is none.
-func (st *SecretStore) Get(ctx context.Context, tenant, ref string) (secret.Row, error) {
+func (st *SecretStore) Get(ctx context.Context, tenant, ref string) (datastore.Row, error) {
 	if err := owned(tenant, ref); err != nil {
-		return secret.Row{}, err
+		return datastore.Row{}, err
 	}
 	row, err := st.q.GetSecret(ctx, sqlcgen.GetSecretParams{TenantID: tenant, Ref: ref})
 	if errors.Is(err, pgx.ErrNoRows) {
-		return secret.Row{}, fmt.Errorf("%w: %s", secret.ErrNotFound, ref)
+		return datastore.Row{}, fmt.Errorf("%w: %s", secret.ErrNotFound, ref)
 	}
 	if err != nil {
-		return secret.Row{}, err
+		return datastore.Row{}, err
 	}
-	return secret.Row{
+	return datastore.Row{
 		Tenant: row.TenantID, Ref: row.Ref, Ciphertext: row.Ciphertext, Nonce: row.Nonce, KeyID: row.KeyID, Meta: row.Metadata,
 	}, nil
 }

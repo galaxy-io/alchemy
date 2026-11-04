@@ -9,7 +9,11 @@ import { galaxyDls } from "@galaxy-io/dls/vite";
 
 export const CLASS_PREFIX = "alchemy";
 const API_PROXY_TARGET = process.env.API_PROXY_TARGET ?? "http://localhost:8780";
-const API_SERVICE_PATHS = ["/functions.v1.FunctionsService", "/metrics.v1.MetricsService"];
+const API_SERVICE_PATHS = [
+  "/functions.v1.FunctionsService",
+  "/metrics.v1.MetricsService",
+  "/auth.v1.AuthService",
+];
 
 export const API_PROXY = Object.fromEntries(
   API_SERVICE_PATHS.map((servicePath) => [

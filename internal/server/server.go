@@ -16,7 +16,7 @@ import (
 	"gocloud.dev/blob"
 	"google.golang.org/protobuf/encoding/protojson"
 
-	"github.com/galaxy-io/alchemy/internal/secret"
+	"github.com/galaxy-io/modules/secret"
 
 	functionsv1 "github.com/galaxy-io/alchemy/api/functions/v1"
 	"github.com/galaxy-io/alchemy/api/functions/v1/functionsv1connect"
@@ -106,7 +106,6 @@ type Service struct {
 	artifacts *blob.Bucket   // nil when functions are built from images only
 	secrets   secret.Secrets // nil when the server has no secret provider
 	log       *slog.Logger
-	tenant    string
 	tracker   *invocationTracker // invocations this server holds
 
 	// background scopes builds and subscriptions to the service's life.
@@ -145,7 +144,6 @@ func New(ctx context.Context, cfg Config, store *postgres.Store, b *bus.Bus, log
 		artifacts:  artifactBucket,
 		secrets:    secrets,
 		log:        log,
-		tenant:     postgres.DefaultTenantID,
 		tracker:    newTracker(),
 		background: bg,
 		stop:       stop,

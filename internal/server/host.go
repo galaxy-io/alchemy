@@ -178,6 +178,10 @@ func (s *Service) liveHosts() []*functionsv1.Host {
 // ListInstances asks every host what it is running and names the function
 // and version behind each artifact.
 func (s *Service) ListInstances(ctx context.Context, req *connect.Request[functionsv1.ListInstancesRequest]) (*connect.Response[functionsv1.ListInstancesResponse], error) {
+	tenant, err := tenantFromContext(ctx)
+	if err != nil {
+		return nil, err
+	}
 	replies, err := s.bus.Gather(ctx, bus.InstancesSubject, &hostv1.ListInstancesRequest{}, s.cfg.GatherWindow,
 		func() proto.Message { return &hostv1.ListInstancesResponse{} })
 	if err != nil {
@@ -189,7 +193,7 @@ func (s *Service) ListInstances(ctx context.Context, req *connect.Request[functi
 		for _, in := range r.(*hostv1.ListInstancesResponse).GetInstances() {
 			v, ok := versions[in.GetArtifactId()]
 			if !ok {
-				row, err := s.store.GetFunctionVersionByArtifact(ctx, sqlcgen.GetFunctionVersionByArtifactParams{TenantID: s.tenant, ArtifactID: in.GetArtifactId()})
+				row, err := s.store.GetFunctionVersionByArtifact(ctx, sqlcgen.GetFunctionVersionByArtifactParams{TenantID: tenant, ArtifactID: in.GetArtifactId()})
 				if err == nil {
 					v = row
 				}
