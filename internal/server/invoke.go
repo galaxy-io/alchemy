@@ -2,17 +2,25 @@ package server
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"log/slog"
+	"mime"
+	"net"
+	"net/http"
+	"strconv"
 	"time"
 
 	"connectrpc.com/connect"
 	"github.com/google/go-containerregistry/pkg/name"
+	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/proto"
 
 	functionsv1 "github.com/galaxy-io/alchemy/api/functions/v1"
 	hostv1 "github.com/galaxy-io/alchemy/api/host/v1"
+	"github.com/galaxy-io/alchemy/api/host/v1/hostv1connect"
 	"github.com/galaxy-io/alchemy/datastore/postgres/sqlcgen"
 	"github.com/galaxy-io/alchemy/internal/bus"
 	"github.com/galaxy-io/alchemy/internal/logs"
@@ -31,17 +39,22 @@ var errNoHosts = errors.New("no host is available")
 // ends, and this server publishes one only when no host took it.
 func (s *Service) Invoke(ctx context.Context, req *connect.Request[functionsv1.InvokeRequest]) (*connect.Response[functionsv1.InvokeResponse], error) {
 	start := time.Now()
-
 	cv, err := s.resolve(ctx, req.Msg.GetFunctionId(), req.Msg.GetVersion())
 	if err != nil {
 		return nil, err
 	}
-	raw := req.Msg.GetInput()
+	return s.invoke(ctx, start, cv, req.Msg)
+}
+
+// invoke runs req against cv, the version resolve picked for it, timing it
+// from start.
+func (s *Service) invoke(ctx context.Context, start time.Time, cv *compiledVersion, req *functionsv1.InvokeRequest) (*connect.Response[functionsv1.InvokeResponse], error) {
+	raw := req.GetInput()
 	if len(raw) > s.cfg.MaxPayloadBytes {
 		return nil, connect.NewError(connect.CodeInvalidArgument,
 			fmt.Errorf("input is %d bytes; the limit is %d", len(raw), s.cfg.MaxPayloadBytes))
 	}
-	key := req.Msg.GetIdempotencyKey()
+	key := req.GetIdempotencyKey()
 	if len(key) > maxIdempotencyKeyLen {
 		return nil, connect.NewError(connect.CodeInvalidArgument,
 			fmt.Errorf("idempotency_key is %d bytes; the limit is %d", len(key), maxIdempotencyKeyLen))
@@ -181,7 +194,7 @@ func (s *Service) invokeOnHost(ctx context.Context, inv *invocation, cv *compile
 		}
 		out, err := s.requestInvoke(ctx, c.host, req, timeout)
 		switch {
-		case errors.Is(err, bus.ErrNoResponders):
+		case errors.Is(err, errHostGone):
 			// Gone since its last heartbeat.
 			inv.notSent()
 			s.forgetHost(c.host)
@@ -227,13 +240,51 @@ func (cv *compiledVersion) pinnedSpec() *functionsv1.FunctionSpec {
 // requestInvoke sends req to host on a fresh budget, so a build that
 // ran first takes nothing from it. The host enforces the function timeout
 // and its own acquire; the budget only guards against a host that vanished
-// mid-call.
+// mid-call. errHostGone means the host never saw req.
 func (s *Service) requestInvoke(ctx context.Context, host string, req *hostv1.InvokeRequest, timeout time.Duration) (*hostv1.InvokeResponse, error) {
+	s.mu.Lock()
+	k, ok := s.hosts[host]
+	s.mu.Unlock()
+	if !ok || k.invokeURL == "" {
+		return nil, errHostGone
+	}
 	ctx, cancel := context.WithTimeout(ctx, invokeBudget(timeout))
 	defer cancel()
-	out := &hostv1.InvokeResponse{}
-	err := s.bus.Request(ctx, bus.HostInvokeSubject(host), req, out)
-	return out, err
+	out, err := k.invoke.Invoke(ctx, connect.NewRequest(req))
+	var op *net.OpError
+	switch {
+	case err == nil:
+		return out.Msg, nil
+	case errors.As(err, &op) && op.Op == "dial":
+		return nil, errHostGone
+	default:
+		return nil, err
+	}
+}
+
+// errHostGone means the host could not be reached at all, so it never saw
+// the invocation: gone since its last heartbeat.
+var errHostGone = errors.New("host is unreachable")
+
+// newHostHTTP is the one transport every invocation reaches hosts on:
+// HTTP/2 without TLS, so each host keeps one connection.
+func newHostHTTP() *http.Client {
+	protocols := new(http.Protocols)
+	protocols.SetUnencryptedHTTP2(true)
+	return &http.Client{Transport: &http.Transport{
+		Protocols:   protocols,
+		DialContext: (&net.Dialer{Timeout: 5 * time.Second, KeepAlive: 30 * time.Second}).DialContext,
+	}}
+}
+
+// hostClient is HostService at url. Replies are read up to the payload limit
+// plus room for the rest of the reply, and nothing is gzipped: payloads
+// cross a private network, where compressing 64MB costs more than it saves.
+func (s *Service) hostClient(url string) hostv1connect.HostServiceClient {
+	return hostv1connect.NewHostServiceClient(s.hostHTTP, url,
+		connect.WithReadMaxBytes(s.cfg.MaxPayloadBytes+1<<20),
+		connect.WithAcceptCompression("gzip", nil, nil),
+	)
 }
 
 // When every host serving an artifact is full, an invocation waits up to
@@ -486,4 +537,139 @@ func (i *invocation) canceled() {
 	}); inv != nil {
 		i.s.publishRecord(inv)
 	}
+}
+
+// Content types of an InvokeHTTP body, by contract.
+const (
+	jsonContentType  = "application/json"
+	arrowContentType = "application/vnd.apache.arrow.stream"
+)
+
+// InvokeHTTP serves POST /functions/{function}/invoke: Invoke over plain
+// HTTP, where the body is the input and the response body the output, in
+// the contract's encoding, with no envelope. ?version= pins a version and Idempotency-Key works as on Invoke. The
+// request must carry the contract's content type, which a browser cannot
+// send cross-site without a preflight this server never grants, so a
+// session cookie alone cannot invoke.
+func (s *Service) InvokeHTTP(w http.ResponseWriter, r *http.Request) {
+	start := time.Now()
+	ctx := r.Context()
+	var version int64
+	if v := r.URL.Query().Get("version"); v != "" {
+		n, err := strconv.ParseInt(v, 10, 64)
+		if err != nil || n < 1 {
+			writeError(w, connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("version %q is not a version number", v)))
+			return
+		}
+		version = n
+	}
+	cv, err := s.resolve(ctx, r.PathValue("function"), version)
+	if err != nil {
+		writeError(w, err)
+		return
+	}
+	contentType := jsonContentType
+	if cv.spec.GetContract().GetArrow() != nil {
+		contentType = arrowContentType
+	}
+	if got, _, _ := mime.ParseMediaType(r.Header.Get("Content-Type")); got != contentType {
+		writeStatus(w, http.StatusUnsupportedMediaType, connect.CodeInvalidArgument,
+			fmt.Sprintf("this function takes %s", contentType), nil)
+		return
+	}
+	input, err := io.ReadAll(http.MaxBytesReader(w, r.Body, int64(s.cfg.MaxPayloadBytes)))
+	if err != nil {
+		var tooBig *http.MaxBytesError
+		if errors.As(err, &tooBig) {
+			writeStatus(w, http.StatusRequestEntityTooLarge, connect.CodeInvalidArgument,
+				fmt.Sprintf("input is over the %d byte limit", s.cfg.MaxPayloadBytes), nil)
+			return
+		}
+		writeError(w, connect.NewError(connect.CodeInvalidArgument, err))
+		return
+	}
+	resp, err := s.invoke(ctx, start, cv, &functionsv1.InvokeRequest{
+		FunctionId:     cv.row.FunctionID,
+		Version:        version,
+		Input:          input,
+		IdempotencyKey: r.Header.Get("Idempotency-Key"),
+	})
+	if err != nil {
+		writeError(w, err)
+		return
+	}
+	out := resp.Msg
+	h := w.Header()
+	h.Set("Alchemy-Invocation-Id", out.GetInvocationId())
+	h.Set("Alchemy-Version", strconv.FormatInt(out.GetVersion(), 10))
+	if out.GetReplayed() {
+		h.Set("Alchemy-Replayed", "true")
+	}
+	if fe := out.GetError(); fe != nil {
+		status := http.StatusInternalServerError
+		if fe.GetKind() == functionsv1.FunctionErrorKind_FUNCTION_ERROR_KIND_TIMEOUT {
+			status = http.StatusGatewayTimeout
+		}
+		body, _ := protojson.Marshal(fe)
+		h.Set("Content-Type", jsonContentType)
+		w.WriteHeader(status)
+		_, _ = w.Write(body)
+		return
+	}
+	h.Set("Content-Type", contentType)
+	_, _ = w.Write(out.GetOutput())
+}
+
+// writeError answers err as a Connect handler would: its code as the HTTP
+// status, and a JSON body with the code, message and any contract
+// violations.
+func writeError(w http.ResponseWriter, err error) {
+	code := connect.CodeOf(err)
+	msg := err.Error()
+	var violations []json.RawMessage
+	if cerr := new(connect.Error); errors.As(err, &cerr) {
+		msg = cerr.Message()
+		for _, d := range cerr.Details() {
+			if v, derr := d.Value(); derr == nil {
+				if cv, ok := v.(*functionsv1.ContractViolation); ok {
+					b, _ := protojson.Marshal(cv)
+					violations = append(violations, b)
+				}
+			}
+		}
+	}
+	writeStatus(w, httpStatus[code], code, msg, violations)
+}
+
+func writeStatus(w http.ResponseWriter, status int, code connect.Code, msg string, violations []json.RawMessage) {
+	if status == 0 {
+		status = http.StatusInternalServerError
+	}
+	w.Header().Set("Content-Type", jsonContentType)
+	w.WriteHeader(status)
+	_ = json.NewEncoder(w).Encode(struct {
+		Code       string            `json:"code"`
+		Message    string            `json:"message"`
+		Violations []json.RawMessage `json:"violations,omitempty"`
+	}{code.String(), msg, violations})
+}
+
+// httpStatus is the Connect protocol's HTTP status for each code.
+var httpStatus = map[connect.Code]int{
+	connect.CodeCanceled:           499,
+	connect.CodeUnknown:            http.StatusInternalServerError,
+	connect.CodeInvalidArgument:    http.StatusBadRequest,
+	connect.CodeDeadlineExceeded:   http.StatusGatewayTimeout,
+	connect.CodeNotFound:           http.StatusNotFound,
+	connect.CodeAlreadyExists:      http.StatusConflict,
+	connect.CodePermissionDenied:   http.StatusForbidden,
+	connect.CodeResourceExhausted:  http.StatusTooManyRequests,
+	connect.CodeFailedPrecondition: http.StatusBadRequest,
+	connect.CodeAborted:            http.StatusConflict,
+	connect.CodeOutOfRange:         http.StatusBadRequest,
+	connect.CodeUnimplemented:      http.StatusNotImplemented,
+	connect.CodeInternal:           http.StatusInternalServerError,
+	connect.CodeUnavailable:        http.StatusServiceUnavailable,
+	connect.CodeDataLoss:           http.StatusInternalServerError,
+	connect.CodeUnauthenticated:    http.StatusUnauthorized,
 }

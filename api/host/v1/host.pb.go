@@ -26,7 +26,7 @@ const (
 // build time so the spec is never consulted again. The server stores it on
 // the version and sends it back verbatim with every invoke.
 //
-// id keys instances and the invoke subject: it hashes everything that makes
+// id keys instances: it hashes everything that makes
 // two instances interchangeable, including the tenant, so two functions with
 // the same image but different env never share a warm instance. The contract
 // is not in it: an instance can run any input. The drive cache is keyed by
@@ -1351,7 +1351,10 @@ type Heartbeat struct {
 	Host  *v1.Host               `protobuf:"bytes,1,opt,name=host,proto3" json:"host,omitempty"`
 	// artifacts are those the host has built and takes invocations for, with
 	// what it holds of each. The server places invocations from this.
-	Artifacts     []*ArtifactState `protobuf:"bytes,2,rep,name=artifacts,proto3" json:"artifacts,omitempty"`
+	Artifacts []*ArtifactState `protobuf:"bytes,2,rep,name=artifacts,proto3" json:"artifacts,omitempty"`
+	// invoke_url is where the host serves HostService, reachable from every
+	// server.
+	InvokeUrl     string `protobuf:"bytes,3,opt,name=invoke_url,json=invokeUrl,proto3" json:"invoke_url,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1398,6 +1401,13 @@ func (x *Heartbeat) GetArtifacts() []*ArtifactState {
 		return x.Artifacts
 	}
 	return nil
+}
+
+func (x *Heartbeat) GetInvokeUrl() string {
+	if x != nil {
+		return x.InvokeUrl
+	}
+	return ""
 }
 
 // ArtifactState is what a host holds of one artifact.
@@ -1769,10 +1779,12 @@ const file_host_v1_host_proto_rawDesc = "" +
 	"\x04host\x18\x01 \x01(\v2\x12.functions.v1.HostR\x04host\"\x16\n" +
 	"\x14ListInstancesRequest\"M\n" +
 	"\x15ListInstancesResponse\x124\n" +
-	"\tinstances\x18\x01 \x03(\v2\x16.functions.v1.InstanceR\tinstances\"i\n" +
+	"\tinstances\x18\x01 \x03(\v2\x16.functions.v1.InstanceR\tinstances\"\x88\x01\n" +
 	"\tHeartbeat\x12&\n" +
 	"\x04host\x18\x01 \x01(\v2\x12.functions.v1.HostR\x04host\x124\n" +
-	"\tartifacts\x18\x02 \x03(\v2\x16.host.v1.ArtifactStateR\tartifacts\"G\n" +
+	"\tartifacts\x18\x02 \x03(\v2\x16.host.v1.ArtifactStateR\tartifacts\x12\x1d\n" +
+	"\n" +
+	"invoke_url\x18\x03 \x01(\tR\tinvokeUrl\"G\n" +
 	"\rArtifactState\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x12\n" +
 	"\x04idle\x18\x02 \x01(\x05R\x04idle\x12\x12\n" +
@@ -1784,7 +1796,9 @@ const file_host_v1_host_proto_rawDesc = "" +
 	"\x19ActiveInvocationsResponse\x12:\n" +
 	"\vinvocations\x18\x01 \x03(\v2\x18.functions.v1.InvocationR\vinvocations\"O\n" +
 	"\x11InvocationRecords\x12:\n" +
-	"\vinvocations\x18\x01 \x03(\v2\x18.functions.v1.InvocationR\vinvocationsB\x86\x01\n" +
+	"\vinvocations\x18\x01 \x03(\v2\x18.functions.v1.InvocationR\vinvocations2H\n" +
+	"\vHostService\x129\n" +
+	"\x06Invoke\x12\x16.host.v1.InvokeRequest\x1a\x17.host.v1.InvokeResponseB\x86\x01\n" +
 	"\vcom.host.v1B\tHostProtoP\x01Z/github.com/galaxy-io/alchemy/api/host/v1;hostv1\xa2\x02\x03HXX\xaa\x02\aHost.V1\xca\x02\aHost\\V1\xe2\x02\x13Host\\V1\\GPBMetadata\xea\x02\bHost::V1b\x06proto3"
 
 var (
@@ -1865,8 +1879,10 @@ var file_host_v1_host_proto_depIdxs = []int32{
 	18, // 24: host.v1.Heartbeat.artifacts:type_name -> host.v1.ArtifactState
 	29, // 25: host.v1.ActiveInvocationsResponse.invocations:type_name -> functions.v1.Invocation
 	29, // 26: host.v1.InvocationRecords.invocations:type_name -> functions.v1.Invocation
-	27, // [27:27] is the sub-list for method output_type
-	27, // [27:27] is the sub-list for method input_type
+	10, // 27: host.v1.HostService.Invoke:input_type -> host.v1.InvokeRequest
+	11, // 28: host.v1.HostService.Invoke:output_type -> host.v1.InvokeResponse
+	28, // [28:29] is the sub-list for method output_type
+	27, // [27:28] is the sub-list for method input_type
 	27, // [27:27] is the sub-list for extension type_name
 	27, // [27:27] is the sub-list for extension extendee
 	0,  // [0:27] is the sub-list for field type_name
@@ -1898,7 +1914,7 @@ func file_host_v1_host_proto_init() {
 			NumEnums:      0,
 			NumMessages:   26,
 			NumExtensions: 0,
-			NumServices:   0,
+			NumServices:   1,
 		},
 		GoTypes:           file_host_v1_host_proto_goTypes,
 		DependencyIndexes: file_host_v1_host_proto_depIdxs,

@@ -65,7 +65,7 @@ CREATE TABLE function_versions (
   rootfs_bytes       BIGINT                  NOT NULL DEFAULT 0,
   -- artifact is what the build produced (host.v1.Artifact as JSON): the
   -- server sends it to a host verbatim with every invoke. artifact_id keys
-  -- instances and the invoke subject.
+  -- instances.
   artifact_id        TEXT                    NOT NULL DEFAULT '',
   artifact           JSONB,
   build_log          TEXT                    NOT NULL DEFAULT '',

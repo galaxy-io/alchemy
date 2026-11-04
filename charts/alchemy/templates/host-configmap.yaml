@@ -6,6 +6,7 @@ metadata:
   labels:
     {{- include "alchemy.host.labels" . | nindent 4 }}
 data:
+  INVOKE_ADDR: {{ printf ":%v" .Values.host.invokePort | quote }}
   # Capacity
   MAX_INSTANCES: {{ .Values.host.maxInstances | quote }}
   MEMORY_BUDGET_MIB: {{ int64 .Values.host.memoryBudgetMiB | quote }}

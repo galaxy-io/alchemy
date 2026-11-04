@@ -1,5 +1,5 @@
 // Command server is the Galaxy Functions API: it owns Postgres, validates
-// contracts, records invocations and reaches hosts over the bus. It needs
+// contracts, records invocations and sends them to hosts. It needs
 // neither KVM nor Docker.
 package main
 
@@ -128,7 +128,7 @@ func run(log *slog.Logger) error {
 	protocols.SetUnencryptedHTTP2(true)
 	srv := &http.Server{
 		Addr:              addr,
-		Handler:           routes(svc, server.AuthHandler(auth), server.AuthInterceptor(auth, store)),
+		Handler:           routes(svc, server.AuthHandler(auth), server.NewAuthInterceptor(auth, store)),
 		Protocols:         protocols,
 		ReadHeaderTimeout: 10 * time.Second,
 	}
@@ -151,14 +151,15 @@ func run(log *slog.Logger) error {
 	return nil
 }
 
-// routes serves the API, behind one interceptor that authenticates every
-// procedure, and the UI.
-func routes(svc *server.Service, auth authv1connect.AuthServiceHandler, interceptor connect.Interceptor) *http.ServeMux {
+// routes serves the API and Invoke over plain HTTP, behind one interceptor
+// that authenticates both, and the UI.
+func routes(svc *server.Service, auth authv1connect.AuthServiceHandler, interceptor *server.AuthInterceptor) *http.ServeMux {
 	opts := connect.WithInterceptors(interceptor)
 	mux := http.NewServeMux()
 	mux.Handle(functionsv1connect.NewFunctionsServiceHandler(svc, opts))
 	mux.Handle(metricsv1connect.NewMetricsServiceHandler(svc.NewMetricsService(), opts))
 	mux.Handle(authv1connect.NewAuthServiceHandler(auth, opts))
+	mux.Handle("POST /functions/{function}/invoke", interceptor.Handler(functionsv1connect.FunctionsServiceInvokeProcedure, http.HandlerFunc(svc.InvokeHTTP)))
 	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusNoContent)
 	})

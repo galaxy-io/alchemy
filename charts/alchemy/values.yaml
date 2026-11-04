@@ -133,8 +133,8 @@ eventBus:
   nats:
     # -- NATS connection URL stored in the chart-created Secret as `NATS_URL`.
     # Required unless `existingSecret` is set. The server must allow 64MB
-    # payloads (`max_payload`), since messages carry whole function inputs and
-    # outputs, and have JetStream enabled with memory storage for function logs.
+    # messages (`max_payload`) and have JetStream enabled with memory storage
+    # for function logs.
     # @default -- required
     url: ""
 
@@ -273,6 +273,9 @@ host:
     name: ""
     # -- Annotations for the chart-created host ServiceAccount.
     annotations: {}
+
+  # -- Port hosts take invocations on. Servers must reach host pods on it.
+  invokePort: 8790
 
   # -- Number of hosts. Each runs on its own node; on an autoscaled cluster,
   # raising this is what brings up more KVM nodes. Ignored when
@@ -424,8 +427,7 @@ nats:
         pvc:
           size: 10Gi
     merge:
-      # -- Largest message NATS accepts. Payloads carry whole function inputs
-      # and outputs, so this matches the server's payload limit.
+      # -- Largest message NATS accepts.
       max_payload: << 64MB >>
   container:
     # -- Merged into the vendored NATS container spec. Sets resources so the

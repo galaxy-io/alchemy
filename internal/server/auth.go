@@ -62,15 +62,17 @@ var publicProcedures = map[string]bool{
 	authv1connect.AuthServiceAcceptInviteProcedure:  true,
 }
 
-// AuthInterceptor authenticates every RPC except the public session ones,
+// NewAuthInterceptor authenticates every RPC except the public session ones,
 // resolves the caller's tenant and user to alchemy's own rows, and puts the
 // caller on the context. With no provider every request runs in the default
 // tenant.
-func AuthInterceptor(provider identity.Authenticator, store *postgres.Store) connect.Interceptor {
-	return &authInterceptor{provider: provider, store: store}
+func NewAuthInterceptor(provider identity.Authenticator, store *postgres.Store) *AuthInterceptor {
+	return &AuthInterceptor{provider: provider, store: store}
 }
 
-type authInterceptor struct {
+// AuthInterceptor is a connect.Interceptor, and wraps plain HTTP handlers
+// with Handler.
+type AuthInterceptor struct {
 	provider identity.Authenticator
 	store    *postgres.Store
 	// tenants caches ResolveTenant by provider organization id, and users
@@ -82,7 +84,8 @@ type authInterceptor struct {
 
 type userKey struct{ tenant, userID string }
 
-func (i *authInterceptor) WrapUnary(next connect.UnaryFunc) connect.UnaryFunc {
+// WrapUnary authenticates a unary call before next runs it.
+func (i *AuthInterceptor) WrapUnary(next connect.UnaryFunc) connect.UnaryFunc {
 	return func(ctx context.Context, req connect.AnyRequest) (connect.AnyResponse, error) {
 		ctx, err := i.authenticate(ctx, req.Spec().Procedure, req.Header())
 		if err != nil {
@@ -92,7 +95,8 @@ func (i *authInterceptor) WrapUnary(next connect.UnaryFunc) connect.UnaryFunc {
 	}
 }
 
-func (i *authInterceptor) WrapStreamingHandler(next connect.StreamingHandlerFunc) connect.StreamingHandlerFunc {
+// WrapStreamingHandler authenticates a stream before next serves it.
+func (i *AuthInterceptor) WrapStreamingHandler(next connect.StreamingHandlerFunc) connect.StreamingHandlerFunc {
 	return func(ctx context.Context, conn connect.StreamingHandlerConn) error {
 		ctx, err := i.authenticate(ctx, conn.Spec().Procedure, conn.RequestHeader())
 		if err != nil {
@@ -102,11 +106,25 @@ func (i *authInterceptor) WrapStreamingHandler(next connect.StreamingHandlerFunc
 	}
 }
 
-func (i *authInterceptor) WrapStreamingClient(next connect.StreamingClientFunc) connect.StreamingClientFunc {
+// WrapStreamingClient leaves client streams alone: the server makes none.
+func (i *AuthInterceptor) WrapStreamingClient(next connect.StreamingClientFunc) connect.StreamingClientFunc {
 	return next
 }
 
-func (i *authInterceptor) authenticate(ctx context.Context, procedure string, header http.Header) (context.Context, error) {
+// Handler authenticates requests to next as it does calls to procedure,
+// answering failures the way a Connect handler would.
+func (i *AuthInterceptor) Handler(procedure string, next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		ctx, err := i.authenticate(r.Context(), procedure, r.Header)
+		if err != nil {
+			writeError(w, err)
+			return
+		}
+		next.ServeHTTP(w, r.WithContext(ctx))
+	})
+}
+
+func (i *AuthInterceptor) authenticate(ctx context.Context, procedure string, header http.Header) (context.Context, error) {
 	if i.provider == nil {
 		return identity.WithTenant(ctx, postgres.DefaultTenantID), nil
 	}

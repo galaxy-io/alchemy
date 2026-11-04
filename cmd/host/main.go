@@ -8,6 +8,8 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"net"
+	"net/http"
 	"os"
 	"os/signal"
 	"path/filepath"
@@ -15,8 +17,10 @@ import (
 	"syscall"
 	"time"
 
+	"connectrpc.com/connect"
 	"gocloud.dev/blob"
 
+	"github.com/galaxy-io/alchemy/api/host/v1/hostv1connect"
 	"github.com/galaxy-io/alchemy/cmd/internal/logger"
 	"github.com/galaxy-io/alchemy/internal/bus"
 	"github.com/galaxy-io/alchemy/internal/driver/firecracker"
@@ -46,6 +50,12 @@ func run(log *slog.Logger) error {
 	artifactsBucket := os.Getenv("ARTIFACTS_BUCKET")
 	cfg := host.DefaultConfig()
 	cfg.Name = envOr("HOST_NAME", hostname)
+	invokeAddr := envOr("INVOKE_ADDR", ":8790")
+	url, err := invokeURL(os.Getenv("INVOKE_URL"), hostname, invokeAddr)
+	if err != nil {
+		return err
+	}
+	cfg.InvokeURL = url
 	fcCfg := firecracker.Config{
 		FirecrackerBin: envOr("FIRECRACKER_BIN", "/usr/local/bin/firecracker"),
 		JailerBin:      envOr("JAILER_BIN", "/usr/local/bin/jailer"),
@@ -108,7 +118,57 @@ func run(log *slog.Logger) error {
 		defer func() { _ = artifacts.Close() }()
 	}
 
-	return host.New(cfg, drv, b, bucket, artifacts, log).Run(ctx)
+	h := host.New(cfg, drv, b, bucket, artifacts, log)
+	// Listening before Run, so the URL its first heartbeat names answers.
+	ln, err := net.Listen("tcp", invokeAddr)
+	if err != nil {
+		return fmt.Errorf("listen %s: %w", invokeAddr, err)
+	}
+	srv := invokeServer(h)
+	go func() {
+		if err := srv.Serve(ln); err != nil && !errors.Is(err, http.ErrServerClosed) {
+			log.Error("serve invocations", "err", err)
+		}
+	}()
+	log.Info("serving invocations", "addr", invokeAddr, "url", cfg.InvokeURL)
+	err = h.Run(ctx)
+	// Run has drained every invocation, so only refused ones can be open.
+	shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	return errors.Join(err, srv.Shutdown(shutdownCtx))
+}
+
+// maxInvokeRequestBytes bounds an invoke request: the input, the artifact
+// and the rest. It sits above the server's 64MB payload limit, which the
+// server enforces.
+const maxInvokeRequestBytes = 72 << 20
+
+// invokeServer serves h's HostService over HTTP/2 without TLS, the way
+// servers dial it. Nothing is gzipped: payloads cross a private network,
+// where compressing 64MB costs more than it saves.
+func invokeServer(h *host.Host) *http.Server {
+	mux := http.NewServeMux()
+	mux.Handle(hostv1connect.NewHostServiceHandler(h,
+		connect.WithReadMaxBytes(maxInvokeRequestBytes),
+		connect.WithCompression("gzip", nil, nil),
+	))
+	protocols := new(http.Protocols)
+	protocols.SetHTTP1(true)
+	protocols.SetUnencryptedHTTP2(true)
+	return &http.Server{Handler: mux, Protocols: protocols, ReadHeaderTimeout: 10 * time.Second}
+}
+
+// invokeURL is where the servers dial this host: INVOKE_URL, else the
+// hostname on InvokeAddr's port.
+func invokeURL(set, hostname, addr string) (string, error) {
+	if set != "" {
+		return set, nil
+	}
+	_, port, err := net.SplitHostPort(addr)
+	if err != nil {
+		return "", fmt.Errorf("INVOKE_ADDR: %w", err)
+	}
+	return "http://" + net.JoinHostPort(hostname, port), nil
 }
 
 func envOr(key, fallback string) string {

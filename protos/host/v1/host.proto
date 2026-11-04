@@ -8,13 +8,13 @@ import "functions/v1/host.proto";
 import "functions/v1/invocations.proto";
 
 // host.v1 is the contract between the servers and the hosts, and between
-// servers. It rides on NATS rather than a Connect service. Hosts keep no
-// state the servers rely on beyond what their heartbeats last said, and
-// the servers keep no state about hosts beyond those heartbeats.
+// servers. The control plane rides on NATS. Invocations, which carry whole
+// inputs and outputs, go straight from a server to the host it picked, over
+// HostService at the invoke_url the host heartbeats, so payloads never pass
+// through NATS. Hosts keep no state the servers rely on beyond what their
+// heartbeats last said, and the servers keep no state about hosts beyond
+// those heartbeats.
 //
-//   host.<name>.invoke           request/reply: that host runs the
-//                                invocation, or answers not_found when it
-//                                has not built the artifact
 //   host.<name>.build            request/reply: that host builds, replies
 //                                with the Artifact
 //   host.<name>.compile          request/reply: that host compiles a
@@ -50,11 +50,17 @@ import "functions/v1/invocations.proto";
 // Payloads are protobuf-encoded messages from this file. Request/reply
 // errors are an Error message in the reply, never a NATS-level error.
 
+// HostService is what a host serves to the servers directly. It answers
+// not_found in the reply when it has not built the artifact.
+service HostService {
+  rpc Invoke(InvokeRequest) returns (InvokeResponse);
+}
+
 // Artifact is everything a host needs to run an invocation, resolved at
 // build time so the spec is never consulted again. The server stores it on
 // the version and sends it back verbatim with every invoke.
 //
-// id keys instances and the invoke subject: it hashes everything that makes
+// id keys instances: it hashes everything that makes
 // two instances interchangeable, including the tenant, so two functions with
 // the same image but different env never share a warm instance. The contract
 // is not in it: an instance can run any input. The drive cache is keyed by
@@ -241,6 +247,9 @@ message Heartbeat {
   // artifacts are those the host has built and takes invocations for, with
   // what it holds of each. The server places invocations from this.
   repeated ArtifactState artifacts = 2;
+  // invoke_url is where the host serves HostService, reachable from every
+  // server.
+  string invoke_url = 3;
 }
 
 // ArtifactState is what a host holds of one artifact.

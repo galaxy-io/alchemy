@@ -76,10 +76,10 @@ func (h *Host) secretEnv(ctx context.Context, a *hostv1.Artifact) (map[string]st
 	return env, nil
 }
 
-// invocationSecrets is secretEnv as handleInvoke uses it: the environment,
+// invocationSecrets is secretEnv as invoke uses it: the environment,
 // or the reply when the secrets could not be had. The instance ran nothing,
 // so it stays reusable.
-func (h *Host) invocationSecrets(ctx context.Context, a *hostv1.Artifact, log *slog.Logger) (map[string]string, proto.Message) {
+func (h *Host) invocationSecrets(ctx context.Context, a *hostv1.Artifact, log *slog.Logger) (map[string]string, *hostv1.InvokeResponse) {
 	env, err := h.secretEnv(ctx, a)
 	if err != nil {
 		log.Warn("secrets", "err", err)
