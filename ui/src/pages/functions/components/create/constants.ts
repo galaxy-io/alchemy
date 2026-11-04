@@ -214,3 +214,4 @@ export const CREATE_FUNCTION_MODAL_VARIABLE_DESCRIPTION = "Plain text, stored wi
 export const CREATE_FUNCTION_MODAL_SECRET_DESCRIPTION = "Encrypted at rest, hidden once saved";
 
 export const CREATE_FUNCTION_MODAL_SOURCE_KIND_NAME = "create-function-source-kind";
+export const CREATE_FUNCTION_MODAL_COMMAND_SEPARATORS = [" ", ","];

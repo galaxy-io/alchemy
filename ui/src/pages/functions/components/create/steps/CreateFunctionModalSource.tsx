@@ -13,6 +13,7 @@ import {
   useCreateFunctionModalActions,
   useCreateFunctionModalState,
 } from "@/pages/functions/components/create/CreateFunctionModalProvider";
+import { CREATE_FUNCTION_MODAL_COMMAND_SEPARATORS } from "@/pages/functions/components/create/constants";
 import CreateFunctionModalEnv from "@/pages/functions/components/create/steps/components/CreateFunctionModalEnv";
 import CreateFunctionModalSourceKind from "@/pages/functions/components/create/steps/components/CreateFunctionModalSourceKind";
 import FunctionRuntimeIcon from "@/pages/functions/components/FunctionRuntimeIcon";
@@ -63,9 +64,10 @@ const CreateFunctionModalSource: FC = () => {
         <TagInput
           label="Command"
           labelTooltip="Empty uses the image's entrypoint"
-          placeholder="python, handler.py..."
+          placeholder="python handler.py"
           value={command}
           onChange={setCommand}
+          separators={CREATE_FUNCTION_MODAL_COMMAND_SEPARATORS}
           fillWidth
         />
       </Widget>
