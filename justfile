@@ -74,7 +74,6 @@ host count="1" memory="512" warm="5m" prewarm="0": build-linux
           ARTIFACTS_BUCKET="s3://alchemy-artifacts?$bucket" \
           LOG_FORMAT=text LOG_LEVEL="${LOG_LEVEL:-info}" \
           HOST_NAME="host-$i" DATA_DIR="/var/lib/alchemy/host-$i" UID_BASE=$((10000000 * i)) \
-          INVOKE_ADDR=":$((8790 + i))" INVOKE_URL="http://localhost:$((8790 + i))" \
           MEMORY_BUDGET_MIB={{ memory }} WARM_INSTANCE_TTL={{ warm }} PREWARM_COUNT={{ prewarm }} \
           bin/linux-arm64/host 2>&1 | sed -u "s/^/[host-$i] /" &
       done

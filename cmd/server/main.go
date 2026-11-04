@@ -1,5 +1,5 @@
 // Command server is the Galaxy Functions API: it owns Postgres, validates
-// contracts, records invocations and sends them to hosts. It needs
+// contracts, records invocations and reaches hosts over the bus. It needs
 // neither KVM nor Docker.
 package main
 

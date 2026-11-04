@@ -1,5 +1,5 @@
 // Package host is the per-machine process: it builds artifacts, runs
-// instances and serves the invocations servers send it. It holds nothing durable
+// instances and serves invocations over the bus. It holds nothing durable
 // beyond the records of invocations it has not published yet; if it dies,
 // its instances die with it and the server records the invocations it was
 // serving as errored.
@@ -19,7 +19,6 @@ import (
 	"sync"
 	"time"
 
-	"connectrpc.com/connect"
 	"gocloud.dev/blob"
 	"google.golang.org/protobuf/proto"
 
@@ -43,9 +42,6 @@ const (
 type Config struct {
 	// Name is the host's identity on the bus; the hostname by default.
 	Name string
-	// InvokeURL is where the servers reach this host's HostService, which
-	// the host heartbeats.
-	InvokeURL string
 	// MaxConcurrency is how many invocations may hold an instance at once.
 	MaxConcurrency int
 	// MemoryMiB is the guest memory this host may commit across booting,
@@ -168,6 +164,7 @@ func (h *Host) Run(ctx context.Context) error {
 		// and the invocations it chose it for.
 		{bus.HostBuildSubject(h.cfg.Name), "", h.handleBuild, buildError("unavailable", errShuttingDown)},
 		{bus.HostCompileSubject(h.cfg.Name), "", h.handleCompile, compileError("unavailable", errShuttingDown)},
+		{bus.HostInvokeSubject(h.cfg.Name), "", h.handleInvoke, invokeError("unavailable", errShuttingDown)},
 		{bus.DescribeSubject, "", h.handleDescribe, nil},
 		{bus.InstancesSubject, "", h.handleInstances, nil},
 		{bus.HostSecretsInvalidateSubject, "", h.handleSecretsInvalidate, nil},
@@ -214,24 +211,16 @@ const shutdownGrace = 40 * time.Second
 // them, and answers refused instead once the host is draining.
 func (h *Host) tracked(handler bus.Handler, refused proto.Message) bus.Handler {
 	return func(ctx context.Context, data []byte) proto.Message {
-		if !h.enter() {
+		h.mu.Lock()
+		if h.draining {
+			h.mu.Unlock()
 			return refused
 		}
+		h.handlers.Add(1)
+		h.mu.Unlock()
 		defer h.handlers.Done()
 		return handler(ctx, data)
 	}
-}
-
-// enter counts one handler run in h.handlers, or reports false once the
-// host is draining. A true return is paired with h.handlers.Done.
-func (h *Host) enter() bool {
-	h.mu.Lock()
-	defer h.mu.Unlock()
-	if h.draining {
-		return false
-	}
-	h.handlers.Add(1)
-	return true
 }
 
 // shutdown stops taking work and releases the warm pool, gives in-flight
@@ -258,7 +247,7 @@ func (h *Host) shutdown(stopRecords context.CancelFunc) {
 }
 
 func (h *Host) heartbeat() {
-	if err := h.bus.Publish(bus.HeartbeatSubject(h.cfg.Name), &hostv1.Heartbeat{Host: h.describe(), Artifacts: h.artifactStates(), InvokeUrl: h.cfg.InvokeURL}); err != nil {
+	if err := h.bus.Publish(bus.HeartbeatSubject(h.cfg.Name), &hostv1.Heartbeat{Host: h.describe(), Artifacts: h.artifactStates()}); err != nil {
 		h.log.Warn("heartbeat", "err", err)
 	}
 }
@@ -423,22 +412,15 @@ const (
 	outputUploadBackoff  = 500 * time.Millisecond
 )
 
-// Invoke serves HostService. It runs on the host's background context, not
-// the request's: a server that stops waiting does not stop the function,
-// which records how it ended either way.
-func (h *Host) Invoke(_ context.Context, req *connect.Request[hostv1.InvokeRequest]) (*connect.Response[hostv1.InvokeResponse], error) {
-	if !h.enter() {
-		return connect.NewResponse(invokeError("unavailable", errShuttingDown)), nil
-	}
-	defer h.handlers.Done()
-	return connect.NewResponse(h.invoke(h.background, req.Msg)), nil
-}
-
-// invoke runs one input through an instance. Every reply is an
+// handleInvoke runs one input through an instance. Every reply is an
 // InvokeResponse; an Error result means no instance ran the input. When an
 // instance ran it, the host publishes the invocation's record as well: the
 // reply tells the caller, the record tells the database.
-func (h *Host) invoke(ctx context.Context, req *hostv1.InvokeRequest) *hostv1.InvokeResponse {
+func (h *Host) handleInvoke(ctx context.Context, data []byte) proto.Message {
+	req := &hostv1.InvokeRequest{}
+	if err := proto.Unmarshal(data, req); err != nil {
+		return invokeError("invalid_argument", err)
+	}
 	id := req.GetInvocation().GetId()
 	log := h.log.With("invocation_id", id, "artifact_id", req.GetArtifact().GetId())
 	start := time.Now()
@@ -543,7 +525,7 @@ func (h *Host) invoke(ctx context.Context, req *hostv1.InvokeRequest) *hostv1.In
 
 // checkInput compiles the artifact's contract and checks the input against
 // it. A rejection is the reply to send, already recorded; nothing ran.
-func (h *Host) checkInput(req *hostv1.InvokeRequest, start time.Time) (contract.Contract, *contract.Input, *hostv1.InvokeResponse) {
+func (h *Host) checkInput(req *hostv1.InvokeRequest, start time.Time) (contract.Contract, *contract.Input, proto.Message) {
 	c, err := h.contracts.get(req.GetArtifact().GetContract())
 	if err != nil {
 		return nil, nil, invokeError("failed_precondition", fmt.Errorf("compile contract: %w", err))

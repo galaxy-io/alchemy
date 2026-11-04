@@ -5,7 +5,7 @@ This chart deploys the Alchemy server and one host per KVM-capable node, plus th
 - **server** is a Deployment behind one Service, sized by `server.replicas` or, with `server.autoscaling.enabled`, by a HorizontalPodAutoscaler on CPU. Any replica serves any request. Each applies migrations when it starts, one at a time under a PostgreSQL lock. Servers place each function on `server.hostsPerFunction` hosts and send its invocations to the one with a warm instance.
 
 Invocations are not written to PostgreSQL while they run. The host that ran one publishes its record to a JetStream stream when it ends, and the servers write records in batches, so the database is never on the invocation path.
-- **host** is a Deployment of `host.replicas` hosts, one per node, on nodes matching `host.nodeSelector` (`alchemy.getgalaxy.io/kvm: "true"` by default). Each host boots Firecracker microVMs on its node and pulls function images straight from their registries, with no container daemon. Pulls from ECR, Artifact Registry and GCR authenticate with the cloud's workload identity (IRSA or Pod Identity on AWS, Workload Identity on GCP). Other registries use the Docker config or are pulled anonymously. Server pods must reach host pods on `host.invokePort` (8790).
+- **host** is a Deployment of `host.replicas` hosts, one per node, on nodes matching `host.nodeSelector` (`alchemy.getgalaxy.io/kvm: "true"` by default). Each host boots Firecracker microVMs on its node and pulls function images straight from their registries, with no container daemon. Pulls from ECR, Artifact Registry and GCR authenticate with the cloud's workload identity (IRSA or Pod Identity on AWS, Workload Identity on GCP). Other registries use the Docker config or are pulled anonymously.
 
 ## Host nodes
 

@@ -10,7 +10,6 @@ import (
 
 	functionsv1 "github.com/galaxy-io/alchemy/api/functions/v1"
 	hostv1 "github.com/galaxy-io/alchemy/api/host/v1"
-	"github.com/galaxy-io/alchemy/api/host/v1/hostv1connect"
 	"github.com/galaxy-io/alchemy/datastore/postgres/sqlcgen"
 	"github.com/galaxy-io/alchemy/internal/bus"
 )
@@ -19,8 +18,6 @@ import (
 type knownHost struct {
 	host      *functionsv1.Host
 	artifacts map[string]*hostv1.ArtifactState // what it holds, by artifact id
-	invokeURL string                           // where it serves HostService
-	invoke    hostv1connect.HostServiceClient  // dials invokeURL
 	seen      time.Time
 }
 
@@ -124,17 +121,9 @@ func (s *Service) onHeartbeat(_ context.Context, data []byte) proto.Message {
 	for _, st := range msg.GetArtifacts() {
 		artifacts[st.GetId()] = st
 	}
-	name, url := msg.GetHost().GetHostname(), msg.GetInvokeUrl()
 	s.mu.Lock()
-	defer s.mu.Unlock()
-	// A host keeps its client, and so its connection, while its URL holds.
-	var client hostv1connect.HostServiceClient
-	if prev, ok := s.hosts[name]; ok && prev.invokeURL == url {
-		client = prev.invoke
-	} else {
-		client = s.hostClient(url)
-	}
-	s.hosts[name] = &knownHost{host: msg.GetHost(), artifacts: artifacts, invokeURL: url, invoke: client, seen: time.Now()}
+	s.hosts[msg.GetHost().GetHostname()] = &knownHost{host: msg.GetHost(), artifacts: artifacts, seen: time.Now()}
+	s.mu.Unlock()
 	return nil
 }
 

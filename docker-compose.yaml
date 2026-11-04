@@ -123,6 +123,8 @@ services:
       timeout: 5s
       retries: 30
 
+# Payloads carry whole function inputs and outputs, so the message cap
+# matches the server's payload limit.
 configs:
   nats:
     content: |

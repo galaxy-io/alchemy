@@ -8,7 +8,6 @@ import (
 	"io"
 	"log/slog"
 	"mime"
-	"net"
 	"net/http"
 	"strconv"
 	"time"
@@ -20,7 +19,6 @@ import (
 
 	functionsv1 "github.com/galaxy-io/alchemy/api/functions/v1"
 	hostv1 "github.com/galaxy-io/alchemy/api/host/v1"
-	"github.com/galaxy-io/alchemy/api/host/v1/hostv1connect"
 	"github.com/galaxy-io/alchemy/datastore/postgres/sqlcgen"
 	"github.com/galaxy-io/alchemy/internal/bus"
 	"github.com/galaxy-io/alchemy/internal/logs"
@@ -194,7 +192,7 @@ func (s *Service) invokeOnHost(ctx context.Context, inv *invocation, cv *compile
 		}
 		out, err := s.requestInvoke(ctx, c.host, req, timeout)
 		switch {
-		case errors.Is(err, errHostGone):
+		case errors.Is(err, bus.ErrNoResponders):
 			// Gone since its last heartbeat.
 			inv.notSent()
 			s.forgetHost(c.host)
@@ -240,51 +238,13 @@ func (cv *compiledVersion) pinnedSpec() *functionsv1.FunctionSpec {
 // requestInvoke sends req to host on a fresh budget, so a build that
 // ran first takes nothing from it. The host enforces the function timeout
 // and its own acquire; the budget only guards against a host that vanished
-// mid-call. errHostGone means the host never saw req.
+// mid-call.
 func (s *Service) requestInvoke(ctx context.Context, host string, req *hostv1.InvokeRequest, timeout time.Duration) (*hostv1.InvokeResponse, error) {
-	s.mu.Lock()
-	k, ok := s.hosts[host]
-	s.mu.Unlock()
-	if !ok || k.invokeURL == "" {
-		return nil, errHostGone
-	}
 	ctx, cancel := context.WithTimeout(ctx, invokeBudget(timeout))
 	defer cancel()
-	out, err := k.invoke.Invoke(ctx, connect.NewRequest(req))
-	var op *net.OpError
-	switch {
-	case err == nil:
-		return out.Msg, nil
-	case errors.As(err, &op) && op.Op == "dial":
-		return nil, errHostGone
-	default:
-		return nil, err
-	}
-}
-
-// errHostGone means the host could not be reached at all, so it never saw
-// the invocation: gone since its last heartbeat.
-var errHostGone = errors.New("host is unreachable")
-
-// newHostHTTP is the one transport every invocation reaches hosts on:
-// HTTP/2 without TLS, so each host keeps one connection.
-func newHostHTTP() *http.Client {
-	protocols := new(http.Protocols)
-	protocols.SetUnencryptedHTTP2(true)
-	return &http.Client{Transport: &http.Transport{
-		Protocols:   protocols,
-		DialContext: (&net.Dialer{Timeout: 5 * time.Second, KeepAlive: 30 * time.Second}).DialContext,
-	}}
-}
-
-// hostClient is HostService at url. Replies are read up to the payload limit
-// plus room for the rest of the reply, and nothing is gzipped: payloads
-// cross a private network, where compressing 64MB costs more than it saves.
-func (s *Service) hostClient(url string) hostv1connect.HostServiceClient {
-	return hostv1connect.NewHostServiceClient(s.hostHTTP, url,
-		connect.WithReadMaxBytes(s.cfg.MaxPayloadBytes+1<<20),
-		connect.WithAcceptCompression("gzip", nil, nil),
-	)
+	out := &hostv1.InvokeResponse{}
+	err := s.bus.Request(ctx, bus.HostInvokeSubject(host), req, out)
+	return out, err
 }
 
 // When every host serving an artifact is full, an invocation waits up to

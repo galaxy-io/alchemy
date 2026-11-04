@@ -55,19 +55,9 @@ spec:
                 secretKeyRef:
                   name: {{ include "alchemy.secretName" . }}
                   key: NATS_URL
-            - name: POD_IP
-              valueFrom:
-                fieldRef:
-                  fieldPath: status.podIP
-            - name: INVOKE_URL
-              value: "http://$(POD_IP):{{ .Values.host.invokePort }}"
           envFrom:
             - configMapRef:
                 name: {{ include "alchemy.host.fullname" . }}
-          ports:
-            - name: invoke
-              containerPort: {{ .Values.host.invokePort }}
-              protocol: TCP
           # Root with every capability: the jailer chroots each microVM, makes
           # its device nodes, manages its cgroup and drops it to its own uid.
           securityContext:

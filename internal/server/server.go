@@ -1,5 +1,5 @@
 // Package server implements FunctionsService on top of the Postgres
-// datastore, sending invocations to hosts it learns of on the bus. It owns every decision that
+// datastore, with hosts reached over the bus. It owns every decision that
 // touches durable state; it never touches KVM or Docker.
 package server
 
@@ -8,7 +8,6 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
-	"net/http"
 	"sync"
 	"time"
 
@@ -108,8 +107,6 @@ type Service struct {
 	secrets   secret.Secrets // nil when the server has no secret provider
 	log       *slog.Logger
 	tracker   *invocationTracker // invocations this server holds
-	// hostHTTP carries invocations to hosts.
-	hostHTTP *http.Client
 
 	// background scopes builds and subscriptions to the service's life.
 	background context.Context
@@ -152,7 +149,6 @@ func New(ctx context.Context, cfg Config, store *postgres.Store, b *bus.Bus, log
 		stop:       stop,
 		versions:   make(map[string]*compiledVersion),
 		hosts:      make(map[string]*knownHost),
-		hostHTTP:   newHostHTTP(),
 		servers:    make(map[string]*knownServer),
 		hostBuilds: make(map[string]time.Time),
 	}
