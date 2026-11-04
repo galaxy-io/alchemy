@@ -48,7 +48,7 @@ const CreateFunctionModalSource: FC = () => {
           <Widget header="Image">
             <TextInput
               label="Image reference"
-              placeholder="ghcr.io/..."
+              placeholder="ghcr.io/acme/enrich:1.4.0"
               value={image}
               onChange={setImage}
               family={FontFamily.MONO}
