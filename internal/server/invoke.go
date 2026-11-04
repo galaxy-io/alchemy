@@ -278,11 +278,14 @@ func hostCode(code string) connect.Code {
 // function's current version when n is zero, with its compiled contract and
 // artifact.
 func (s *Service) resolve(ctx context.Context, functionID string, n int64) (*compiledVersion, error) {
-	if _, err := s.store.GetFunction(ctx, sqlcgen.GetFunctionParams{TenantID: s.tenant, ID: functionID}); err != nil {
+	tenant, err := tenantFromContext(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if _, err := s.store.GetFunction(ctx, sqlcgen.GetFunctionParams{TenantID: tenant, ID: functionID}); err != nil {
 		return nil, notFound(err, "function %q not found", functionID)
 	}
 	var row *sqlcgen.FunctionVersion
-	var err error
 	if n == 0 {
 		row, err = s.store.GetCurrentFunctionVersion(ctx, functionID)
 		if err != nil {
@@ -360,7 +363,7 @@ type invocation struct {
 // the function's live stream when it runs, and discarded if it never does.
 func (s *Service) newInvocation(cv *compiledVersion, key string, inputBytes int64) *invocation {
 	inv := &functionsv1.Invocation{
-		TenantId:       s.tenant,
+		TenantId:       cv.row.TenantID,
 		Id:             newID(),
 		FunctionId:     cv.row.FunctionID,
 		Version:        cv.row.Version,

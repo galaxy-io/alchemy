@@ -121,6 +121,11 @@ jobs:
           helm template alchemy charts/alchemy --set existingSecret=byo > /dev/null
           helm template alchemy charts/alchemy --set server.ingress.enabled=true --set "server.ingress.hosts[0]=alchemy.example.com" > /dev/null
           helm template alchemy charts/alchemy --set host.autoscaling.enabled=true > /dev/null
+          helm template alchemy charts/alchemy --set secrets.type=aws-secrets-manager > /dev/null
+          helm template alchemy charts/alchemy --set auth.enabled=true --set auth.keycloak.issuer=https://kc/realms/alchemy --set auth.keycloak.clientSecret=s > /dev/null
+          helm template alchemy charts/alchemy --set auth.enabled=true --set auth.type=zitadel --set auth.zitadel.issuer=https://z --set auth.zitadel.pat=p > /dev/null
+          helm template alchemy charts/alchemy --set auth.enabled=true --set auth.type=proxy > /dev/null
+          helm template alchemy charts/alchemy --set secrets.type=gcp-secret-manager --set secrets.gcp.projectId=p --set secrets.gcp.region=r > /dev/null
           helm template alchemy charts/alchemy --set postgresql.enabled=true --set postgresql.auth.password=p --set nats.enabled=true > /dev/null
 
       - name: Package

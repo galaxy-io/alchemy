@@ -13,8 +13,10 @@ import (
 	"connectrpc.com/connect"
 	"google.golang.org/protobuf/proto"
 
+	"github.com/galaxy-io/modules/identity"
+	"github.com/galaxy-io/modules/secret"
+
 	"github.com/galaxy-io/alchemy/internal/bus"
-	"github.com/galaxy-io/alchemy/internal/secret"
 
 	functionsv1 "github.com/galaxy-io/alchemy/api/functions/v1"
 	hostv1 "github.com/galaxy-io/alchemy/api/host/v1"
@@ -33,6 +35,10 @@ var (
 // checkSecrets validates spec.secrets: every variable is a valid name and
 // every secret exists in the tenant.
 func (s *Service) checkSecrets(ctx context.Context, spec *functionsv1.FunctionSpec) error {
+	tenant, err := tenantFromContext(ctx)
+	if err != nil {
+		return err
+	}
 	invalid := func(format string, args ...any) error {
 		return connect.NewError(connect.CodeInvalidArgument, fmt.Errorf(format, args...))
 	}
@@ -46,7 +52,7 @@ func (s *Service) checkSecrets(ctx context.Context, spec *functionsv1.FunctionSp
 		if !secretName.MatchString(name) {
 			return invalid("spec.secrets[%s]: %q is not a secret name", variable, name)
 		}
-		if _, err := s.store.GetSecret(ctx, sqlcgen.GetSecretParams{TenantID: s.tenant, Ref: SecretScope.Ref(s.tenant, name)}); err != nil {
+		if _, err := s.store.GetSecret(ctx, sqlcgen.GetSecretParams{TenantID: tenant, Ref: SecretScope.Ref(tenant, name)}); err != nil {
 			return notFound(err, "spec.secrets[%s]: secret %q not found", variable, name)
 		}
 	}
@@ -59,6 +65,10 @@ func (s *Service) checkSecrets(ctx context.Context, spec *functionsv1.FunctionSp
 // own, so a new version never changes what an older one reads. The spec is
 // the caller's copy.
 func (s *Service) storeSecretValues(ctx context.Context, functionID string, spec *functionsv1.FunctionSpec, values map[string]string) error {
+	tenant, err := tenantFromContext(ctx)
+	if err != nil {
+		return err
+	}
 	if len(values) == 0 {
 		return nil
 	}
@@ -82,7 +92,7 @@ func (s *Service) storeSecretValues(ctx context.Context, functionID string, spec
 		if !secretName.MatchString(name) {
 			return connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("secret_values: %q is too long for a secret name", variable))
 		}
-		if err := s.secrets.Write(ctx, SecretScope.Ref(s.tenant, name), secret.Secret{Tenant: s.tenant, Value: []byte(values[variable])}); err != nil {
+		if err := s.secrets.Write(ctx, SecretScope.Ref(tenant, name), secret.Secret{Tenant: tenant, Value: []byte(values[variable])}); err != nil {
 			return connect.NewError(connect.CodeInternal, err)
 		}
 		if spec.Secrets == nil {
@@ -91,18 +101,18 @@ func (s *Service) storeSecretValues(ctx context.Context, functionID string, spec
 		spec.Secrets[variable] = name
 		written = append(written, name)
 	}
-	s.invalidateSecrets(written)
+	s.invalidateSecrets(tenant, written)
 	return nil
 }
 
-// invalidateSecrets tells every host to drop its cached values for names, so
-// a rotated value takes effect on the next invocation. It is best effort; the
-// refresh interval is the backstop.
-func (s *Service) invalidateSecrets(names []string) {
+// invalidateSecrets tells every host to drop its cached values for tenant's
+// names, so a rotated value takes effect on the next invocation. It is best
+// effort; the refresh interval is the backstop.
+func (s *Service) invalidateSecrets(tenant string, names []string) {
 	if len(names) == 0 {
 		return
 	}
-	msg := &hostv1.SecretsInvalidate{TenantId: s.tenant, Names: names}
+	msg := &hostv1.SecretsInvalidate{TenantId: tenant, Names: names}
 	if err := s.bus.Publish(bus.HostSecretsInvalidateSubject, msg); err != nil {
 		s.log.Warn("invalidate secrets", "err", err)
 	}
@@ -118,10 +128,13 @@ func (s *Service) handleSecrets(ctx context.Context, data []byte) proto.Message 
 	if s.secrets == nil {
 		return &hostv1.SecretsResponse{Error: &hostv1.Error{Code: "failed_precondition", Message: "the server has no secret provider"}}
 	}
-	if req.GetTenantId() != s.tenant || !slices.Contains(s.placedHosts(req.GetFunctionId()), req.GetHost()) {
+	if !slices.Contains(s.placedHosts(req.GetFunctionId()), req.GetHost()) {
 		return &hostv1.SecretsResponse{Error: &hostv1.Error{Code: "permission_denied", Message: fmt.Sprintf("function %q is not placed on host %q", req.GetFunctionId(), req.GetHost())}}
 	}
-	// A host gets only the secrets the version it runs names.
+	// A host asks on its function's tenant's behalf: the version lookup
+	// below finds the function only in that tenant, and a host gets only the
+	// secrets the version it runs names.
+	ctx = identity.WithTenant(ctx, req.GetTenantId())
 	named, err := s.versionSecrets(ctx, req.GetFunctionId(), req.GetVersion())
 	if err != nil {
 		return &hostv1.SecretsResponse{Error: &hostv1.Error{Code: "not_found", Message: err.Error()}}

@@ -1,4 +1,5 @@
-# Local infrastructure only: Postgres, NATS, an object store and a registry. `server`
+# Local infrastructure only: Postgres, NATS, an object store, a registry and,
+# with the zitadel or keycloak profile, an identity provider. `server`
 # runs on the Mac; `host` runs in the Lima VM and reaches them at
 # host.lima.internal.
 name: alchemy
@@ -57,6 +58,71 @@ services:
     volumes:
       - registry-data:/var/lib/registry
 
+  # Identity provider for `just infra zitadel` and `just server zitadel`. Its
+  # database is created in the compose Postgres. The first instance gets a
+  # machine user whose token lands in ./.zitadel, which `just server` reads
+  # into AUTH_PAT.
+  zitadel:
+    image: ${ZITADEL_IMAGE:-ghcr.io/zitadel/zitadel:v4.17.0}
+    profiles: ["zitadel"]
+    command: ["start-from-init", "--masterkey", "MasterkeyNeedsToHave32Characters", "--tlsMode", "disabled"]
+    ports:
+      - "127.0.0.1:${ALCHEMY_ZITADEL_PORT:-8301}:8080"
+    environment:
+      ZITADEL_DATABASE_POSTGRES_HOST: postgres
+      ZITADEL_DATABASE_POSTGRES_PORT: 5432
+      ZITADEL_DATABASE_POSTGRES_DATABASE: zitadel
+      ZITADEL_DATABASE_POSTGRES_USER_USERNAME: zitadel
+      ZITADEL_DATABASE_POSTGRES_USER_PASSWORD: zitadel
+      ZITADEL_DATABASE_POSTGRES_USER_SSL_MODE: disable
+      ZITADEL_DATABASE_POSTGRES_ADMIN_USERNAME: alchemy
+      ZITADEL_DATABASE_POSTGRES_ADMIN_PASSWORD: alchemy
+      ZITADEL_DATABASE_POSTGRES_ADMIN_SSL_MODE: disable
+      ZITADEL_EXTERNALDOMAIN: localhost
+      ZITADEL_EXTERNALPORT: ${ALCHEMY_ZITADEL_PORT:-8301}
+      ZITADEL_EXTERNALSECURE: "false"
+      ZITADEL_TLS_ENABLED: "false"
+      ZITADEL_FIRSTINSTANCE_ORG_NAME: t1
+      ZITADEL_FIRSTINSTANCE_ORG_HUMAN_USERNAME: admin
+      ZITADEL_FIRSTINSTANCE_ORG_HUMAN_PASSWORD: Password1!
+      ZITADEL_FIRSTINSTANCE_ORG_MACHINE_MACHINE_USERNAME: alchemy-sa
+      ZITADEL_FIRSTINSTANCE_ORG_MACHINE_MACHINE_NAME: alchemy-sa
+      ZITADEL_FIRSTINSTANCE_ORG_MACHINE_PAT_EXPIRATIONDATE: "2100-01-01T00:00:00Z"
+      ZITADEL_FIRSTINSTANCE_PATPATH: /machinekey/pat
+    volumes:
+      - ./.zitadel:/machinekey:Z
+    healthcheck:
+      test: ["CMD", "/app/zitadel", "ready"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  # Identity provider for `just infra keycloak` and `just server keycloak`.
+  # Dev mode with its file-backed database, kept in the volume. The server
+  # creates alchemy's realm on boot with the admin credentials below.
+  keycloak:
+    image: ${KEYCLOAK_IMAGE:-quay.io/keycloak/keycloak:26.4}
+    profiles: ["keycloak"]
+    command: ["start-dev"]
+    ports:
+      - "127.0.0.1:${ALCHEMY_KEYCLOAK_PORT:-8401}:8080"
+    environment:
+      KC_BOOTSTRAP_ADMIN_USERNAME: admin
+      KC_BOOTSTRAP_ADMIN_PASSWORD: admin
+      KC_HEALTH_ENABLED: "true"
+    volumes:
+      # The whole data directory, so the volume inherits the image's ownership.
+      - keycloak-data:/opt/keycloak/data
+    healthcheck:
+      # The image ships no curl; bash reaches the management port directly.
+      test: ["CMD-SHELL", "exec 3<>/dev/tcp/127.0.0.1/9000 && printf 'GET /health/ready HTTP/1.0\\r\\n\\r\\n' >&3 && grep -q '200 OK' <&3"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+
 # Payloads carry whole function inputs and outputs, so the message cap
 # matches the server's payload limit.
 configs:
@@ -71,3 +137,4 @@ volumes:
   nats-data:
   rustfs-data:
   registry-data:
+  keycloak-data:

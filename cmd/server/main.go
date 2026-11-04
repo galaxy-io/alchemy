@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"log/slog"
 	"net/http"
 	"os"
@@ -17,12 +18,15 @@ import (
 	"syscall"
 	"time"
 
+	"connectrpc.com/connect"
 	"gocloud.dev/blob"
 
-	"github.com/galaxy-io/alchemy/internal/secret"
+	"github.com/galaxy-io/modules/identity/auth/v1/authv1connect"
+	"github.com/galaxy-io/modules/secret"
 
 	"github.com/galaxy-io/alchemy/api/functions/v1/functionsv1connect"
 	"github.com/galaxy-io/alchemy/api/metrics/v1/metricsv1connect"
+	"github.com/galaxy-io/alchemy/cmd/internal/identity"
 	"github.com/galaxy-io/alchemy/cmd/internal/logger"
 	"github.com/galaxy-io/alchemy/cmd/internal/secrets"
 	"github.com/galaxy-io/alchemy/datastore/postgres"
@@ -96,9 +100,20 @@ func run(log *slog.Logger) error {
 		defer func() { _ = artifacts.Close() }()
 	}
 
-	provider, err := secretProvider(store, log)
+	provider, closeSecrets, err := secretProvider(ctx, store, log)
 	if err != nil {
 		return err
+	}
+	defer closeSecrets()
+
+	// A nil authenticator leaves the API unauthenticated, in the default
+	// tenant, and the UI renders without a session.
+	auth, err := identity.FromEnv(ctx)
+	if err != nil {
+		return err
+	}
+	if closer, ok := auth.(io.Closer); ok {
+		defer func() { _ = closer.Close() }()
 	}
 
 	svc, err := server.New(ctx, cfg, store, b, bucket, artifacts, provider, log)
@@ -107,26 +122,13 @@ func run(log *slog.Logger) error {
 	}
 	defer svc.Close()
 
-	mux := http.NewServeMux()
-	mux.Handle(functionsv1connect.NewFunctionsServiceHandler(svc))
-	mux.Handle(metricsv1connect.NewMetricsServiceHandler(svc.NewMetricsService()))
-	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, _ *http.Request) {
-		w.WriteHeader(http.StatusNoContent)
-	})
-	// KEDA scales hosts on this (charts/alchemy, host.autoscaling).
-	mux.HandleFunc("GET /scaling", func(w http.ResponseWriter, _ *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
-		_ = json.NewEncoder(w).Encode(svc.Scaling())
-	})
-	mux.Handle("/", ui.Handler())
-
 	// Unencrypted HTTP/2 lets gRPC clients connect without TLS.
 	protocols := new(http.Protocols)
 	protocols.SetHTTP1(true)
 	protocols.SetUnencryptedHTTP2(true)
 	srv := &http.Server{
 		Addr:              addr,
-		Handler:           mux,
+		Handler:           routes(svc, server.AuthHandler(auth), server.AuthInterceptor(auth, store)),
 		Protocols:         protocols,
 		ReadHeaderTimeout: 10 * time.Second,
 	}
@@ -149,17 +151,42 @@ func run(log *slog.Logger) error {
 	return nil
 }
 
+// routes serves the API, behind one interceptor that authenticates every
+// procedure, and the UI.
+func routes(svc *server.Service, auth authv1connect.AuthServiceHandler, interceptor connect.Interceptor) *http.ServeMux {
+	opts := connect.WithInterceptors(interceptor)
+	mux := http.NewServeMux()
+	mux.Handle(functionsv1connect.NewFunctionsServiceHandler(svc, opts))
+	mux.Handle(metricsv1connect.NewMetricsServiceHandler(svc.NewMetricsService(), opts))
+	mux.Handle(authv1connect.NewAuthServiceHandler(auth, opts))
+	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusNoContent)
+	})
+	// KEDA scales hosts on this (charts/alchemy, host.autoscaling).
+	mux.HandleFunc("GET /scaling", func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(svc.Scaling())
+	})
+	mux.Handle("/", ui.Handler())
+	return mux
+}
+
 // secretProvider is where tenant secrets are kept, or nil with a warning
-// when the server has no key for them.
-func secretProvider(store *postgres.Store, log *slog.Logger) (secret.Secrets, error) {
-	provider, err := secrets.FromEnv(store.Secrets(), server.SecretScope)
+// when the server has no key for them. close releases a provider's client,
+// such as GCP's connection.
+func secretProvider(ctx context.Context, store *postgres.Store, log *slog.Logger) (secret.Secrets, func(), error) {
+	provider, err := secrets.FromEnv(ctx, store.Secrets(), server.SecretScope)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	if provider == nil {
 		log.Warn("no secret provider: ENCRYPTION_KEY is unset, so the secrets API is off")
 	}
-	return provider, nil
+	closer, ok := provider.(io.Closer)
+	if !ok {
+		return provider, func() {}, nil
+	}
+	return provider, func() { _ = closer.Close() }, nil
 }
 
 func envOr(key, fallback string) string {

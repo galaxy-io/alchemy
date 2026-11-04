@@ -19,24 +19,28 @@ const maxMetricsWindow = 90 * 24 * time.Hour
 type MetricsService struct {
 	metricsv1connect.UnimplementedMetricsServiceHandler
 
-	store  *postgres.Store
-	tenant string
+	store *postgres.Store
 }
 
-// NewMetricsService returns the metrics handler for the service's tenant.
+// NewMetricsService returns the metrics handler, scoped to each request's
+// tenant.
 func (s *Service) NewMetricsService() *MetricsService {
-	return &MetricsService{store: s.store, tenant: s.tenant}
+	return &MetricsService{store: s.store}
 }
 
 // QueryTimeseries returns bucketed metrics over a window.
 func (m *MetricsService) QueryTimeseries(ctx context.Context, req *connect.Request[metricsv1.QueryTimeseriesRequest]) (*connect.Response[metricsv1.QueryTimeseriesResponse], error) {
+	tenant, err := tenantFromContext(ctx)
+	if err != nil {
+		return nil, err
+	}
 	since, until, err := window(req.Msg.GetSinceMs(), req.Msg.GetUntilMs())
 	if err != nil {
 		return nil, err
 	}
 	series, err := m.store.QueryTimeseries(ctx, postgres.TimeseriesQuery{
 		MetricsQuery: postgres.MetricsQuery{
-			Tenant:  m.tenant,
+			Tenant:  tenant,
 			Metrics: req.Msg.GetMetrics(),
 			Since:   since,
 			Until:   until,
@@ -54,12 +58,16 @@ func (m *MetricsService) QueryTimeseries(ctx context.Context, req *connect.Reque
 
 // QueryAggregate returns one row per group over a window.
 func (m *MetricsService) QueryAggregate(ctx context.Context, req *connect.Request[metricsv1.QueryAggregateRequest]) (*connect.Response[metricsv1.QueryAggregateResponse], error) {
+	tenant, err := tenantFromContext(ctx)
+	if err != nil {
+		return nil, err
+	}
 	since, until, err := window(req.Msg.GetSinceMs(), req.Msg.GetUntilMs())
 	if err != nil {
 		return nil, err
 	}
 	rows, err := m.store.QueryAggregate(ctx, postgres.MetricsQuery{
-		Tenant:  m.tenant,
+		Tenant:  tenant,
 		Metrics: req.Msg.GetMetrics(),
 		Since:   since,
 		Until:   until,
