@@ -38,7 +38,7 @@ const FunctionSettingsPage: FC = () => {
           alchemyFunction={alchemyFunction}
         />
         <FunctionSettingsPageLimits
-          key={`${alchemyFunction.timeoutMs}:${alchemyFunction.maxConcurrency}`}
+          key={`${alchemyFunction.timeoutMs}:${alchemyFunction.maxConcurrency}:${alchemyFunction.resources?.vcpus}:${alchemyFunction.resources?.memoryMib}`}
           alchemyFunction={alchemyFunction}
         />
         <FunctionSettingsPageRuntime />

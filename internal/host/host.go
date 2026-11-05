@@ -116,14 +116,16 @@ type Host struct {
 	// before it waits for tasks, so no handler starts a task after that.
 	handlers sync.WaitGroup
 
-	mu        sync.Mutex
-	artifacts map[string]*hostv1.Artifact // built and ready to run, by id
-	used      map[string]time.Time        // when each artifact was built or last invoked, by id
-	instances map[string]*liveInstance    // every instance, by key
-	warm      map[string][]*liveInstance  // idle instances by artifact id, most recently used last
-	draining  bool                        // shutting down: nothing more is parked
-	building  map[string]*pendingBuild    // builds for invocations in flight, by artifact id
-	filling   map[string]int              // prewarm boots in flight, by artifact id
+	mu              sync.Mutex
+	artifacts       map[string]*hostv1.Artifact          // built and ready to run, by id
+	used            map[string]time.Time                 // when each artifact was built or last invoked, by id
+	instances       map[string]*liveInstance             // every instance, by key
+	warm            map[string][]*liveInstance           // idle instances by artifact id, most recently used last
+	draining        bool                                 // shutting down: nothing more is parked
+	building        map[string]*pendingBuild             // builds for invocations in flight, by artifact id
+	running         map[functionKey]int32                // invocations running, by function
+	functionConfigs map[functionKey]cachedFunctionConfig // function configs as last read, by function
+	filling         map[string]int                       // prewarm boots in flight, by artifact id
 }
 
 // New returns a host that is not yet serving; Run starts it. Function logs
@@ -132,25 +134,27 @@ type Host struct {
 func New(cfg Config, d driver.Driver, b *bus.Bus, logBucket, artifactBucket *blob.Bucket, log *slog.Logger) *Host {
 	bg, stop := context.WithCancel(context.Background())
 	return &Host{
-		cfg:        cfg,
-		driver:     d,
-		bus:        b,
-		logs:       logBucket,
-		layers:     artifactBucket,
-		log:        log,
-		startedAt:  time.Now(),
-		slots:      make(chan struct{}, cfg.MaxConcurrency),
-		records:    newRecordQueue(b, log),
-		contracts:  newContractCache(),
-		secrets:    secretCache{values: make(map[string]cachedSecret)},
-		background: bg,
-		stop:       stop,
-		artifacts:  make(map[string]*hostv1.Artifact),
-		used:       make(map[string]time.Time),
-		instances:  make(map[string]*liveInstance),
-		warm:       make(map[string][]*liveInstance),
-		filling:    make(map[string]int),
-		building:   make(map[string]*pendingBuild),
+		cfg:             cfg,
+		driver:          d,
+		bus:             b,
+		logs:            logBucket,
+		layers:          artifactBucket,
+		log:             log,
+		startedAt:       time.Now(),
+		slots:           make(chan struct{}, cfg.MaxConcurrency),
+		records:         newRecordQueue(b, log),
+		contracts:       newContractCache(),
+		secrets:         secretCache{values: make(map[string]cachedSecret)},
+		background:      bg,
+		stop:            stop,
+		artifacts:       make(map[string]*hostv1.Artifact),
+		used:            make(map[string]time.Time),
+		instances:       make(map[string]*liveInstance),
+		warm:            make(map[string][]*liveInstance),
+		filling:         make(map[string]int),
+		building:        make(map[string]*pendingBuild),
+		running:         make(map[functionKey]int32),
+		functionConfigs: make(map[functionKey]cachedFunctionConfig),
 	}
 }
 
@@ -273,7 +277,7 @@ func (h *Host) shutdown(stopRecords context.CancelFunc) {
 }
 
 func (h *Host) heartbeat() {
-	if err := h.bus.Publish(bus.HeartbeatSubject(h.cfg.Name), &hostv1.Heartbeat{Host: h.describe(), Artifacts: h.artifactStates()}); err != nil {
+	if err := h.bus.Publish(bus.HeartbeatSubject(h.cfg.Name), &hostv1.Heartbeat{Host: h.describe(), Artifacts: h.artifactStates(), Running: h.runningByFunction()}); err != nil {
 		h.log.Warn("heartbeat", "err", err)
 	}
 }
@@ -327,7 +331,7 @@ func (h *Host) build(ctx context.Context, req *hostv1.BuildRequest) *hostv1.Buil
 	}
 	h.drives.RLock()
 	defer h.drives.RUnlock()
-	built, err := h.driver.Build(ctx, req.GetSpec(), layers)
+	built, err := h.driver.Build(ctx, req.GetSpec(), req.GetResources(), layers)
 	if err != nil {
 		h.log.Warn("build failed", "image", req.GetSpec().GetImage(), "err", err)
 		return &hostv1.BuildResponse{Result: &hostv1.BuildResponse_Error{Error: &hostv1.Error{Code: "internal", Message: err.Error()}}, BuildLog: err.Error()}
@@ -996,6 +1000,9 @@ func (live *liveInstance) proto() *functionsv1.Instance {
 	defer live.mu.Unlock()
 	return &functionsv1.Instance{
 		Id:           live.id,
+		TenantId:     live.artifact.GetTenantId(),
+		FunctionId:   live.artifact.GetFunctionId(),
+		Version:      live.artifact.GetVersion(),
 		ArtifactId:   live.artifact.GetId(),
 		Status:       live.status,
 		StartKind:    live.startKind,

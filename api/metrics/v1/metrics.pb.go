@@ -673,6 +673,106 @@ func (x *QueryAggregateResponse) GetRows() []*AggregateRow {
 	return nil
 }
 
+// GetQueueRequest narrows the counts to function_ids, or every function of
+// the tenant when empty.
+type GetQueueRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	FunctionIds   []string               `protobuf:"bytes,1,rep,name=function_ids,json=functionIds,proto3" json:"function_ids,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetQueueRequest) Reset() {
+	*x = GetQueueRequest{}
+	mi := &file_metrics_v1_metrics_proto_msgTypes[8]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetQueueRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetQueueRequest) ProtoMessage() {}
+
+func (x *GetQueueRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_metrics_v1_metrics_proto_msgTypes[8]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetQueueRequest.ProtoReflect.Descriptor instead.
+func (*GetQueueRequest) Descriptor() ([]byte, []int) {
+	return file_metrics_v1_metrics_proto_rawDescGZIP(), []int{8}
+}
+
+func (x *GetQueueRequest) GetFunctionIds() []string {
+	if x != nil {
+		return x.FunctionIds
+	}
+	return nil
+}
+
+type GetQueueResponse struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// queued is invocations waiting to start: in the queue, or taken by a host
+	// that is building the function or waiting on its max_concurrency.
+	Queued        int64 `protobuf:"varint,1,opt,name=queued,proto3" json:"queued,omitempty"`
+	Running       int64 `protobuf:"varint,2,opt,name=running,proto3" json:"running,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetQueueResponse) Reset() {
+	*x = GetQueueResponse{}
+	mi := &file_metrics_v1_metrics_proto_msgTypes[9]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetQueueResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetQueueResponse) ProtoMessage() {}
+
+func (x *GetQueueResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_metrics_v1_metrics_proto_msgTypes[9]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetQueueResponse.ProtoReflect.Descriptor instead.
+func (*GetQueueResponse) Descriptor() ([]byte, []int) {
+	return file_metrics_v1_metrics_proto_rawDescGZIP(), []int{9}
+}
+
+func (x *GetQueueResponse) GetQueued() int64 {
+	if x != nil {
+		return x.Queued
+	}
+	return 0
+}
+
+func (x *GetQueueResponse) GetRunning() int64 {
+	if x != nil {
+		return x.Running
+	}
+	return 0
+}
+
 var File_metrics_v1_metrics_proto protoreflect.FileDescriptor
 
 const file_metrics_v1_metrics_proto_rawDesc = "" +
@@ -709,7 +809,12 @@ const file_metrics_v1_metrics_proto_rawDesc = "" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x16\n" +
 	"\x06values\x18\x02 \x03(\x01R\x06values\"F\n" +
 	"\x16QueryAggregateResponse\x12,\n" +
-	"\x04rows\x18\x01 \x03(\v2\x18.metrics.v1.AggregateRowR\x04rows*\xf6\x01\n" +
+	"\x04rows\x18\x01 \x03(\v2\x18.metrics.v1.AggregateRowR\x04rows\"4\n" +
+	"\x0fGetQueueRequest\x12!\n" +
+	"\ffunction_ids\x18\x01 \x03(\tR\vfunctionIds\"D\n" +
+	"\x10GetQueueResponse\x12\x16\n" +
+	"\x06queued\x18\x01 \x01(\x03R\x06queued\x12\x18\n" +
+	"\arunning\x18\x02 \x01(\x03R\arunning*\xf6\x01\n" +
 	"\x06Metric\x12\x16\n" +
 	"\x12METRIC_UNSPECIFIED\x10\x00\x12\x1b\n" +
 	"\x17METRIC_INVOCATION_COUNT\x10\x01\x12&\n" +
@@ -728,10 +833,11 @@ const file_metrics_v1_metrics_proto_rawDesc = "" +
 	"\x1eMETRIC_GRANULARITY_UNSPECIFIED\x10\x00\x12\x1d\n" +
 	"\x19METRIC_GRANULARITY_MINUTE\x10\x01\x12\x1b\n" +
 	"\x17METRIC_GRANULARITY_HOUR\x10\x02\x12\x1a\n" +
-	"\x16METRIC_GRANULARITY_DAY\x10\x032\xc5\x01\n" +
+	"\x16METRIC_GRANULARITY_DAY\x10\x032\x8c\x02\n" +
 	"\x0eMetricsService\x12Z\n" +
 	"\x0fQueryTimeseries\x12\".metrics.v1.QueryTimeseriesRequest\x1a#.metrics.v1.QueryTimeseriesResponse\x12W\n" +
-	"\x0eQueryAggregate\x12!.metrics.v1.QueryAggregateRequest\x1a\".metrics.v1.QueryAggregateResponseB\x9e\x01\n" +
+	"\x0eQueryAggregate\x12!.metrics.v1.QueryAggregateRequest\x1a\".metrics.v1.QueryAggregateResponse\x12E\n" +
+	"\bGetQueue\x12\x1b.metrics.v1.GetQueueRequest\x1a\x1c.metrics.v1.GetQueueResponseB\x9e\x01\n" +
 	"\x0ecom.metrics.v1B\fMetricsProtoP\x01Z5github.com/galaxy-io/alchemy/api/metrics/v1;metricsv1\xa2\x02\x03MXX\xaa\x02\n" +
 	"Metrics.V1\xca\x02\n" +
 	"Metrics\\V1\xe2\x02\x16Metrics\\V1\\GPBMetadata\xea\x02\vMetrics::V1b\x06proto3"
@@ -749,7 +855,7 @@ func file_metrics_v1_metrics_proto_rawDescGZIP() []byte {
 }
 
 var file_metrics_v1_metrics_proto_enumTypes = make([]protoimpl.EnumInfo, 3)
-var file_metrics_v1_metrics_proto_msgTypes = make([]protoimpl.MessageInfo, 8)
+var file_metrics_v1_metrics_proto_msgTypes = make([]protoimpl.MessageInfo, 10)
 var file_metrics_v1_metrics_proto_goTypes = []any{
 	(Metric)(0),                     // 0: metrics.v1.Metric
 	(MetricDimension)(0),            // 1: metrics.v1.MetricDimension
@@ -762,6 +868,8 @@ var file_metrics_v1_metrics_proto_goTypes = []any{
 	(*QueryAggregateRequest)(nil),   // 8: metrics.v1.QueryAggregateRequest
 	(*AggregateRow)(nil),            // 9: metrics.v1.AggregateRow
 	(*QueryAggregateResponse)(nil),  // 10: metrics.v1.QueryAggregateResponse
+	(*GetQueueRequest)(nil),         // 11: metrics.v1.GetQueueRequest
+	(*GetQueueResponse)(nil),        // 12: metrics.v1.GetQueueResponse
 }
 var file_metrics_v1_metrics_proto_depIdxs = []int32{
 	1,  // 0: metrics.v1.MetricFilter.dimension:type_name -> metrics.v1.MetricDimension
@@ -777,10 +885,12 @@ var file_metrics_v1_metrics_proto_depIdxs = []int32{
 	9,  // 10: metrics.v1.QueryAggregateResponse.rows:type_name -> metrics.v1.AggregateRow
 	4,  // 11: metrics.v1.MetricsService.QueryTimeseries:input_type -> metrics.v1.QueryTimeseriesRequest
 	8,  // 12: metrics.v1.MetricsService.QueryAggregate:input_type -> metrics.v1.QueryAggregateRequest
-	7,  // 13: metrics.v1.MetricsService.QueryTimeseries:output_type -> metrics.v1.QueryTimeseriesResponse
-	10, // 14: metrics.v1.MetricsService.QueryAggregate:output_type -> metrics.v1.QueryAggregateResponse
-	13, // [13:15] is the sub-list for method output_type
-	11, // [11:13] is the sub-list for method input_type
+	11, // 13: metrics.v1.MetricsService.GetQueue:input_type -> metrics.v1.GetQueueRequest
+	7,  // 14: metrics.v1.MetricsService.QueryTimeseries:output_type -> metrics.v1.QueryTimeseriesResponse
+	10, // 15: metrics.v1.MetricsService.QueryAggregate:output_type -> metrics.v1.QueryAggregateResponse
+	12, // 16: metrics.v1.MetricsService.GetQueue:output_type -> metrics.v1.GetQueueResponse
+	14, // [14:17] is the sub-list for method output_type
+	11, // [11:14] is the sub-list for method input_type
 	11, // [11:11] is the sub-list for extension type_name
 	11, // [11:11] is the sub-list for extension extendee
 	0,  // [0:11] is the sub-list for field type_name
@@ -797,7 +907,7 @@ func file_metrics_v1_metrics_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_metrics_v1_metrics_proto_rawDesc), len(file_metrics_v1_metrics_proto_rawDesc)),
 			NumEnums:      3,
-			NumMessages:   8,
+			NumMessages:   10,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

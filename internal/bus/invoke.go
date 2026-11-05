@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"math/rand/v2"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/nats-io/nats.go"
@@ -37,8 +38,10 @@ const (
 	InlinePayloadBytes = 8 << 20
 )
 
-// InvokeSubject is where invocations of function id are published.
-func InvokeSubject(functionID string) string { return "invoke." + functionID }
+// InvokeSubject is where invocations of a tenant's function are published.
+func InvokeSubject(tenantID, functionID string) string {
+	return "invoke." + tenantID + "." + functionID
+}
 
 // ServerResultSubject is where hosts publish the results of server name's
 // invocations.
@@ -66,7 +69,7 @@ func (b *Bus) EnsureInvokeQueue(ctx context.Context, cfg InvokeQueueConfig) erro
 	replicas := max(cfg.Replicas, 1)
 	if _, err := js.CreateOrUpdateStream(ctx, jetstream.StreamConfig{
 		Name:      InvokeStream,
-		Subjects:  []string{InvokeSubject(">")},
+		Subjects:  []string{"invoke.>"},
 		Storage:   jetstream.FileStorage,
 		Replicas:  replicas,
 		MaxAge:    cfg.MaxAge,
@@ -148,7 +151,8 @@ func (q *InvokeQueue) Publish(ctx context.Context, req *hostv1.InvokeRequest) er
 	if err != nil {
 		return err
 	}
-	if _, err := q.js.Publish(ctx, InvokeSubject(req.GetInvocation().GetFunctionId()), data, jetstream.WithMsgID(id)); err != nil {
+	inv := req.GetInvocation()
+	if _, err := q.js.Publish(ctx, InvokeSubject(inv.GetTenantId(), inv.GetFunctionId()), data, jetstream.WithMsgID(id)); err != nil {
 		return fmt.Errorf("bus: publish invocation: %w", err)
 	}
 	return nil
@@ -248,6 +252,68 @@ func (q *InvokeQueue) Depth(ctx context.Context) (waiting, running int, err erro
 		return 0, 0, fmt.Errorf("bus: invoke consumer info: %w", err)
 	}
 	return int(info.NumPending), info.NumAckPending, nil //nolint:gosec // bounded by the stream
+}
+
+// InFlight is the invocations of each of a tenant's functions in the
+// queue, by function id: waiting for a host and held by one, since the
+// stream keeps an invocation until it is done.
+func (q *InvokeQueue) InFlight(ctx context.Context, tenantID string) (map[string]int, error) {
+	stream, err := q.js.Stream(ctx, InvokeStream)
+	if err != nil {
+		return nil, fmt.Errorf("bus: invoke stream: %w", err)
+	}
+	prefix := InvokeSubject(tenantID, "")
+	info, err := stream.Info(ctx, jetstream.WithSubjectFilter(prefix+">"))
+	if err != nil {
+		return nil, fmt.Errorf("bus: invoke stream info: %w", err)
+	}
+	out := make(map[string]int, len(info.State.Subjects))
+	for subject, n := range info.State.Subjects {
+		out[strings.TrimPrefix(subject, prefix)] = int(n) //nolint:gosec // bounded by the stream
+	}
+	return out, nil
+}
+
+// functionKey is where a function's FunctionConfig is kept.
+func functionKey(tenantID, functionID string) string {
+	return "function." + tenantID + "." + functionID
+}
+
+// SetFunctionConfig records what hosts read about a function; nil removes
+// it.
+func (q *InvokeQueue) SetFunctionConfig(ctx context.Context, tenantID, functionID string, cfg *hostv1.FunctionConfig) error {
+	key := functionKey(tenantID, functionID)
+	if cfg == nil {
+		if err := q.leases.Delete(ctx, key); err != nil && !errors.Is(err, jetstream.ErrKeyNotFound) {
+			return fmt.Errorf("bus: clear function config: %w", err)
+		}
+		return nil
+	}
+	data, err := proto.Marshal(cfg)
+	if err != nil {
+		return err
+	}
+	if _, err := q.leases.Put(ctx, key, data); err != nil {
+		return fmt.Errorf("bus: set function config: %w", err)
+	}
+	return nil
+}
+
+// FunctionConfig is what hosts read about a function, or nil when nothing
+// was recorded.
+func (q *InvokeQueue) FunctionConfig(ctx context.Context, tenantID, functionID string) (*hostv1.FunctionConfig, error) {
+	entry, err := q.leases.Get(ctx, functionKey(tenantID, functionID))
+	switch {
+	case errors.Is(err, jetstream.ErrKeyNotFound):
+		return nil, nil
+	case err != nil:
+		return nil, fmt.Errorf("bus: read function config: %w", err)
+	}
+	cfg := &hostv1.FunctionConfig{}
+	if err := proto.Unmarshal(entry.Value(), cfg); err != nil {
+		return nil, fmt.Errorf("bus: read function config: %w", err)
+	}
+	return cfg, nil
 }
 
 // Lease is one of a function's max_concurrency seats, held while one of

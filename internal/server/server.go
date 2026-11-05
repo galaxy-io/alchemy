@@ -130,14 +130,13 @@ type Service struct {
 }
 
 // compiledVersion is the in-memory half of a ready version. resolve sets
-// timeout and maxConcurrency from the function on a copy for each call, so
-// a change to either applies to the next invocation.
+// timeout from the function on a copy for each call, so a change applies
+// to the next invocation.
 type compiledVersion struct {
-	row            *sqlcgen.FunctionVersion
-	spec           *functionsv1.FunctionSpec
-	artifact       *hostv1.Artifact
-	timeout        time.Duration
-	maxConcurrency int32
+	row      *sqlcgen.FunctionVersion
+	spec     *functionsv1.FunctionSpec
+	artifact *hostv1.Artifact
+	timeout  time.Duration
 }
 
 // New returns a service backed by store and b, reading function logs from
@@ -183,6 +182,10 @@ func New(ctx context.Context, cfg Config, store *postgres.Store, b *bus.Bus, log
 		return nil, err
 	}
 	s.queue = queue
+	if err := s.syncFunctionConfigs(ctx); err != nil {
+		stop()
+		return nil, err
+	}
 	// A starting server has nothing in flight, so claims in its name that
 	// were never marked with a host are a previous process's, lost between
 	// claiming and sending. They are released before this name is live

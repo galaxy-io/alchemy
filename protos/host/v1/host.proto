@@ -12,7 +12,7 @@ import "functions/v1/invocations.proto";
 // state the servers rely on beyond what their heartbeats last said, and
 // the servers keep no state about hosts beyond those heartbeats.
 //
-//   invoke.<function_id>         publish, JetStream: an InvokeRequest, kept
+//   invoke.<tenant>.<function>   publish, JetStream: an InvokeRequest, kept
 //                                until a host has run it; every host pulls
 //                                from one shared consumer
 //   host.<name>.build            request/reply: that host builds, replies
@@ -41,7 +41,9 @@ import "functions/v1/invocations.proto";
 // first host with room takes the next invocation, whatever its function, and
 // builds the artifact first when it lacks it. A function's max_concurrency
 // is a set of leases in a key-value bucket that a host takes before it runs
-// one of the function's invocations, and gives back after.
+// one of the function's invocations, and gives back after. The limit itself
+// is kept beside the leases, so a change applies to invocations already
+// queued.
 //
 // Invocations are not written as they run. The host that took one publishes
 // its record when it ends; the server publishes a record only when no host
@@ -139,6 +141,8 @@ message BuildRequest {
   repeated Layer layers = 3;
   string function_id = 4;
   int64 version = 5;
+  // resources size the microVM the artifact is snapshotted at, and runs in.
+  functions.v1.Resources resources = 6;
 }
 
 message BuildResponse {
@@ -206,9 +210,6 @@ message InvokeRequest {
   string input_object = 11;
   // build is what a host that lacks the artifact builds first.
   BuildRequest build = 12;
-  // max_concurrency is how many of the function's invocations may run at
-  // once across all hosts. 0 means no limit.
-  int32 max_concurrency = 13;
 }
 
 // InvokeResult is how the host that ran an invocation answers the server
@@ -266,8 +267,17 @@ message ListInstancesResponse {
 message Heartbeat {
   functions.v1.Host host = 1;
   // artifacts are those the host has built and takes invocations for, with
-  // what it holds of each. The server places invocations from this.
+  // what it holds of each.
   repeated ArtifactState artifacts = 2;
+  // running is how many invocations of each function the host is running.
+  repeated FunctionRunning running = 3;
+}
+
+// FunctionRunning is how many invocations of one function a host runs.
+message FunctionRunning {
+  string tenant_id = 1;
+  string function_id = 2;
+  int32 count = 3;
 }
 
 // ArtifactState is what a host holds of one artifact.
@@ -299,4 +309,14 @@ message ActiveInvocationsResponse {
 // outcome it alone knows.
 message InvocationRecords {
   repeated functions.v1.Invocation invocations = 1;
+}
+
+// FunctionConfig is what hosts read about a function each time they take
+// one of its invocations, so a change applies to invocations already
+// queued.
+message FunctionConfig {
+  // max_concurrency is how many of its invocations may run at once across
+  // every host; 0 means no limit.
+  int32 max_concurrency = 1;
+  functions.v1.Resources resources = 2;
 }

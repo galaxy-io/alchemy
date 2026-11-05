@@ -20,6 +20,7 @@ import (
 	functionsv1 "github.com/galaxy-io/alchemy/api/functions/v1"
 	hostv1 "github.com/galaxy-io/alchemy/api/host/v1"
 	"github.com/galaxy-io/alchemy/datastore/postgres/sqlcgen"
+	"github.com/galaxy-io/alchemy/internal/artifact"
 	"github.com/galaxy-io/alchemy/internal/bus"
 	"github.com/galaxy-io/alchemy/internal/logs"
 )
@@ -205,7 +206,15 @@ func (s *Service) resolve(ctx context.Context, functionID string, n int64) (*com
 	}
 	cv := *cached
 	cv.timeout = time.Duration(fn.TimeoutMs) * time.Millisecond
-	cv.maxConcurrency = fn.MaxConcurrency
+	// The version was built at the function's resources then. When they
+	// changed since, the invocation runs as the artifact those built at the
+	// new size would be, which a host builds the first time it takes one.
+	if r := functionResources(fn); r.GetVcpus() != cv.artifact.GetVcpus() || r.GetMemoryMib() != cv.artifact.GetMemoryMib() {
+		a := proto.CloneOf(cv.artifact)
+		a.Vcpus, a.MemoryMib = r.GetVcpus(), r.GetMemoryMib()
+		a.Id = artifact.ID(a)
+		cv.artifact = a
+	}
 	return &cv, nil
 }
 

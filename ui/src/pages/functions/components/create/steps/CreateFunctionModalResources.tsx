@@ -4,6 +4,7 @@ import DurationInput from "@galaxy-io/dls/inputs/DurationInput";
 import NumberInput from "@galaxy-io/dls/inputs/NumberInput";
 import SliderInput from "@galaxy-io/dls/inputs/SliderInput";
 import Flex, { FlexDirection } from "@galaxy-io/dls/layout/Flex";
+import Grid from "@galaxy-io/dls/layout/Grid";
 import { Radius } from "@galaxy-io/dls/theme/enums";
 import Widget from "@galaxy-io/dls/widget/Widget";
 
@@ -12,33 +13,23 @@ import {
   useCreateFunctionModalState,
 } from "@/pages/functions/components/create/CreateFunctionModalProvider";
 import {
-  CREATE_FUNCTION_MODAL_MEMORY_MIB_MARKS,
   CREATE_FUNCTION_MODAL_MEMORY_MIB_MAX,
   CREATE_FUNCTION_MODAL_MEMORY_MIB_MIN,
   CREATE_FUNCTION_MODAL_MEMORY_MIB_STEP,
+  CREATE_FUNCTION_MODAL_MEMORY_SLIDER_MARKS,
   CREATE_FUNCTION_MODAL_RESOURCES_MAX_WIDTH,
   CREATE_FUNCTION_MODAL_TIMEOUT_MAX_MS,
   CREATE_FUNCTION_MODAL_TIMEOUT_MIN_MS,
-  CREATE_FUNCTION_MODAL_VCPUS_MARKS,
   CREATE_FUNCTION_MODAL_VCPUS_MAX,
   CREATE_FUNCTION_MODAL_VCPUS_MIN,
+  CREATE_FUNCTION_MODAL_VCPUS_SLIDER_MARKS,
 } from "@/pages/functions/components/create/constants";
-import { CreateFunctionModalMode } from "@/pages/functions/components/create/types";
-import { FUNCTION_LIMITS_INPUT_WIDTH } from "@/pages/functions/constants";
+import { FUNCTION_LIMITS_COLUMNS } from "@/pages/functions/constants";
 
 import { formatMemory } from "@/utils/format";
 
-const CREATE_FUNCTION_MODAL_VCPUS_SLIDER_MARKS = CREATE_FUNCTION_MODAL_VCPUS_MARKS.map((value) => ({
-  value,
-  label: String(value),
-}));
-
-const CREATE_FUNCTION_MODAL_MEMORY_SLIDER_MARKS = CREATE_FUNCTION_MODAL_MEMORY_MIB_MARKS.map(
-  (value) => ({ value, label: formatMemory(value) }),
-);
-
 const CreateFunctionModalResources: FC = () => {
-  const { mode, vcpus, memoryMib, timeoutMs, maxConcurrency } = useCreateFunctionModalState();
+  const { vcpus, memoryMib, timeoutMs, maxConcurrency } = useCreateFunctionModalState();
   const { setVcpus, setMemoryMib, setTimeoutMs, setMaxConcurrency } =
     useCreateFunctionModalActions();
 
@@ -77,32 +68,30 @@ const CreateFunctionModalResources: FC = () => {
           </Flex>
         </Flex>
       </Widget>
-      {mode === CreateFunctionModalMode.FUNCTION && (
-        <Widget header="Limits">
-          <Flex direction={FlexDirection.COLUMN} gap={12} maxWidth={FUNCTION_LIMITS_INPUT_WIDTH}>
-            <DurationInput
-              label="Timeout"
-              value={timeoutMs}
-              min={CREATE_FUNCTION_MODAL_TIMEOUT_MIN_MS}
-              max={CREATE_FUNCTION_MODAL_TIMEOUT_MAX_MS}
-              onChange={(ms) => setTimeoutMs(ms ?? CREATE_FUNCTION_MODAL_TIMEOUT_MIN_MS)}
-              fillWidth
-            />
-            <NumberInput
-              label="Max concurrency"
-              labelTooltip="Invocations past it wait in the queue"
-              value={maxConcurrency}
-              min={1}
-              step={1}
-              precision={0}
-              hasSteppers
-              placeholder="No limit"
-              onChange={setMaxConcurrency}
-              fillWidth
-            />
-          </Flex>
-        </Widget>
-      )}
+      <Widget header="Limits">
+        <Grid columns={FUNCTION_LIMITS_COLUMNS} gap={12}>
+          <DurationInput
+            label="Timeout"
+            value={timeoutMs}
+            min={CREATE_FUNCTION_MODAL_TIMEOUT_MIN_MS}
+            max={CREATE_FUNCTION_MODAL_TIMEOUT_MAX_MS}
+            onChange={(ms) => setTimeoutMs(ms ?? CREATE_FUNCTION_MODAL_TIMEOUT_MIN_MS)}
+            fillWidth
+          />
+          <NumberInput
+            label="Max concurrency"
+            labelTooltip="Invocations past it wait in the queue"
+            value={maxConcurrency}
+            min={1}
+            step={1}
+            precision={0}
+            hasSteppers
+            placeholder="No limit"
+            onChange={setMaxConcurrency}
+            fillWidth
+          />
+        </Grid>
+      </Widget>
     </Flex>
   );
 };
