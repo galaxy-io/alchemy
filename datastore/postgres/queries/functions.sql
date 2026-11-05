@@ -1,6 +1,6 @@
 -- name: CreateFunction :one
-INSERT INTO functions (tenant_id, name, description, timeout_ms, max_concurrency, vcpus, memory_mib, created_by_user_id, updated_by_user_id)
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $8)
+INSERT INTO functions (tenant_id, name, description, timeout_ms, max_concurrency, retries, vcpus, memory_mib, created_by_user_id, updated_by_user_id)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $9)
 RETURNING *;
 
 -- name: GetFunction :one
@@ -11,6 +11,7 @@ UPDATE functions
 SET name = $3, description = $4, updated_by_user_id = $5, updated_at = now(),
     timeout_ms = COALESCE(sqlc.narg(timeout_ms), timeout_ms),
     max_concurrency = COALESCE(sqlc.narg(max_concurrency), max_concurrency),
+    retries = COALESCE(sqlc.narg(retries), retries),
     vcpus = COALESCE(sqlc.narg(vcpus), vcpus),
     memory_mib = COALESCE(sqlc.narg(memory_mib), memory_mib)
 WHERE tenant_id = $1 AND id = $2 AND NOT is_deleted
@@ -39,5 +40,5 @@ WHERE tenant_id = $1 AND NOT is_deleted AND (sqlc.arg('search')::text = '' OR na
 
 -- name: ListFunctionConfigs :many
 -- What hosts read about every live function.
-SELECT tenant_id, id, max_concurrency, vcpus, memory_mib FROM functions
+SELECT tenant_id, id, max_concurrency, retries, vcpus, memory_mib FROM functions
 WHERE NOT is_deleted;

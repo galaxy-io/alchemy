@@ -67,6 +67,10 @@ curl localhost:8780/functions/<function-id>/invoke -H 'Content-Type: application
 
 When every host is busy the call waits in the queue, for up to 5 minutes or the deadline the caller sets, and a function's `max_concurrency` caps how many of its calls run at once. `?version=3` pins a version and an `Idempotency-Key` header makes the call safe to retry. The response names the invocation in `Alchemy-Invocation-Id` and the version that ran in `Alchemy-Version`. A failure answers with its HTTP status and a JSON body with `code` and `message`. A function that fails answers 500, or 504 when it timed out, with its error as JSON. With auth enabled, send `Authorization: Bearer <token>`. The same call is `FunctionsService.Invoke` on the API.
 
+A call whose function raises, crashes or times out, or that the platform cannot run, runs again up to the function's `retries`, 2 by default, after 1s, then 5s, then 25s and so on up to 5 minutes, while its deadline leaves room for another run. An `Alchemy-Retries` header sets a call's own, and `Alchemy-Attempts` answers how many runs the result took. One whose input breaks the contract never runs again.
+
+Add `Prefer: respond-async` and the call returns at once with 202, the invocation id in the body and `Location: /invocations/<id>`. Nothing waits for it and its output is dropped, but its status, error, attempts and logs are recorded. It retries the same way, and may wait in the queue for up to 24 hours. An `Idempotency-Key` seen before returns the invocation it queued. The same call is `FunctionsService.InvokeAsync` on the API.
+
 ## Deploying Alchemy
 
 Kubernetes with Helm is the recommended way to run Alchemy in production. Hosts need `/dev/kvm`, so they run on bare-metal nodes or on VMs with nested virtualization. The server runs anywhere. See the [Helm chart README](charts/alchemy/README.md) for preparing KVM nodes and for all supported values.

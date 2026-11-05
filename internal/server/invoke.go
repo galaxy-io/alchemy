@@ -48,20 +48,15 @@ func (s *Service) Invoke(ctx context.Context, req *connect.Request[functionsv1.I
 // invoke runs req against cv, the version resolve picked for it, timing it
 // from start.
 func (s *Service) invoke(ctx context.Context, start time.Time, cv *compiledVersion, req *functionsv1.InvokeRequest) (*connect.Response[functionsv1.InvokeResponse], error) {
-	raw := req.GetInput()
-	if len(raw) > s.cfg.MaxPayloadBytes {
-		return nil, connect.NewError(connect.CodeInvalidArgument,
-			fmt.Errorf("input is %d bytes; the limit is %d", len(raw), s.cfg.MaxPayloadBytes))
-	}
-	key := req.GetIdempotencyKey()
-	if len(key) > maxIdempotencyKeyLen {
-		return nil, connect.NewError(connect.CodeInvalidArgument,
-			fmt.Errorf("idempotency_key is %d bytes; the limit is %d", len(key), maxIdempotencyKeyLen))
+	raw, key := req.GetInput(), req.GetIdempotencyKey()
+	if err := s.checkCall(raw, key, req.Retries); err != nil {
+		return nil, err
 	}
 
 	// The invocation is tracked before its key is claimed, so a retry that
 	// sees the claim always finds it on this server.
-	inv := s.newInvocation(cv, key, int64(len(raw)))
+	inv := s.newInvocation(cv, key, int64(len(raw)), false)
+	inv.retries = req.Retries
 	if key != "" {
 		if s.logs == nil {
 			inv.discard()
@@ -83,6 +78,24 @@ func (s *Service) invoke(ctx context.Context, start time.Time, cv *compiledVersi
 	return s.run(ctx, start, inv, cv, raw)
 }
 
+// checkCall checks what any call carries against the server's limits.
+func (s *Service) checkCall(raw []byte, key string, retries *int32) error {
+	if retries != nil {
+		if _, err := validRetries(*retries); err != nil {
+			return err
+		}
+	}
+	if len(raw) > s.cfg.MaxPayloadBytes {
+		return connect.NewError(connect.CodeInvalidArgument,
+			fmt.Errorf("input is %d bytes; the limit is %d", len(raw), s.cfg.MaxPayloadBytes))
+	}
+	if len(key) > maxIdempotencyKeyLen {
+		return connect.NewError(connect.CodeInvalidArgument,
+			fmt.Errorf("idempotency_key is %d bytes; the limit is %d", len(key), maxIdempotencyKeyLen))
+	}
+	return nil
+}
+
 // run announces one tracked invocation, sends it to a host and returns its
 // result.
 func (s *Service) run(ctx context.Context, start time.Time, inv *invocation, cv *compiledVersion, raw []byte) (*connect.Response[functionsv1.InvokeResponse], error) {
@@ -92,18 +105,22 @@ func (s *Service) run(ctx context.Context, start time.Time, inv *invocation, cv 
 	key := accepted.GetIdempotencyKey()
 	created := time.UnixMilli(accepted.GetCreatedAt())
 	hostReq := &hostv1.InvokeRequest{
-		Invocation:     accepted,
-		Artifact:       cv.artifact,
-		Input:          raw,
-		TimeoutMs:      timeout.Milliseconds(),
-		LogKey:         logs.Key(accepted.GetTenantId(), accepted.GetFunctionId(), created, accepted.GetId()),
-		StateSubject:   bus.ServerStateSubject(s.cfg.Name),
-		MaxOutputBytes: int64(s.cfg.MaxPayloadBytes),
+		Invocation:        accepted,
+		Artifact:          cv.artifact,
+		Input:             raw,
+		TimeoutMs:         timeout.Milliseconds(),
+		LogKey:            logs.Key(accepted.GetTenantId(), accepted.GetFunctionId(), created, accepted.GetId()),
+		StateSubject:      bus.ServerStateSubject(s.cfg.Name),
+		MaxOutputBytes:    int64(s.cfg.MaxPayloadBytes),
+		Retries:           inv.retries,
+		RetryBackoffMs:    s.cfg.RetryBackoff.Milliseconds(),
+		RetryBackoffMaxMs: s.cfg.RetryBackoffMax.Milliseconds(),
 	}
 	if key != "" {
 		hostReq.OutputKey = logs.OutputKey(accepted.GetTenantId(), accepted.GetFunctionId(), created, accepted.GetId())
 	}
-	out, err := s.dispatch(ctx, inv, cv, hostReq)
+	res, err := s.dispatch(ctx, inv, cv, hostReq)
+	out := res.GetResponse()
 	if err != nil {
 		if ctx.Err() != nil {
 			inv.canceled()
@@ -124,6 +141,7 @@ func (s *Service) run(ctx context.Context, start time.Time, inv *invocation, cv 
 	resp := &functionsv1.InvokeResponse{
 		InvocationId: accepted.GetId(),
 		Version:      cv.row.Version,
+		Attempts:     res.GetAttempts(),
 		Stats: &functionsv1.InvocationStats{
 			StartKind: out.GetStartKind(),
 			AcquireUs: out.GetAcquireUs(),
@@ -206,6 +224,7 @@ func (s *Service) resolve(ctx context.Context, functionID string, n int64) (*com
 	}
 	cv := *cached
 	cv.timeout = time.Duration(fn.TimeoutMs) * time.Millisecond
+	cv.retries = fn.Retries
 	// The version was built at the function's resources then. When they
 	// changed since, the invocation runs as the artifact those built at the
 	// new size would be, which a host builds the first time it takes one.
@@ -267,11 +286,13 @@ type invocation struct {
 	// accepted is the invocation as created, which the host completes into
 	// its record.
 	accepted *functionsv1.Invocation
+	// retries is the call's own retries, when it set them.
+	retries *int32
 }
 
 // newInvocation starts tracking a new invocation of cv. It is announced on
 // the function's live stream when it runs, and discarded if it never does.
-func (s *Service) newInvocation(cv *compiledVersion, key string, inputBytes int64) *invocation {
+func (s *Service) newInvocation(cv *compiledVersion, key string, inputBytes int64, async bool) *invocation {
 	inv := &functionsv1.Invocation{
 		TenantId:       cv.row.TenantID,
 		Id:             newID(),
@@ -281,6 +302,7 @@ func (s *Service) newInvocation(cv *compiledVersion, key string, inputBytes int6
 		CreatedAt:      time.Now().UnixMilli(),
 		InputBytes:     inputBytes,
 		IdempotencyKey: key,
+		Async:          async,
 	}
 	s.tracker.put(inv)
 	return &invocation{
@@ -353,6 +375,7 @@ func (i *invocation) finished(resp *functionsv1.InvokeResponse, out *hostv1.Invo
 		inv.Stats = resp.GetStats()
 		inv.StartKind = resp.GetStats().GetStartKind()
 		inv.InstanceId = out.GetInstanceId()
+		inv.Attempts = resp.GetAttempts()
 		if fe := resp.GetError(); fe != nil {
 			inv.Status = functionsv1.InvocationStatus_INVOCATION_STATUS_FAILED
 			inv.Error = fe
@@ -406,7 +429,11 @@ const (
 
 // InvokeHTTP serves POST /functions/{function}/invoke: Invoke over plain
 // HTTP, where the body is the input and the response body the output, in
-// the contract's encoding, with no envelope. ?version= pins a version and Idempotency-Key works as on Invoke. The
+// the contract's encoding, with no envelope. ?version= pins a version and
+// Idempotency-Key works as on Invoke. Alchemy-Retries sets the call's
+// retries, and Alchemy-Attempts answers how many runs the result took.
+// With Prefer: respond-async it is
+// InvokeAsync instead: 202 with the invocation id and its Location. The
 // request must carry the contract's content type, which a browser cannot
 // send cross-site without a preflight this server never grants, so a
 // session cookie alone cannot invoke.
@@ -423,6 +450,11 @@ func (s *Service) InvokeHTTP(w http.ResponseWriter, r *http.Request) {
 		version = n
 	}
 	cv, err := s.resolve(ctx, r.PathValue("function"), version)
+	if err != nil {
+		writeError(w, err)
+		return
+	}
+	retries, err := retriesHeader(r.Header)
 	if err != nil {
 		writeError(w, err)
 		return
@@ -447,20 +479,39 @@ func (s *Service) InvokeHTTP(w http.ResponseWriter, r *http.Request) {
 		writeError(w, connect.NewError(connect.CodeInvalidArgument, err))
 		return
 	}
+	if prefersAsync(r.Header) {
+		resp, err := s.invokeAsync(ctx, cv, input, r.Header.Get("Idempotency-Key"), retries)
+		if err != nil {
+			writeError(w, err)
+			return
+		}
+		writeAccepted(w, resp)
+		return
+	}
 	resp, err := s.invoke(ctx, start, cv, &functionsv1.InvokeRequest{
 		FunctionId:     cv.row.FunctionID,
 		Version:        version,
 		Input:          input,
 		IdempotencyKey: r.Header.Get("Idempotency-Key"),
+		Retries:        retries,
 	})
 	if err != nil {
 		writeError(w, err)
 		return
 	}
-	out := resp.Msg
+	writeInvoked(w, resp.Msg, contentType)
+}
+
+// writeInvoked answers a sync call over HTTP: the output in the contract's
+// content type, or the function's error as JSON with 500, or 504 when it
+// timed out, and what ran in the headers.
+func writeInvoked(w http.ResponseWriter, out *functionsv1.InvokeResponse, contentType string) {
 	h := w.Header()
 	h.Set("Alchemy-Invocation-Id", out.GetInvocationId())
 	h.Set("Alchemy-Version", strconv.FormatInt(out.GetVersion(), 10))
+	if n := out.GetAttempts(); n > 0 {
+		h.Set("Alchemy-Attempts", strconv.Itoa(int(n)))
+	}
 	if out.GetReplayed() {
 		h.Set("Alchemy-Replayed", "true")
 	}
@@ -477,6 +528,23 @@ func (s *Service) InvokeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 	h.Set("Content-Type", contentType)
 	_, _ = w.Write(out.GetOutput())
+}
+
+// retriesHeader is the call's Alchemy-Retries, or nil when it sets none.
+func retriesHeader(h http.Header) (*int32, error) {
+	v := h.Get("Alchemy-Retries")
+	if v == "" {
+		return nil, nil
+	}
+	n, err := strconv.ParseInt(v, 10, 32)
+	if err != nil {
+		return nil, connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("Alchemy-Retries %q is not a number", v))
+	}
+	retries := int32(n)
+	if _, err := validRetries(retries); err != nil {
+		return nil, err
+	}
+	return &retries, nil
 }
 
 // writeError answers err as a Connect handler would: its code as the HTTP

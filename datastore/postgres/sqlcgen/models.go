@@ -152,6 +152,7 @@ type Function struct {
 	Description     string
 	TimeoutMs       int64
 	MaxConcurrency  int32
+	Retries         int32
 	Vcpus           int32
 	MemoryMib       int32
 	IsDeleted       bool
@@ -210,6 +211,8 @@ type Invocation struct {
 	InstanceID      string
 	IdempotencyKey  string
 	Host            string
+	Attempts        int32
+	Async           bool
 	CreatedByUserID pgtype.Text
 	CreatedAt       pgtype.Timestamptz
 	StartedAt       pgtype.Timestamptz

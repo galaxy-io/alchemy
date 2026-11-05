@@ -58,6 +58,17 @@ func record(host string, accepted *functionsv1.Invocation, resp *hostv1.InvokeRe
 	return inv
 }
 
+// ended is the record of an invocation that ended on host without a result
+// from the function, with status and why.
+func ended(host string, accepted *functionsv1.Invocation, status functionsv1.InvocationStatus, why string) *functionsv1.Invocation {
+	inv := proto.CloneOf(accepted)
+	inv.Host = host
+	inv.Status = status
+	inv.PlatformError = why
+	inv.EndedAt = time.Now().UnixMilli()
+	return inv
+}
+
 // recordQueue publishes ended invocations to the invocation stream in batches.
 type recordQueue struct {
 	bus *bus.Bus

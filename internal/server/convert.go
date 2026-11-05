@@ -26,6 +26,7 @@ func functionProto(f *sqlcgen.Function, current *sqlcgen.FunctionVersion, versio
 		TimeoutMs:       f.TimeoutMs,
 		MaxConcurrency:  f.MaxConcurrency,
 		Resources:       functionResources(f),
+		Retries:         f.Retries,
 	}
 	if current != nil {
 		out.CurrentVersion = versionProto(current)
@@ -72,6 +73,8 @@ func invocationProto(i *sqlcgen.Invocation) *functionsv1.Invocation {
 		IdempotencyKey:  i.IdempotencyKey,
 		Host:            i.Host,
 		CreatedByUserId: i.CreatedByUserID.String,
+		Attempts:        i.Attempts,
+		Async:           i.Async,
 	}
 	if i.AcquireUs != 0 || i.RunUs != 0 || i.TotalUs != 0 {
 		out.Stats = &functionsv1.InvocationStats{

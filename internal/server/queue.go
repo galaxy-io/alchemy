@@ -22,13 +22,23 @@ const (
 	// queuedHost is the host an invocation is marked sent to once it is
 	// queued, until the host that takes it reports itself.
 	queuedHost = "queue"
+	// queueMargin is how much longer the queue keeps an invocation than any
+	// call may wait for it, so a host always takes it in time to record
+	// that it expired.
+	queueMargin = 10 * time.Minute
 )
+
+// queueMaxAge is how long the queue keeps an invocation no host is done
+// with.
+func queueMaxAge(cfg Config) time.Duration {
+	return max(cfg.InvokeMaxDeadline, cfg.AsyncMaxAge) + queueMargin
+}
 
 // dispatch queues req and waits for its result until the call's deadline.
 // Once queued, the function may run, so the record says so until a result
 // arrives. An invocation still queued at its deadline is left for the
 // first host that takes it to drop.
-func (s *Service) dispatch(ctx context.Context, inv *invocation, cv *compiledVersion, req *hostv1.InvokeRequest) (*hostv1.InvokeResponse, error) {
+func (s *Service) dispatch(ctx context.Context, inv *invocation, cv *compiledVersion, req *hostv1.InvokeRequest) (*hostv1.InvokeResult, error) {
 	deadline := s.deadline(ctx)
 	ctx, cancel := context.WithDeadline(ctx, deadline)
 	defer cancel()
@@ -46,11 +56,7 @@ func (s *Service) dispatch(ctx context.Context, inv *invocation, cv *compiledVer
 
 	req.DeadlineMs = deadline.UnixMilli()
 	req.ReplySubject = bus.ServerResultSubject(s.cfg.Name)
-	req.Build = &hostv1.BuildRequest{
-		TenantId: cv.row.TenantID, FunctionId: cv.row.FunctionID, Version: cv.row.Version,
-		Spec: cv.pinnedSpec(), Layers: cv.artifact.GetLayers(),
-		Resources: &functionsv1.Resources{Vcpus: cv.artifact.GetVcpus(), MemoryMib: cv.artifact.GetMemoryMib()},
-	}
+	req.Build = buildFor(cv)
 	if err := inv.sentTo(ctx, queuedHost); err != nil {
 		return nil, err
 	}
@@ -61,17 +67,26 @@ func (s *Service) dispatch(ctx context.Context, inv *invocation, cv *compiledVer
 
 	select {
 	case res := <-result:
-		out := res.GetResponse()
 		if name := res.GetOutputObject(); name != "" {
 			output, err := s.queue.Output(ctx, name)
 			if err != nil {
 				return nil, err
 			}
-			out.Result = &hostv1.InvokeResponse_Output{Output: output}
+			res.GetResponse().Result = &hostv1.InvokeResponse_Output{Output: output}
 		}
-		return out, nil
+		return res, nil
 	case <-ctx.Done():
 		return nil, fmt.Errorf("no result for invocation %s by its deadline: %w", id, ctx.Err())
+	}
+}
+
+// buildFor is what a host that lacks cv's artifact builds before it runs
+// an invocation of it.
+func buildFor(cv *compiledVersion) *hostv1.BuildRequest {
+	return &hostv1.BuildRequest{
+		TenantId: cv.row.TenantID, FunctionId: cv.row.FunctionID, Version: cv.row.Version,
+		Spec: cv.pinnedSpec(), Layers: cv.artifact.GetLayers(),
+		Resources: &functionsv1.Resources{Vcpus: cv.artifact.GetVcpus(), MemoryMib: cv.artifact.GetMemoryMib()},
 	}
 }
 
