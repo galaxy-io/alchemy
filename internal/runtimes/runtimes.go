@@ -10,11 +10,11 @@ import (
 	functionsv1 "github.com/galaxy-io/alchemy/api/functions/v1"
 )
 
-// starters are the handlers a function starts from, named
-// <id>.<contract kind>.<extension>. Go starters end in .go.tmpl, so they are
-// not part of this module.
+// starters are the handlers a function starts from, one folder per
+// runtime, named <id>/<contract kind>.<extension>. Go starters end in
+// .go.tmpl, so they are not part of this module.
 //
-//go:embed starters/*
+//go:embed starters
 var starters embed.FS
 
 // Runtime is one entry of the catalog.
@@ -72,7 +72,7 @@ func List(imagePrefix, iconBaseURL string) []*functionsv1.Runtime {
 }
 
 func (r Runtime) starterFor(kind string) string {
-	b, err := starters.ReadFile(path.Join("starters", r.ID+"."+kind+"."+r.starter))
+	b, err := starters.ReadFile(path.Join("starters", r.ID, kind+"."+r.starter))
 	if err != nil {
 		panic("runtimes: missing starter for " + r.ID + " " + kind)
 	}
