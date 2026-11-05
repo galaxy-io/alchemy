@@ -164,9 +164,14 @@ func routes(svc *server.Service, auth authv1connect.AuthServiceHandler, intercep
 		w.WriteHeader(http.StatusNoContent)
 	})
 	// KEDA scales hosts on this (charts/alchemy, host.autoscaling).
-	mux.HandleFunc("GET /scaling", func(w http.ResponseWriter, _ *http.Request) {
+	mux.HandleFunc("GET /scaling", func(w http.ResponseWriter, r *http.Request) {
+		scaling, err := svc.Scaling(r.Context())
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusServiceUnavailable)
+			return
+		}
 		w.Header().Set("Content-Type", "application/json")
-		_ = json.NewEncoder(w).Encode(svc.Scaling())
+		_ = json.NewEncoder(w).Encode(scaling)
 	})
 	mux.Handle("/", ui.Handler())
 	return mux
@@ -224,13 +229,6 @@ func configure(cfg *server.Config) error {
 		}
 		cfg.IdempotencyWindow = d
 	}
-	if s := os.Getenv("HOSTS_PER_FUNCTION"); s != "" {
-		n, err := strconv.Atoi(s)
-		if err != nil || n < 1 {
-			return fmt.Errorf("HOSTS_PER_FUNCTION: want a positive integer, got %q", s)
-		}
-		cfg.HostsPerFunction = n
-	}
 	if s := os.Getenv("INVOCATION_STREAM_RETENTION"); s != "" {
 		d, err := time.ParseDuration(s)
 		if err != nil {
@@ -244,6 +242,25 @@ func configure(cfg *server.Config) error {
 			return fmt.Errorf("INVOCATION_STREAM_REPLICAS: %w", err)
 		}
 		cfg.InvocationReplicas = n
+	}
+	for _, d := range []struct {
+		key string
+		v   *time.Duration
+	}{{"INVOKE_DEADLINE", &cfg.InvokeDeadline}, {"INVOKE_MAX_DEADLINE", &cfg.InvokeMaxDeadline}} {
+		if s := os.Getenv(d.key); s != "" {
+			v, err := time.ParseDuration(s)
+			if err != nil {
+				return fmt.Errorf("%s: %w", d.key, err)
+			}
+			*d.v = v
+		}
+	}
+	if s := os.Getenv("INVOKE_QUEUE_REPLICAS"); s != "" {
+		n, err := strconv.Atoi(s)
+		if err != nil {
+			return fmt.Errorf("INVOKE_QUEUE_REPLICAS: %w", err)
+		}
+		cfg.InvokeReplicas = n
 	}
 	return nil
 }

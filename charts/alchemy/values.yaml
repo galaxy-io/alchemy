@@ -190,10 +190,15 @@ server:
   # Any replica serves any request.
   replicas: 1
 
-  # -- How many hosts each function is built on and takes invocations from,
-  # when that many are live. Builds, root filesystems and warm instances
-  # scale with functions times this, not functions times hosts.
-  hostsPerFunction: 3
+  invoke:
+    # -- How long a call waits for its result, queued and running, when the
+    # caller sets no deadline of its own.
+    deadline: 5m
+    # -- The longest deadline a caller may set, and how long the queue keeps
+    # an invocation no host has taken.
+    maxDeadline: 1h
+    # -- How many NATS servers keep each queued invocation.
+    queueReplicas: 1
 
   # -- How long an invoke's idempotency key keeps a retry with the same key
   # from running the function again.
@@ -418,8 +423,8 @@ nats:
         # -- JetStream memory limit. Covers `functionLogs.maxBytes`.
         maxSize: 1Gi
       fileStore:
-        # -- Keep invocation records on disk until a server writes them to
-        # PostgreSQL, so a NATS restart loses none.
+        # -- Keep queued invocations, and invocation records until a server
+        # writes them to PostgreSQL, on disk, so a NATS restart loses none.
         enabled: true
         pvc:
           size: 10Gi

@@ -19,6 +19,7 @@ import (
 	"sync"
 	"time"
 
+	"connectrpc.com/connect"
 	"gocloud.dev/blob"
 	"google.golang.org/protobuf/proto"
 
@@ -121,6 +122,7 @@ type Host struct {
 	instances map[string]*liveInstance    // every instance, by key
 	warm      map[string][]*liveInstance  // idle instances by artifact id, most recently used last
 	draining  bool                        // shutting down: nothing more is parked
+	building  map[string]*pendingBuild    // builds for invocations in flight, by artifact id
 	filling   map[string]int              // prewarm boots in flight, by artifact id
 }
 
@@ -148,6 +150,7 @@ func New(cfg Config, d driver.Driver, b *bus.Bus, logBucket, artifactBucket *blo
 		instances:  make(map[string]*liveInstance),
 		warm:       make(map[string][]*liveInstance),
 		filling:    make(map[string]int),
+		building:   make(map[string]*pendingBuild),
 	}
 }
 
@@ -160,11 +163,10 @@ func (h *Host) Run(ctx context.Context) error {
 		handler        bus.Handler
 		refused        proto.Message // the reply once the host is shutting down
 	}{
-		// The server places functions on hosts: it sends this host the builds
-		// and the invocations it chose it for.
+		// A server sends a host the builds and compiles it chose it for.
+		// Invocations come from the queue.
 		{bus.HostBuildSubject(h.cfg.Name), "", h.handleBuild, buildError("unavailable", errShuttingDown)},
 		{bus.HostCompileSubject(h.cfg.Name), "", h.handleCompile, compileError("unavailable", errShuttingDown)},
-		{bus.HostInvokeSubject(h.cfg.Name), "", h.handleInvoke, invokeError("unavailable", errShuttingDown)},
 		{bus.DescribeSubject, "", h.handleDescribe, nil},
 		{bus.InstancesSubject, "", h.handleInstances, nil},
 		{bus.HostSecretsInvalidateSubject, "", h.handleSecretsInvalidate, nil},
@@ -180,6 +182,21 @@ func (h *Host) Run(ctx context.Context) error {
 	records, stopRecords := context.WithCancel(context.WithoutCancel(h.background))
 	defer stopRecords()
 	h.tasks.Go(func() { h.records.run(records) })
+
+	// The servers create the queue; a host that starts first waits for it.
+	q, err := h.openQueue(ctx)
+	if err != nil {
+		for _, s := range subs {
+			s.Unsubscribe()
+		}
+		h.shutdown(stopRecords)
+		return nil
+	}
+	pulling, stopPulling := context.WithCancel(h.background)
+	defer stopPulling()
+	for range h.cfg.MaxConcurrency {
+		h.tasks.Go(func() { h.pull(pulling, q) })
+	}
 	h.log.Info("host serving", "slots", h.cfg.MaxConcurrency, "memory_mib", h.cfg.MemoryMiB, "warm_ttl", h.cfg.WarmTTL, "prewarm", h.cfg.Prewarm, "kept_versions", h.cfg.KeptVersions, "version_idle_ttl", h.cfg.VersionIdleTTL)
 
 	ticker := time.NewTicker(h.cfg.HeartbeatInterval)
@@ -192,6 +209,7 @@ func (h *Host) Run(ctx context.Context) error {
 			h.evictVersions(time.Now())
 			h.heartbeat()
 		case <-ctx.Done():
+			stopPulling()
 			for _, s := range subs {
 				s.Unsubscribe()
 			}
@@ -211,16 +229,24 @@ const shutdownGrace = 40 * time.Second
 // them, and answers refused instead once the host is draining.
 func (h *Host) tracked(handler bus.Handler, refused proto.Message) bus.Handler {
 	return func(ctx context.Context, data []byte) proto.Message {
-		h.mu.Lock()
-		if h.draining {
-			h.mu.Unlock()
+		if !h.enter() {
 			return refused
 		}
-		h.handlers.Add(1)
-		h.mu.Unlock()
 		defer h.handlers.Done()
 		return handler(ctx, data)
 	}
+}
+
+// enter counts one run of work in h.handlers, or reports false once the
+// host is draining. A true return is paired with h.handlers.Done.
+func (h *Host) enter() bool {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	if h.draining {
+		return false
+	}
+	h.handlers.Add(1)
+	return true
 }
 
 // shutdown stops taking work and releases the warm pool, gives in-flight
@@ -286,6 +312,12 @@ func (h *Host) handleBuild(ctx context.Context, data []byte) proto.Message {
 	if err := proto.Unmarshal(data, req); err != nil {
 		return buildError("invalid_argument", err)
 	}
+	return h.build(ctx, req)
+}
+
+// build builds and snapshots req's artifact, serves it, and returns the
+// reply to send.
+func (h *Host) build(ctx context.Context, req *hostv1.BuildRequest) *hostv1.BuildResponse {
 	ctx, cancel := context.WithTimeout(ctx, h.cfg.BuildTimeout)
 	defer cancel()
 	start := time.Now()
@@ -412,49 +444,35 @@ const (
 	outputUploadBackoff  = 500 * time.Millisecond
 )
 
-// handleInvoke runs one input through an instance. Every reply is an
-// InvokeResponse; an Error result means no instance ran the input. When an
+// invoke runs one input through an instance of an artifact this host
+// serves, in a slot the caller holds. Every reply is an InvokeResponse; an
+// Error result means no instance ran the input, and retry says whether
+// another host could: this one had no room or no instance for it. When an
 // instance ran it, the host publishes the invocation's record as well: the
 // reply tells the caller, the record tells the database.
-func (h *Host) handleInvoke(ctx context.Context, data []byte) proto.Message {
-	req := &hostv1.InvokeRequest{}
-	if err := proto.Unmarshal(data, req); err != nil {
-		return invokeError("invalid_argument", err)
-	}
+func (h *Host) invoke(ctx context.Context, req *hostv1.InvokeRequest) (reply *hostv1.InvokeResponse, retry bool) {
 	id := req.GetInvocation().GetId()
 	log := h.log.With("invocation_id", id, "artifact_id", req.GetArtifact().GetId())
 	start := time.Now()
-	if !h.serving(req.GetArtifact().GetId()) {
-		// The server's view of this host is stale; it builds here and retries.
-		return invokeError("not_found", errors.New("artifact is not built on this host"))
-	}
 
-	// Check the input before taking a slot: a rejected input costs no
-	// capacity, and it is the caller's mistake, so it ends here.
+	// A rejected input is the caller's mistake, so it ends here.
 	c, input, rejected := h.checkInput(req, start)
 	if rejected != nil {
-		return rejected
+		return rejected, false
 	}
 
-	select {
-	case h.slots <- struct{}{}:
-		defer func() { <-h.slots }()
-	default:
-		return invokeError("resource_exhausted", errors.New("host is at capacity"))
-	}
-
-	h.publishState(req, functionsv1.InvocationStatus_INVOCATION_STATUS_STARTING, "", functionsv1.StartKind_START_KIND_UNSPECIFIED, 0)
 	live, err := h.admit(req.GetArtifact())
 	if err != nil {
-		return invokeError("resource_exhausted", err)
+		return invokeError("resource_exhausted", err), true
 	}
+	h.publishState(req, functionsv1.InvocationStatus_INVOCATION_STATUS_STARTING, "", functionsv1.StartKind_START_KIND_UNSPECIFIED, 0)
 	instance, startKind := live.instance, functionsv1.StartKind_START_KIND_WARM
 	if instance == nil {
 		instance, startKind, err = h.driver.Acquire(ctx, fromProto(req.GetArtifact()))
 		if err != nil {
 			h.untrack(live)
 			log.Warn("acquire instance", "err", err)
-			return invokeError("unavailable", fmt.Errorf("acquire instance: %w", err))
+			return invokeError("unavailable", fmt.Errorf("acquire instance: %w", err)), true
 		}
 	}
 	live.ready(instance, startKind, id)
@@ -480,10 +498,10 @@ func (h *Host) handleInvoke(ctx context.Context, data []byte) proto.Message {
 	timeout := time.Duration(req.GetTimeoutMs()) * time.Millisecond
 	runCtx, cancel := context.WithTimeout(ctx, timeout+supervisorGrace)
 	defer cancel()
-	secrets, rejected := h.invocationSecrets(runCtx, req.GetArtifact(), log)
-	if rejected != nil {
+	secrets, refused := h.invocationSecrets(runCtx, req.GetArtifact(), log)
+	if refused != nil {
 		reusable = true
-		return rejected
+		return refused, false
 	}
 	fnLogs := h.functionLogs(req, log)
 	out, err := instance.Invoke(runCtx, &supervisorv1.InvokeRequest{
@@ -511,21 +529,26 @@ func (h *Host) handleInvoke(ctx context.Context, data []byte) proto.Message {
 			Message: fmt.Sprintf("function exceeded its %dms timeout and the instance stopped responding", timeout.Milliseconds()),
 		}}
 		resp.RunUs = time.Since(acquired).Microseconds()
+	case connect.CodeOf(err) == connect.CodeFailedPrecondition:
+		// The supervisor refused the input before running it, so another
+		// instance, here or on another host, can take it.
+		log.Warn("instance refused the invocation", "instance_id", instance.ID(), "err", err)
+		return invokeError("unavailable", fmt.Errorf("invoke instance: %w", err)), true
 	default:
 		// The instance stopped answering after it took the input, so the
 		// function may have run: aborted, not unavailable, tells the server
 		// the outcome is unknown rather than that nothing happened.
 		log.Warn("invoke instance", "instance_id", instance.ID(), "err", err)
-		return invokeError("aborted", fmt.Errorf("invoke instance: %w", err))
+		return invokeError("aborted", fmt.Errorf("invoke instance: %w", err)), false
 	}
 	log.Debug("invocation finished", "instance_id", instance.ID(), "start_kind", startKind, "acquire_us", acquireUs, "run_us", resp.GetRunUs())
 	h.records.add(record(h.cfg.Name, req.GetInvocation(), resp, start, acquired))
-	return resp
+	return resp, false
 }
 
 // checkInput compiles the artifact's contract and checks the input against
 // it. A rejection is the reply to send, already recorded; nothing ran.
-func (h *Host) checkInput(req *hostv1.InvokeRequest, start time.Time) (contract.Contract, *contract.Input, proto.Message) {
+func (h *Host) checkInput(req *hostv1.InvokeRequest, start time.Time) (contract.Contract, *contract.Input, *hostv1.InvokeResponse) {
 	c, err := h.contracts.get(req.GetArtifact().GetContract())
 	if err != nil {
 		return nil, nil, invokeError("failed_precondition", fmt.Errorf("compile contract: %w", err))
@@ -655,6 +678,7 @@ func (h *Host) publishState(req *hostv1.InvokeRequest, status functionsv1.Invoca
 		InstanceId:   instanceID,
 		StartKind:    kind,
 		AcquireUs:    acquireUs,
+		Host:         h.cfg.Name,
 	})
 	if err != nil {
 		h.log.Warn("publish invocation state", "invocation_id", req.GetInvocation().GetId(), "err", err)

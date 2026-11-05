@@ -23,7 +23,7 @@ const FUNCTION_VERSIONS_TABLE_COLUMN_WIDTH_CREATED_AT = 120;
 export const FUNCTION_VERSIONS_DETAILS_FILE_ICON_SIZE = 12;
 
 export const FUNCTION_VERSIONS_DETAILS_COLUMNS =
-  "max-content auto minmax(0, 1fr) minmax(0, 1fr) auto auto";
+  "max-content auto minmax(0, 1fr) minmax(0, 1fr) auto";
 
 export const FUNCTION_VERSIONS_TABLE_COLUMNS: TableColumn<FunctionVersionsTableRow>[] = [
   {

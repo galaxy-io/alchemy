@@ -8,6 +8,7 @@ import ScrollArea from "@galaxy-io/dls/layout/ScrollArea";
 import { FUNCTION_SETTINGS_PAGE_MAX_WIDTH } from "@/pages/functions/settings/constants";
 import FunctionSettingsPageDanger from "@/pages/functions/settings/FunctionSettingsPageDanger";
 import FunctionSettingsPageGeneral from "@/pages/functions/settings/FunctionSettingsPageGeneral";
+import FunctionSettingsPageLimits from "@/pages/functions/settings/FunctionSettingsPageLimits";
 import FunctionSettingsPageRuntime from "@/pages/functions/settings/FunctionSettingsPageRuntime";
 
 import { useFunctionParams } from "@/module/hooks";
@@ -34,6 +35,10 @@ const FunctionSettingsPage: FC = () => {
       >
         <FunctionSettingsPageGeneral
           key={`${alchemyFunction.name}:${alchemyFunction.description}`}
+          alchemyFunction={alchemyFunction}
+        />
+        <FunctionSettingsPageLimits
+          key={`${alchemyFunction.timeoutMs}:${alchemyFunction.maxConcurrency}`}
           alchemyFunction={alchemyFunction}
         />
         <FunctionSettingsPageRuntime />

@@ -23,6 +23,8 @@ func functionProto(f *sqlcgen.Function, current *sqlcgen.FunctionVersion, versio
 		UpdatedAt:       stamp(f.UpdatedAt),
 		CreatedByUserId: f.CreatedByUserID.String,
 		UpdatedByUserId: f.UpdatedByUserID.String,
+		TimeoutMs:       f.TimeoutMs,
+		MaxConcurrency:  f.MaxConcurrency,
 	}
 	if current != nil {
 		out.CurrentVersion = versionProto(current)

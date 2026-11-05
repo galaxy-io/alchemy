@@ -29,15 +29,17 @@ func (q *Queries) CountFunctions(ctx context.Context, arg CountFunctionsParams) 
 }
 
 const createFunction = `-- name: CreateFunction :one
-INSERT INTO functions (tenant_id, name, description, created_by_user_id, updated_by_user_id)
-VALUES ($1, $2, $3, $4, $4)
-RETURNING id, tenant_id, name, description, is_deleted, deleted_at, deleted_by_user_id, created_by_user_id, updated_by_user_id, created_at, updated_at
+INSERT INTO functions (tenant_id, name, description, timeout_ms, max_concurrency, created_by_user_id, updated_by_user_id)
+VALUES ($1, $2, $3, $4, $5, $6, $6)
+RETURNING id, tenant_id, name, description, timeout_ms, max_concurrency, is_deleted, deleted_at, deleted_by_user_id, created_by_user_id, updated_by_user_id, created_at, updated_at
 `
 
 type CreateFunctionParams struct {
 	TenantID        string
 	Name            string
 	Description     string
+	TimeoutMs       int64
+	MaxConcurrency  int32
 	CreatedByUserID pgtype.Text
 }
 
@@ -46,6 +48,8 @@ func (q *Queries) CreateFunction(ctx context.Context, arg CreateFunctionParams) 
 		arg.TenantID,
 		arg.Name,
 		arg.Description,
+		arg.TimeoutMs,
+		arg.MaxConcurrency,
 		arg.CreatedByUserID,
 	)
 	var i Function
@@ -54,6 +58,8 @@ func (q *Queries) CreateFunction(ctx context.Context, arg CreateFunctionParams) 
 		&i.TenantID,
 		&i.Name,
 		&i.Description,
+		&i.TimeoutMs,
+		&i.MaxConcurrency,
 		&i.IsDeleted,
 		&i.DeletedAt,
 		&i.DeletedByUserID,
@@ -89,7 +95,7 @@ func (q *Queries) DeleteFunction(ctx context.Context, arg DeleteFunctionParams) 
 }
 
 const getFunction = `-- name: GetFunction :one
-SELECT id, tenant_id, name, description, is_deleted, deleted_at, deleted_by_user_id, created_by_user_id, updated_by_user_id, created_at, updated_at FROM functions WHERE tenant_id = $1 AND id = $2 AND NOT is_deleted
+SELECT id, tenant_id, name, description, timeout_ms, max_concurrency, is_deleted, deleted_at, deleted_by_user_id, created_by_user_id, updated_by_user_id, created_at, updated_at FROM functions WHERE tenant_id = $1 AND id = $2 AND NOT is_deleted
 `
 
 type GetFunctionParams struct {
@@ -105,6 +111,8 @@ func (q *Queries) GetFunction(ctx context.Context, arg GetFunctionParams) (*Func
 		&i.TenantID,
 		&i.Name,
 		&i.Description,
+		&i.TimeoutMs,
+		&i.MaxConcurrency,
 		&i.IsDeleted,
 		&i.DeletedAt,
 		&i.DeletedByUserID,
@@ -117,7 +125,7 @@ func (q *Queries) GetFunction(ctx context.Context, arg GetFunctionParams) (*Func
 }
 
 const listFunctions = `-- name: ListFunctions :many
-SELECT id, tenant_id, name, description, is_deleted, deleted_at, deleted_by_user_id, created_by_user_id, updated_by_user_id, created_at, updated_at FROM functions
+SELECT id, tenant_id, name, description, timeout_ms, max_concurrency, is_deleted, deleted_at, deleted_by_user_id, created_by_user_id, updated_by_user_id, created_at, updated_at FROM functions
 WHERE tenant_id = $1 AND NOT is_deleted AND ($2::text = '' OR name ILIKE '%' || $2 || '%')
 ORDER BY created_at, id
 LIMIT $4 OFFSET $3
@@ -149,6 +157,8 @@ func (q *Queries) ListFunctions(ctx context.Context, arg ListFunctionsParams) ([
 			&i.TenantID,
 			&i.Name,
 			&i.Description,
+			&i.TimeoutMs,
+			&i.MaxConcurrency,
 			&i.IsDeleted,
 			&i.DeletedAt,
 			&i.DeletedByUserID,
@@ -178,9 +188,11 @@ func (q *Queries) TouchFunction(ctx context.Context, id string) error {
 
 const updateFunction = `-- name: UpdateFunction :one
 UPDATE functions
-SET name = $3, description = $4, updated_by_user_id = $5, updated_at = now()
+SET name = $3, description = $4, updated_by_user_id = $5, updated_at = now(),
+    timeout_ms = COALESCE($6, timeout_ms),
+    max_concurrency = COALESCE($7, max_concurrency)
 WHERE tenant_id = $1 AND id = $2 AND NOT is_deleted
-RETURNING id, tenant_id, name, description, is_deleted, deleted_at, deleted_by_user_id, created_by_user_id, updated_by_user_id, created_at, updated_at
+RETURNING id, tenant_id, name, description, timeout_ms, max_concurrency, is_deleted, deleted_at, deleted_by_user_id, created_by_user_id, updated_by_user_id, created_at, updated_at
 `
 
 type UpdateFunctionParams struct {
@@ -189,6 +201,8 @@ type UpdateFunctionParams struct {
 	Name            string
 	Description     string
 	UpdatedByUserID pgtype.Text
+	TimeoutMs       pgtype.Int8
+	MaxConcurrency  pgtype.Int4
 }
 
 func (q *Queries) UpdateFunction(ctx context.Context, arg UpdateFunctionParams) (*Function, error) {
@@ -198,6 +212,8 @@ func (q *Queries) UpdateFunction(ctx context.Context, arg UpdateFunctionParams) 
 		arg.Name,
 		arg.Description,
 		arg.UpdatedByUserID,
+		arg.TimeoutMs,
+		arg.MaxConcurrency,
 	)
 	var i Function
 	err := row.Scan(
@@ -205,6 +221,8 @@ func (q *Queries) UpdateFunction(ctx context.Context, arg UpdateFunctionParams) 
 		&i.TenantID,
 		&i.Name,
 		&i.Description,
+		&i.TimeoutMs,
+		&i.MaxConcurrency,
 		&i.IsDeleted,
 		&i.DeletedAt,
 		&i.DeletedByUserID,

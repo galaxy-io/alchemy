@@ -204,6 +204,7 @@ export const CREATE_FUNCTION_MODAL_DEFAULT_STATE: CreateFunctionModalState = {
   vcpus: 1,
   memoryMib: 256,
   timeoutMs: 30_000,
+  maxConcurrency: null,
   isSubmitting: false,
 };
 

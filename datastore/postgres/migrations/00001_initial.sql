@@ -37,6 +37,10 @@ CREATE TABLE functions (
   tenant_id          UUID        NOT NULL REFERENCES tenants (id),
   name               TEXT        NOT NULL,
   description        TEXT        NOT NULL DEFAULT '',
+  -- timeout_ms and max_concurrency apply to every version; 0 means no
+  -- limit on concurrency.
+  timeout_ms         BIGINT      NOT NULL,
+  max_concurrency    INTEGER     NOT NULL DEFAULT 0,
   -- A deleted function stays, flagged and renamed out of the way, so its
   -- versions and invocations keep their history.
   is_deleted         BOOLEAN     NOT NULL DEFAULT false,

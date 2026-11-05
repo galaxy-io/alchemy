@@ -58,6 +58,7 @@ export interface CreateFunctionModalState {
   vcpus: Resources["vcpus"];
   memoryMib: Resources["memoryMib"];
   timeoutMs: number;
+  maxConcurrency: number | null;
   isSubmitting: boolean;
 }
 

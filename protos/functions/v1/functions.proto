@@ -36,9 +36,6 @@ message FunctionSpec {
   InvocationProtocol protocol = 5;
   Contract contract = 6;
   Resources resources = 7;
-  // timeout_ms bounds a single invocation's run time, measured from the
-  // moment input is handed to the function. Zero takes the server default.
-  int64 timeout_ms = 8;
   // source makes the version a function built from source: files extracted
   // over image under /app, where the runtime images look for the handler.
   Source source = 9;
@@ -144,6 +141,13 @@ message Function {
   int64 updated_at = 8;
   string created_by_user_id = 9;
   string updated_by_user_id = 10;
+  // timeout_ms bounds a single invocation's run time, measured from the
+  // moment input is handed to the function, whichever version runs.
+  int64 timeout_ms = 11;
+  // max_concurrency is how many invocations of the function may run at once
+  // across every host. Invocations past it wait in the queue. 0 means no
+  // limit.
+  int32 max_concurrency = 12;
 }
 
 // CreateFunction creates the function and version 1 from spec. It returns as
@@ -157,6 +161,10 @@ message CreateFunctionRequest {
   // later version never changes what this one reads, and named in
   // spec.secrets.
   map<string, string> secret_values = 4;
+  // timeout_ms and max_concurrency are as on Function. A zero timeout_ms
+  // takes the server default.
+  int64 timeout_ms = 5;
+  int32 max_concurrency = 6;
 }
 
 message CreateFunctionResponse {
@@ -164,10 +172,15 @@ message CreateFunctionResponse {
   FunctionVersion version = 2;
 }
 
+// UpdateFunction changes a function's settings. They apply to the next
+// invocation of any version. timeout_ms and max_concurrency change only
+// when set.
 message UpdateFunctionRequest {
   string function_id = 1;
   string name = 2;
   string description = 3;
+  optional int64 timeout_ms = 4;
+  optional int32 max_concurrency = 5;
 }
 
 message UpdateFunctionResponse {

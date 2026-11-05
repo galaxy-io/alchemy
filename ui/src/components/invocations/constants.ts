@@ -49,7 +49,7 @@ export const START_KINDS = getEnumValues(StartKind);
 
 export const INVOCATION_STATUS_TO_LABEL_MAP: Record<InvocationStatus, string> = {
   [InvocationStatus.UNSPECIFIED]: "Unknown",
-  [InvocationStatus.PENDING]: "Pending",
+  [InvocationStatus.PENDING]: "Queued",
   [InvocationStatus.STARTING]: "Starting",
   [InvocationStatus.RUNNING]: "Running",
   [InvocationStatus.SUCCEEDED]: "Succeeded",

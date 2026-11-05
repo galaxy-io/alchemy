@@ -111,7 +111,7 @@ export const createInitialCreateFunctionModalState = ({
         : state.arrowFields,
     vcpus: spec?.resources?.vcpus || state.vcpus,
     memoryMib: spec?.resources?.memoryMib || state.memoryMib,
-    timeoutMs: spec?.timeoutMs ? Number(spec.timeoutMs) : state.timeoutMs,
+    timeoutMs: state.timeoutMs,
   };
 };
 

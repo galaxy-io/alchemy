@@ -12,8 +12,6 @@ import { FUNCTION_CONTRACT_KIND_TO_LABEL_MAP } from "@/pages/functions/constants
 import { FUNCTION_VERSIONS_DETAILS_COLUMNS } from "@/pages/functions/versions/constants";
 import FunctionVersionsDetailsFiles from "@/pages/functions/versions/FunctionVersionsDetailsFiles";
 
-import { formatMillis } from "@/utils/format";
-
 interface FunctionVersionsDetailsProps {
   version: FunctionVersion;
 }
@@ -32,10 +30,6 @@ const FunctionVersionsDetails: FC<FunctionVersionsDetailsProps> = ({ version }) 
         />
         <FunctionVersionsDetailsFiles files={spec?.source?.files ?? []} />
         <Stat label="Command" value={spec?.command.length ? spec.command.join(" ") : EMPTY_VALUE} />
-        <Stat
-          label="Timeout"
-          value={spec?.timeoutMs ? formatMillis(spec.timeoutMs) : EMPTY_VALUE}
-        />
         <Stat
           label="Root filesystem"
           align="right"

@@ -29,9 +29,6 @@ const (
 	HostSecretsInvalidateSubject = "host.secrets.invalidate"
 )
 
-// HostInvokeSubject is where host name takes invocations.
-func HostInvokeSubject(name string) string { return "host." + name + ".invoke" }
-
 // HostBuildSubject is where host name takes builds.
 func HostBuildSubject(name string) string { return "host." + name + ".build" }
 
@@ -67,7 +64,7 @@ func InvocationSubject(functionID string) string { return "invocation." + functi
 const InvocationWildcard = "invocation.*"
 
 // ErrNoResponders is returned by Request when nothing is subscribed to the
-// subject: for an invoke subject, no host has the artifact ready.
+// subject.
 var ErrNoResponders = errors.New("bus: no responders")
 
 // Bus is one NATS connection.

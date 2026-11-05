@@ -8,6 +8,7 @@ import {
   type SetContractKindAction,
   type SetDescriptionAction,
   type SetImageAction,
+  type SetMaxConcurrencyAction,
   type SetMemoryMibAction,
   type SetNameAction,
   type SetRuntimeAction,
@@ -145,6 +146,13 @@ function setTimeoutMs(
   return { ...state, timeoutMs: action.payload };
 }
 
+function setMaxConcurrency(
+  state: CreateFunctionModalState,
+  action: SetMaxConcurrencyAction,
+): CreateFunctionModalState {
+  return { ...state, maxConcurrency: action.payload };
+}
+
 function setSubmitting(
   state: CreateFunctionModalState,
   action: SetSubmittingAction,
@@ -265,6 +273,8 @@ const createFunctionModalReducer = (
       return setMemoryMib(state, action);
     case CreateFunctionModalActionType.SET_TIMEOUT_MS:
       return setTimeoutMs(state, action);
+    case CreateFunctionModalActionType.SET_MAX_CONCURRENCY:
+      return setMaxConcurrency(state, action);
     case CreateFunctionModalActionType.GO_TO_STEP:
       return goToStep(state, action);
     case CreateFunctionModalActionType.GO_BACK:

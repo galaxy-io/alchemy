@@ -23,8 +23,7 @@ type knownHost struct {
 
 // knownServer is what another server last said about itself.
 type knownServer struct {
-	pending int32
-	seen    time.Time
+	seen time.Time
 }
 
 // serverHeartbeatInterval is how often a server announces itself.
@@ -42,6 +41,7 @@ func (s *Service) listen() error {
 		{bus.HeartbeatWildcard, s.onHeartbeat, false},
 		{bus.ServerHeartbeatWildcard, s.onServerHeartbeat, false},
 		{bus.ServerStateSubject(s.cfg.Name), s.onInvocationState, false},
+		{bus.ServerResultSubject(s.cfg.Name), s.onResult, false},
 		{bus.ServerInvocationsSubject, s.handleActiveInvocations, true},
 		{bus.ServerSecretsSubject, s.handleSecrets, true},
 	}
@@ -72,7 +72,7 @@ func (s *Service) heartbeat() {
 	defer ticker.Stop()
 	for {
 		s.tracker.forget(time.Now())
-		hb := &hostv1.ServerHeartbeat{Name: s.cfg.Name, Pending: int32(s.tracker.pending())} //nolint:gosec // small
+		hb := &hostv1.ServerHeartbeat{Name: s.cfg.Name}
 		if err := s.bus.Publish(bus.ServerHeartbeatSubject(s.cfg.Name), hb); err != nil {
 			s.log.Warn("heartbeat", "err", err)
 		}
@@ -90,7 +90,7 @@ func (s *Service) onServerHeartbeat(_ context.Context, data []byte) proto.Messag
 		return nil
 	}
 	s.mu.Lock()
-	s.servers[msg.GetName()] = &knownServer{pending: msg.GetPending(), seen: time.Now()}
+	s.servers[msg.GetName()] = &knownServer{seen: time.Now()}
 	s.mu.Unlock()
 	return nil
 }
@@ -139,6 +139,9 @@ func (s *Service) onInvocationState(_ context.Context, data []byte) proto.Messag
 	inv := s.tracker.update(ev.GetInvocationId(), func(inv *functionsv1.Invocation) {
 		if terminal(inv.GetStatus()) {
 			return
+		}
+		if h := ev.GetHost(); h != "" {
+			inv.Host = h
 		}
 		switch ev.GetStatus() {
 		case functionsv1.InvocationStatus_INVOCATION_STATUS_STARTING:

@@ -123,6 +123,8 @@ export const useCreateFunctionModalActions = () => {
         dispatch({ type: CreateFunctionModalActionType.SET_MEMORY_MIB, payload }),
       setTimeoutMs: (payload: CreateFunctionModalState["timeoutMs"]) =>
         dispatch({ type: CreateFunctionModalActionType.SET_TIMEOUT_MS, payload }),
+      setMaxConcurrency: (payload: CreateFunctionModalState["maxConcurrency"]) =>
+        dispatch({ type: CreateFunctionModalActionType.SET_MAX_CONCURRENCY, payload }),
       goToStep: (payload: CreateFunctionModalStep) =>
         dispatch({ type: CreateFunctionModalActionType.GO_TO_STEP, payload }),
       goBack: () => dispatch({ type: CreateFunctionModalActionType.GO_BACK }),

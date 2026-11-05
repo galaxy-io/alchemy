@@ -12,9 +12,9 @@ import "functions/v1/invocations.proto";
 // state the servers rely on beyond what their heartbeats last said, and
 // the servers keep no state about hosts beyond those heartbeats.
 //
-//   host.<name>.invoke           request/reply: that host runs the
-//                                invocation, or answers not_found when it
-//                                has not built the artifact
+//   invoke.<function_id>         publish, JetStream: an InvokeRequest, kept
+//                                until a host has run it; every host pulls
+//                                from one shared consumer
 //   host.<name>.build            request/reply: that host builds, replies
 //                                with the Artifact
 //   host.<name>.compile          request/reply: that host compiles a
@@ -26,6 +26,8 @@ import "functions/v1/invocations.proto";
 //                                with its instances
 //   server.<name>.state          publish: InvocationEvent, from a host to
 //                                the server whose invocation moved
+//   server.<name>.result         publish: InvokeResult, from the host that
+//                                ran an invocation to the server waiting on it
 //   server.<name>.heartbeat      publish: a ServerHeartbeat, periodically
 //   server.invocations           request, scatter/gather: every server
 //                                replies with the invocations it holds
@@ -34,13 +36,12 @@ import "functions/v1/invocations.proto";
 //   invocations.host, .server    publish, JetStream: InvocationRecords,
 //                                kept until a server has written them
 //
-// Placement is the server's choice. A function lives on a few hosts, picked
-// by rendezvous hashing of its id over the live hosts, so every server picks
-// the same ones from the same heartbeats and a host joining or leaving
-// moves only the functions that hashed to it. A server builds a function's
-// versions on those hosts and sends each invocation to the one holding a
-// warm instance, else the least loaded one that has the artifact, else it
-// builds the artifact there first.
+// Hosts pull. A server publishes every invocation to the invoke stream and
+// waits for its result; a host keeps one fetch waiting per free slot, so the
+// first host with room takes the next invocation, whatever its function, and
+// builds the artifact first when it lacks it. A function's max_concurrency
+// is a set of leases in a key-value bucket that a host takes before it runs
+// one of the function's invocations, and gives back after.
 //
 // Invocations are not written as they run. The host that took one publishes
 // its record when it ends; the server publishes a record only when no host
@@ -195,6 +196,30 @@ message InvokeRequest {
   // output_key, when set, is where the host keeps the checked output in the
   // bucket, so a server can replay it for a retried call.
   string output_key = 8;
+  // deadline_ms is when the caller stops waiting, in Unix milliseconds. A
+  // host that takes the invocation later acknowledges it without running it.
+  int64 deadline_ms = 9;
+  // reply_subject is where the host publishes the InvokeResult.
+  string reply_subject = 10;
+  // input_object, when set, names the object in the invoke object store that
+  // holds the input, which was too large for the message. input is empty.
+  string input_object = 11;
+  // build is what a host that lacks the artifact builds first.
+  BuildRequest build = 12;
+  // max_concurrency is how many of the function's invocations may run at
+  // once across all hosts. 0 means no limit.
+  int32 max_concurrency = 13;
+}
+
+// InvokeResult is how the host that ran an invocation answers the server
+// waiting on it.
+message InvokeResult {
+  string invocation_id = 1;
+  InvokeResponse response = 2;
+  // output_object, when set, names the object in the invoke object store
+  // that holds the output, which was too large for the message. The server
+  // reads it and deletes it.
+  string output_object = 3;
 }
 
 // InvokeResponse is returned whenever the host took the input, including
@@ -221,6 +246,8 @@ message InvocationEvent {
   string instance_id = 3;
   functions.v1.StartKind start_kind = 4;
   int64 acquire_us = 5;
+  // host is the host that took the invocation from the queue.
+  string host = 6;
 }
 
 message DescribeRequest {}
@@ -256,9 +283,6 @@ message ArtifactState {
 // of them can answer for all of them.
 message ServerHeartbeat {
   string name = 1;
-  // pending is how many invocations the server has accepted that no host
-  // has started: demand no host has room for yet.
-  int32 pending = 2;
 }
 
 // ActiveInvocationsRequest asks every server for the invocations it holds.

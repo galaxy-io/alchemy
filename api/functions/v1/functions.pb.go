@@ -98,9 +98,6 @@ type FunctionSpec struct {
 	Protocol  InvocationProtocol `protobuf:"varint,5,opt,name=protocol,proto3,enum=functions.v1.InvocationProtocol" json:"protocol,omitempty"`
 	Contract  *Contract          `protobuf:"bytes,6,opt,name=contract,proto3" json:"contract,omitempty"`
 	Resources *Resources         `protobuf:"bytes,7,opt,name=resources,proto3" json:"resources,omitempty"`
-	// timeout_ms bounds a single invocation's run time, measured from the
-	// moment input is handed to the function. Zero takes the server default.
-	TimeoutMs int64 `protobuf:"varint,8,opt,name=timeout_ms,json=timeoutMs,proto3" json:"timeout_ms,omitempty"`
 	// source makes the version a function built from source: files extracted
 	// over image under /app, where the runtime images look for the handler.
 	Source        *Source `protobuf:"bytes,9,opt,name=source,proto3" json:"source,omitempty"`
@@ -185,13 +182,6 @@ func (x *FunctionSpec) GetResources() *Resources {
 		return x.Resources
 	}
 	return nil
-}
-
-func (x *FunctionSpec) GetTimeoutMs() int64 {
-	if x != nil {
-		return x.TimeoutMs
-	}
-	return 0
 }
 
 func (x *FunctionSpec) GetSource() *Source {
@@ -824,8 +814,15 @@ type Function struct {
 	UpdatedAt       int64                  `protobuf:"varint,8,opt,name=updated_at,json=updatedAt,proto3" json:"updated_at,omitempty"`
 	CreatedByUserId string                 `protobuf:"bytes,9,opt,name=created_by_user_id,json=createdByUserId,proto3" json:"created_by_user_id,omitempty"`
 	UpdatedByUserId string                 `protobuf:"bytes,10,opt,name=updated_by_user_id,json=updatedByUserId,proto3" json:"updated_by_user_id,omitempty"`
-	unknownFields   protoimpl.UnknownFields
-	sizeCache       protoimpl.SizeCache
+	// timeout_ms bounds a single invocation's run time, measured from the
+	// moment input is handed to the function, whichever version runs.
+	TimeoutMs int64 `protobuf:"varint,11,opt,name=timeout_ms,json=timeoutMs,proto3" json:"timeout_ms,omitempty"`
+	// max_concurrency is how many invocations of the function may run at once
+	// across every host. Invocations past it wait in the queue. 0 means no
+	// limit.
+	MaxConcurrency int32 `protobuf:"varint,12,opt,name=max_concurrency,json=maxConcurrency,proto3" json:"max_concurrency,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
 }
 
 func (x *Function) Reset() {
@@ -928,6 +925,20 @@ func (x *Function) GetUpdatedByUserId() string {
 	return ""
 }
 
+func (x *Function) GetTimeoutMs() int64 {
+	if x != nil {
+		return x.TimeoutMs
+	}
+	return 0
+}
+
+func (x *Function) GetMaxConcurrency() int32 {
+	if x != nil {
+		return x.MaxConcurrency
+	}
+	return 0
+}
+
 // CreateFunction creates the function and version 1 from spec. It returns as
 // soon as the version is accepted, in BUILDING.
 type CreateFunctionRequest struct {
@@ -939,9 +950,13 @@ type CreateFunctionRequest struct {
 	// value. Each is stored under the tenant as a new secret of its own, so a
 	// later version never changes what this one reads, and named in
 	// spec.secrets.
-	SecretValues  map[string]string `protobuf:"bytes,4,rep,name=secret_values,json=secretValues,proto3" json:"secret_values,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	SecretValues map[string]string `protobuf:"bytes,4,rep,name=secret_values,json=secretValues,proto3" json:"secret_values,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
+	// timeout_ms and max_concurrency are as on Function. A zero timeout_ms
+	// takes the server default.
+	TimeoutMs      int64 `protobuf:"varint,5,opt,name=timeout_ms,json=timeoutMs,proto3" json:"timeout_ms,omitempty"`
+	MaxConcurrency int32 `protobuf:"varint,6,opt,name=max_concurrency,json=maxConcurrency,proto3" json:"max_concurrency,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
 }
 
 func (x *CreateFunctionRequest) Reset() {
@@ -1002,6 +1017,20 @@ func (x *CreateFunctionRequest) GetSecretValues() map[string]string {
 	return nil
 }
 
+func (x *CreateFunctionRequest) GetTimeoutMs() int64 {
+	if x != nil {
+		return x.TimeoutMs
+	}
+	return 0
+}
+
+func (x *CreateFunctionRequest) GetMaxConcurrency() int32 {
+	if x != nil {
+		return x.MaxConcurrency
+	}
+	return 0
+}
+
 type CreateFunctionResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Function      *Function              `protobuf:"bytes,1,opt,name=function,proto3" json:"function,omitempty"`
@@ -1054,13 +1083,18 @@ func (x *CreateFunctionResponse) GetVersion() *FunctionVersion {
 	return nil
 }
 
+// UpdateFunction changes a function's settings. They apply to the next
+// invocation of any version. timeout_ms and max_concurrency change only
+// when set.
 type UpdateFunctionRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	FunctionId    string                 `protobuf:"bytes,1,opt,name=function_id,json=functionId,proto3" json:"function_id,omitempty"`
-	Name          string                 `protobuf:"bytes,2,opt,name=name,proto3" json:"name,omitempty"`
-	Description   string                 `protobuf:"bytes,3,opt,name=description,proto3" json:"description,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state          protoimpl.MessageState `protogen:"open.v1"`
+	FunctionId     string                 `protobuf:"bytes,1,opt,name=function_id,json=functionId,proto3" json:"function_id,omitempty"`
+	Name           string                 `protobuf:"bytes,2,opt,name=name,proto3" json:"name,omitempty"`
+	Description    string                 `protobuf:"bytes,3,opt,name=description,proto3" json:"description,omitempty"`
+	TimeoutMs      *int64                 `protobuf:"varint,4,opt,name=timeout_ms,json=timeoutMs,proto3,oneof" json:"timeout_ms,omitempty"`
+	MaxConcurrency *int32                 `protobuf:"varint,5,opt,name=max_concurrency,json=maxConcurrency,proto3,oneof" json:"max_concurrency,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
 }
 
 func (x *UpdateFunctionRequest) Reset() {
@@ -1112,6 +1146,20 @@ func (x *UpdateFunctionRequest) GetDescription() string {
 		return x.Description
 	}
 	return ""
+}
+
+func (x *UpdateFunctionRequest) GetTimeoutMs() int64 {
+	if x != nil && x.TimeoutMs != nil {
+		return *x.TimeoutMs
+	}
+	return 0
+}
+
+func (x *UpdateFunctionRequest) GetMaxConcurrency() int32 {
+	if x != nil && x.MaxConcurrency != nil {
+		return *x.MaxConcurrency
+	}
+	return 0
 }
 
 type UpdateFunctionResponse struct {
@@ -1749,7 +1797,7 @@ var File_functions_v1_functions_proto protoreflect.FileDescriptor
 
 const file_functions_v1_functions_proto_rawDesc = "" +
 	"\n" +
-	"\x1cfunctions/v1/functions.proto\x12\ffunctions.v1\x1a\x19functions/v1/common.proto\x1a\x1dfunctions/v1/pagination.proto\"\xa2\x04\n" +
+	"\x1cfunctions/v1/functions.proto\x12\ffunctions.v1\x1a\x19functions/v1/common.proto\x1a\x1dfunctions/v1/pagination.proto\"\x83\x04\n" +
 	"\fFunctionSpec\x12\x14\n" +
 	"\x05image\x18\x01 \x01(\tR\x05image\x12\x18\n" +
 	"\acommand\x18\x02 \x03(\tR\acommand\x125\n" +
@@ -1757,9 +1805,7 @@ const file_functions_v1_functions_proto_rawDesc = "" +
 	"\asecrets\x18\x04 \x03(\v2'.functions.v1.FunctionSpec.SecretsEntryR\asecrets\x12<\n" +
 	"\bprotocol\x18\x05 \x01(\x0e2 .functions.v1.InvocationProtocolR\bprotocol\x122\n" +
 	"\bcontract\x18\x06 \x01(\v2\x16.functions.v1.ContractR\bcontract\x125\n" +
-	"\tresources\x18\a \x01(\v2\x17.functions.v1.ResourcesR\tresources\x12\x1d\n" +
-	"\n" +
-	"timeout_ms\x18\b \x01(\x03R\ttimeoutMs\x12,\n" +
+	"\tresources\x18\a \x01(\v2\x17.functions.v1.ResourcesR\tresources\x12,\n" +
 	"\x06source\x18\t \x01(\v2\x14.functions.v1.SourceR\x06source\x1a6\n" +
 	"\bEnvEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
@@ -1811,7 +1857,7 @@ const file_functions_v1_functions_proto_rawDesc = "" +
 	"\frootfs_bytes\x18\n" +
 	" \x01(\x03R\vrootfsBytes\x12\x1b\n" +
 	"\tbuild_log\x18\v \x01(\tR\bbuildLog\x12+\n" +
-	"\x12created_by_user_id\x18\f \x01(\tR\x0fcreatedByUserId\"\x88\x03\n" +
+	"\x12created_by_user_id\x18\f \x01(\tR\x0fcreatedByUserId\"\xd0\x03\n" +
 	"\bFunction\x12\x1b\n" +
 	"\ttenant_id\x18\x01 \x01(\tR\btenantId\x12\x0e\n" +
 	"\x02id\x18\x02 \x01(\tR\x02id\x12\x12\n" +
@@ -1825,23 +1871,34 @@ const file_functions_v1_functions_proto_rawDesc = "" +
 	"updated_at\x18\b \x01(\x03R\tupdatedAt\x12+\n" +
 	"\x12created_by_user_id\x18\t \x01(\tR\x0fcreatedByUserId\x12+\n" +
 	"\x12updated_by_user_id\x18\n" +
-	" \x01(\tR\x0fupdatedByUserId\"\x9a\x02\n" +
+	" \x01(\tR\x0fupdatedByUserId\x12\x1d\n" +
+	"\n" +
+	"timeout_ms\x18\v \x01(\x03R\ttimeoutMs\x12'\n" +
+	"\x0fmax_concurrency\x18\f \x01(\x05R\x0emaxConcurrency\"\xe2\x02\n" +
 	"\x15CreateFunctionRequest\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12 \n" +
 	"\vdescription\x18\x02 \x01(\tR\vdescription\x12.\n" +
 	"\x04spec\x18\x03 \x01(\v2\x1a.functions.v1.FunctionSpecR\x04spec\x12Z\n" +
-	"\rsecret_values\x18\x04 \x03(\v25.functions.v1.CreateFunctionRequest.SecretValuesEntryR\fsecretValues\x1a?\n" +
+	"\rsecret_values\x18\x04 \x03(\v25.functions.v1.CreateFunctionRequest.SecretValuesEntryR\fsecretValues\x12\x1d\n" +
+	"\n" +
+	"timeout_ms\x18\x05 \x01(\x03R\ttimeoutMs\x12'\n" +
+	"\x0fmax_concurrency\x18\x06 \x01(\x05R\x0emaxConcurrency\x1a?\n" +
 	"\x11SecretValuesEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
 	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\x85\x01\n" +
 	"\x16CreateFunctionResponse\x122\n" +
 	"\bfunction\x18\x01 \x01(\v2\x16.functions.v1.FunctionR\bfunction\x127\n" +
-	"\aversion\x18\x02 \x01(\v2\x1d.functions.v1.FunctionVersionR\aversion\"n\n" +
+	"\aversion\x18\x02 \x01(\v2\x1d.functions.v1.FunctionVersionR\aversion\"\xe3\x01\n" +
 	"\x15UpdateFunctionRequest\x12\x1f\n" +
 	"\vfunction_id\x18\x01 \x01(\tR\n" +
 	"functionId\x12\x12\n" +
 	"\x04name\x18\x02 \x01(\tR\x04name\x12 \n" +
-	"\vdescription\x18\x03 \x01(\tR\vdescription\"L\n" +
+	"\vdescription\x18\x03 \x01(\tR\vdescription\x12\"\n" +
+	"\n" +
+	"timeout_ms\x18\x04 \x01(\x03H\x00R\ttimeoutMs\x88\x01\x01\x12,\n" +
+	"\x0fmax_concurrency\x18\x05 \x01(\x05H\x01R\x0emaxConcurrency\x88\x01\x01B\r\n" +
+	"\v_timeout_msB\x12\n" +
+	"\x10_max_concurrency\"L\n" +
 	"\x16UpdateFunctionResponse\x122\n" +
 	"\bfunction\x18\x01 \x01(\v2\x16.functions.v1.FunctionR\bfunction\"O\n" +
 	"\x12GetFunctionRequest\x12\x0e\n" +
@@ -1995,6 +2052,7 @@ func file_functions_v1_functions_proto_init() {
 	}
 	file_functions_v1_common_proto_init()
 	file_functions_v1_pagination_proto_init()
+	file_functions_v1_functions_proto_msgTypes[13].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{

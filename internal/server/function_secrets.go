@@ -118,8 +118,8 @@ func (s *Service) invalidateSecrets(tenant string, names []string) {
 	}
 }
 
-// handleSecrets answers a host's request for a function's secret values,
-// when the function is placed on that host.
+// handleSecrets answers a live host's request for a function's secret
+// values. Any host may run any function, so any live host may ask.
 func (s *Service) handleSecrets(ctx context.Context, data []byte) proto.Message {
 	req := &hostv1.SecretsRequest{}
 	if err := proto.Unmarshal(data, req); err != nil {
@@ -128,8 +128,8 @@ func (s *Service) handleSecrets(ctx context.Context, data []byte) proto.Message 
 	if s.secrets == nil {
 		return &hostv1.SecretsResponse{Error: &hostv1.Error{Code: "failed_precondition", Message: "the server has no secret provider"}}
 	}
-	if !slices.Contains(s.placedHosts(req.GetFunctionId()), req.GetHost()) {
-		return &hostv1.SecretsResponse{Error: &hostv1.Error{Code: "permission_denied", Message: fmt.Sprintf("function %q is not placed on host %q", req.GetFunctionId(), req.GetHost())}}
+	if !s.hostLive(req.GetHost()) {
+		return &hostv1.SecretsResponse{Error: &hostv1.Error{Code: "permission_denied", Message: fmt.Sprintf("host %q is not live", req.GetHost())}}
 	}
 	// A host asks on its function's tenant's behalf: the version lookup
 	// below finds the function only in that tenant, and a host gets only the

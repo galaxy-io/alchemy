@@ -10,6 +10,7 @@ import (
 	"connectrpc.com/connect"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
+	"github.com/jackc/pgx/v5/pgtype"
 	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/proto"
 
@@ -32,14 +33,24 @@ func (s *Service) CreateFunction(ctx context.Context, req *connect.Request[funct
 	if err != nil {
 		return nil, err
 	}
+	timeout, err := s.validTimeout(req.Msg.GetTimeoutMs())
+	if err != nil {
+		return nil, err
+	}
+	limit, err := validConcurrency(req.Msg.GetMaxConcurrency())
+	if err != nil {
+		return nil, err
+	}
 	spec, err := s.prepareSpec(ctx, req.Msg.GetSpec())
 	if err != nil {
 		return nil, err
 	}
 	fn, err := s.store.CreateFunction(ctx, sqlcgen.CreateFunctionParams{
-		TenantID:    tenant,
-		Name:        name,
-		Description: req.Msg.GetDescription(),
+		TenantID:       tenant,
+		Name:           name,
+		Description:    req.Msg.GetDescription(),
+		TimeoutMs:      timeout,
+		MaxConcurrency: limit,
 	})
 	if err != nil {
 		return nil, storeError(err, "a function named %q already exists", name)
@@ -57,7 +68,9 @@ func (s *Service) CreateFunction(ctx context.Context, req *connect.Request[funct
 	}), nil
 }
 
-// UpdateFunction changes a function's name and description.
+// UpdateFunction changes a function's name, description, timeout and
+// concurrency limit. The last two change only when the request sets them,
+// and apply to the next invocation of any version.
 func (s *Service) UpdateFunction(ctx context.Context, req *connect.Request[functionsv1.UpdateFunctionRequest]) (*connect.Response[functionsv1.UpdateFunctionResponse], error) {
 	tenant, err := tenantFromContext(ctx)
 	if err != nil {
@@ -67,12 +80,27 @@ func (s *Service) UpdateFunction(ctx context.Context, req *connect.Request[funct
 	if err != nil {
 		return nil, err
 	}
-	fn, err := s.store.UpdateFunction(ctx, sqlcgen.UpdateFunctionParams{
+	params := sqlcgen.UpdateFunctionParams{
 		TenantID:    tenant,
 		ID:          req.Msg.GetFunctionId(),
 		Name:        name,
 		Description: req.Msg.GetDescription(),
-	})
+	}
+	if req.Msg.TimeoutMs != nil {
+		timeout, err := s.validTimeout(req.Msg.GetTimeoutMs())
+		if err != nil {
+			return nil, err
+		}
+		params.TimeoutMs = pgtype.Int8{Int64: timeout, Valid: true}
+	}
+	if req.Msg.MaxConcurrency != nil {
+		limit, err := validConcurrency(req.Msg.GetMaxConcurrency())
+		if err != nil {
+			return nil, err
+		}
+		params.MaxConcurrency = pgtype.Int4{Int32: limit, Valid: true}
+	}
+	fn, err := s.store.UpdateFunction(ctx, params)
 	if err != nil {
 		return nil, storeError(err, "a function named %q already exists", name)
 	}
@@ -327,44 +355,55 @@ func (s *Service) build(v *sqlcgen.FunctionVersion) {
 	}
 }
 
-// requestBuild builds spec on the hosts functionID lives on and returns the
-// first artifact to come back with its build log; the other hosts finish on
-// their own and report it in their heartbeats. Hosts cache by image and
-// layer digests, so a rebuild of a known image is a cache hit.
+// requestBuild builds spec on the least busy live host, trying the next
+// when one is gone, and returns the artifact with its build log. Other
+// hosts build the artifact themselves when they first take one of the
+// version's invocations. Hosts cache by image and layer digests, so a
+// rebuild of a known image is a cache hit.
 func (s *Service) requestBuild(ctx context.Context, v *sqlcgen.FunctionVersion, spec *functionsv1.FunctionSpec, layers []*hostv1.Layer) (*hostv1.Artifact, string, error) {
-	hosts := s.placedHosts(v.FunctionID)
-	if len(hosts) == 0 {
-		return nil, "", errNoHosts
-	}
 	ctx, cancel := context.WithTimeout(ctx, s.cfg.BuildTimeout)
 	defer cancel()
-	type result struct {
-		resp *hostv1.BuildResponse
-		err  error
-	}
-	results := make(chan result, len(hosts))
 	req := &hostv1.BuildRequest{TenantId: v.TenantID, FunctionId: v.FunctionID, Version: v.Version, Spec: spec, Layers: layers}
-	for _, name := range hosts {
-		s.tasks.Go(func() {
-			resp := &hostv1.BuildResponse{}
-			err := s.bus.Request(ctx, bus.HostBuildSubject(name), req, resp)
-			results <- result{resp, err}
-		})
-	}
-	var last result
-	for range hosts {
-		last = <-results
-		if last.err == nil && last.resp.GetArtifact() != nil {
-			return last.resp.GetArtifact(), last.resp.GetBuildLog(), nil
+	err := errNoHosts
+	for _, name := range s.hostsByLoad() {
+		resp := &hostv1.BuildResponse{}
+		rerr := s.bus.Request(ctx, bus.HostBuildSubject(name), req, resp)
+		switch {
+		case errors.Is(rerr, bus.ErrNoResponders):
+			continue
+		case rerr != nil:
+			return nil, "", rerr
+		case resp.GetArtifact() != nil:
+			return resp.GetArtifact(), resp.GetBuildLog(), nil
+		case resp.GetError().GetCode() == "unavailable":
+			err = errors.New(resp.GetError().GetMessage())
+			continue
 		}
+		return nil, resp.GetBuildLog(), errors.New(resp.GetError().GetMessage())
 	}
-	switch {
-	case errors.Is(last.err, bus.ErrNoResponders):
-		return nil, "", errNoHosts
-	case last.err != nil:
-		return nil, "", last.err
+	return nil, "", err
+}
+
+// validTimeout is a function's timeout_ms with the server default filled
+// in for zero.
+func (s *Service) validTimeout(ms int64) (int64, error) {
+	switch timeout := time.Duration(ms) * time.Millisecond; {
+	case timeout < 0:
+		return 0, connect.NewError(connect.CodeInvalidArgument, errors.New("timeout_ms must not be negative"))
+	case timeout == 0:
+		return s.cfg.DefaultTimeout.Milliseconds(), nil
+	case timeout > s.cfg.MaxTimeout:
+		return 0, connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("timeout_ms exceeds the maximum of %dms", s.cfg.MaxTimeout.Milliseconds()))
 	}
-	return nil, last.resp.GetBuildLog(), errors.New(last.resp.GetError().GetMessage())
+	return ms, nil
+}
+
+// validConcurrency is a function's max_concurrency, where 0 means no limit.
+func validConcurrency(n int32) (int32, error) {
+	if n < 0 {
+		return 0, connect.NewError(connect.CodeInvalidArgument, errors.New("max_concurrency must not be negative"))
+	}
+	return n, nil
 }
 
 // prepareSpec validates a spec, fills in server defaults, checks that its
@@ -394,15 +433,6 @@ func (s *Service) prepareSpec(ctx context.Context, in *functionsv1.FunctionSpec)
 	}
 	if err := s.checkSecrets(ctx, spec); err != nil {
 		return nil, err
-	}
-
-	switch timeout := time.Duration(spec.GetTimeoutMs()) * time.Millisecond; {
-	case timeout < 0:
-		return nil, invalid("spec.timeout_ms must not be negative")
-	case timeout == 0:
-		spec.TimeoutMs = s.cfg.DefaultTimeout.Milliseconds()
-	case timeout > s.cfg.MaxTimeout:
-		return nil, invalid("spec.timeout_ms exceeds the maximum of %dms", s.cfg.MaxTimeout.Milliseconds())
 	}
 
 	if spec.GetResources() == nil {
@@ -439,4 +469,47 @@ func storeError(err error, conflictFormat string, args ...any) error {
 		return connect.NewError(connect.CodeAlreadyExists, fmt.Errorf(conflictFormat, args...))
 	}
 	return notFound(err, "not found")
+}
+
+const (
+	// resumeInterval is how often the server looks for builds a server
+	// left behind.
+	resumeInterval = 5 * time.Second
+	// resumeAfter is how long past BuildTimeout a build may go with no
+	// result before another server takes it over: long enough for a slow
+	// build to finish and for a failing one not to be retried in a loop.
+	resumeAfter = time.Minute
+)
+
+// resumeBuilds takes over builds whose server died, until the service
+// stops. Hosts build a version's artifact themselves the first time they
+// take one of its invocations, so nothing else needs building ahead.
+func (s *Service) resumeBuilds() {
+	ticker := time.NewTicker(resumeInterval)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-s.background.Done():
+			return
+		case <-ticker.C:
+			s.resumeStaleBuilds()
+		}
+	}
+}
+
+// resumeStaleBuilds claims and runs builds that are past what a build may
+// take with no result: their server died, or stopped before they ended.
+// Every server sweeps; the claim moves build_started_at, so each build is
+// taken by one.
+func (s *Service) resumeStaleBuilds() {
+	stale := s.cfg.BuildTimeout + resumeAfter
+	rows, err := s.store.ClaimStaleFunctionVersionBuilds(s.background, pgtype.Interval{Microseconds: stale.Microseconds(), Valid: true})
+	if err != nil {
+		s.log.Warn("resume builds: claim stale builds", "err", err)
+		return
+	}
+	for _, v := range rows {
+		s.log.Warn("resuming a build its server left behind", "function_id", v.FunctionID, "version", v.Version)
+		s.tasks.Go(func() { s.build(v) })
+	}
 }

@@ -101,3 +101,5 @@ export const FUNCTION_SOURCE_EXTENSION_TO_RUNTIME_ID_MAP: Record<string, Runtime
   go: "go",
   rs: "rust",
 };
+
+export const FUNCTION_LIMITS_INPUT_WIDTH = 160;

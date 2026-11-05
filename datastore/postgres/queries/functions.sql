@@ -1,6 +1,6 @@
 -- name: CreateFunction :one
-INSERT INTO functions (tenant_id, name, description, created_by_user_id, updated_by_user_id)
-VALUES ($1, $2, $3, $4, $4)
+INSERT INTO functions (tenant_id, name, description, timeout_ms, max_concurrency, created_by_user_id, updated_by_user_id)
+VALUES ($1, $2, $3, $4, $5, $6, $6)
 RETURNING *;
 
 -- name: GetFunction :one
@@ -8,7 +8,9 @@ SELECT * FROM functions WHERE tenant_id = $1 AND id = $2 AND NOT is_deleted;
 
 -- name: UpdateFunction :one
 UPDATE functions
-SET name = $3, description = $4, updated_by_user_id = $5, updated_at = now()
+SET name = $3, description = $4, updated_by_user_id = $5, updated_at = now(),
+    timeout_ms = COALESCE(sqlc.narg(timeout_ms), timeout_ms),
+    max_concurrency = COALESCE(sqlc.narg(max_concurrency), max_concurrency)
 WHERE tenant_id = $1 AND id = $2 AND NOT is_deleted
 RETURNING *;
 

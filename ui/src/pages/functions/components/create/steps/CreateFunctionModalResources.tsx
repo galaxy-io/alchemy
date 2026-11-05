@@ -1,6 +1,7 @@
 import type { FC } from "react";
 
 import DurationInput from "@galaxy-io/dls/inputs/DurationInput";
+import NumberInput from "@galaxy-io/dls/inputs/NumberInput";
 import SliderInput from "@galaxy-io/dls/inputs/SliderInput";
 import Flex, { FlexDirection } from "@galaxy-io/dls/layout/Flex";
 import { Radius } from "@galaxy-io/dls/theme/enums";
@@ -22,6 +23,8 @@ import {
   CREATE_FUNCTION_MODAL_VCPUS_MAX,
   CREATE_FUNCTION_MODAL_VCPUS_MIN,
 } from "@/pages/functions/components/create/constants";
+import { CreateFunctionModalMode } from "@/pages/functions/components/create/types";
+import { FUNCTION_LIMITS_INPUT_WIDTH } from "@/pages/functions/constants";
 
 import { formatMemory } from "@/utils/format";
 
@@ -35,8 +38,9 @@ const CREATE_FUNCTION_MODAL_MEMORY_SLIDER_MARKS = CREATE_FUNCTION_MODAL_MEMORY_M
 );
 
 const CreateFunctionModalResources: FC = () => {
-  const { vcpus, memoryMib, timeoutMs } = useCreateFunctionModalState();
-  const { setVcpus, setMemoryMib, setTimeoutMs } = useCreateFunctionModalActions();
+  const { mode, vcpus, memoryMib, timeoutMs, maxConcurrency } = useCreateFunctionModalState();
+  const { setVcpus, setMemoryMib, setTimeoutMs, setMaxConcurrency } =
+    useCreateFunctionModalActions();
 
   return (
     <Flex
@@ -73,15 +77,32 @@ const CreateFunctionModalResources: FC = () => {
           </Flex>
         </Flex>
       </Widget>
-      <Widget header="Limits">
-        <DurationInput
-          label="Timeout"
-          value={timeoutMs}
-          min={CREATE_FUNCTION_MODAL_TIMEOUT_MIN_MS}
-          max={CREATE_FUNCTION_MODAL_TIMEOUT_MAX_MS}
-          onChange={(ms) => setTimeoutMs(ms ?? CREATE_FUNCTION_MODAL_TIMEOUT_MIN_MS)}
-        />
-      </Widget>
+      {mode === CreateFunctionModalMode.FUNCTION && (
+        <Widget header="Limits">
+          <Flex direction={FlexDirection.COLUMN} gap={12} maxWidth={FUNCTION_LIMITS_INPUT_WIDTH}>
+            <DurationInput
+              label="Timeout"
+              value={timeoutMs}
+              min={CREATE_FUNCTION_MODAL_TIMEOUT_MIN_MS}
+              max={CREATE_FUNCTION_MODAL_TIMEOUT_MAX_MS}
+              onChange={(ms) => setTimeoutMs(ms ?? CREATE_FUNCTION_MODAL_TIMEOUT_MIN_MS)}
+              fillWidth
+            />
+            <NumberInput
+              label="Max concurrency"
+              labelTooltip="Invocations past it wait in the queue"
+              value={maxConcurrency}
+              min={1}
+              step={1}
+              precision={0}
+              hasSteppers
+              placeholder="No limit"
+              onChange={setMaxConcurrency}
+              fillWidth
+            />
+          </Flex>
+        </Widget>
+      )}
     </Flex>
   );
 };

@@ -150,6 +150,8 @@ type Function struct {
 	TenantID        string
 	Name            string
 	Description     string
+	TimeoutMs       int64
+	MaxConcurrency  int32
 	IsDeleted       bool
 	DeletedAt       pgtype.Timestamptz
 	DeletedByUserID pgtype.Text

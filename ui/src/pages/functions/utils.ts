@@ -83,7 +83,6 @@ export const createFunctionSpecJson = (spec: FunctionSpec): JsonValue => ({
     vcpus: spec.resources?.vcpus ?? 0,
     memoryMib: spec.resources?.memoryMib ?? 0,
   },
-  timeoutMs: Number(spec.timeoutMs),
   ...(spec.source && {
     source: {
       files: spec.source.files.map(({ path, size }) => ({ path, size: Number(size) })),
