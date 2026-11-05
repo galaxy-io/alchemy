@@ -452,9 +452,9 @@ const (
 // serves, in a slot the caller holds. Every reply is an InvokeResponse; an
 // Error result means no instance ran the input, and retry says whether
 // another host could: this one had no room or no instance for it. When an
-// instance ran it, the host publishes the invocation's record as well: the
-// reply tells the caller, the record tells the database.
-func (h *Host) invoke(ctx context.Context, req *hostv1.InvokeRequest) (reply *hostv1.InvokeResponse, retry bool) {
+// instance ran it, rec is the invocation's record for the database, which
+// the caller publishes once it knows whether the invocation ends here.
+func (h *Host) invoke(ctx context.Context, req *hostv1.InvokeRequest) (reply *hostv1.InvokeResponse, rec *functionsv1.Invocation, retry bool) {
 	id := req.GetInvocation().GetId()
 	log := h.log.With("invocation_id", id, "artifact_id", req.GetArtifact().GetId())
 	start := time.Now()
@@ -462,12 +462,12 @@ func (h *Host) invoke(ctx context.Context, req *hostv1.InvokeRequest) (reply *ho
 	// A rejected input is the caller's mistake, so it ends here.
 	c, input, rejected := h.checkInput(req, start)
 	if rejected != nil {
-		return rejected, false
+		return rejected, nil, false
 	}
 
 	live, err := h.admit(req.GetArtifact())
 	if err != nil {
-		return invokeError("resource_exhausted", err), true
+		return invokeError("resource_exhausted", err), nil, true
 	}
 	h.publishState(req, functionsv1.InvocationStatus_INVOCATION_STATUS_STARTING, "", functionsv1.StartKind_START_KIND_UNSPECIFIED, 0)
 	instance, startKind := live.instance, functionsv1.StartKind_START_KIND_WARM
@@ -476,7 +476,7 @@ func (h *Host) invoke(ctx context.Context, req *hostv1.InvokeRequest) (reply *ho
 		if err != nil {
 			h.untrack(live)
 			log.Warn("acquire instance", "err", err)
-			return invokeError("unavailable", fmt.Errorf("acquire instance: %w", err)), true
+			return invokeError("unavailable", fmt.Errorf("acquire instance: %w", err)), nil, true
 		}
 	}
 	live.ready(instance, startKind, id)
@@ -505,7 +505,7 @@ func (h *Host) invoke(ctx context.Context, req *hostv1.InvokeRequest) (reply *ho
 	secrets, refused := h.invocationSecrets(runCtx, req.GetArtifact(), log)
 	if refused != nil {
 		reusable = true
-		return refused, false
+		return refused, nil, false
 	}
 	fnLogs := h.functionLogs(req, log)
 	out, err := instance.Invoke(runCtx, &supervisorv1.InvokeRequest{
@@ -537,17 +537,16 @@ func (h *Host) invoke(ctx context.Context, req *hostv1.InvokeRequest) (reply *ho
 		// The supervisor refused the input before running it, so another
 		// instance, here or on another host, can take it.
 		log.Warn("instance refused the invocation", "instance_id", instance.ID(), "err", err)
-		return invokeError("unavailable", fmt.Errorf("invoke instance: %w", err)), true
+		return invokeError("unavailable", fmt.Errorf("invoke instance: %w", err)), nil, true
 	default:
 		// The instance stopped answering after it took the input, so the
 		// function may have run: aborted, not unavailable, tells the server
 		// the outcome is unknown rather than that nothing happened.
 		log.Warn("invoke instance", "instance_id", instance.ID(), "err", err)
-		return invokeError("aborted", fmt.Errorf("invoke instance: %w", err)), false
+		return invokeError("aborted", fmt.Errorf("invoke instance: %w", err)), nil, false
 	}
 	log.Debug("invocation finished", "instance_id", instance.ID(), "start_kind", startKind, "acquire_us", acquireUs, "run_us", resp.GetRunUs())
-	h.records.add(record(h.cfg.Name, req.GetInvocation(), resp, start, acquired))
-	return resp, false
+	return resp, record(h.cfg.Name, req.GetInvocation(), resp, start, acquired), false
 }
 
 // checkInput compiles the artifact's contract and checks the input against
@@ -648,8 +647,9 @@ type functionLog struct {
 
 func (h *Host) functionLogs(req *hostv1.InvokeRequest, log *slog.Logger) *functionLog {
 	tenantID := req.GetArtifact().GetTenantId()
-	subject := bus.LogSubject(tenantID, req.GetInvocation().GetId())
-	w := logs.NewWriter(h.background, h.logs, req.GetLogKey(),
+	attempt := req.GetInvocation().GetAttempts()
+	subject := bus.AttemptLogSubject(tenantID, req.GetInvocation().GetId(), attempt)
+	w := logs.NewWriter(h.background, h.logs, logs.AttemptKey(req.GetLogKey(), attempt),
 		func(p []byte) error { return h.bus.PublishLog(subject, p) }, log)
 	return &functionLog{Writer: w, h: h, subject: subject, log: log}
 }
@@ -671,21 +671,53 @@ func invokeError(code string, err error) *hostv1.InvokeResponse {
 	return &hostv1.InvokeResponse{Result: &hostv1.InvokeResponse_Error{Error: &hostv1.Error{Code: code, Message: err.Error()}}}
 }
 
-// publishState tells the server that sent req how its invocation is doing.
+// publishState tells whoever follows req how its invocation is doing.
 func (h *Host) publishState(req *hostv1.InvokeRequest, status functionsv1.InvocationStatus, instanceID string, kind functionsv1.StartKind, acquireUs int64) {
+	inv := proto.CloneOf(req.GetInvocation())
+	inv.Status, inv.Host, inv.InstanceId, inv.StartKind = status, h.cfg.Name, instanceID, kind
+	if status == functionsv1.InvocationStatus_INVOCATION_STATUS_RUNNING {
+		inv.StartedAt = time.Now().UnixMilli()
+		inv.Stats = &functionsv1.InvocationStats{StartKind: kind, AcquireUs: acquireUs}
+	}
+	h.follow(req, inv)
+}
+
+// follow hands on how an invocation that has not ended is doing. The
+// server waiting on a sync one hears it on its state subject. No server
+// follows an async one, so the host records it running or waiting for its
+// next attempt, and publishes each change for the live streams itself.
+func (h *Host) follow(req *hostv1.InvokeRequest, inv *functionsv1.Invocation) {
+	log := h.log.With("invocation_id", inv.GetId())
+	if req.GetAsync() {
+		if inv.GetStatus() != functionsv1.InvocationStatus_INVOCATION_STATUS_STARTING {
+			h.records.add(inv)
+		}
+		h.publishInvocation(inv, log)
+		return
+	}
 	if req.GetStateSubject() == "" {
 		return
 	}
 	err := h.bus.Publish(req.GetStateSubject(), &hostv1.InvocationEvent{
-		InvocationId: req.GetInvocation().GetId(),
-		Status:       status,
-		InstanceId:   instanceID,
-		StartKind:    kind,
-		AcquireUs:    acquireUs,
-		Host:         h.cfg.Name,
+		InvocationId:  inv.GetId(),
+		Status:        inv.GetStatus(),
+		InstanceId:    inv.GetInstanceId(),
+		StartKind:     inv.GetStartKind(),
+		AcquireUs:     inv.GetStats().GetAcquireUs(),
+		Host:          h.cfg.Name,
+		Attempts:      inv.GetAttempts(),
+		Error:         inv.GetError(),
+		PlatformError: inv.GetPlatformError(),
 	})
 	if err != nil {
-		h.log.Warn("publish invocation state", "invocation_id", req.GetInvocation().GetId(), "err", err)
+		log.Warn("publish invocation state", "err", err)
+	}
+}
+
+// publishInvocation publishes inv as it now is, for the live streams.
+func (h *Host) publishInvocation(inv *functionsv1.Invocation, log *slog.Logger) {
+	if err := h.bus.Publish(bus.InvocationSubject(inv.GetFunctionId()), inv); err != nil {
+		log.Warn("publish invocation", "err", err)
 	}
 }
 

@@ -33,3 +33,20 @@ func TestLeaseValueTruncates(t *testing.T) {
 		t.Errorf("expiry = %v, want %v", got, want)
 	}
 }
+
+func TestAttemptLogSubject(t *testing.T) {
+	first := LogSubject("t1", "inv-1")
+	tests := []struct {
+		attempt int32
+		want    string
+	}{
+		{0, first},
+		{1, first},
+		{2, first + ".2"},
+	}
+	for _, tt := range tests {
+		if got := AttemptLogSubject("t1", "inv-1", tt.attempt); got != tt.want {
+			t.Errorf("AttemptLogSubject(%d) = %q, want %q", tt.attempt, got, tt.want)
+		}
+	}
+}

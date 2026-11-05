@@ -149,7 +149,9 @@ type InvocationStatus int32
 
 const (
 	InvocationStatus_INVOCATION_STATUS_UNSPECIFIED InvocationStatus = 0
-	// PENDING: accepted, waiting for a host to take it.
+	// PENDING: accepted, waiting for a host to take it. An invocation whose
+	// attempt failed is PENDING again until its next attempt, with the failed
+	// attempt's error set.
 	InvocationStatus_INVOCATION_STATUS_PENDING InvocationStatus = 1
 	// STARTING: a instance is booting or being restored for it.
 	InvocationStatus_INVOCATION_STATUS_STARTING InvocationStatus = 2
@@ -382,8 +384,11 @@ type InvokeRequest struct {
 	// call a host took but never reported on has an unknown outcome and holds
 	// the key: a retry gets ABORTED, and a new key runs again.
 	IdempotencyKey string `protobuf:"bytes,4,opt,name=idempotency_key,json=idempotencyKey,proto3" json:"idempotency_key,omitempty"`
-	unknownFields  protoimpl.UnknownFields
-	sizeCache      protoimpl.SizeCache
+	// retries, when set, is how many more times this call runs after a failed
+	// attempt instead of the function's retries.
+	Retries       *int32 `protobuf:"varint,5,opt,name=retries,proto3,oneof" json:"retries,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *InvokeRequest) Reset() {
@@ -444,6 +449,13 @@ func (x *InvokeRequest) GetIdempotencyKey() string {
 	return ""
 }
 
+func (x *InvokeRequest) GetRetries() int32 {
+	if x != nil && x.Retries != nil {
+		return *x.Retries
+	}
+	return 0
+}
+
 // InvokeResponse is returned whenever the function ran. output is the
 // function's result in the encoding the contract defines, already checked
 // against the output schema; error means the function ran and failed.
@@ -460,7 +472,9 @@ type InvokeResponse struct {
 	Stats  *InvocationStats        `protobuf:"bytes,5,opt,name=stats,proto3" json:"stats,omitempty"`
 	// replayed is set when the result is an earlier invocation's, found by
 	// the request's idempotency_key, and nothing ran for this call.
-	Replayed      bool `protobuf:"varint,6,opt,name=replayed,proto3" json:"replayed,omitempty"`
+	Replayed bool `protobuf:"varint,6,opt,name=replayed,proto3" json:"replayed,omitempty"`
+	// attempts is how many times the function ran for this result.
+	Attempts      int32 `protobuf:"varint,7,opt,name=attempts,proto3" json:"attempts,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -548,6 +562,13 @@ func (x *InvokeResponse) GetReplayed() bool {
 	return false
 }
 
+func (x *InvokeResponse) GetAttempts() int32 {
+	if x != nil {
+		return x.Attempts
+	}
+	return 0
+}
+
 type isInvokeResponse_Result interface {
 	isInvokeResponse_Result()
 }
@@ -563,6 +584,142 @@ type InvokeResponse_Error struct {
 func (*InvokeResponse_Output) isInvokeResponse_Result() {}
 
 func (*InvokeResponse_Error) isInvokeResponse_Result() {}
+
+// InvokeAsyncRequest is InvokeRequest for a caller that does not wait.
+// idempotency_key returns the invocation an earlier call with the key
+// queued instead of queueing another.
+type InvokeAsyncRequest struct {
+	state          protoimpl.MessageState `protogen:"open.v1"`
+	FunctionId     string                 `protobuf:"bytes,1,opt,name=function_id,json=functionId,proto3" json:"function_id,omitempty"`
+	Version        int64                  `protobuf:"varint,2,opt,name=version,proto3" json:"version,omitempty"`
+	Input          []byte                 `protobuf:"bytes,3,opt,name=input,proto3" json:"input,omitempty"`
+	IdempotencyKey string                 `protobuf:"bytes,4,opt,name=idempotency_key,json=idempotencyKey,proto3" json:"idempotency_key,omitempty"`
+	Retries        *int32                 `protobuf:"varint,5,opt,name=retries,proto3,oneof" json:"retries,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
+}
+
+func (x *InvokeAsyncRequest) Reset() {
+	*x = InvokeAsyncRequest{}
+	mi := &file_functions_v1_invocations_proto_msgTypes[4]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *InvokeAsyncRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*InvokeAsyncRequest) ProtoMessage() {}
+
+func (x *InvokeAsyncRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_functions_v1_invocations_proto_msgTypes[4]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use InvokeAsyncRequest.ProtoReflect.Descriptor instead.
+func (*InvokeAsyncRequest) Descriptor() ([]byte, []int) {
+	return file_functions_v1_invocations_proto_rawDescGZIP(), []int{4}
+}
+
+func (x *InvokeAsyncRequest) GetFunctionId() string {
+	if x != nil {
+		return x.FunctionId
+	}
+	return ""
+}
+
+func (x *InvokeAsyncRequest) GetVersion() int64 {
+	if x != nil {
+		return x.Version
+	}
+	return 0
+}
+
+func (x *InvokeAsyncRequest) GetInput() []byte {
+	if x != nil {
+		return x.Input
+	}
+	return nil
+}
+
+func (x *InvokeAsyncRequest) GetIdempotencyKey() string {
+	if x != nil {
+		return x.IdempotencyKey
+	}
+	return ""
+}
+
+func (x *InvokeAsyncRequest) GetRetries() int32 {
+	if x != nil && x.Retries != nil {
+		return *x.Retries
+	}
+	return 0
+}
+
+// InvokeAsyncResponse is returned once the invocation is queued. Nothing
+// waits for it to run and its output is dropped. GetInvocation follows its
+// status, attempts and error.
+type InvokeAsyncResponse struct {
+	state        protoimpl.MessageState `protogen:"open.v1"`
+	InvocationId string                 `protobuf:"bytes,1,opt,name=invocation_id,json=invocationId,proto3" json:"invocation_id,omitempty"`
+	// replayed is set when an earlier call with the same idempotency_key
+	// queued invocation_id, and nothing was queued for this call.
+	Replayed      bool `protobuf:"varint,2,opt,name=replayed,proto3" json:"replayed,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *InvokeAsyncResponse) Reset() {
+	*x = InvokeAsyncResponse{}
+	mi := &file_functions_v1_invocations_proto_msgTypes[5]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *InvokeAsyncResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*InvokeAsyncResponse) ProtoMessage() {}
+
+func (x *InvokeAsyncResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_functions_v1_invocations_proto_msgTypes[5]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use InvokeAsyncResponse.ProtoReflect.Descriptor instead.
+func (*InvokeAsyncResponse) Descriptor() ([]byte, []int) {
+	return file_functions_v1_invocations_proto_rawDescGZIP(), []int{5}
+}
+
+func (x *InvokeAsyncResponse) GetInvocationId() string {
+	if x != nil {
+		return x.InvocationId
+	}
+	return ""
+}
+
+func (x *InvokeAsyncResponse) GetReplayed() bool {
+	if x != nil {
+		return x.Replayed
+	}
+	return false
+}
 
 // Invocation is the persisted record of one Invoke call. Lifecycle stamps
 // are epoch millis; 0 means unset. started_at is when the function received
@@ -590,14 +747,18 @@ type Invocation struct {
 	IdempotencyKey string `protobuf:"bytes,17,opt,name=idempotency_key,json=idempotencyKey,proto3" json:"idempotency_key,omitempty"`
 	// host is the host the invocation was sent to, empty when none took
 	// it. Set by the server when it sends it and by the host in its record.
-	Host          string `protobuf:"bytes,18,opt,name=host,proto3" json:"host,omitempty"`
+	Host string `protobuf:"bytes,18,opt,name=host,proto3" json:"host,omitempty"`
+	// attempts is how many times a host has started to run it.
+	Attempts int32 `protobuf:"varint,19,opt,name=attempts,proto3" json:"attempts,omitempty"`
+	// async is set when the caller did not wait for the result.
+	Async         bool `protobuf:"varint,20,opt,name=async,proto3" json:"async,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
 func (x *Invocation) Reset() {
 	*x = Invocation{}
-	mi := &file_functions_v1_invocations_proto_msgTypes[4]
+	mi := &file_functions_v1_invocations_proto_msgTypes[6]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -609,7 +770,7 @@ func (x *Invocation) String() string {
 func (*Invocation) ProtoMessage() {}
 
 func (x *Invocation) ProtoReflect() protoreflect.Message {
-	mi := &file_functions_v1_invocations_proto_msgTypes[4]
+	mi := &file_functions_v1_invocations_proto_msgTypes[6]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -622,7 +783,7 @@ func (x *Invocation) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Invocation.ProtoReflect.Descriptor instead.
 func (*Invocation) Descriptor() ([]byte, []int) {
-	return file_functions_v1_invocations_proto_rawDescGZIP(), []int{4}
+	return file_functions_v1_invocations_proto_rawDescGZIP(), []int{6}
 }
 
 func (x *Invocation) GetTenantId() string {
@@ -751,6 +912,20 @@ func (x *Invocation) GetHost() string {
 	return ""
 }
 
+func (x *Invocation) GetAttempts() int32 {
+	if x != nil {
+		return x.Attempts
+	}
+	return 0
+}
+
+func (x *Invocation) GetAsync() bool {
+	if x != nil {
+		return x.Async
+	}
+	return false
+}
+
 type GetInvocationRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
@@ -760,7 +935,7 @@ type GetInvocationRequest struct {
 
 func (x *GetInvocationRequest) Reset() {
 	*x = GetInvocationRequest{}
-	mi := &file_functions_v1_invocations_proto_msgTypes[5]
+	mi := &file_functions_v1_invocations_proto_msgTypes[7]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -772,7 +947,7 @@ func (x *GetInvocationRequest) String() string {
 func (*GetInvocationRequest) ProtoMessage() {}
 
 func (x *GetInvocationRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_functions_v1_invocations_proto_msgTypes[5]
+	mi := &file_functions_v1_invocations_proto_msgTypes[7]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -785,7 +960,7 @@ func (x *GetInvocationRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetInvocationRequest.ProtoReflect.Descriptor instead.
 func (*GetInvocationRequest) Descriptor() ([]byte, []int) {
-	return file_functions_v1_invocations_proto_rawDescGZIP(), []int{5}
+	return file_functions_v1_invocations_proto_rawDescGZIP(), []int{7}
 }
 
 func (x *GetInvocationRequest) GetId() string {
@@ -804,7 +979,7 @@ type GetInvocationResponse struct {
 
 func (x *GetInvocationResponse) Reset() {
 	*x = GetInvocationResponse{}
-	mi := &file_functions_v1_invocations_proto_msgTypes[6]
+	mi := &file_functions_v1_invocations_proto_msgTypes[8]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -816,7 +991,7 @@ func (x *GetInvocationResponse) String() string {
 func (*GetInvocationResponse) ProtoMessage() {}
 
 func (x *GetInvocationResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_functions_v1_invocations_proto_msgTypes[6]
+	mi := &file_functions_v1_invocations_proto_msgTypes[8]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -829,7 +1004,7 @@ func (x *GetInvocationResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetInvocationResponse.ProtoReflect.Descriptor instead.
 func (*GetInvocationResponse) Descriptor() ([]byte, []int) {
-	return file_functions_v1_invocations_proto_rawDescGZIP(), []int{6}
+	return file_functions_v1_invocations_proto_rawDescGZIP(), []int{8}
 }
 
 func (x *GetInvocationResponse) GetInvocation() *Invocation {
@@ -858,7 +1033,7 @@ type ListInvocationsRequest struct {
 
 func (x *ListInvocationsRequest) Reset() {
 	*x = ListInvocationsRequest{}
-	mi := &file_functions_v1_invocations_proto_msgTypes[7]
+	mi := &file_functions_v1_invocations_proto_msgTypes[9]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -870,7 +1045,7 @@ func (x *ListInvocationsRequest) String() string {
 func (*ListInvocationsRequest) ProtoMessage() {}
 
 func (x *ListInvocationsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_functions_v1_invocations_proto_msgTypes[7]
+	mi := &file_functions_v1_invocations_proto_msgTypes[9]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -883,7 +1058,7 @@ func (x *ListInvocationsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListInvocationsRequest.ProtoReflect.Descriptor instead.
 func (*ListInvocationsRequest) Descriptor() ([]byte, []int) {
-	return file_functions_v1_invocations_proto_rawDescGZIP(), []int{7}
+	return file_functions_v1_invocations_proto_rawDescGZIP(), []int{9}
 }
 
 func (x *ListInvocationsRequest) GetFunctionIds() []string {
@@ -938,7 +1113,7 @@ type ListInvocationsResponse struct {
 
 func (x *ListInvocationsResponse) Reset() {
 	*x = ListInvocationsResponse{}
-	mi := &file_functions_v1_invocations_proto_msgTypes[8]
+	mi := &file_functions_v1_invocations_proto_msgTypes[10]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -950,7 +1125,7 @@ func (x *ListInvocationsResponse) String() string {
 func (*ListInvocationsResponse) ProtoMessage() {}
 
 func (x *ListInvocationsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_functions_v1_invocations_proto_msgTypes[8]
+	mi := &file_functions_v1_invocations_proto_msgTypes[10]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -963,7 +1138,7 @@ func (x *ListInvocationsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListInvocationsResponse.ProtoReflect.Descriptor instead.
 func (*ListInvocationsResponse) Descriptor() ([]byte, []int) {
-	return file_functions_v1_invocations_proto_rawDescGZIP(), []int{8}
+	return file_functions_v1_invocations_proto_rawDescGZIP(), []int{10}
 }
 
 func (x *ListInvocationsResponse) GetInvocations() []*Invocation {
@@ -993,7 +1168,7 @@ type TailInvocationsRequest struct {
 
 func (x *TailInvocationsRequest) Reset() {
 	*x = TailInvocationsRequest{}
-	mi := &file_functions_v1_invocations_proto_msgTypes[9]
+	mi := &file_functions_v1_invocations_proto_msgTypes[11]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1005,7 +1180,7 @@ func (x *TailInvocationsRequest) String() string {
 func (*TailInvocationsRequest) ProtoMessage() {}
 
 func (x *TailInvocationsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_functions_v1_invocations_proto_msgTypes[9]
+	mi := &file_functions_v1_invocations_proto_msgTypes[11]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1018,7 +1193,7 @@ func (x *TailInvocationsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use TailInvocationsRequest.ProtoReflect.Descriptor instead.
 func (*TailInvocationsRequest) Descriptor() ([]byte, []int) {
-	return file_functions_v1_invocations_proto_rawDescGZIP(), []int{9}
+	return file_functions_v1_invocations_proto_rawDescGZIP(), []int{11}
 }
 
 func (x *TailInvocationsRequest) GetFunctionId() string {
@@ -1049,7 +1224,7 @@ type TailInvocationsResponse struct {
 
 func (x *TailInvocationsResponse) Reset() {
 	*x = TailInvocationsResponse{}
-	mi := &file_functions_v1_invocations_proto_msgTypes[10]
+	mi := &file_functions_v1_invocations_proto_msgTypes[12]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1061,7 +1236,7 @@ func (x *TailInvocationsResponse) String() string {
 func (*TailInvocationsResponse) ProtoMessage() {}
 
 func (x *TailInvocationsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_functions_v1_invocations_proto_msgTypes[10]
+	mi := &file_functions_v1_invocations_proto_msgTypes[12]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1074,7 +1249,7 @@ func (x *TailInvocationsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use TailInvocationsResponse.ProtoReflect.Descriptor instead.
 func (*TailInvocationsResponse) Descriptor() ([]byte, []int) {
-	return file_functions_v1_invocations_proto_rawDescGZIP(), []int{10}
+	return file_functions_v1_invocations_proto_rawDescGZIP(), []int{12}
 }
 
 func (x *TailInvocationsResponse) GetInvocation() *Invocation {
@@ -1109,16 +1284,19 @@ func (x *TailInvocationsResponse) GetEmittedAt() int64 {
 // With follow, the stream stays open while the invocation runs and ends when
 // it does; without, it ends at what has been written so far.
 type GetInvocationLogsRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
-	Follow        bool                   `protobuf:"varint,2,opt,name=follow,proto3" json:"follow,omitempty"`
+	state  protoimpl.MessageState `protogen:"open.v1"`
+	Id     string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	Follow bool                   `protobuf:"varint,2,opt,name=follow,proto3" json:"follow,omitempty"`
+	// attempt picks one attempt of the invocation, counting from 1. 0 is the
+	// latest.
+	Attempt       int32 `protobuf:"varint,3,opt,name=attempt,proto3" json:"attempt,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
 func (x *GetInvocationLogsRequest) Reset() {
 	*x = GetInvocationLogsRequest{}
-	mi := &file_functions_v1_invocations_proto_msgTypes[11]
+	mi := &file_functions_v1_invocations_proto_msgTypes[13]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1130,7 +1308,7 @@ func (x *GetInvocationLogsRequest) String() string {
 func (*GetInvocationLogsRequest) ProtoMessage() {}
 
 func (x *GetInvocationLogsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_functions_v1_invocations_proto_msgTypes[11]
+	mi := &file_functions_v1_invocations_proto_msgTypes[13]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1143,7 +1321,7 @@ func (x *GetInvocationLogsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetInvocationLogsRequest.ProtoReflect.Descriptor instead.
 func (*GetInvocationLogsRequest) Descriptor() ([]byte, []int) {
-	return file_functions_v1_invocations_proto_rawDescGZIP(), []int{11}
+	return file_functions_v1_invocations_proto_rawDescGZIP(), []int{13}
 }
 
 func (x *GetInvocationLogsRequest) GetId() string {
@@ -1160,6 +1338,13 @@ func (x *GetInvocationLogsRequest) GetFollow() bool {
 	return false
 }
 
+func (x *GetInvocationLogsRequest) GetAttempt() int32 {
+	if x != nil {
+		return x.Attempt
+	}
+	return 0
+}
+
 // GetInvocationLogsResponse is the next piece of the log, in order. Pieces
 // are not split on line boundaries.
 type GetInvocationLogsResponse struct {
@@ -1171,7 +1356,7 @@ type GetInvocationLogsResponse struct {
 
 func (x *GetInvocationLogsResponse) Reset() {
 	*x = GetInvocationLogsResponse{}
-	mi := &file_functions_v1_invocations_proto_msgTypes[12]
+	mi := &file_functions_v1_invocations_proto_msgTypes[14]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1183,7 +1368,7 @@ func (x *GetInvocationLogsResponse) String() string {
 func (*GetInvocationLogsResponse) ProtoMessage() {}
 
 func (x *GetInvocationLogsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_functions_v1_invocations_proto_msgTypes[12]
+	mi := &file_functions_v1_invocations_proto_msgTypes[14]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1196,7 +1381,7 @@ func (x *GetInvocationLogsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetInvocationLogsResponse.ProtoReflect.Descriptor instead.
 func (*GetInvocationLogsResponse) Descriptor() ([]byte, []int) {
-	return file_functions_v1_invocations_proto_rawDescGZIP(), []int{12}
+	return file_functions_v1_invocations_proto_rawDescGZIP(), []int{14}
 }
 
 func (x *GetInvocationLogsResponse) GetData() []byte {
@@ -1224,21 +1409,37 @@ const file_functions_v1_invocations_proto_rawDesc = "" +
 	"\n" +
 	"acquire_us\x18\x02 \x01(\x03R\tacquireUs\x12\x15\n" +
 	"\x06run_us\x18\x03 \x01(\x03R\x05runUs\x12\x19\n" +
-	"\btotal_us\x18\x04 \x01(\x03R\atotalUs\"\x89\x01\n" +
+	"\btotal_us\x18\x04 \x01(\x03R\atotalUs\"\xb4\x01\n" +
 	"\rInvokeRequest\x12\x1f\n" +
 	"\vfunction_id\x18\x01 \x01(\tR\n" +
 	"functionId\x12\x18\n" +
 	"\aversion\x18\x02 \x01(\x03R\aversion\x12\x14\n" +
 	"\x05input\x18\x03 \x01(\fR\x05input\x12'\n" +
-	"\x0fidempotency_key\x18\x04 \x01(\tR\x0eidempotencyKey\"\xf9\x01\n" +
+	"\x0fidempotency_key\x18\x04 \x01(\tR\x0eidempotencyKey\x12\x1d\n" +
+	"\aretries\x18\x05 \x01(\x05H\x00R\aretries\x88\x01\x01B\n" +
+	"\n" +
+	"\b_retries\"\x95\x02\n" +
 	"\x0eInvokeResponse\x12#\n" +
 	"\rinvocation_id\x18\x01 \x01(\tR\finvocationId\x12\x18\n" +
 	"\aversion\x18\x02 \x01(\x03R\aversion\x12\x18\n" +
 	"\x06output\x18\x03 \x01(\fH\x00R\x06output\x123\n" +
 	"\x05error\x18\x04 \x01(\v2\x1b.functions.v1.FunctionErrorH\x00R\x05error\x123\n" +
 	"\x05stats\x18\x05 \x01(\v2\x1d.functions.v1.InvocationStatsR\x05stats\x12\x1a\n" +
-	"\breplayed\x18\x06 \x01(\bR\breplayedB\b\n" +
-	"\x06result\"\x9b\x05\n" +
+	"\breplayed\x18\x06 \x01(\bR\breplayed\x12\x1a\n" +
+	"\battempts\x18\a \x01(\x05R\battemptsB\b\n" +
+	"\x06result\"\xb9\x01\n" +
+	"\x12InvokeAsyncRequest\x12\x1f\n" +
+	"\vfunction_id\x18\x01 \x01(\tR\n" +
+	"functionId\x12\x18\n" +
+	"\aversion\x18\x02 \x01(\x03R\aversion\x12\x14\n" +
+	"\x05input\x18\x03 \x01(\fR\x05input\x12'\n" +
+	"\x0fidempotency_key\x18\x04 \x01(\tR\x0eidempotencyKey\x12\x1d\n" +
+	"\aretries\x18\x05 \x01(\x05H\x00R\aretries\x88\x01\x01B\n" +
+	"\n" +
+	"\b_retries\"V\n" +
+	"\x13InvokeAsyncResponse\x12#\n" +
+	"\rinvocation_id\x18\x01 \x01(\tR\finvocationId\x12\x1a\n" +
+	"\breplayed\x18\x02 \x01(\bR\breplayed\"\xcd\x05\n" +
 	"\n" +
 	"Invocation\x12\x1b\n" +
 	"\ttenant_id\x18\x01 \x01(\tR\btenantId\x12\x0e\n" +
@@ -1265,7 +1466,9 @@ const file_functions_v1_invocations_proto_rawDesc = "" +
 	"instanceId\x12+\n" +
 	"\x12created_by_user_id\x18\x10 \x01(\tR\x0fcreatedByUserId\x12'\n" +
 	"\x0fidempotency_key\x18\x11 \x01(\tR\x0eidempotencyKey\x12\x12\n" +
-	"\x04host\x18\x12 \x01(\tR\x04host\"&\n" +
+	"\x04host\x18\x12 \x01(\tR\x04host\x12\x1a\n" +
+	"\battempts\x18\x13 \x01(\x05R\battempts\x12\x14\n" +
+	"\x05async\x18\x14 \x01(\bR\x05async\"&\n" +
 	"\x14GetInvocationRequest\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\"Q\n" +
 	"\x15GetInvocationResponse\x128\n" +
@@ -1299,10 +1502,11 @@ const file_functions_v1_invocations_proto_rawDesc = "" +
 	"event_type\x18\x02 \x01(\tR\teventType\x12\x16\n" +
 	"\x06replay\x18\x03 \x01(\bR\x06replay\x12\x1d\n" +
 	"\n" +
-	"emitted_at\x18\x04 \x01(\x03R\temittedAt\"B\n" +
+	"emitted_at\x18\x04 \x01(\x03R\temittedAt\"\\\n" +
 	"\x18GetInvocationLogsRequest\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x16\n" +
-	"\x06follow\x18\x02 \x01(\bR\x06follow\"/\n" +
+	"\x06follow\x18\x02 \x01(\bR\x06follow\x12\x18\n" +
+	"\aattempt\x18\x03 \x01(\x05R\aattempt\"/\n" +
 	"\x19GetInvocationLogsResponse\x12\x12\n" +
 	"\x04data\x18\x01 \x01(\fR\x04data*\xe9\x01\n" +
 	"\x11FunctionErrorKind\x12#\n" +
@@ -1342,7 +1546,7 @@ func file_functions_v1_invocations_proto_rawDescGZIP() []byte {
 }
 
 var file_functions_v1_invocations_proto_enumTypes = make([]protoimpl.EnumInfo, 3)
-var file_functions_v1_invocations_proto_msgTypes = make([]protoimpl.MessageInfo, 13)
+var file_functions_v1_invocations_proto_msgTypes = make([]protoimpl.MessageInfo, 15)
 var file_functions_v1_invocations_proto_goTypes = []any{
 	(FunctionErrorKind)(0),            // 0: functions.v1.FunctionErrorKind
 	(StartKind)(0),                    // 1: functions.v1.StartKind
@@ -1351,22 +1555,24 @@ var file_functions_v1_invocations_proto_goTypes = []any{
 	(*InvocationStats)(nil),           // 4: functions.v1.InvocationStats
 	(*InvokeRequest)(nil),             // 5: functions.v1.InvokeRequest
 	(*InvokeResponse)(nil),            // 6: functions.v1.InvokeResponse
-	(*Invocation)(nil),                // 7: functions.v1.Invocation
-	(*GetInvocationRequest)(nil),      // 8: functions.v1.GetInvocationRequest
-	(*GetInvocationResponse)(nil),     // 9: functions.v1.GetInvocationResponse
-	(*ListInvocationsRequest)(nil),    // 10: functions.v1.ListInvocationsRequest
-	(*ListInvocationsResponse)(nil),   // 11: functions.v1.ListInvocationsResponse
-	(*TailInvocationsRequest)(nil),    // 12: functions.v1.TailInvocationsRequest
-	(*TailInvocationsResponse)(nil),   // 13: functions.v1.TailInvocationsResponse
-	(*GetInvocationLogsRequest)(nil),  // 14: functions.v1.GetInvocationLogsRequest
-	(*GetInvocationLogsResponse)(nil), // 15: functions.v1.GetInvocationLogsResponse
-	(*ContractViolation)(nil),         // 16: functions.v1.ContractViolation
-	(*PaginationRequest)(nil),         // 17: functions.v1.PaginationRequest
-	(*PaginationResponse)(nil),        // 18: functions.v1.PaginationResponse
+	(*InvokeAsyncRequest)(nil),        // 7: functions.v1.InvokeAsyncRequest
+	(*InvokeAsyncResponse)(nil),       // 8: functions.v1.InvokeAsyncResponse
+	(*Invocation)(nil),                // 9: functions.v1.Invocation
+	(*GetInvocationRequest)(nil),      // 10: functions.v1.GetInvocationRequest
+	(*GetInvocationResponse)(nil),     // 11: functions.v1.GetInvocationResponse
+	(*ListInvocationsRequest)(nil),    // 12: functions.v1.ListInvocationsRequest
+	(*ListInvocationsResponse)(nil),   // 13: functions.v1.ListInvocationsResponse
+	(*TailInvocationsRequest)(nil),    // 14: functions.v1.TailInvocationsRequest
+	(*TailInvocationsResponse)(nil),   // 15: functions.v1.TailInvocationsResponse
+	(*GetInvocationLogsRequest)(nil),  // 16: functions.v1.GetInvocationLogsRequest
+	(*GetInvocationLogsResponse)(nil), // 17: functions.v1.GetInvocationLogsResponse
+	(*ContractViolation)(nil),         // 18: functions.v1.ContractViolation
+	(*PaginationRequest)(nil),         // 19: functions.v1.PaginationRequest
+	(*PaginationResponse)(nil),        // 20: functions.v1.PaginationResponse
 }
 var file_functions_v1_invocations_proto_depIdxs = []int32{
 	0,  // 0: functions.v1.FunctionError.kind:type_name -> functions.v1.FunctionErrorKind
-	16, // 1: functions.v1.FunctionError.violations:type_name -> functions.v1.ContractViolation
+	18, // 1: functions.v1.FunctionError.violations:type_name -> functions.v1.ContractViolation
 	1,  // 2: functions.v1.InvocationStats.start_kind:type_name -> functions.v1.StartKind
 	3,  // 3: functions.v1.InvokeResponse.error:type_name -> functions.v1.FunctionError
 	4,  // 4: functions.v1.InvokeResponse.stats:type_name -> functions.v1.InvocationStats
@@ -1374,13 +1580,13 @@ var file_functions_v1_invocations_proto_depIdxs = []int32{
 	1,  // 6: functions.v1.Invocation.start_kind:type_name -> functions.v1.StartKind
 	4,  // 7: functions.v1.Invocation.stats:type_name -> functions.v1.InvocationStats
 	3,  // 8: functions.v1.Invocation.error:type_name -> functions.v1.FunctionError
-	7,  // 9: functions.v1.GetInvocationResponse.invocation:type_name -> functions.v1.Invocation
+	9,  // 9: functions.v1.GetInvocationResponse.invocation:type_name -> functions.v1.Invocation
 	2,  // 10: functions.v1.ListInvocationsRequest.statuses:type_name -> functions.v1.InvocationStatus
 	1,  // 11: functions.v1.ListInvocationsRequest.start_kinds:type_name -> functions.v1.StartKind
-	17, // 12: functions.v1.ListInvocationsRequest.pagination:type_name -> functions.v1.PaginationRequest
-	7,  // 13: functions.v1.ListInvocationsResponse.invocations:type_name -> functions.v1.Invocation
-	18, // 14: functions.v1.ListInvocationsResponse.pagination:type_name -> functions.v1.PaginationResponse
-	7,  // 15: functions.v1.TailInvocationsResponse.invocation:type_name -> functions.v1.Invocation
+	19, // 12: functions.v1.ListInvocationsRequest.pagination:type_name -> functions.v1.PaginationRequest
+	9,  // 13: functions.v1.ListInvocationsResponse.invocations:type_name -> functions.v1.Invocation
+	20, // 14: functions.v1.ListInvocationsResponse.pagination:type_name -> functions.v1.PaginationResponse
+	9,  // 15: functions.v1.TailInvocationsResponse.invocation:type_name -> functions.v1.Invocation
 	16, // [16:16] is the sub-list for method output_type
 	16, // [16:16] is the sub-list for method input_type
 	16, // [16:16] is the sub-list for extension type_name
@@ -1395,17 +1601,19 @@ func file_functions_v1_invocations_proto_init() {
 	}
 	file_functions_v1_common_proto_init()
 	file_functions_v1_pagination_proto_init()
+	file_functions_v1_invocations_proto_msgTypes[2].OneofWrappers = []any{}
 	file_functions_v1_invocations_proto_msgTypes[3].OneofWrappers = []any{
 		(*InvokeResponse_Output)(nil),
 		(*InvokeResponse_Error)(nil),
 	}
+	file_functions_v1_invocations_proto_msgTypes[4].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_functions_v1_invocations_proto_rawDesc), len(file_functions_v1_invocations_proto_rawDesc)),
 			NumEnums:      3,
-			NumMessages:   13,
+			NumMessages:   15,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

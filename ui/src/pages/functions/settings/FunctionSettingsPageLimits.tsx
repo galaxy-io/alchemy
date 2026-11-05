@@ -23,6 +23,8 @@ import {
   CREATE_FUNCTION_MODAL_MEMORY_MIB_MIN,
   CREATE_FUNCTION_MODAL_MEMORY_MIB_STEP,
   CREATE_FUNCTION_MODAL_MEMORY_SLIDER_MARKS,
+  CREATE_FUNCTION_MODAL_RETRIES_MAX,
+  CREATE_FUNCTION_MODAL_RETRIES_MIN,
   CREATE_FUNCTION_MODAL_TIMEOUT_MAX_MS,
   CREATE_FUNCTION_MODAL_TIMEOUT_MIN_MS,
   CREATE_FUNCTION_MODAL_VCPUS_MAX,
@@ -41,6 +43,7 @@ interface FunctionSettingsPageLimitsState {
   memoryMib: number;
   timeoutMs: number;
   maxConcurrency: number | null;
+  retries: number;
 }
 
 interface FunctionSettingsPageLimitsProps {
@@ -56,6 +59,7 @@ const FunctionSettingsPageLimits: FC<FunctionSettingsPageLimitsProps> = ({ alche
     memoryMib: alchemyFunction.resources?.memoryMib ?? CREATE_FUNCTION_MODAL_MEMORY_MIB_MIN,
     timeoutMs: Number(alchemyFunction.timeoutMs),
     maxConcurrency: alchemyFunction.maxConcurrency || null,
+    retries: alchemyFunction.retries,
   });
 
   const [state, setState] = useState<FunctionSettingsPageLimitsState>(createInitialState);
@@ -65,7 +69,8 @@ const FunctionSettingsPageLimits: FC<FunctionSettingsPageLimitsProps> = ({ alche
     state.vcpus !== alchemyFunction.resources?.vcpus ||
     state.memoryMib !== alchemyFunction.resources?.memoryMib ||
     state.timeoutMs !== Number(alchemyFunction.timeoutMs) ||
-    maxConcurrency !== alchemyFunction.maxConcurrency;
+    maxConcurrency !== alchemyFunction.maxConcurrency ||
+    state.retries !== alchemyFunction.retries;
 
   const handleChange = (patch: Partial<FunctionSettingsPageLimitsState>) => {
     setState((prev) => ({ ...prev, ...patch }));
@@ -79,6 +84,7 @@ const FunctionSettingsPageLimits: FC<FunctionSettingsPageLimitsProps> = ({ alche
         description: alchemyFunction.description,
         timeoutMs: BigInt(Math.round(state.timeoutMs)),
         maxConcurrency,
+        retries: state.retries,
         resources: { vcpus: state.vcpus, memoryMib: state.memoryMib },
       }),
       {
@@ -146,6 +152,20 @@ const FunctionSettingsPageLimits: FC<FunctionSettingsPageLimitsProps> = ({ alche
             hasSteppers
             placeholder="No limit"
             onChange={(value) => handleChange({ maxConcurrency: value })}
+            fillWidth
+          />
+          <NumberInput
+            label="Retries"
+            labelTooltip="Runs after an invocation fails, waiting longer before each"
+            value={state.retries}
+            min={CREATE_FUNCTION_MODAL_RETRIES_MIN}
+            max={CREATE_FUNCTION_MODAL_RETRIES_MAX}
+            step={1}
+            precision={0}
+            hasSteppers
+            onChange={(value) =>
+              handleChange({ retries: value ?? CREATE_FUNCTION_MODAL_RETRIES_MIN })
+            }
             fillWidth
           />
         </Grid>

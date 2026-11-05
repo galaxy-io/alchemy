@@ -4,7 +4,10 @@ SELECT * FROM invocations WHERE tenant_id = $1 AND id = $2;
 -- name: InsertInvocations :exec
 -- One row per element of the arrays, which all have the same length. A
 -- record of an invocation already written changes it only when override is
--- set: a host's record over a server's, since the host knows what ran. A
+-- set: a host's record over a server's, since the host knows what ran. Of
+-- two host records, the one of the later attempt wins, and within one
+-- attempt a failure waiting for the next attempt wins over running, and an
+-- end over both, so records that arrive out of order never step back. A
 -- user deleted since the invocation ran is left null, so a late record
 -- never fails on the reference. Functions are never deleted, only flagged.
 WITH r AS (
@@ -25,25 +28,30 @@ WITH r AS (
     unnest(sqlc.arg('instance_ids')::text[]) AS instance_id,
     unnest(sqlc.arg('idempotency_keys')::text[]) AS idempotency_key,
     unnest(sqlc.arg('hosts')::text[]) AS host,
+    unnest(sqlc.arg('attempts')::integer[]) AS attempts,
+    unnest(sqlc.arg('asyncs')::boolean[]) AS async,
     unnest(sqlc.arg('created_by_user_ids')::text[]) AS created_by_user_id,
     unnest(sqlc.arg('created_ats')::timestamptz[]) AS created_at,
     unnest(sqlc.arg('started_ats')::timestamptz[]) AS started_at,
     unnest(sqlc.arg('ended_ats')::timestamptz[]) AS ended_at
 )
 INSERT INTO invocations (id, tenant_id, function_id, version, status, start_kind, acquire_us, run_us, total_us,
-                         error, platform_error, input_bytes, output_bytes, instance_id, idempotency_key, host, created_by_user_id,
-                         created_at, started_at, ended_at)
+                         error, platform_error, input_bytes, output_bytes, instance_id, idempotency_key, host, attempts, async,
+                         created_by_user_id, created_at, started_at, ended_at)
 SELECT r.id, r.tenant_id, r.function_id, r.version, r.status::invocation_status, nullif(r.start_kind, '')::start_kind,
        r.acquire_us, r.run_us, r.total_us, nullif(r.error, '')::jsonb, r.platform_error, r.input_bytes, r.output_bytes, r.instance_id,
-       r.idempotency_key, r.host, u.id, r.created_at, r.started_at, r.ended_at
+       r.idempotency_key, r.host, r.attempts, r.async, u.id, r.created_at, r.started_at, r.ended_at
 FROM r
 LEFT JOIN users u ON u.id = nullif(r.created_by_user_id, '')::uuid
 ON CONFLICT (id) DO UPDATE SET
   status = excluded.status, start_kind = excluded.start_kind, acquire_us = excluded.acquire_us,
   run_us = excluded.run_us, total_us = excluded.total_us, error = excluded.error,
   platform_error = excluded.platform_error, output_bytes = excluded.output_bytes,
-  instance_id = excluded.instance_id, host = excluded.host, started_at = excluded.started_at, ended_at = excluded.ended_at
-WHERE sqlc.arg('override')::boolean;
+  instance_id = excluded.instance_id, host = excluded.host, attempts = excluded.attempts,
+  started_at = excluded.started_at, ended_at = excluded.ended_at
+WHERE sqlc.arg('override')::boolean
+  AND (excluded.attempts, CASE excluded.status WHEN 'starting' THEN 1 WHEN 'running' THEN 1 WHEN 'pending' THEN 2 ELSE 3 END)
+   >= (invocations.attempts, CASE invocations.status WHEN 'starting' THEN 1 WHEN 'running' THEN 1 WHEN 'pending' THEN 2 ELSE 3 END);
 
 -- name: ListInvocations :many
 SELECT * FROM invocations

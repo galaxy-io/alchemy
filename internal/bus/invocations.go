@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"strconv"
 	"time"
 
 	"github.com/nats-io/nats.go/jetstream"
@@ -67,9 +68,9 @@ func (b *Bus) EnsureInvocationStream(ctx context.Context, cfg InvocationStreamCo
 }
 
 // PublishInvocations appends records to the invocation stream on subject
-// and waits for the stream to have them. The message id is the records'
-// ids, so a publish retried after the stream stored it but the
-// acknowledgement was lost is dropped as a duplicate.
+// and waits for the stream to have them. The message id is recordsMsgID, so
+// a publish retried after the stream stored it but the acknowledgement was
+// lost is dropped as a duplicate.
 func (b *Bus) PublishInvocations(ctx context.Context, subject string, records *hostv1.InvocationRecords) error {
 	data, err := proto.Marshal(records)
 	if err != nil {
@@ -79,15 +80,30 @@ func (b *Bus) PublishInvocations(ctx context.Context, subject string, records *h
 	if err != nil {
 		return err
 	}
-	h := sha256.New()
-	for _, inv := range records.GetInvocations() {
-		h.Write([]byte(inv.GetId()))
-		h.Write([]byte{0})
-	}
-	if _, err := js.Publish(ctx, subject, data, jetstream.WithMsgID(hex.EncodeToString(h.Sum(nil)))); err != nil {
+	if _, err := js.Publish(ctx, subject, data, jetstream.WithMsgID(recordsMsgID(subject, records))); err != nil {
 		return fmt.Errorf("bus: publish invocations: %w", err)
 	}
 	return nil
+}
+
+// recordsMsgID names a batch of records by who published it and what each
+// record says of its invocation: id, status and attempt. The same batch
+// published again has the same name. Another record of the same
+// invocation, such as the server's pending record and the host's later
+// one, does not, so the stream keeps both.
+func recordsMsgID(subject string, records *hostv1.InvocationRecords) string {
+	h := sha256.New()
+	h.Write([]byte(subject))
+	h.Write([]byte{0})
+	for _, inv := range records.GetInvocations() {
+		h.Write([]byte(inv.GetId()))
+		h.Write([]byte{0})
+		h.Write([]byte(strconv.Itoa(int(inv.GetStatus()))))
+		h.Write([]byte{0})
+		h.Write([]byte(strconv.Itoa(int(inv.GetAttempts()))))
+		h.Write([]byte{0})
+	}
+	return hex.EncodeToString(h.Sum(nil))
 }
 
 // Message is one message from the invocation stream: a batch of records.

@@ -76,3 +76,21 @@ func TestTrackerUnknownAndDropped(t *testing.T) {
 		t.Error("dropped invocation still tracked")
 	}
 }
+
+func TestTrackerSettle(t *testing.T) {
+	tr := newTracker()
+	tr.put(&functionsv1.Invocation{Id: "a", Status: functionsv1.InvocationStatus_INVOCATION_STATUS_PENDING})
+	got := tr.settle("a")
+	if got.GetStatus() != functionsv1.InvocationStatus_INVOCATION_STATUS_PENDING {
+		t.Fatalf("settled status = %v, want PENDING", got.GetStatus())
+	}
+	if _, active := tr.active["a"]; active {
+		t.Fatal("settled invocation still active")
+	}
+	if tr.get("a") == nil {
+		t.Fatal("settled invocation not kept as recent")
+	}
+	if tr.settle("a") != nil || tr.settle("missing") != nil {
+		t.Error("settle of an untracked id returned something")
+	}
+}

@@ -816,7 +816,11 @@ type Function struct {
 	// resources size the microVM every invocation of any version runs in. A
 	// change applies to the next invocation; each host snapshots the function
 	// again at the new size the first time it runs it.
-	Resources     *Resources `protobuf:"bytes,13,opt,name=resources,proto3" json:"resources,omitempty"`
+	Resources *Resources `protobuf:"bytes,13,opt,name=resources,proto3" json:"resources,omitempty"`
+	// retries is how many more times an invocation runs after its function
+	// raised, crashed or timed out, or the platform could not run it, with
+	// exponential backoff between attempts. A call may set its own.
+	Retries       int32 `protobuf:"varint,14,opt,name=retries,proto3" json:"retries,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -942,6 +946,13 @@ func (x *Function) GetResources() *Resources {
 	return nil
 }
 
+func (x *Function) GetRetries() int32 {
+	if x != nil {
+		return x.Retries
+	}
+	return 0
+}
+
 // CreateFunction creates the function and version 1 from spec. It returns as
 // soon as the version is accepted, in BUILDING.
 type CreateFunctionRequest struct {
@@ -959,8 +970,10 @@ type CreateFunctionRequest struct {
 	TimeoutMs      int64      `protobuf:"varint,5,opt,name=timeout_ms,json=timeoutMs,proto3" json:"timeout_ms,omitempty"`
 	MaxConcurrency int32      `protobuf:"varint,6,opt,name=max_concurrency,json=maxConcurrency,proto3" json:"max_concurrency,omitempty"`
 	Resources      *Resources `protobuf:"bytes,7,opt,name=resources,proto3" json:"resources,omitempty"`
-	unknownFields  protoimpl.UnknownFields
-	sizeCache      protoimpl.SizeCache
+	// retries is as on Function. Unset takes the default of 2.
+	Retries       *int32 `protobuf:"varint,8,opt,name=retries,proto3,oneof" json:"retries,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *CreateFunctionRequest) Reset() {
@@ -1042,6 +1055,13 @@ func (x *CreateFunctionRequest) GetResources() *Resources {
 	return nil
 }
 
+func (x *CreateFunctionRequest) GetRetries() int32 {
+	if x != nil && x.Retries != nil {
+		return *x.Retries
+	}
+	return 0
+}
+
 type CreateFunctionResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Function      *Function              `protobuf:"bytes,1,opt,name=function,proto3" json:"function,omitempty"`
@@ -1095,8 +1115,8 @@ func (x *CreateFunctionResponse) GetVersion() *FunctionVersion {
 }
 
 // UpdateFunction changes a function's settings. They apply to the next
-// invocation of any version. timeout_ms, max_concurrency and resources
-// change only when set.
+// invocation of any version. timeout_ms, max_concurrency, resources and
+// retries change only when set.
 type UpdateFunctionRequest struct {
 	state          protoimpl.MessageState `protogen:"open.v1"`
 	FunctionId     string                 `protobuf:"bytes,1,opt,name=function_id,json=functionId,proto3" json:"function_id,omitempty"`
@@ -1105,6 +1125,7 @@ type UpdateFunctionRequest struct {
 	TimeoutMs      *int64                 `protobuf:"varint,4,opt,name=timeout_ms,json=timeoutMs,proto3,oneof" json:"timeout_ms,omitempty"`
 	MaxConcurrency *int32                 `protobuf:"varint,5,opt,name=max_concurrency,json=maxConcurrency,proto3,oneof" json:"max_concurrency,omitempty"`
 	Resources      *Resources             `protobuf:"bytes,6,opt,name=resources,proto3" json:"resources,omitempty"`
+	Retries        *int32                 `protobuf:"varint,7,opt,name=retries,proto3,oneof" json:"retries,omitempty"`
 	unknownFields  protoimpl.UnknownFields
 	sizeCache      protoimpl.SizeCache
 }
@@ -1179,6 +1200,13 @@ func (x *UpdateFunctionRequest) GetResources() *Resources {
 		return x.Resources
 	}
 	return nil
+}
+
+func (x *UpdateFunctionRequest) GetRetries() int32 {
+	if x != nil && x.Retries != nil {
+		return *x.Retries
+	}
+	return 0
 }
 
 type UpdateFunctionResponse struct {
@@ -1875,7 +1903,7 @@ const file_functions_v1_functions_proto_rawDesc = "" +
 	"\frootfs_bytes\x18\n" +
 	" \x01(\x03R\vrootfsBytes\x12\x1b\n" +
 	"\tbuild_log\x18\v \x01(\tR\bbuildLog\x12+\n" +
-	"\x12created_by_user_id\x18\f \x01(\tR\x0fcreatedByUserId\"\x87\x04\n" +
+	"\x12created_by_user_id\x18\f \x01(\tR\x0fcreatedByUserId\"\xa1\x04\n" +
 	"\bFunction\x12\x1b\n" +
 	"\ttenant_id\x18\x01 \x01(\tR\btenantId\x12\x0e\n" +
 	"\x02id\x18\x02 \x01(\tR\x02id\x12\x12\n" +
@@ -1893,7 +1921,8 @@ const file_functions_v1_functions_proto_rawDesc = "" +
 	"\n" +
 	"timeout_ms\x18\v \x01(\x03R\ttimeoutMs\x12'\n" +
 	"\x0fmax_concurrency\x18\f \x01(\x05R\x0emaxConcurrency\x125\n" +
-	"\tresources\x18\r \x01(\v2\x17.functions.v1.ResourcesR\tresources\"\x99\x03\n" +
+	"\tresources\x18\r \x01(\v2\x17.functions.v1.ResourcesR\tresources\x12\x18\n" +
+	"\aretries\x18\x0e \x01(\x05R\aretries\"\xc4\x03\n" +
 	"\x15CreateFunctionRequest\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12 \n" +
 	"\vdescription\x18\x02 \x01(\tR\vdescription\x12.\n" +
@@ -1902,13 +1931,16 @@ const file_functions_v1_functions_proto_rawDesc = "" +
 	"\n" +
 	"timeout_ms\x18\x05 \x01(\x03R\ttimeoutMs\x12'\n" +
 	"\x0fmax_concurrency\x18\x06 \x01(\x05R\x0emaxConcurrency\x125\n" +
-	"\tresources\x18\a \x01(\v2\x17.functions.v1.ResourcesR\tresources\x1a?\n" +
+	"\tresources\x18\a \x01(\v2\x17.functions.v1.ResourcesR\tresources\x12\x1d\n" +
+	"\aretries\x18\b \x01(\x05H\x00R\aretries\x88\x01\x01\x1a?\n" +
 	"\x11SecretValuesEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
-	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\x85\x01\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01B\n" +
+	"\n" +
+	"\b_retries\"\x85\x01\n" +
 	"\x16CreateFunctionResponse\x122\n" +
 	"\bfunction\x18\x01 \x01(\v2\x16.functions.v1.FunctionR\bfunction\x127\n" +
-	"\aversion\x18\x02 \x01(\v2\x1d.functions.v1.FunctionVersionR\aversion\"\x9a\x02\n" +
+	"\aversion\x18\x02 \x01(\v2\x1d.functions.v1.FunctionVersionR\aversion\"\xc5\x02\n" +
 	"\x15UpdateFunctionRequest\x12\x1f\n" +
 	"\vfunction_id\x18\x01 \x01(\tR\n" +
 	"functionId\x12\x12\n" +
@@ -1917,9 +1949,12 @@ const file_functions_v1_functions_proto_rawDesc = "" +
 	"\n" +
 	"timeout_ms\x18\x04 \x01(\x03H\x00R\ttimeoutMs\x88\x01\x01\x12,\n" +
 	"\x0fmax_concurrency\x18\x05 \x01(\x05H\x01R\x0emaxConcurrency\x88\x01\x01\x125\n" +
-	"\tresources\x18\x06 \x01(\v2\x17.functions.v1.ResourcesR\tresourcesB\r\n" +
+	"\tresources\x18\x06 \x01(\v2\x17.functions.v1.ResourcesR\tresources\x12\x1d\n" +
+	"\aretries\x18\a \x01(\x05H\x02R\aretries\x88\x01\x01B\r\n" +
 	"\v_timeout_msB\x12\n" +
-	"\x10_max_concurrency\"L\n" +
+	"\x10_max_concurrencyB\n" +
+	"\n" +
+	"\b_retries\"L\n" +
 	"\x16UpdateFunctionResponse\x122\n" +
 	"\bfunction\x18\x01 \x01(\v2\x16.functions.v1.FunctionR\bfunction\"O\n" +
 	"\x12GetFunctionRequest\x12\x0e\n" +
@@ -2075,6 +2110,7 @@ func file_functions_v1_functions_proto_init() {
 	}
 	file_functions_v1_common_proto_init()
 	file_functions_v1_pagination_proto_init()
+	file_functions_v1_functions_proto_msgTypes[11].OneofWrappers = []any{}
 	file_functions_v1_functions_proto_msgTypes[13].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{

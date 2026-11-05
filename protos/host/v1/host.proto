@@ -210,6 +210,17 @@ message InvokeRequest {
   string input_object = 11;
   // build is what a host that lacks the artifact builds first.
   BuildRequest build = 12;
+  // async is set when no server waits for the result, so the host records
+  // how the invocation is doing instead of telling a server.
+  bool async = 13;
+  // A function that raised, crashed or timed out, or a platform failure,
+  // runs the invocation again up to retries, or the function's when unset,
+  // waiting retry_backoff_ms after the first failure, five times longer
+  // after each one since, and at most retry_backoff_max_ms, while the
+  // deadline leaves room for another attempt.
+  int64 retry_backoff_ms = 14;
+  int64 retry_backoff_max_ms = 15;
+  optional int32 retries = 16;
 }
 
 // InvokeResult is how the host that ran an invocation answers the server
@@ -221,6 +232,8 @@ message InvokeResult {
   // that holds the output, which was too large for the message. The server
   // reads it and deletes it.
   string output_object = 3;
+  // attempts is how many times the function ran for this result.
+  int32 attempts = 4;
 }
 
 // InvokeResponse is returned whenever the host took the input, including
@@ -249,6 +262,12 @@ message InvocationEvent {
   int64 acquire_us = 5;
   // host is the host that took the invocation from the queue.
   string host = 6;
+  // attempts is the attempt this event is about. A PENDING event after one
+  // is the attempt failing, with error or platform_error saying why, before
+  // the next.
+  int32 attempts = 7;
+  functions.v1.FunctionError error = 8;
+  string platform_error = 9;
 }
 
 message DescribeRequest {}
@@ -319,4 +338,7 @@ message FunctionConfig {
   // every host; 0 means no limit.
   int32 max_concurrency = 1;
   functions.v1.Resources resources = 2;
+  // retries is how many more times an invocation runs after a failed
+  // attempt, unless the call set its own.
+  int32 retries = 3;
 }

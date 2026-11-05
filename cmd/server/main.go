@@ -246,7 +246,13 @@ func configure(cfg *server.Config) error {
 	for _, d := range []struct {
 		key string
 		v   *time.Duration
-	}{{"INVOKE_DEADLINE", &cfg.InvokeDeadline}, {"INVOKE_MAX_DEADLINE", &cfg.InvokeMaxDeadline}} {
+	}{
+		{"INVOKE_DEADLINE", &cfg.InvokeDeadline},
+		{"INVOKE_MAX_DEADLINE", &cfg.InvokeMaxDeadline},
+		{"ASYNC_MAX_AGE", &cfg.AsyncMaxAge},
+		{"RETRY_BACKOFF", &cfg.RetryBackoff},
+		{"RETRY_BACKOFF_MAX", &cfg.RetryBackoffMax},
+	} {
 		if s := os.Getenv(d.key); s != "" {
 			v, err := time.ParseDuration(s)
 			if err != nil {

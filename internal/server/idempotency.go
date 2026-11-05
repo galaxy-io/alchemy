@@ -110,7 +110,7 @@ func (s *Service) replay(ctx context.Context, start time.Time, inv *invocation, 
 	default:
 	}
 	inv.discard()
-	resp := &functionsv1.InvokeResponse{InvocationId: prior.GetId(), Version: prior.GetVersion(), Stats: prior.GetStats(), Replayed: true}
+	resp := &functionsv1.InvokeResponse{InvocationId: prior.GetId(), Version: prior.GetVersion(), Stats: prior.GetStats(), Attempts: prior.GetAttempts(), Replayed: true}
 	if fe := prior.GetError(); fe != nil {
 		resp.Result = &functionsv1.InvokeResponse_Error{Error: fe}
 		return connect.NewResponse(resp), nil
@@ -194,7 +194,7 @@ func (s *Service) outcome(ctx context.Context, cv *compiledVersion, held *claim)
 		switch {
 		case err != nil && connect.CodeOf(err) != connect.CodeNotFound:
 			return nil, err
-		case err == nil && terminal(inv.GetStatus()) && !s.hostMayStillReport(inv, timeout):
+		case err == nil && terminal(inv.GetStatus()) && !s.hostMayStillReport(inv, s.hostWindow(cv)):
 			return inv, nil
 		case err != nil && !s.serverLive(held.server) && held.host == "":
 			return nil, nil
@@ -211,10 +211,23 @@ func (s *Service) outcome(ctx context.Context, cv *compiledVersion, held *claim)
 	}
 }
 
+// hostWindow is how long after a server stopped waiting a host may still
+// record an invocation of cv: every run its retries allow, each with the
+// host's grace, and the backoff between them.
+func (s *Service) hostWindow(cv *compiledVersion) time.Duration {
+	window := time.Duration(cv.retries+1) * (cv.timeout + hostGrace)
+	wait := s.cfg.RetryBackoff
+	for range cv.retries {
+		window += wait + wait/5
+		wait = min(wait*5, s.cfg.RetryBackoffMax)
+	}
+	return window
+}
+
 // hostMayStillReport is true for a server's record of an invocation a host
 // took and has not yet reported on: the host's record, which overrides it,
-// may still arrive until the function's timeout and the host's grace pass.
-func (s *Service) hostMayStillReport(inv *functionsv1.Invocation, timeout time.Duration) bool {
+// may still arrive until window passes.
+func (s *Service) hostMayStillReport(inv *functionsv1.Invocation, window time.Duration) bool {
 	switch inv.GetStatus() {
 	case functionsv1.InvocationStatus_INVOCATION_STATUS_ERRORED, functionsv1.InvocationStatus_INVOCATION_STATUS_CANCELED:
 	default:
@@ -223,7 +236,7 @@ func (s *Service) hostMayStillReport(inv *functionsv1.Invocation, timeout time.D
 	if inv.GetHost() == "" {
 		return false
 	}
-	return time.Since(time.UnixMilli(inv.GetEndedAt())) < timeout+hostGrace
+	return time.Since(time.UnixMilli(inv.GetEndedAt())) < window
 }
 
 // serverLive reports whether name heartbeated within HostTTL. A process
