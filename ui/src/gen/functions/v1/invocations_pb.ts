@@ -14,7 +14,7 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file functions/v1/invocations.proto.
  */
 export const file_functions_v1_invocations: GenFile = /*@__PURE__*/
-  fileDesc("Ch5mdW5jdGlvbnMvdjEvaW52b2NhdGlvbnMucHJvdG8SDGZ1bmN0aW9ucy52MSKSAQoNRnVuY3Rpb25FcnJvchItCgRraW5kGAEgASgOMh8uZnVuY3Rpb25zLnYxLkZ1bmN0aW9uRXJyb3JLaW5kEg8KB21lc3NhZ2UYAiABKAkSDAoEdHlwZRgDIAEoCRIzCgp2aW9sYXRpb25zGAQgAygLMh8uZnVuY3Rpb25zLnYxLkNvbnRyYWN0VmlvbGF0aW9uInQKD0ludm9jYXRpb25TdGF0cxIrCgpzdGFydF9raW5kGAEgASgOMhcuZnVuY3Rpb25zLnYxLlN0YXJ0S2luZBISCgphY3F1aXJlX3VzGAIgASgDEg4KBnJ1bl91cxgDIAEoAxIQCgh0b3RhbF91cxgEIAEoAyJdCg1JbnZva2VSZXF1ZXN0EhMKC2Z1bmN0aW9uX2lkGAEgASgJEg8KB3ZlcnNpb24YAiABKAMSDQoFaW5wdXQYAyABKAwSFwoPaWRlbXBvdGVuY3lfa2V5GAQgASgJIsIBCg5JbnZva2VSZXNwb25zZRIVCg1pbnZvY2F0aW9uX2lkGAEgASgJEg8KB3ZlcnNpb24YAiABKAMSEAoGb3V0cHV0GAMgASgMSAASLAoFZXJyb3IYBCABKAsyGy5mdW5jdGlvbnMudjEuRnVuY3Rpb25FcnJvckgAEiwKBXN0YXRzGAUgASgLMh0uZnVuY3Rpb25zLnYxLkludm9jYXRpb25TdGF0cxIQCghyZXBsYXllZBgGIAEoCEIICgZyZXN1bHQi3QMKCkludm9jYXRpb24SEQoJdGVuYW50X2lkGAEgASgJEgoKAmlkGAIgASgJEhMKC2Z1bmN0aW9uX2lkGAMgASgJEg8KB3ZlcnNpb24YBCABKAMSLgoGc3RhdHVzGAUgASgOMh4uZnVuY3Rpb25zLnYxLkludm9jYXRpb25TdGF0dXMSKwoKc3RhcnRfa2luZBgGIAEoDjIXLmZ1bmN0aW9ucy52MS5TdGFydEtpbmQSEgoKY3JlYXRlZF9hdBgHIAEoAxISCgpzdGFydGVkX2F0GAggASgDEhAKCGVuZGVkX2F0GAkgASgDEiwKBXN0YXRzGAogASgLMh0uZnVuY3Rpb25zLnYxLkludm9jYXRpb25TdGF0cxIqCgVlcnJvchgLIAEoCzIbLmZ1bmN0aW9ucy52MS5GdW5jdGlvbkVycm9yEhYKDnBsYXRmb3JtX2Vycm9yGAwgASgJEhMKC2lucHV0X2J5dGVzGA0gASgDEhQKDG91dHB1dF9ieXRlcxgOIAEoAxITCgtpbnN0YW5jZV9pZBgPIAEoCRIaChJjcmVhdGVkX2J5X3VzZXJfaWQYECABKAkSFwoPaWRlbXBvdGVuY3lfa2V5GBEgASgJEgwKBGhvc3QYEiABKAkiIgoUR2V0SW52b2NhdGlvblJlcXVlc3QSCgoCaWQYASABKAkiRQoVR2V0SW52b2NhdGlvblJlc3BvbnNlEiwKCmludm9jYXRpb24YASABKAsyGC5mdW5jdGlvbnMudjEuSW52b2NhdGlvbiLnAQoWTGlzdEludm9jYXRpb25zUmVxdWVzdBIUCgxmdW5jdGlvbl9pZHMYASADKAkSMAoIc3RhdHVzZXMYAiADKA4yHi5mdW5jdGlvbnMudjEuSW52b2NhdGlvblN0YXR1cxIsCgtzdGFydF9raW5kcxgDIAMoDjIXLmZ1bmN0aW9ucy52MS5TdGFydEtpbmQSMwoKcGFnaW5hdGlvbhgEIAEoCzIfLmZ1bmN0aW9ucy52MS5QYWdpbmF0aW9uUmVxdWVzdBIQCghzaW5jZV9tcxgFIAEoAxIQCgh1bnRpbF9tcxgGIAEoAyJ+ChdMaXN0SW52b2NhdGlvbnNSZXNwb25zZRItCgtpbnZvY2F0aW9ucxgBIAMoCzIYLmZ1bmN0aW9ucy52MS5JbnZvY2F0aW9uEjQKCnBhZ2luYXRpb24YAiABKAsyIC5mdW5jdGlvbnMudjEuUGFnaW5hdGlvblJlc3BvbnNlIkQKFlRhaWxJbnZvY2F0aW9uc1JlcXVlc3QSEwoLZnVuY3Rpb25faWQYASABKAkSFQoNc2hvdWxkX3JlcGxheRgCIAEoCCJ/ChdUYWlsSW52b2NhdGlvbnNSZXNwb25zZRIsCgppbnZvY2F0aW9uGAEgASgLMhguZnVuY3Rpb25zLnYxLkludm9jYXRpb24SEgoKZXZlbnRfdHlwZRgCIAEoCRIOCgZyZXBsYXkYAyABKAgSEgoKZW1pdHRlZF9hdBgEIAEoAyI2ChhHZXRJbnZvY2F0aW9uTG9nc1JlcXVlc3QSCgoCaWQYASABKAkSDgoGZm9sbG93GAIgASgIIikKGUdldEludm9jYXRpb25Mb2dzUmVzcG9uc2USDAoEZGF0YRgBIAEoDCrpAQoRRnVuY3Rpb25FcnJvcktpbmQSIwofRlVOQ1RJT05fRVJST1JfS0lORF9VTlNQRUNJRklFRBAAEh4KGkZVTkNUSU9OX0VSUk9SX0tJTkRfUkFJU0VEEAESHwobRlVOQ1RJT05fRVJST1JfS0lORF9DUkFTSEVEEAISHwobRlVOQ1RJT05fRVJST1JfS0lORF9USU1FT1VUEAMSJgoiRlVOQ1RJT05fRVJST1JfS0lORF9PVVRQVVRfSU5WQUxJRBAEEiUKIUZVTkNUSU9OX0VSUk9SX0tJTkRfSU5QVVRfSU5WQUxJRBAFKncKCVN0YXJ0S2luZBIaChZTVEFSVF9LSU5EX1VOU1BFQ0lGSUVEEAASGAoUU1RBUlRfS0lORF9DT0xEX0JPT1QQARIfChtTVEFSVF9LSU5EX1NOQVBTSE9UX1JFU1RPUkUQAhITCg9TVEFSVF9LSU5EX1dBUk0QAyqxAgoQSW52b2NhdGlvblN0YXR1cxIhCh1JTlZPQ0FUSU9OX1NUQVRVU19VTlNQRUNJRklFRBAAEh0KGUlOVk9DQVRJT05fU1RBVFVTX1BFTkRJTkcQARIeChpJTlZPQ0FUSU9OX1NUQVRVU19TVEFSVElORxACEh0KGUlOVk9DQVRJT05fU1RBVFVTX1JVTk5JTkcQAxIfChtJTlZPQ0FUSU9OX1NUQVRVU19TVUNDRUVERUQQBBIcChhJTlZPQ0FUSU9OX1NUQVRVU19GQUlMRUQQBRIdChlJTlZPQ0FUSU9OX1NUQVRVU19FUlJPUkVEEAYSHgoaSU5WT0NBVElPTl9TVEFUVVNfQ0FOQ0VMRUQQBxIeChpJTlZPQ0FUSU9OX1NUQVRVU19SRUpFQ1RFRBAIYgZwcm90bzM", [file_functions_v1_common, file_functions_v1_pagination]);
+  fileDesc("Ch5mdW5jdGlvbnMvdjEvaW52b2NhdGlvbnMucHJvdG8SDGZ1bmN0aW9ucy52MSKSAQoNRnVuY3Rpb25FcnJvchItCgRraW5kGAEgASgOMh8uZnVuY3Rpb25zLnYxLkZ1bmN0aW9uRXJyb3JLaW5kEg8KB21lc3NhZ2UYAiABKAkSDAoEdHlwZRgDIAEoCRIzCgp2aW9sYXRpb25zGAQgAygLMh8uZnVuY3Rpb25zLnYxLkNvbnRyYWN0VmlvbGF0aW9uInQKD0ludm9jYXRpb25TdGF0cxIrCgpzdGFydF9raW5kGAEgASgOMhcuZnVuY3Rpb25zLnYxLlN0YXJ0S2luZBISCgphY3F1aXJlX3VzGAIgASgDEg4KBnJ1bl91cxgDIAEoAxIQCgh0b3RhbF91cxgEIAEoAyJ/Cg1JbnZva2VSZXF1ZXN0EhMKC2Z1bmN0aW9uX2lkGAEgASgJEg8KB3ZlcnNpb24YAiABKAMSDQoFaW5wdXQYAyABKAwSFwoPaWRlbXBvdGVuY3lfa2V5GAQgASgJEhQKB3JldHJpZXMYBSABKAVIAIgBAUIKCghfcmV0cmllcyLUAQoOSW52b2tlUmVzcG9uc2USFQoNaW52b2NhdGlvbl9pZBgBIAEoCRIPCgd2ZXJzaW9uGAIgASgDEhAKBm91dHB1dBgDIAEoDEgAEiwKBWVycm9yGAQgASgLMhsuZnVuY3Rpb25zLnYxLkZ1bmN0aW9uRXJyb3JIABIsCgVzdGF0cxgFIAEoCzIdLmZ1bmN0aW9ucy52MS5JbnZvY2F0aW9uU3RhdHMSEAoIcmVwbGF5ZWQYBiABKAgSEAoIYXR0ZW1wdHMYByABKAVCCAoGcmVzdWx0IoQBChJJbnZva2VBc3luY1JlcXVlc3QSEwoLZnVuY3Rpb25faWQYASABKAkSDwoHdmVyc2lvbhgCIAEoAxINCgVpbnB1dBgDIAEoDBIXCg9pZGVtcG90ZW5jeV9rZXkYBCABKAkSFAoHcmV0cmllcxgFIAEoBUgAiAEBQgoKCF9yZXRyaWVzIj4KE0ludm9rZUFzeW5jUmVzcG9uc2USFQoNaW52b2NhdGlvbl9pZBgBIAEoCRIQCghyZXBsYXllZBgCIAEoCCL+AwoKSW52b2NhdGlvbhIRCgl0ZW5hbnRfaWQYASABKAkSCgoCaWQYAiABKAkSEwoLZnVuY3Rpb25faWQYAyABKAkSDwoHdmVyc2lvbhgEIAEoAxIuCgZzdGF0dXMYBSABKA4yHi5mdW5jdGlvbnMudjEuSW52b2NhdGlvblN0YXR1cxIrCgpzdGFydF9raW5kGAYgASgOMhcuZnVuY3Rpb25zLnYxLlN0YXJ0S2luZBISCgpjcmVhdGVkX2F0GAcgASgDEhIKCnN0YXJ0ZWRfYXQYCCABKAMSEAoIZW5kZWRfYXQYCSABKAMSLAoFc3RhdHMYCiABKAsyHS5mdW5jdGlvbnMudjEuSW52b2NhdGlvblN0YXRzEioKBWVycm9yGAsgASgLMhsuZnVuY3Rpb25zLnYxLkZ1bmN0aW9uRXJyb3ISFgoOcGxhdGZvcm1fZXJyb3IYDCABKAkSEwoLaW5wdXRfYnl0ZXMYDSABKAMSFAoMb3V0cHV0X2J5dGVzGA4gASgDEhMKC2luc3RhbmNlX2lkGA8gASgJEhoKEmNyZWF0ZWRfYnlfdXNlcl9pZBgQIAEoCRIXCg9pZGVtcG90ZW5jeV9rZXkYESABKAkSDAoEaG9zdBgSIAEoCRIQCghhdHRlbXB0cxgTIAEoBRINCgVhc3luYxgUIAEoCCIiChRHZXRJbnZvY2F0aW9uUmVxdWVzdBIKCgJpZBgBIAEoCSJFChVHZXRJbnZvY2F0aW9uUmVzcG9uc2USLAoKaW52b2NhdGlvbhgBIAEoCzIYLmZ1bmN0aW9ucy52MS5JbnZvY2F0aW9uIucBChZMaXN0SW52b2NhdGlvbnNSZXF1ZXN0EhQKDGZ1bmN0aW9uX2lkcxgBIAMoCRIwCghzdGF0dXNlcxgCIAMoDjIeLmZ1bmN0aW9ucy52MS5JbnZvY2F0aW9uU3RhdHVzEiwKC3N0YXJ0X2tpbmRzGAMgAygOMhcuZnVuY3Rpb25zLnYxLlN0YXJ0S2luZBIzCgpwYWdpbmF0aW9uGAQgASgLMh8uZnVuY3Rpb25zLnYxLlBhZ2luYXRpb25SZXF1ZXN0EhAKCHNpbmNlX21zGAUgASgDEhAKCHVudGlsX21zGAYgASgDIn4KF0xpc3RJbnZvY2F0aW9uc1Jlc3BvbnNlEi0KC2ludm9jYXRpb25zGAEgAygLMhguZnVuY3Rpb25zLnYxLkludm9jYXRpb24SNAoKcGFnaW5hdGlvbhgCIAEoCzIgLmZ1bmN0aW9ucy52MS5QYWdpbmF0aW9uUmVzcG9uc2UiRAoWVGFpbEludm9jYXRpb25zUmVxdWVzdBITCgtmdW5jdGlvbl9pZBgBIAEoCRIVCg1zaG91bGRfcmVwbGF5GAIgASgIIn8KF1RhaWxJbnZvY2F0aW9uc1Jlc3BvbnNlEiwKCmludm9jYXRpb24YASABKAsyGC5mdW5jdGlvbnMudjEuSW52b2NhdGlvbhISCgpldmVudF90eXBlGAIgASgJEg4KBnJlcGxheRgDIAEoCBISCgplbWl0dGVkX2F0GAQgASgDIkcKGEdldEludm9jYXRpb25Mb2dzUmVxdWVzdBIKCgJpZBgBIAEoCRIOCgZmb2xsb3cYAiABKAgSDwoHYXR0ZW1wdBgDIAEoBSIpChlHZXRJbnZvY2F0aW9uTG9nc1Jlc3BvbnNlEgwKBGRhdGEYASABKAwq6QEKEUZ1bmN0aW9uRXJyb3JLaW5kEiMKH0ZVTkNUSU9OX0VSUk9SX0tJTkRfVU5TUEVDSUZJRUQQABIeChpGVU5DVElPTl9FUlJPUl9LSU5EX1JBSVNFRBABEh8KG0ZVTkNUSU9OX0VSUk9SX0tJTkRfQ1JBU0hFRBACEh8KG0ZVTkNUSU9OX0VSUk9SX0tJTkRfVElNRU9VVBADEiYKIkZVTkNUSU9OX0VSUk9SX0tJTkRfT1VUUFVUX0lOVkFMSUQQBBIlCiFGVU5DVElPTl9FUlJPUl9LSU5EX0lOUFVUX0lOVkFMSUQQBSp3CglTdGFydEtpbmQSGgoWU1RBUlRfS0lORF9VTlNQRUNJRklFRBAAEhgKFFNUQVJUX0tJTkRfQ09MRF9CT09UEAESHwobU1RBUlRfS0lORF9TTkFQU0hPVF9SRVNUT1JFEAISEwoPU1RBUlRfS0lORF9XQVJNEAMqsQIKEEludm9jYXRpb25TdGF0dXMSIQodSU5WT0NBVElPTl9TVEFUVVNfVU5TUEVDSUZJRUQQABIdChlJTlZPQ0FUSU9OX1NUQVRVU19QRU5ESU5HEAESHgoaSU5WT0NBVElPTl9TVEFUVVNfU1RBUlRJTkcQAhIdChlJTlZPQ0FUSU9OX1NUQVRVU19SVU5OSU5HEAMSHwobSU5WT0NBVElPTl9TVEFUVVNfU1VDQ0VFREVEEAQSHAoYSU5WT0NBVElPTl9TVEFUVVNfRkFJTEVEEAUSHQoZSU5WT0NBVElPTl9TVEFUVVNfRVJST1JFRBAGEh4KGklOVk9DQVRJT05fU1RBVFVTX0NBTkNFTEVEEAcSHgoaSU5WT0NBVElPTl9TVEFUVVNfUkVKRUNURUQQCGIGcHJvdG8z", [file_functions_v1_common, file_functions_v1_pagination]);
 
 /**
  * FunctionError describes a function that ran and failed. type is the
@@ -127,6 +127,14 @@ export type InvokeRequest = Message<"functions.v1.InvokeRequest"> & {
    * @generated from field: string idempotency_key = 4;
    */
   idempotencyKey: string;
+
+  /**
+   * retries, when set, is how many more times this call runs after a failed
+   * attempt instead of the function's retries.
+   *
+   * @generated from field: optional int32 retries = 5;
+   */
+  retries?: number | undefined;
 };
 
 /**
@@ -184,6 +192,13 @@ export type InvokeResponse = Message<"functions.v1.InvokeResponse"> & {
    * @generated from field: bool replayed = 6;
    */
   replayed: boolean;
+
+  /**
+   * attempts is how many times the function ran for this result.
+   *
+   * @generated from field: int32 attempts = 7;
+   */
+  attempts: number;
 };
 
 /**
@@ -192,6 +207,76 @@ export type InvokeResponse = Message<"functions.v1.InvokeResponse"> & {
  */
 export const InvokeResponseSchema: GenMessage<InvokeResponse> = /*@__PURE__*/
   messageDesc(file_functions_v1_invocations, 3);
+
+/**
+ * InvokeAsyncRequest is InvokeRequest for a caller that does not wait.
+ * idempotency_key returns the invocation an earlier call with the key
+ * queued instead of queueing another.
+ *
+ * @generated from message functions.v1.InvokeAsyncRequest
+ */
+export type InvokeAsyncRequest = Message<"functions.v1.InvokeAsyncRequest"> & {
+  /**
+   * @generated from field: string function_id = 1;
+   */
+  functionId: string;
+
+  /**
+   * @generated from field: int64 version = 2;
+   */
+  version: bigint;
+
+  /**
+   * @generated from field: bytes input = 3;
+   */
+  input: Uint8Array;
+
+  /**
+   * @generated from field: string idempotency_key = 4;
+   */
+  idempotencyKey: string;
+
+  /**
+   * @generated from field: optional int32 retries = 5;
+   */
+  retries?: number | undefined;
+};
+
+/**
+ * Describes the message functions.v1.InvokeAsyncRequest.
+ * Use `create(InvokeAsyncRequestSchema)` to create a new message.
+ */
+export const InvokeAsyncRequestSchema: GenMessage<InvokeAsyncRequest> = /*@__PURE__*/
+  messageDesc(file_functions_v1_invocations, 4);
+
+/**
+ * InvokeAsyncResponse is returned once the invocation is queued. Nothing
+ * waits for it to run and its output is dropped. GetInvocation follows its
+ * status, attempts and error.
+ *
+ * @generated from message functions.v1.InvokeAsyncResponse
+ */
+export type InvokeAsyncResponse = Message<"functions.v1.InvokeAsyncResponse"> & {
+  /**
+   * @generated from field: string invocation_id = 1;
+   */
+  invocationId: string;
+
+  /**
+   * replayed is set when an earlier call with the same idempotency_key
+   * queued invocation_id, and nothing was queued for this call.
+   *
+   * @generated from field: bool replayed = 2;
+   */
+  replayed: boolean;
+};
+
+/**
+ * Describes the message functions.v1.InvokeAsyncResponse.
+ * Use `create(InvokeAsyncResponseSchema)` to create a new message.
+ */
+export const InvokeAsyncResponseSchema: GenMessage<InvokeAsyncResponse> = /*@__PURE__*/
+  messageDesc(file_functions_v1_invocations, 5);
 
 /**
  * Invocation is the persisted record of one Invoke call. Lifecycle stamps
@@ -297,6 +382,20 @@ export type Invocation = Message<"functions.v1.Invocation"> & {
    * @generated from field: string host = 18;
    */
   host: string;
+
+  /**
+   * attempts is how many times a host has started to run it.
+   *
+   * @generated from field: int32 attempts = 19;
+   */
+  attempts: number;
+
+  /**
+   * async is set when the caller did not wait for the result.
+   *
+   * @generated from field: bool async = 20;
+   */
+  async: boolean;
 };
 
 /**
@@ -304,7 +403,7 @@ export type Invocation = Message<"functions.v1.Invocation"> & {
  * Use `create(InvocationSchema)` to create a new message.
  */
 export const InvocationSchema: GenMessage<Invocation> = /*@__PURE__*/
-  messageDesc(file_functions_v1_invocations, 4);
+  messageDesc(file_functions_v1_invocations, 6);
 
 /**
  * @generated from message functions.v1.GetInvocationRequest
@@ -321,7 +420,7 @@ export type GetInvocationRequest = Message<"functions.v1.GetInvocationRequest"> 
  * Use `create(GetInvocationRequestSchema)` to create a new message.
  */
 export const GetInvocationRequestSchema: GenMessage<GetInvocationRequest> = /*@__PURE__*/
-  messageDesc(file_functions_v1_invocations, 5);
+  messageDesc(file_functions_v1_invocations, 7);
 
 /**
  * @generated from message functions.v1.GetInvocationResponse
@@ -338,7 +437,7 @@ export type GetInvocationResponse = Message<"functions.v1.GetInvocationResponse"
  * Use `create(GetInvocationResponseSchema)` to create a new message.
  */
 export const GetInvocationResponseSchema: GenMessage<GetInvocationResponse> = /*@__PURE__*/
-  messageDesc(file_functions_v1_invocations, 6);
+  messageDesc(file_functions_v1_invocations, 8);
 
 /**
  * ListInvocations returns newest first. Empty function_id lists the tenant's
@@ -387,7 +486,7 @@ export type ListInvocationsRequest = Message<"functions.v1.ListInvocationsReques
  * Use `create(ListInvocationsRequestSchema)` to create a new message.
  */
 export const ListInvocationsRequestSchema: GenMessage<ListInvocationsRequest> = /*@__PURE__*/
-  messageDesc(file_functions_v1_invocations, 7);
+  messageDesc(file_functions_v1_invocations, 9);
 
 /**
  * @generated from message functions.v1.ListInvocationsResponse
@@ -409,7 +508,7 @@ export type ListInvocationsResponse = Message<"functions.v1.ListInvocationsRespo
  * Use `create(ListInvocationsResponseSchema)` to create a new message.
  */
 export const ListInvocationsResponseSchema: GenMessage<ListInvocationsResponse> = /*@__PURE__*/
-  messageDesc(file_functions_v1_invocations, 8);
+  messageDesc(file_functions_v1_invocations, 10);
 
 /**
  * TailInvocations streams invocation changes. With should_replay the stream
@@ -435,7 +534,7 @@ export type TailInvocationsRequest = Message<"functions.v1.TailInvocationsReques
  * Use `create(TailInvocationsRequestSchema)` to create a new message.
  */
 export const TailInvocationsRequestSchema: GenMessage<TailInvocationsRequest> = /*@__PURE__*/
-  messageDesc(file_functions_v1_invocations, 9);
+  messageDesc(file_functions_v1_invocations, 11);
 
 /**
  * TailInvocationsResponse is one lifecycle transition. event_type is the new
@@ -470,7 +569,7 @@ export type TailInvocationsResponse = Message<"functions.v1.TailInvocationsRespo
  * Use `create(TailInvocationsResponseSchema)` to create a new message.
  */
 export const TailInvocationsResponseSchema: GenMessage<TailInvocationsResponse> = /*@__PURE__*/
-  messageDesc(file_functions_v1_invocations, 10);
+  messageDesc(file_functions_v1_invocations, 12);
 
 /**
  * GetInvocationLogs streams what an invocation's function wrote to stderr.
@@ -489,6 +588,14 @@ export type GetInvocationLogsRequest = Message<"functions.v1.GetInvocationLogsRe
    * @generated from field: bool follow = 2;
    */
   follow: boolean;
+
+  /**
+   * attempt picks one attempt of the invocation, counting from 1. 0 is the
+   * latest.
+   *
+   * @generated from field: int32 attempt = 3;
+   */
+  attempt: number;
 };
 
 /**
@@ -496,7 +603,7 @@ export type GetInvocationLogsRequest = Message<"functions.v1.GetInvocationLogsRe
  * Use `create(GetInvocationLogsRequestSchema)` to create a new message.
  */
 export const GetInvocationLogsRequestSchema: GenMessage<GetInvocationLogsRequest> = /*@__PURE__*/
-  messageDesc(file_functions_v1_invocations, 11);
+  messageDesc(file_functions_v1_invocations, 13);
 
 /**
  * GetInvocationLogsResponse is the next piece of the log, in order. Pieces
@@ -516,7 +623,7 @@ export type GetInvocationLogsResponse = Message<"functions.v1.GetInvocationLogsR
  * Use `create(GetInvocationLogsResponseSchema)` to create a new message.
  */
 export const GetInvocationLogsResponseSchema: GenMessage<GetInvocationLogsResponse> = /*@__PURE__*/
-  messageDesc(file_functions_v1_invocations, 12);
+  messageDesc(file_functions_v1_invocations, 14);
 
 /**
  * FunctionErrorKind classifies a failure attributable to the function rather
@@ -625,7 +732,9 @@ export enum InvocationStatus {
   UNSPECIFIED = 0,
 
   /**
-   * PENDING: accepted, waiting for a host to take it.
+   * PENDING: accepted, waiting for a host to take it. An invocation whose
+   * attempt failed is PENDING again until its next attempt, with the failed
+   * attempt's error set.
    *
    * @generated from enum value: INVOCATION_STATUS_PENDING = 1;
    */

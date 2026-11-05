@@ -73,6 +73,9 @@ message InvokeRequest {
   // call a host took but never reported on has an unknown outcome and holds
   // the key: a retry gets ABORTED, and a new key runs again.
   string idempotency_key = 4;
+  // retries, when set, is how many more times this call runs after a failed
+  // attempt instead of the function's retries.
+  optional int32 retries = 5;
 }
 
 // InvokeResponse is returned whenever the function ran. output is the
@@ -90,12 +93,37 @@ message InvokeResponse {
   // replayed is set when the result is an earlier invocation's, found by
   // the request's idempotency_key, and nothing ran for this call.
   bool replayed = 6;
+  // attempts is how many times the function ran for this result.
+  int32 attempts = 7;
+}
+
+// InvokeAsyncRequest is InvokeRequest for a caller that does not wait.
+// idempotency_key returns the invocation an earlier call with the key
+// queued instead of queueing another.
+message InvokeAsyncRequest {
+  string function_id = 1;
+  int64 version = 2;
+  bytes input = 3;
+  string idempotency_key = 4;
+  optional int32 retries = 5;
+}
+
+// InvokeAsyncResponse is returned once the invocation is queued. Nothing
+// waits for it to run and its output is dropped. GetInvocation follows its
+// status, attempts and error.
+message InvokeAsyncResponse {
+  string invocation_id = 1;
+  // replayed is set when an earlier call with the same idempotency_key
+  // queued invocation_id, and nothing was queued for this call.
+  bool replayed = 2;
 }
 
 // InvocationStatus is the persisted lifecycle state of an invocation.
 enum InvocationStatus {
   INVOCATION_STATUS_UNSPECIFIED = 0;
-  // PENDING: accepted, waiting for a host to take it.
+  // PENDING: accepted, waiting for a host to take it. An invocation whose
+  // attempt failed is PENDING again until its next attempt, with the failed
+  // attempt's error set.
   INVOCATION_STATUS_PENDING = 1;
   // STARTING: a instance is booting or being restored for it.
   INVOCATION_STATUS_STARTING = 2;
@@ -139,6 +167,10 @@ message Invocation {
   // host is the host the invocation was sent to, empty when none took
   // it. Set by the server when it sends it and by the host in its record.
   string host = 18;
+  // attempts is how many times a host has started to run it.
+  int32 attempts = 19;
+  // async is set when the caller did not wait for the result.
+  bool async = 20;
 }
 
 message GetInvocationRequest {
@@ -191,6 +223,9 @@ message TailInvocationsResponse {
 message GetInvocationLogsRequest {
   string id = 1;
   bool follow = 2;
+  // attempt picks one attempt of the invocation, counting from 1. 0 is the
+  // latest.
+  int32 attempt = 3;
 }
 
 // GetInvocationLogsResponse is the next piece of the log, in order. Pieces
