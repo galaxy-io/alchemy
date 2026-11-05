@@ -12,6 +12,7 @@ import { useQueryClient } from "@tanstack/react-query";
 
 import type { Function as AlchemyFunction } from "@/gen/functions/v1/functions_pb";
 import {
+  GetQueueRequestSchema,
   Metric,
   MetricDimension,
   MetricFilterSchema,
@@ -23,7 +24,10 @@ import {
   type QueryTimeseriesResponse,
 } from "@/gen/metrics/v1/metrics_pb";
 
-import { METRICS_REFETCH_INTERVAL } from "@/api/queries/constants";
+import {
+  ACTIVE_INVOCATIONS_REFETCH_INTERVAL,
+  METRICS_REFETCH_INTERVAL,
+} from "@/api/queries/constants";
 import { createListInvocationsQueryKey } from "@/api/queries/invocations";
 
 const createQueryTimeseriesQueryKey = (input?: QueryTimeseriesRequest, transport?: Transport) => {
@@ -73,6 +77,15 @@ export const useQueryAggregateQuery = ({
   return useQuery(MetricsService.method.queryAggregate, input, {
     refetchInterval: METRICS_REFETCH_INTERVAL,
     ...options,
+  });
+};
+
+export const createGetQueueInput = (functionId?: AlchemyFunction["id"]) =>
+  create(GetQueueRequestSchema, { functionIds: functionId ? [functionId] : [] });
+
+export const useGetQueueQuery = ({ functionId }: { functionId?: AlchemyFunction["id"] } = {}) => {
+  return useQuery(MetricsService.method.getQueue, createGetQueueInput(functionId), {
+    refetchInterval: ACTIVE_INVOCATIONS_REFETCH_INTERVAL,
   });
 };
 

@@ -20,6 +20,7 @@ import (
 	functionsv1 "github.com/galaxy-io/alchemy/api/functions/v1"
 	hostv1 "github.com/galaxy-io/alchemy/api/host/v1"
 	"github.com/galaxy-io/alchemy/datastore/postgres/sqlcgen"
+	"github.com/galaxy-io/alchemy/internal/artifact"
 	"github.com/galaxy-io/alchemy/internal/bus"
 	"github.com/galaxy-io/alchemy/internal/logs"
 )
@@ -86,7 +87,7 @@ func (s *Service) invoke(ctx context.Context, start time.Time, cv *compiledVersi
 // result.
 func (s *Service) run(ctx context.Context, start time.Time, inv *invocation, cv *compiledVersion, raw []byte) (*connect.Response[functionsv1.InvokeResponse], error) {
 	inv.announce()
-	timeout := time.Duration(cv.spec.GetTimeoutMs()) * time.Millisecond
+	timeout := cv.timeout
 	accepted := inv.accepted
 	key := accepted.GetIdempotencyKey()
 	created := time.UnixMilli(accepted.GetCreatedAt())
@@ -102,7 +103,7 @@ func (s *Service) run(ctx context.Context, start time.Time, inv *invocation, cv 
 	if key != "" {
 		hostReq.OutputKey = logs.OutputKey(accepted.GetTenantId(), accepted.GetFunctionId(), created, accepted.GetId())
 	}
-	out, err := s.invokeOnHost(ctx, inv, cv, hostReq, timeout)
+	out, err := s.dispatch(ctx, inv, cv, hostReq)
 	if err != nil {
 		if ctx.Err() != nil {
 			inv.canceled()
@@ -135,93 +136,6 @@ func (s *Service) run(ctx context.Context, start time.Time, inv *invocation, cv 
 	return connect.NewResponse(resp), nil
 }
 
-// invokeOnHost sends the invocation to the host the placement picks, and
-// to the next one when that host turns out to be full, gone or unable to
-// build. When no placed host has the artifact, which happens after they all
-// restart, the first of them builds it before the invocation is sent. When
-// every placed host is full, the invocation waits up to capacityWait for a
-// slot, trying them all again with backoff.
-func (s *Service) invokeOnHost(ctx context.Context, inv *invocation, cv *compiledVersion, req *hostv1.InvokeRequest, timeout time.Duration) (*hostv1.InvokeResponse, error) {
-	wait := capacityBackoff
-	deadline := time.Now().Add(capacityWait)
-	skip := map[string]bool{}
-	var full *hostv1.InvokeResponse
-	var unbuilt error
-	for {
-		c, ok := s.chooseHost(cv, skip)
-		switch {
-		case !ok && full == nil && unbuilt != nil:
-			return nil, connect.NewError(connect.CodeFailedPrecondition, unbuilt)
-		case !ok && full == nil:
-			return nil, errNoHosts
-		case !ok:
-			if time.Now().Add(wait).After(deadline) {
-				return full, nil
-			}
-			select {
-			case <-ctx.Done():
-				return full, nil
-			case <-time.After(wait):
-			}
-			wait = min(wait*2, capacityBackoffMax)
-			clear(skip)
-			continue
-		}
-		if !c.built {
-			err := s.buildFor(ctx, inv, cv, c.host)
-			switch {
-			case errors.Is(err, bus.ErrNoResponders):
-				// Gone since its last heartbeat.
-				s.forgetHost(c.host)
-				skip[c.host] = true
-				continue
-			case err != nil:
-				// A build fails for reasons of the host's own as often as the
-				// version's, so every placed host gets a try. The call fails
-				// as unbuildable only once they all have.
-				inv.log.Warn("build on placed host failed", "host", c.host, "err", err)
-				skip[c.host] = true
-				unbuilt = err
-				continue
-			}
-		}
-		// From here the host may run the function, and the record says so
-		// until the host answers that it did not.
-		if err := inv.sentTo(ctx, c.host); err != nil {
-			return nil, err
-		}
-		out, err := s.requestInvoke(ctx, c.host, req, timeout)
-		switch {
-		case errors.Is(err, bus.ErrNoResponders):
-			// Gone since its last heartbeat.
-			inv.notSent()
-			s.forgetHost(c.host)
-			skip[c.host] = true
-			continue
-		case err != nil:
-			return nil, err
-		}
-		if e := out.GetError(); e != nil && e.GetCode() != "aborted" {
-			inv.notSent()
-		}
-		switch out.GetError().GetCode() {
-		case "resource_exhausted":
-			skip[c.host] = true
-			full = out
-			continue
-		case "not_found":
-			// Restarted since its last heartbeat: it builds on the next pass.
-			if c.built {
-				s.noteArtifact(c.host, cv.artifact.GetId(), "", false)
-				continue
-			}
-			return out, nil
-		}
-		s.noteArtifact(c.host, cv.artifact.GetId(), out.GetInstanceId(), true)
-		return out, nil
-	}
-}
-
 // pinnedSpec is the version's spec with the image pinned to the digest it
 // was built against (repo@digest), not the tag: a tag may have moved since,
 // and a different image is a different artifact.
@@ -235,36 +149,9 @@ func (cv *compiledVersion) pinnedSpec() *functionsv1.FunctionSpec {
 	return spec
 }
 
-// requestInvoke sends req to host on a fresh budget, so a build that
-// ran first takes nothing from it. The host enforces the function timeout
-// and its own acquire; the budget only guards against a host that vanished
-// mid-call.
-func (s *Service) requestInvoke(ctx context.Context, host string, req *hostv1.InvokeRequest, timeout time.Duration) (*hostv1.InvokeResponse, error) {
-	ctx, cancel := context.WithTimeout(ctx, invokeBudget(timeout))
-	defer cancel()
-	out := &hostv1.InvokeResponse{}
-	err := s.bus.Request(ctx, bus.HostInvokeSubject(host), req, out)
-	return out, err
-}
-
-// When every host serving an artifact is full, an invocation waits up to
-// capacityWait for a slot, polling with backoff.
-const (
-	capacityWait       = 30 * time.Second
-	capacityBackoff    = 25 * time.Millisecond
-	capacityBackoffMax = 500 * time.Millisecond
-)
-
 // hostGrace is how long past the function's timeout the server waits for
-// a host's reply before treating the host as gone.
+// a host's record of an invocation it took.
 const hostGrace = 15 * time.Second
-
-// invokeBudget is the longest the server spends on an invocation with
-// timeout once a host has its artifact: waiting for a slot, running it, and
-// the host's grace to reply.
-func invokeBudget(timeout time.Duration) time.Duration {
-	return capacityWait + timeout + hostGrace
-}
 
 func hostCode(code string) connect.Code {
 	switch code {
@@ -293,7 +180,8 @@ func (s *Service) resolve(ctx context.Context, functionID string, n int64) (*com
 	if err != nil {
 		return nil, err
 	}
-	if _, err := s.store.GetFunction(ctx, sqlcgen.GetFunctionParams{TenantID: tenant, ID: functionID}); err != nil {
+	fn, err := s.store.GetFunction(ctx, sqlcgen.GetFunctionParams{TenantID: tenant, ID: functionID})
+	if err != nil {
 		return nil, notFound(err, "function %q not found", functionID)
 	}
 	var row *sqlcgen.FunctionVersion
@@ -312,11 +200,22 @@ func (s *Service) resolve(ctx context.Context, functionID string, n int64) (*com
 				fmt.Errorf("version %d of function %q is not ready", n, functionID))
 		}
 	}
-	cv, err := s.compiled(row)
+	cached, err := s.compiled(row)
 	if err != nil {
 		return nil, connect.NewError(connect.CodeInternal, err)
 	}
-	return cv, nil
+	cv := *cached
+	cv.timeout = time.Duration(fn.TimeoutMs) * time.Millisecond
+	// The version was built at the function's resources then. When they
+	// changed since, the invocation runs as the artifact those built at the
+	// new size would be, which a host builds the first time it takes one.
+	if r := functionResources(fn); r.GetVcpus() != cv.artifact.GetVcpus() || r.GetMemoryMib() != cv.artifact.GetMemoryMib() {
+		a := proto.CloneOf(cv.artifact)
+		a.Vcpus, a.MemoryMib = r.GetVcpus(), r.GetMemoryMib()
+		a.Id = artifact.ID(a)
+		cv.artifact = a
+	}
+	return &cv, nil
 }
 
 // setResult maps the host's answer, already checked against the contract,

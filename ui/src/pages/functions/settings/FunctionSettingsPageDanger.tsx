@@ -1,11 +1,12 @@
 import type { FC } from "react";
 
 import { create } from "@bufbuild/protobuf";
+import { TrashIcon } from "@phosphor-icons/react";
 
 import Button, { ButtonVariant } from "@galaxy-io/dls/buttons/Button";
 import Flex, { AlignItems, FlexDirection, JustifyContent } from "@galaxy-io/dls/layout/Flex";
 import ConfirmDialog from "@galaxy-io/dls/modal/ConfirmDialog";
-import Text, { TextSize, TextVariant } from "@galaxy-io/dls/text/Text";
+import Text, { TextSize, TextVariant, TextWeight } from "@galaxy-io/dls/text/Text";
 import Widget from "@galaxy-io/dls/widget/Widget";
 
 import {
@@ -41,33 +42,36 @@ const FunctionSettingsPageDanger: FC<FunctionSettingsPageDangerProps> = ({ alche
   });
 
   return (
-    <Widget header="Danger zone" isCollapsible defaultIsOpen>
-      <Flex justifyContent={JustifyContent.SPACE_BETWEEN} alignItems={AlignItems.CENTER} gap={16}>
-        <Flex direction={FlexDirection.COLUMN} gap={2}>
-          <Text size={TextSize.BODY_SM}>Delete this function</Text>
-          <Text size={TextSize.CAPTION} variant={TextVariant.TERTIARY}>
-            Every version and invocation record goes with it
-          </Text>
+    <>
+      <Widget>
+        <Flex justifyContent={JustifyContent.SPACE_BETWEEN} alignItems={AlignItems.CENTER} gap={12}>
+          <Flex alignItems={AlignItems.START} direction={FlexDirection.COLUMN} gap={4}>
+            <Text weight={TextWeight.MEDIUM}>Delete function</Text>
+            <Text size={TextSize.BODY_SM} variant={TextVariant.SECONDARY}>
+              This will permanently delete this function.
+            </Text>
+          </Flex>
+          <Button
+            label="Delete"
+            icon={TrashIcon}
+            variant={ButtonVariant.ERROR}
+            onClick={() => handleOpen(alchemyFunction)}
+          />
         </Flex>
-        <Button
-          label="Delete function"
-          variant={ButtonVariant.ERROR}
-          onClick={() => handleOpen(alchemyFunction)}
-        />
-      </Flex>
+      </Widget>
       <ConfirmDialog
         isOpen={isOpen}
         onOpenChange={(open) => {
           if (!open) handleClose();
         }}
         onConfirm={handleConfirm}
-        header={`Delete ${target?.name ?? alchemyFunction.name}?`}
-        description="Type the function's name to confirm. Callers will get NOT_FOUND."
-        label="Delete function"
+        header="Delete function?"
+        description="This is a destructive action and cannot be undone."
         confirmValue={target?.name}
+        label="Delete function"
         isDestructive
       />
-    </Widget>
+    </>
   );
 };
 

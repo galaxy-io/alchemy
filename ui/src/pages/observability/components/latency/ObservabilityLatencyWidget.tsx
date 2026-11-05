@@ -19,6 +19,7 @@ import {
 } from "@/pages/observability/components/latency/utils";
 import {
   OBSERVABILITY_CHART_HEIGHT,
+  OBSERVABILITY_REFRESH_INTERVAL_TO_MS_MAP,
   OBSERVABILITY_START_KINDS,
 } from "@/pages/observability/constants";
 import { useObservabilityBucketStart } from "@/pages/observability/hooks/useObservabilityBucketStart";
@@ -38,7 +39,7 @@ const OBSERVABILITY_LATENCY_SERIES: ChartSeriesStyles<string> = Object.fromEntri
 );
 
 const ObservabilityLatencyWidget: FC = () => {
-  const { timeframe } = useObservabilitySearch();
+  const { timeframe, refreshInterval } = useObservabilitySearch();
   const { granularity } = INVOCATIONS_TIMEFRAME_TO_CONFIG_MAP[timeframe];
   const bucketStartMs = useObservabilityBucketStart(granularity);
 
@@ -46,7 +47,10 @@ const ObservabilityLatencyWidget: FC = () => {
     () => createObservabilityLatencyInput(timeframe, bucketStartMs),
     [timeframe, bucketStartMs],
   );
-  const { data, isLoading } = useQueryTimeseriesQuery({ input });
+  const { data, isLoading } = useQueryTimeseriesQuery({
+    input,
+    options: { refetchInterval: OBSERVABILITY_REFRESH_INTERVAL_TO_MS_MAP[refreshInterval] },
+  });
 
   const lines = useMemo(() => mapTimeseriesToLatencyLines(data?.series ?? []), [data]);
 

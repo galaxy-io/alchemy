@@ -13,10 +13,13 @@ import { createInvocationMetricsInputs, useQueryAggregateQuery } from "@/api/que
 export const useInvocationMetrics = ({
   sinceMs,
   functionId,
+  refetchInterval,
 }: {
   sinceMs: bigint;
   functionId?: AlchemyFunction["id"];
+  refetchInterval?: number;
 }) => {
+  const options = refetchInterval === undefined ? undefined : { refetchInterval };
   const { totalsInput, statusInput, startKindInput } = useMemo(
     () => createInvocationMetricsInputs({ sinceMs, functionId }),
     [sinceMs, functionId],
@@ -24,12 +27,15 @@ export const useInvocationMetrics = ({
 
   const { data: totalsData, isLoading: isTotalsLoading } = useQueryAggregateQuery({
     input: totalsInput,
+    options,
   });
   const { data: statusData, isLoading: isStatusLoading } = useQueryAggregateQuery({
     input: statusInput,
+    options,
   });
   const { data: startKindData, isLoading: isStartKindLoading } = useQueryAggregateQuery({
     input: startKindInput,
+    options,
   });
 
   const [count = 0, meanTotalMs, meanAcquireMs] = totalsData?.rows[0]?.values ?? [];

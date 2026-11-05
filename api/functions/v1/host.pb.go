@@ -94,6 +94,7 @@ type Instance struct {
 	MemoryMib     uint32                 `protobuf:"varint,9,opt,name=memory_mib,json=memoryMib,proto3" json:"memory_mib,omitempty"`
 	ArtifactId    string                 `protobuf:"bytes,10,opt,name=artifact_id,json=artifactId,proto3" json:"artifact_id,omitempty"`
 	Host          string                 `protobuf:"bytes,11,opt,name=host,proto3" json:"host,omitempty"`
+	TenantId      string                 `protobuf:"bytes,12,opt,name=tenant_id,json=tenantId,proto3" json:"tenant_id,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -201,6 +202,13 @@ func (x *Instance) GetArtifactId() string {
 func (x *Instance) GetHost() string {
 	if x != nil {
 		return x.Host
+	}
+	return ""
+}
+
+func (x *Instance) GetTenantId() string {
+	if x != nil {
+		return x.TenantId
 	}
 	return ""
 }
@@ -570,7 +578,7 @@ var File_functions_v1_host_proto protoreflect.FileDescriptor
 
 const file_functions_v1_host_proto_rawDesc = "" +
 	"\n" +
-	"\x17functions/v1/host.proto\x12\ffunctions.v1\x1a\x1efunctions/v1/invocations.proto\"\xf1\x02\n" +
+	"\x17functions/v1/host.proto\x12\ffunctions.v1\x1a\x1efunctions/v1/invocations.proto\"\x8e\x03\n" +
 	"\bInstance\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x1f\n" +
 	"\vfunction_id\x18\x02 \x01(\tR\n" +
@@ -588,7 +596,8 @@ const file_functions_v1_host_proto_rawDesc = "" +
 	"\vartifact_id\x18\n" +
 	" \x01(\tR\n" +
 	"artifactId\x12\x12\n" +
-	"\x04host\x18\v \x01(\tR\x04host\"7\n" +
+	"\x04host\x18\v \x01(\tR\x04host\x12\x1b\n" +
+	"\ttenant_id\x18\f \x01(\tR\btenantId\"7\n" +
 	"\x14ListInstancesRequest\x12\x1f\n" +
 	"\vfunction_id\x18\x01 \x01(\tR\n" +
 	"functionId\"M\n" +

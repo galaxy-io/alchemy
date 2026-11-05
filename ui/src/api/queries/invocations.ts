@@ -97,8 +97,10 @@ export const useListInvocationsQuery = ({
 
 export const useListInvocationsInfiniteQuery = ({
   input,
+  refetchInterval,
 }: {
   input?: InfiniteQueryInput<typeof FunctionsService.method.listInvocations.input>;
+  refetchInterval?: number;
 } = {}) => {
   return useInfiniteQuery(
     FunctionsService.method.listInvocations,
@@ -107,7 +109,10 @@ export const useListInvocationsInfiniteQuery = ({
       pageParamKey: "pagination",
       getNextPageParam,
       refetchInterval: (query) =>
-        getInvocationsRefetchInterval(query.state.data?.pages.flatMap((page) => page.invocations)),
+        getInvocationsRefetchInterval(
+          query.state.data?.pages.flatMap((page) => page.invocations),
+        ) ||
+        (refetchInterval ?? false),
     },
   );
 };

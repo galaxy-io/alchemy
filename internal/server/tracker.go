@@ -96,19 +96,6 @@ func (t *invocationTracker) list() []*functionsv1.Invocation {
 	return out
 }
 
-// pending counts invocations accepted that no host has started.
-func (t *invocationTracker) pending() int {
-	t.mu.Lock()
-	defer t.mu.Unlock()
-	n := 0
-	for _, inv := range t.active {
-		if inv.GetStatus() == functionsv1.InvocationStatus_INVOCATION_STATUS_PENDING {
-			n++
-		}
-	}
-	return n
-}
-
 // forget drops recent invocations that ended before now minus recentFor.
 func (t *invocationTracker) forget(now time.Time) {
 	t.mu.Lock()

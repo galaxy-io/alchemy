@@ -268,39 +268,6 @@ func (q *Queries) GetFunctionVersion(ctx context.Context, arg GetFunctionVersion
 	return &i, err
 }
 
-const getFunctionVersionByArtifact = `-- name: GetFunctionVersionByArtifact :one
-SELECT id, tenant_id, function_id, version, spec, status, status_message, image_digest, rootfs_bytes, artifact_id, artifact, build_log, build_started_at, build_ended_at, created_by_user_id, created_at FROM function_versions WHERE tenant_id = $1 AND artifact_id = $2 ORDER BY version DESC LIMIT 1
-`
-
-type GetFunctionVersionByArtifactParams struct {
-	TenantID   string
-	ArtifactID string
-}
-
-func (q *Queries) GetFunctionVersionByArtifact(ctx context.Context, arg GetFunctionVersionByArtifactParams) (*FunctionVersion, error) {
-	row := q.db.QueryRow(ctx, getFunctionVersionByArtifact, arg.TenantID, arg.ArtifactID)
-	var i FunctionVersion
-	err := row.Scan(
-		&i.ID,
-		&i.TenantID,
-		&i.FunctionID,
-		&i.Version,
-		&i.Spec,
-		&i.Status,
-		&i.StatusMessage,
-		&i.ImageDigest,
-		&i.RootfsBytes,
-		&i.ArtifactID,
-		&i.Artifact,
-		&i.BuildLog,
-		&i.BuildStartedAt,
-		&i.BuildEndedAt,
-		&i.CreatedByUserID,
-		&i.CreatedAt,
-	)
-	return &i, err
-}
-
 const listCurrentFunctionVersions = `-- name: ListCurrentFunctionVersions :many
 SELECT DISTINCT ON (v.function_id) v.id, v.tenant_id, v.function_id, v.version, v.spec, v.status, v.status_message, v.image_digest, v.rootfs_bytes, v.artifact_id, v.artifact, v.build_log, v.build_started_at, v.build_ended_at, v.created_by_user_id, v.created_at FROM function_versions v
 JOIN functions f ON f.id = v.function_id AND NOT f.is_deleted

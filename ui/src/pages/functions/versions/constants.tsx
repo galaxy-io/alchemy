@@ -10,20 +10,18 @@ import RelativeTime from "@/components/RelativeTime";
 import FunctionVersionStatusChip from "@/pages/functions/components/FunctionVersionStatusChip";
 import type { FunctionVersionsTableRow } from "@/pages/functions/versions/types";
 
-import { formatCount, formatMemory, formatMillis, formatVersion } from "@/utils/format";
+import { formatMillis, formatVersion } from "@/utils/format";
 
 const FUNCTION_VERSIONS_TABLE_COLUMN_WIDTH_VERSION = 180;
 const FUNCTION_VERSIONS_TABLE_COLUMN_WIDTH_STATUS = 130;
 const FUNCTION_VERSIONS_TABLE_COLUMN_MIN_WIDTH_IMAGE = 240;
-const FUNCTION_VERSIONS_TABLE_COLUMN_WIDTH_VCPUS = 80;
-const FUNCTION_VERSIONS_TABLE_COLUMN_WIDTH_MEMORY = 100;
 const FUNCTION_VERSIONS_TABLE_COLUMN_WIDTH_BUILD = 90;
 const FUNCTION_VERSIONS_TABLE_COLUMN_WIDTH_CREATED_AT = 120;
 
 export const FUNCTION_VERSIONS_DETAILS_FILE_ICON_SIZE = 12;
 
 export const FUNCTION_VERSIONS_DETAILS_COLUMNS =
-  "max-content auto minmax(0, 1fr) minmax(0, 1fr) auto auto";
+  "max-content auto minmax(0, 1fr) minmax(0, 1fr) auto";
 
 export const FUNCTION_VERSIONS_TABLE_COLUMNS: TableColumn<FunctionVersionsTableRow>[] = [
   {
@@ -61,30 +59,6 @@ export const FUNCTION_VERSIONS_TABLE_COLUMNS: TableColumn<FunctionVersionsTableR
         shouldTooltipOnOverflow
       >
         {row.version.spec?.image}
-      </Text>
-    ),
-  },
-  {
-    id: "vcpus",
-    header: "vCPU",
-    align: "right",
-    width: FUNCTION_VERSIONS_TABLE_COLUMN_WIDTH_VCPUS,
-    cell: ({ row }) => (
-      <Text size={TextSize.BODY_SM} family={FontFamily.MONO} isTabular>
-        {formatCount(row.version.spec?.resources?.vcpus)}
-      </Text>
-    ),
-  },
-  {
-    id: "memory",
-    header: "Memory",
-    align: "right",
-    width: FUNCTION_VERSIONS_TABLE_COLUMN_WIDTH_MEMORY,
-    cell: ({ row }) => (
-      <Text size={TextSize.BODY_SM} family={FontFamily.MONO} isTabular>
-        {row.version.spec?.resources?.memoryMib
-          ? formatMemory(row.version.spec.resources.memoryMib)
-          : EMPTY_VALUE}
       </Text>
     ),
   },

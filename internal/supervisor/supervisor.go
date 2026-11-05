@@ -88,14 +88,14 @@ func (s *Service) Invoke(ctx context.Context, req *connect.Request[supervisorv1.
 	}
 	s.busy = true
 	s.mu.Unlock()
-	defer func() {
-		s.mu.Lock()
-		s.busy = false
-		s.mu.Unlock()
-	}()
 
 	resume(req.Msg.GetHostTimeMs())
 	result, err := s.exec(ctx, req.Msg, logStream{stream})
+	// The host hands the instance to the next invocation as soon as it has
+	// the result, so the instance is free before the result is sent.
+	s.mu.Lock()
+	s.busy = false
+	s.mu.Unlock()
 	if err != nil {
 		return err
 	}

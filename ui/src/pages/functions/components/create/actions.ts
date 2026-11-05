@@ -31,6 +31,7 @@ export enum CreateFunctionModalActionType {
   SET_VCPUS = "SET_VCPUS",
   SET_MEMORY_MIB = "SET_MEMORY_MIB",
   SET_TIMEOUT_MS = "SET_TIMEOUT_MS",
+  SET_MAX_CONCURRENCY = "SET_MAX_CONCURRENCY",
   GO_TO_STEP = "GO_TO_STEP",
   GO_BACK = "GO_BACK",
   GO_NEXT = "GO_NEXT",
@@ -131,6 +132,11 @@ export interface SetTimeoutMsAction {
   payload: CreateFunctionModalState["timeoutMs"];
 }
 
+export interface SetMaxConcurrencyAction {
+  type: CreateFunctionModalActionType.SET_MAX_CONCURRENCY;
+  payload: CreateFunctionModalState["maxConcurrency"];
+}
+
 export interface GoToStepAction {
   type: CreateFunctionModalActionType.GO_TO_STEP;
   payload: CreateFunctionModalStep;
@@ -168,6 +174,7 @@ export type CreateFunctionModalAction =
   | SetVcpusAction
   | SetMemoryMibAction
   | SetTimeoutMsAction
+  | SetMaxConcurrencyAction
   | GoToStepAction
   | GoBackAction
   | GoNextAction

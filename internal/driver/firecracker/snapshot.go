@@ -10,6 +10,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"syscall"
 
 	"github.com/galaxy-io/alchemy/internal/driver"
@@ -30,7 +31,10 @@ func snapshotGeneration(cfg Config) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("firecracker --version: %w", err)
 	}
-	h.Write(out)
+	// Only the first line names the build: Firecracker logs a timestamped
+	// line on exit, which would make every start a new generation.
+	version, _, _ := strings.Cut(string(out), "\n")
+	h.Write([]byte(strings.TrimSpace(version)))
 	for _, path := range []string{cfg.Kernel, cfg.SupervisorBin} {
 		if err := hashFile(h, path); err != nil {
 			return "", err

@@ -23,7 +23,10 @@ import {
   mapChartSelectionToInvocationsFilter,
   mapTimeseriesToInvocationsGroups,
 } from "@/pages/observability/components/invocations/utils";
-import { OBSERVABILITY_CHART_HEIGHT } from "@/pages/observability/constants";
+import {
+  OBSERVABILITY_CHART_HEIGHT,
+  OBSERVABILITY_REFRESH_INTERVAL_TO_MS_MAP,
+} from "@/pages/observability/constants";
 import { useObservabilityBucketStart } from "@/pages/observability/hooks/useObservabilityBucketStart";
 import { getBucketLabelFormatter } from "@/pages/observability/utils";
 
@@ -38,7 +41,8 @@ const OBSERVABILITY_INVOCATIONS_SERIES: ChartSeriesStyles<ObservabilityInvocatio
 
 const ObservabilityInvocationsWidget: FC = () => {
   const updateSearch = useAlchemySearchUpdate<ObservabilitySearch>();
-  const { timeframe, invocationsBucket, invocationsStatus } = useObservabilitySearch();
+  const { timeframe, invocationsBucket, invocationsStatus, refreshInterval } =
+    useObservabilitySearch();
   const { granularity } = INVOCATIONS_TIMEFRAME_TO_CONFIG_MAP[timeframe];
   const bucketStartMs = useObservabilityBucketStart(granularity);
 
@@ -46,7 +50,10 @@ const ObservabilityInvocationsWidget: FC = () => {
     () => createObservabilityInvocationsInput(timeframe, bucketStartMs),
     [timeframe, bucketStartMs],
   );
-  const { data, isLoading } = useQueryTimeseriesQuery({ input });
+  const { data, isLoading } = useQueryTimeseriesQuery({
+    input,
+    options: { refetchInterval: OBSERVABILITY_REFRESH_INTERVAL_TO_MS_MAP[refreshInterval] },
+  });
 
   const groups = useMemo(() => mapTimeseriesToInvocationsGroups(data?.series ?? []), [data]);
 

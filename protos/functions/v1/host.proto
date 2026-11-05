@@ -29,6 +29,7 @@ message Instance {
   uint32 memory_mib = 9;
   string artifact_id = 10;
   string host = 11;
+  string tenant_id = 12;
 }
 
 message ListInstancesRequest {

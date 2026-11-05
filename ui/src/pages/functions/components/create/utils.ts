@@ -109,9 +109,9 @@ export const createInitialCreateFunctionModalState = ({
             ).map((field, index) => ({ ...field, id: `out_${index}` })),
           }
         : state.arrowFields,
-    vcpus: spec?.resources?.vcpus || state.vcpus,
-    memoryMib: spec?.resources?.memoryMib || state.memoryMib,
-    timeoutMs: spec?.timeoutMs ? Number(spec.timeoutMs) : state.timeoutMs,
+    vcpus: state.vcpus,
+    memoryMib: state.memoryMib,
+    timeoutMs: state.timeoutMs,
   };
 };
 
