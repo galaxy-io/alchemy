@@ -21,6 +21,7 @@ export const alchemyLayoutSearchSchema = z.object({
   flow: z.enum(Flow).optional().catch(undefined),
   functionId: z.string().optional().catch(undefined),
   invocationId: z.string().optional().catch(undefined),
+  invocationAttempt: z.coerce.number().int().positive().optional().catch(undefined),
 });
 
 export type AlchemyLayoutSearch = z.infer<typeof alchemyLayoutSearchSchema>;

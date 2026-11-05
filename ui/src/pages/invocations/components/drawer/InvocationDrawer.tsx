@@ -27,11 +27,19 @@ import { isNotFoundError } from "@/utils/errors";
 
 interface InvocationDrawerProps {
   invocationId?: Invocation["id"];
+  attempt?: Invocation["attempts"];
   isOpen: boolean;
   onClose: () => void;
+  onAttemptChange: (attempt: Invocation["attempts"]) => void;
 }
 
-const InvocationDrawer: FC<InvocationDrawerProps> = ({ invocationId, isOpen, onClose }) => {
+const InvocationDrawer: FC<InvocationDrawerProps> = ({
+  invocationId,
+  attempt,
+  isOpen,
+  onClose,
+  onAttemptChange,
+}) => {
   const navigate = useAlchemyNavigate();
 
   const { data, error, isError } = useGetInvocationQuery({
@@ -71,6 +79,9 @@ const InvocationDrawer: FC<InvocationDrawerProps> = ({ invocationId, isOpen, onC
         id="invocation-drawer"
         storageKey={INVOCATION_DRAWER_STORAGE_KEY}
         invocationId={invocation.id}
+        attempts={invocation.attempts}
+        attempt={attempt}
+        onAttemptChange={onAttemptChange}
       >
         <InvocationOutcome invocation={invocation} />
         <InvocationDrawerFacts invocation={invocation} />

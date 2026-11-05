@@ -125,6 +125,8 @@ export const useCreateFunctionModalActions = () => {
         dispatch({ type: CreateFunctionModalActionType.SET_TIMEOUT_MS, payload }),
       setMaxConcurrency: (payload: CreateFunctionModalState["maxConcurrency"]) =>
         dispatch({ type: CreateFunctionModalActionType.SET_MAX_CONCURRENCY, payload }),
+      setRetries: (payload: CreateFunctionModalState["retries"]) =>
+        dispatch({ type: CreateFunctionModalActionType.SET_RETRIES, payload }),
       goToStep: (payload: CreateFunctionModalStep) =>
         dispatch({ type: CreateFunctionModalActionType.GO_TO_STEP, payload }),
       goBack: () => dispatch({ type: CreateFunctionModalActionType.GO_BACK }),

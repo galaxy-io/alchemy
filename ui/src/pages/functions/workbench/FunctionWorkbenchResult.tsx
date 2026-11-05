@@ -79,7 +79,13 @@ const FunctionWorkbenchResult: FC<FunctionWorkbenchResultProps> = ({
     >
       <Flex alignItems={AlignItems.CENTER} gap={8} minWidth={0}>
         <Link
-          onClick={() => void updateSearch((prev) => ({ ...prev, invocationId: invocation.id }))}
+          onClick={() =>
+            void updateSearch((prev) => ({
+              ...prev,
+              invocationId: invocation.id,
+              invocationAttempt: undefined,
+            }))
+          }
         >
           <Text size={TextSize.BODY_SM} family={FontFamily.MONO} lineClamp={1}>
             {invocation.id}

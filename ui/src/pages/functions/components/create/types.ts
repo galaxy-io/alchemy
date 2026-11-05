@@ -59,6 +59,7 @@ export interface CreateFunctionModalState {
   memoryMib: Resources["memoryMib"];
   timeoutMs: number;
   maxConcurrency: number | null;
+  retries: number;
   isSubmitting: boolean;
 }
 

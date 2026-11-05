@@ -38,7 +38,11 @@ const HostsCard: FC<HostsCardProps> = ({ host, instances }) => {
   const slots = Array.from({ length: host.slots }, (_, index) => index);
 
   const handleSelect = (instance: Instance) => {
-    void updateSearch((prev) => ({ ...prev, invocationId: instance.invocationId }));
+    void updateSearch((prev) => ({
+      ...prev,
+      invocationId: instance.invocationId,
+      invocationAttempt: undefined,
+    }));
   };
 
   return (
