@@ -9,6 +9,7 @@ import (
 
 	"google.golang.org/protobuf/proto"
 
+	functionsv1 "github.com/galaxy-io/alchemy/api/functions/v1"
 	hostv1 "github.com/galaxy-io/alchemy/api/host/v1"
 	"github.com/galaxy-io/alchemy/internal/bus"
 )
@@ -45,8 +46,11 @@ func (s *Service) dispatch(ctx context.Context, inv *invocation, cv *compiledVer
 
 	req.DeadlineMs = deadline.UnixMilli()
 	req.ReplySubject = bus.ServerResultSubject(s.cfg.Name)
-	req.Build = &hostv1.BuildRequest{TenantId: cv.row.TenantID, FunctionId: cv.row.FunctionID, Version: cv.row.Version, Spec: cv.pinnedSpec(), Layers: cv.artifact.GetLayers()}
-	req.MaxConcurrency = cv.maxConcurrency
+	req.Build = &hostv1.BuildRequest{
+		TenantId: cv.row.TenantID, FunctionId: cv.row.FunctionID, Version: cv.row.Version,
+		Spec: cv.pinnedSpec(), Layers: cv.artifact.GetLayers(),
+		Resources: &functionsv1.Resources{Vcpus: cv.artifact.GetVcpus(), MemoryMib: cv.artifact.GetMemoryMib()},
+	}
 	if err := inv.sentTo(ctx, queuedHost); err != nil {
 		return nil, err
 	}

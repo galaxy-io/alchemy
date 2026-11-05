@@ -8,6 +8,10 @@ import { INVOCATIONS_DEFAULT_TIMEFRAME } from "@/components/invocations/constant
 import InvocationsTimeframeToggle from "@/components/invocations/InvocationsTimeframeToggle";
 import type { InvocationsTimeframe } from "@/components/invocations/types";
 
+import ObservabilityRefreshIntervalSelect from "@/pages/observability/components/ObservabilityRefreshIntervalSelect";
+import { OBSERVABILITY_DEFAULT_REFRESH_INTERVAL } from "@/pages/observability/constants";
+import type { ObservabilityRefreshInterval } from "@/pages/observability/types";
+
 import { useAlchemySearchUpdate, useObservabilitySearch } from "@/module/hooks";
 import type { ObservabilitySearch } from "@/module/schemas";
 
@@ -16,7 +20,7 @@ import { useRefreshObservabilityQueries } from "@/api/queries/metrics";
 const ObservabilityPageActions: FC = () => {
   const updateSearch = useAlchemySearchUpdate<ObservabilitySearch>();
   const refresh = useRefreshObservabilityQueries();
-  const { timeframe } = useObservabilitySearch();
+  const { timeframe, refreshInterval } = useObservabilitySearch();
 
   const handleTimeframeChange = (next: InvocationsTimeframe) => {
     void updateSearch(
@@ -29,9 +33,23 @@ const ObservabilityPageActions: FC = () => {
     );
   };
 
+  const handleRefreshIntervalChange = (next: ObservabilityRefreshInterval) => {
+    void updateSearch(
+      (prev) => ({
+        ...prev,
+        refreshInterval: next === OBSERVABILITY_DEFAULT_REFRESH_INTERVAL ? undefined : next,
+      }),
+      { replace: true },
+    );
+  };
+
   return (
     <>
       <InvocationsTimeframeToggle value={timeframe} onChange={handleTimeframeChange} />
+      <ObservabilityRefreshIntervalSelect
+        value={refreshInterval}
+        onChange={handleRefreshIntervalChange}
+      />
       <Button
         icon={ArrowsClockwiseIcon}
         variant={ButtonVariant.SECONDARY}

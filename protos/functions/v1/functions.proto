@@ -35,7 +35,6 @@ message FunctionSpec {
   map<string, string> secrets = 4;
   InvocationProtocol protocol = 5;
   Contract contract = 6;
-  Resources resources = 7;
   // source makes the version a function built from source: files extracted
   // over image under /app, where the runtime images look for the handler.
   Source source = 9;
@@ -148,6 +147,10 @@ message Function {
   // across every host. Invocations past it wait in the queue. 0 means no
   // limit.
   int32 max_concurrency = 12;
+  // resources size the microVM every invocation of any version runs in. A
+  // change applies to the next invocation; each host snapshots the function
+  // again at the new size the first time it runs it.
+  Resources resources = 13;
 }
 
 // CreateFunction creates the function and version 1 from spec. It returns as
@@ -161,10 +164,11 @@ message CreateFunctionRequest {
   // later version never changes what this one reads, and named in
   // spec.secrets.
   map<string, string> secret_values = 4;
-  // timeout_ms and max_concurrency are as on Function. A zero timeout_ms
-  // takes the server default.
+  // timeout_ms, max_concurrency and resources are as on Function. Zero
+  // values take the server defaults.
   int64 timeout_ms = 5;
   int32 max_concurrency = 6;
+  Resources resources = 7;
 }
 
 message CreateFunctionResponse {
@@ -173,14 +177,15 @@ message CreateFunctionResponse {
 }
 
 // UpdateFunction changes a function's settings. They apply to the next
-// invocation of any version. timeout_ms and max_concurrency change only
-// when set.
+// invocation of any version. timeout_ms, max_concurrency and resources
+// change only when set.
 message UpdateFunctionRequest {
   string function_id = 1;
   string name = 2;
   string description = 3;
   optional int64 timeout_ms = 4;
   optional int32 max_concurrency = 5;
+  Resources resources = 6;
 }
 
 message UpdateFunctionResponse {

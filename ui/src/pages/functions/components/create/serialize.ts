@@ -56,7 +56,6 @@ export const mapCreateFunctionModalStateToSpec = (
       ),
       protocol: InvocationProtocol.EXEC,
       contract: mapCreateFunctionModalStateToContract(state),
-      resources: { vcpus: state.vcpus, memoryMib: state.memoryMib },
     });
   } catch {
     return undefined;
@@ -81,6 +80,7 @@ export const mapCreateFunctionModalStateToRequest = (
     secretValues: mapCreateFunctionModalStateToSecretValues(state),
     timeoutMs: BigInt(Math.round(state.timeoutMs)),
     maxConcurrency: state.maxConcurrency ?? 0,
+    resources: { vcpus: state.vcpus, memoryMib: state.memoryMib },
   });
 
 export const mapCreateFunctionModalStateToVersionRequest = (

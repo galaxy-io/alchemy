@@ -10,7 +10,7 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file metrics/v1/metrics.proto.
  */
 export const file_metrics_v1_metrics: GenFile = /*@__PURE__*/
-  fileDesc("ChhtZXRyaWNzL3YxL21ldHJpY3MucHJvdG8SCm1ldHJpY3MudjEiTgoMTWV0cmljRmlsdGVyEi4KCWRpbWVuc2lvbhgBIAEoDjIbLm1ldHJpY3MudjEuTWV0cmljRGltZW5zaW9uEg4KBnZhbHVlcxgCIAMoCSKKAgoWUXVlcnlUaW1lc2VyaWVzUmVxdWVzdBIjCgdtZXRyaWNzGAEgAygOMhIubWV0cmljcy52MS5NZXRyaWMSEAoIc2luY2VfbXMYAiABKAMSEAoIdW50aWxfbXMYAyABKAMSMgoLZ3JhbnVsYXJpdHkYBCABKA4yHS5tZXRyaWNzLnYxLk1ldHJpY0dyYW51bGFyaXR5EhkKEXR6X29mZnNldF9taW51dGVzGAUgASgFEi0KCGdyb3VwX2J5GAYgASgOMhsubWV0cmljcy52MS5NZXRyaWNEaW1lbnNpb24SKQoHZmlsdGVycxgHIAMoCzIYLm1ldHJpY3MudjEuTWV0cmljRmlsdGVyIjoKD1RpbWVzZXJpZXNQb2ludBIXCg9idWNrZXRfc3RhcnRfbXMYASABKAMSDgoGdmFsdWVzGAIgAygBIkYKClRpbWVzZXJpZXMSCwoDa2V5GAEgASgJEisKBnBvaW50cxgCIAMoCzIbLm1ldHJpY3MudjEuVGltZXNlcmllc1BvaW50IkEKF1F1ZXJ5VGltZXNlcmllc1Jlc3BvbnNlEiYKBnNlcmllcxgBIAMoCzIWLm1ldHJpY3MudjEuVGltZXNlcmllcyK6AQoVUXVlcnlBZ2dyZWdhdGVSZXF1ZXN0EiMKB21ldHJpY3MYASADKA4yEi5tZXRyaWNzLnYxLk1ldHJpYxIQCghzaW5jZV9tcxgCIAEoAxIQCgh1bnRpbF9tcxgDIAEoAxItCghncm91cF9ieRgEIAEoDjIbLm1ldHJpY3MudjEuTWV0cmljRGltZW5zaW9uEikKB2ZpbHRlcnMYBSADKAsyGC5tZXRyaWNzLnYxLk1ldHJpY0ZpbHRlciIrCgxBZ2dyZWdhdGVSb3cSCwoDa2V5GAEgASgJEg4KBnZhbHVlcxgCIAMoASJAChZRdWVyeUFnZ3JlZ2F0ZVJlc3BvbnNlEiYKBHJvd3MYASADKAsyGC5tZXRyaWNzLnYxLkFnZ3JlZ2F0ZVJvdyr2AQoGTWV0cmljEhYKEk1FVFJJQ19VTlNQRUNJRklFRBAAEhsKF01FVFJJQ19JTlZPQ0FUSU9OX0NPVU5UEAESJgoiTUVUUklDX0lOVk9DQVRJT05fQUNRVUlSRV9EVVJBVElPThACEiIKHk1FVFJJQ19JTlZPQ0FUSU9OX1JVTl9EVVJBVElPThADEiQKIE1FVFJJQ19JTlZPQ0FUSU9OX1RPVEFMX0RVUkFUSU9OEAQSIQodTUVUUklDX0lOVk9DQVRJT05fSU5QVVRfQllURVMQBRIiCh5NRVRSSUNfSU5WT0NBVElPTl9PVVRQVVRfQllURVMQBiqzAQoPTWV0cmljRGltZW5zaW9uEiAKHE1FVFJJQ19ESU1FTlNJT05fVU5TUEVDSUZJRUQQABIeChpNRVRSSUNfRElNRU5TSU9OX1RFTkFOVF9JRBABEiAKHE1FVFJJQ19ESU1FTlNJT05fRlVOQ1RJT05fSUQQAhIbChdNRVRSSUNfRElNRU5TSU9OX1NUQVRVUxADEh8KG01FVFJJQ19ESU1FTlNJT05fU1RBUlRfS0lORBAEKo8BChFNZXRyaWNHcmFudWxhcml0eRIiCh5NRVRSSUNfR1JBTlVMQVJJVFlfVU5TUEVDSUZJRUQQABIdChlNRVRSSUNfR1JBTlVMQVJJVFlfTUlOVVRFEAESGwoXTUVUUklDX0dSQU5VTEFSSVRZX0hPVVIQAhIaChZNRVRSSUNfR1JBTlVMQVJJVFlfREFZEAMyxQEKDk1ldHJpY3NTZXJ2aWNlEloKD1F1ZXJ5VGltZXNlcmllcxIiLm1ldHJpY3MudjEuUXVlcnlUaW1lc2VyaWVzUmVxdWVzdBojLm1ldHJpY3MudjEuUXVlcnlUaW1lc2VyaWVzUmVzcG9uc2USVwoOUXVlcnlBZ2dyZWdhdGUSIS5tZXRyaWNzLnYxLlF1ZXJ5QWdncmVnYXRlUmVxdWVzdBoiLm1ldHJpY3MudjEuUXVlcnlBZ2dyZWdhdGVSZXNwb25zZWIGcHJvdG8z");
+  fileDesc("ChhtZXRyaWNzL3YxL21ldHJpY3MucHJvdG8SCm1ldHJpY3MudjEiTgoMTWV0cmljRmlsdGVyEi4KCWRpbWVuc2lvbhgBIAEoDjIbLm1ldHJpY3MudjEuTWV0cmljRGltZW5zaW9uEg4KBnZhbHVlcxgCIAMoCSKKAgoWUXVlcnlUaW1lc2VyaWVzUmVxdWVzdBIjCgdtZXRyaWNzGAEgAygOMhIubWV0cmljcy52MS5NZXRyaWMSEAoIc2luY2VfbXMYAiABKAMSEAoIdW50aWxfbXMYAyABKAMSMgoLZ3JhbnVsYXJpdHkYBCABKA4yHS5tZXRyaWNzLnYxLk1ldHJpY0dyYW51bGFyaXR5EhkKEXR6X29mZnNldF9taW51dGVzGAUgASgFEi0KCGdyb3VwX2J5GAYgASgOMhsubWV0cmljcy52MS5NZXRyaWNEaW1lbnNpb24SKQoHZmlsdGVycxgHIAMoCzIYLm1ldHJpY3MudjEuTWV0cmljRmlsdGVyIjoKD1RpbWVzZXJpZXNQb2ludBIXCg9idWNrZXRfc3RhcnRfbXMYASABKAMSDgoGdmFsdWVzGAIgAygBIkYKClRpbWVzZXJpZXMSCwoDa2V5GAEgASgJEisKBnBvaW50cxgCIAMoCzIbLm1ldHJpY3MudjEuVGltZXNlcmllc1BvaW50IkEKF1F1ZXJ5VGltZXNlcmllc1Jlc3BvbnNlEiYKBnNlcmllcxgBIAMoCzIWLm1ldHJpY3MudjEuVGltZXNlcmllcyK6AQoVUXVlcnlBZ2dyZWdhdGVSZXF1ZXN0EiMKB21ldHJpY3MYASADKA4yEi5tZXRyaWNzLnYxLk1ldHJpYxIQCghzaW5jZV9tcxgCIAEoAxIQCgh1bnRpbF9tcxgDIAEoAxItCghncm91cF9ieRgEIAEoDjIbLm1ldHJpY3MudjEuTWV0cmljRGltZW5zaW9uEikKB2ZpbHRlcnMYBSADKAsyGC5tZXRyaWNzLnYxLk1ldHJpY0ZpbHRlciIrCgxBZ2dyZWdhdGVSb3cSCwoDa2V5GAEgASgJEg4KBnZhbHVlcxgCIAMoASJAChZRdWVyeUFnZ3JlZ2F0ZVJlc3BvbnNlEiYKBHJvd3MYASADKAsyGC5tZXRyaWNzLnYxLkFnZ3JlZ2F0ZVJvdyInCg9HZXRRdWV1ZVJlcXVlc3QSFAoMZnVuY3Rpb25faWRzGAEgAygJIjMKEEdldFF1ZXVlUmVzcG9uc2USDgoGcXVldWVkGAEgASgDEg8KB3J1bm5pbmcYAiABKAMq9gEKBk1ldHJpYxIWChJNRVRSSUNfVU5TUEVDSUZJRUQQABIbChdNRVRSSUNfSU5WT0NBVElPTl9DT1VOVBABEiYKIk1FVFJJQ19JTlZPQ0FUSU9OX0FDUVVJUkVfRFVSQVRJT04QAhIiCh5NRVRSSUNfSU5WT0NBVElPTl9SVU5fRFVSQVRJT04QAxIkCiBNRVRSSUNfSU5WT0NBVElPTl9UT1RBTF9EVVJBVElPThAEEiEKHU1FVFJJQ19JTlZPQ0FUSU9OX0lOUFVUX0JZVEVTEAUSIgoeTUVUUklDX0lOVk9DQVRJT05fT1VUUFVUX0JZVEVTEAYqswEKD01ldHJpY0RpbWVuc2lvbhIgChxNRVRSSUNfRElNRU5TSU9OX1VOU1BFQ0lGSUVEEAASHgoaTUVUUklDX0RJTUVOU0lPTl9URU5BTlRfSUQQARIgChxNRVRSSUNfRElNRU5TSU9OX0ZVTkNUSU9OX0lEEAISGwoXTUVUUklDX0RJTUVOU0lPTl9TVEFUVVMQAxIfChtNRVRSSUNfRElNRU5TSU9OX1NUQVJUX0tJTkQQBCqPAQoRTWV0cmljR3JhbnVsYXJpdHkSIgoeTUVUUklDX0dSQU5VTEFSSVRZX1VOU1BFQ0lGSUVEEAASHQoZTUVUUklDX0dSQU5VTEFSSVRZX01JTlVURRABEhsKF01FVFJJQ19HUkFOVUxBUklUWV9IT1VSEAISGgoWTUVUUklDX0dSQU5VTEFSSVRZX0RBWRADMowCCg5NZXRyaWNzU2VydmljZRJaCg9RdWVyeVRpbWVzZXJpZXMSIi5tZXRyaWNzLnYxLlF1ZXJ5VGltZXNlcmllc1JlcXVlc3QaIy5tZXRyaWNzLnYxLlF1ZXJ5VGltZXNlcmllc1Jlc3BvbnNlElcKDlF1ZXJ5QWdncmVnYXRlEiEubWV0cmljcy52MS5RdWVyeUFnZ3JlZ2F0ZVJlcXVlc3QaIi5tZXRyaWNzLnYxLlF1ZXJ5QWdncmVnYXRlUmVzcG9uc2USRQoIR2V0UXVldWUSGy5tZXRyaWNzLnYxLkdldFF1ZXVlUmVxdWVzdBocLm1ldHJpY3MudjEuR2V0UXVldWVSZXNwb25zZWIGcHJvdG8z");
 
 /**
  * MetricFilter narrows a query to invocations whose dimension is one of
@@ -249,6 +249,51 @@ export const QueryAggregateResponseSchema: GenMessage<QueryAggregateResponse> = 
   messageDesc(file_metrics_v1_metrics, 7);
 
 /**
+ * GetQueueRequest narrows the counts to function_ids, or every function of
+ * the tenant when empty.
+ *
+ * @generated from message metrics.v1.GetQueueRequest
+ */
+export type GetQueueRequest = Message<"metrics.v1.GetQueueRequest"> & {
+  /**
+   * @generated from field: repeated string function_ids = 1;
+   */
+  functionIds: string[];
+};
+
+/**
+ * Describes the message metrics.v1.GetQueueRequest.
+ * Use `create(GetQueueRequestSchema)` to create a new message.
+ */
+export const GetQueueRequestSchema: GenMessage<GetQueueRequest> = /*@__PURE__*/
+  messageDesc(file_metrics_v1_metrics, 8);
+
+/**
+ * @generated from message metrics.v1.GetQueueResponse
+ */
+export type GetQueueResponse = Message<"metrics.v1.GetQueueResponse"> & {
+  /**
+   * queued is invocations waiting to start: in the queue, or taken by a host
+   * that is building the function or waiting on its max_concurrency.
+   *
+   * @generated from field: int64 queued = 1;
+   */
+  queued: bigint;
+
+  /**
+   * @generated from field: int64 running = 2;
+   */
+  running: bigint;
+};
+
+/**
+ * Describes the message metrics.v1.GetQueueResponse.
+ * Use `create(GetQueueResponseSchema)` to create a new message.
+ */
+export const GetQueueResponseSchema: GenMessage<GetQueueResponse> = /*@__PURE__*/
+  messageDesc(file_metrics_v1_metrics, 9);
+
+/**
  * Metric is an aggregatable measure over invocations. COUNT and the byte
  * metrics are sums. The duration metrics are means in milliseconds over
  * invocations that recorded the phase (a zero column means the phase never
@@ -396,6 +441,17 @@ export const MetricsService: GenService<{
     methodKind: "unary";
     input: typeof QueryAggregateRequestSchema;
     output: typeof QueryAggregateResponseSchema;
+  },
+  /**
+   * GetQueue is what is in flight right now, from the queue rather than
+   * the invocations table: invocations waiting to start, and running.
+   *
+   * @generated from rpc metrics.v1.MetricsService.GetQueue
+   */
+  getQueue: {
+    methodKind: "unary";
+    input: typeof GetQueueRequestSchema;
+    output: typeof GetQueueResponseSchema;
   },
 }> = /*@__PURE__*/
   serviceDesc(file_metrics_v1_metrics, 0);

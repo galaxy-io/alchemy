@@ -11,6 +11,7 @@ import InvocationsTable from "@/components/invocations/table/InvocationsTable";
 import { InvocationsTableVariant } from "@/components/invocations/table/types";
 
 import { createHistoryWindowInput } from "@/pages/observability/components/history/utils";
+import { OBSERVABILITY_REFRESH_INTERVAL_TO_MS_MAP } from "@/pages/observability/constants";
 import { useObservabilityBucketStart } from "@/pages/observability/hooks/useObservabilityBucketStart";
 
 import { useObservabilitySearch } from "@/module/hooks";
@@ -26,7 +27,8 @@ const OBSERVABILITY_HISTORY_WIDGET_CSS = css`
 `;
 
 const ObservabilityHistoryWidget: FC = () => {
-  const { timeframe, invocationsBucket, invocationsStatus } = useObservabilitySearch();
+  const { timeframe, invocationsBucket, invocationsStatus, refreshInterval } =
+    useObservabilitySearch();
   const { granularity } = INVOCATIONS_TIMEFRAME_TO_CONFIG_MAP[timeframe];
   const bucketStartMs = useObservabilityBucketStart(granularity);
 
@@ -39,7 +41,10 @@ const ObservabilityHistoryWidget: FC = () => {
   );
 
   const { data, isLoading, hasNextPage, isFetchingNextPage, fetchNextPage } =
-    useListInvocationsInfiniteQuery({ input });
+    useListInvocationsInfiniteQuery({
+      input,
+      refetchInterval: OBSERVABILITY_REFRESH_INTERVAL_TO_MS_MAP[refreshInterval],
+    });
 
   return (
     <Widget

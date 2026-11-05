@@ -94,10 +94,9 @@ type FunctionSpec struct {
 	// secrets names the tenant's secrets the function receives in its
 	// environment, variable name to secret name. The values are fetched by
 	// the host at invocation and never stored with the version.
-	Secrets   map[string]string  `protobuf:"bytes,4,rep,name=secrets,proto3" json:"secrets,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
-	Protocol  InvocationProtocol `protobuf:"varint,5,opt,name=protocol,proto3,enum=functions.v1.InvocationProtocol" json:"protocol,omitempty"`
-	Contract  *Contract          `protobuf:"bytes,6,opt,name=contract,proto3" json:"contract,omitempty"`
-	Resources *Resources         `protobuf:"bytes,7,opt,name=resources,proto3" json:"resources,omitempty"`
+	Secrets  map[string]string  `protobuf:"bytes,4,rep,name=secrets,proto3" json:"secrets,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
+	Protocol InvocationProtocol `protobuf:"varint,5,opt,name=protocol,proto3,enum=functions.v1.InvocationProtocol" json:"protocol,omitempty"`
+	Contract *Contract          `protobuf:"bytes,6,opt,name=contract,proto3" json:"contract,omitempty"`
 	// source makes the version a function built from source: files extracted
 	// over image under /app, where the runtime images look for the handler.
 	Source        *Source `protobuf:"bytes,9,opt,name=source,proto3" json:"source,omitempty"`
@@ -173,13 +172,6 @@ func (x *FunctionSpec) GetProtocol() InvocationProtocol {
 func (x *FunctionSpec) GetContract() *Contract {
 	if x != nil {
 		return x.Contract
-	}
-	return nil
-}
-
-func (x *FunctionSpec) GetResources() *Resources {
-	if x != nil {
-		return x.Resources
 	}
 	return nil
 }
@@ -821,8 +813,12 @@ type Function struct {
 	// across every host. Invocations past it wait in the queue. 0 means no
 	// limit.
 	MaxConcurrency int32 `protobuf:"varint,12,opt,name=max_concurrency,json=maxConcurrency,proto3" json:"max_concurrency,omitempty"`
-	unknownFields  protoimpl.UnknownFields
-	sizeCache      protoimpl.SizeCache
+	// resources size the microVM every invocation of any version runs in. A
+	// change applies to the next invocation; each host snapshots the function
+	// again at the new size the first time it runs it.
+	Resources     *Resources `protobuf:"bytes,13,opt,name=resources,proto3" json:"resources,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *Function) Reset() {
@@ -939,6 +935,13 @@ func (x *Function) GetMaxConcurrency() int32 {
 	return 0
 }
 
+func (x *Function) GetResources() *Resources {
+	if x != nil {
+		return x.Resources
+	}
+	return nil
+}
+
 // CreateFunction creates the function and version 1 from spec. It returns as
 // soon as the version is accepted, in BUILDING.
 type CreateFunctionRequest struct {
@@ -951,10 +954,11 @@ type CreateFunctionRequest struct {
 	// later version never changes what this one reads, and named in
 	// spec.secrets.
 	SecretValues map[string]string `protobuf:"bytes,4,rep,name=secret_values,json=secretValues,proto3" json:"secret_values,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
-	// timeout_ms and max_concurrency are as on Function. A zero timeout_ms
-	// takes the server default.
-	TimeoutMs      int64 `protobuf:"varint,5,opt,name=timeout_ms,json=timeoutMs,proto3" json:"timeout_ms,omitempty"`
-	MaxConcurrency int32 `protobuf:"varint,6,opt,name=max_concurrency,json=maxConcurrency,proto3" json:"max_concurrency,omitempty"`
+	// timeout_ms, max_concurrency and resources are as on Function. Zero
+	// values take the server defaults.
+	TimeoutMs      int64      `protobuf:"varint,5,opt,name=timeout_ms,json=timeoutMs,proto3" json:"timeout_ms,omitempty"`
+	MaxConcurrency int32      `protobuf:"varint,6,opt,name=max_concurrency,json=maxConcurrency,proto3" json:"max_concurrency,omitempty"`
+	Resources      *Resources `protobuf:"bytes,7,opt,name=resources,proto3" json:"resources,omitempty"`
 	unknownFields  protoimpl.UnknownFields
 	sizeCache      protoimpl.SizeCache
 }
@@ -1031,6 +1035,13 @@ func (x *CreateFunctionRequest) GetMaxConcurrency() int32 {
 	return 0
 }
 
+func (x *CreateFunctionRequest) GetResources() *Resources {
+	if x != nil {
+		return x.Resources
+	}
+	return nil
+}
+
 type CreateFunctionResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Function      *Function              `protobuf:"bytes,1,opt,name=function,proto3" json:"function,omitempty"`
@@ -1084,8 +1095,8 @@ func (x *CreateFunctionResponse) GetVersion() *FunctionVersion {
 }
 
 // UpdateFunction changes a function's settings. They apply to the next
-// invocation of any version. timeout_ms and max_concurrency change only
-// when set.
+// invocation of any version. timeout_ms, max_concurrency and resources
+// change only when set.
 type UpdateFunctionRequest struct {
 	state          protoimpl.MessageState `protogen:"open.v1"`
 	FunctionId     string                 `protobuf:"bytes,1,opt,name=function_id,json=functionId,proto3" json:"function_id,omitempty"`
@@ -1093,6 +1104,7 @@ type UpdateFunctionRequest struct {
 	Description    string                 `protobuf:"bytes,3,opt,name=description,proto3" json:"description,omitempty"`
 	TimeoutMs      *int64                 `protobuf:"varint,4,opt,name=timeout_ms,json=timeoutMs,proto3,oneof" json:"timeout_ms,omitempty"`
 	MaxConcurrency *int32                 `protobuf:"varint,5,opt,name=max_concurrency,json=maxConcurrency,proto3,oneof" json:"max_concurrency,omitempty"`
+	Resources      *Resources             `protobuf:"bytes,6,opt,name=resources,proto3" json:"resources,omitempty"`
 	unknownFields  protoimpl.UnknownFields
 	sizeCache      protoimpl.SizeCache
 }
@@ -1160,6 +1172,13 @@ func (x *UpdateFunctionRequest) GetMaxConcurrency() int32 {
 		return *x.MaxConcurrency
 	}
 	return 0
+}
+
+func (x *UpdateFunctionRequest) GetResources() *Resources {
+	if x != nil {
+		return x.Resources
+	}
+	return nil
 }
 
 type UpdateFunctionResponse struct {
@@ -1797,15 +1816,14 @@ var File_functions_v1_functions_proto protoreflect.FileDescriptor
 
 const file_functions_v1_functions_proto_rawDesc = "" +
 	"\n" +
-	"\x1cfunctions/v1/functions.proto\x12\ffunctions.v1\x1a\x19functions/v1/common.proto\x1a\x1dfunctions/v1/pagination.proto\"\x83\x04\n" +
+	"\x1cfunctions/v1/functions.proto\x12\ffunctions.v1\x1a\x19functions/v1/common.proto\x1a\x1dfunctions/v1/pagination.proto\"\xcc\x03\n" +
 	"\fFunctionSpec\x12\x14\n" +
 	"\x05image\x18\x01 \x01(\tR\x05image\x12\x18\n" +
 	"\acommand\x18\x02 \x03(\tR\acommand\x125\n" +
 	"\x03env\x18\x03 \x03(\v2#.functions.v1.FunctionSpec.EnvEntryR\x03env\x12A\n" +
 	"\asecrets\x18\x04 \x03(\v2'.functions.v1.FunctionSpec.SecretsEntryR\asecrets\x12<\n" +
 	"\bprotocol\x18\x05 \x01(\x0e2 .functions.v1.InvocationProtocolR\bprotocol\x122\n" +
-	"\bcontract\x18\x06 \x01(\v2\x16.functions.v1.ContractR\bcontract\x125\n" +
-	"\tresources\x18\a \x01(\v2\x17.functions.v1.ResourcesR\tresources\x12,\n" +
+	"\bcontract\x18\x06 \x01(\v2\x16.functions.v1.ContractR\bcontract\x12,\n" +
 	"\x06source\x18\t \x01(\v2\x14.functions.v1.SourceR\x06source\x1a6\n" +
 	"\bEnvEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
@@ -1857,7 +1875,7 @@ const file_functions_v1_functions_proto_rawDesc = "" +
 	"\frootfs_bytes\x18\n" +
 	" \x01(\x03R\vrootfsBytes\x12\x1b\n" +
 	"\tbuild_log\x18\v \x01(\tR\bbuildLog\x12+\n" +
-	"\x12created_by_user_id\x18\f \x01(\tR\x0fcreatedByUserId\"\xd0\x03\n" +
+	"\x12created_by_user_id\x18\f \x01(\tR\x0fcreatedByUserId\"\x87\x04\n" +
 	"\bFunction\x12\x1b\n" +
 	"\ttenant_id\x18\x01 \x01(\tR\btenantId\x12\x0e\n" +
 	"\x02id\x18\x02 \x01(\tR\x02id\x12\x12\n" +
@@ -1874,7 +1892,8 @@ const file_functions_v1_functions_proto_rawDesc = "" +
 	" \x01(\tR\x0fupdatedByUserId\x12\x1d\n" +
 	"\n" +
 	"timeout_ms\x18\v \x01(\x03R\ttimeoutMs\x12'\n" +
-	"\x0fmax_concurrency\x18\f \x01(\x05R\x0emaxConcurrency\"\xe2\x02\n" +
+	"\x0fmax_concurrency\x18\f \x01(\x05R\x0emaxConcurrency\x125\n" +
+	"\tresources\x18\r \x01(\v2\x17.functions.v1.ResourcesR\tresources\"\x99\x03\n" +
 	"\x15CreateFunctionRequest\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12 \n" +
 	"\vdescription\x18\x02 \x01(\tR\vdescription\x12.\n" +
@@ -1882,13 +1901,14 @@ const file_functions_v1_functions_proto_rawDesc = "" +
 	"\rsecret_values\x18\x04 \x03(\v25.functions.v1.CreateFunctionRequest.SecretValuesEntryR\fsecretValues\x12\x1d\n" +
 	"\n" +
 	"timeout_ms\x18\x05 \x01(\x03R\ttimeoutMs\x12'\n" +
-	"\x0fmax_concurrency\x18\x06 \x01(\x05R\x0emaxConcurrency\x1a?\n" +
+	"\x0fmax_concurrency\x18\x06 \x01(\x05R\x0emaxConcurrency\x125\n" +
+	"\tresources\x18\a \x01(\v2\x17.functions.v1.ResourcesR\tresources\x1a?\n" +
 	"\x11SecretValuesEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
 	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\x85\x01\n" +
 	"\x16CreateFunctionResponse\x122\n" +
 	"\bfunction\x18\x01 \x01(\v2\x16.functions.v1.FunctionR\bfunction\x127\n" +
-	"\aversion\x18\x02 \x01(\v2\x1d.functions.v1.FunctionVersionR\aversion\"\xe3\x01\n" +
+	"\aversion\x18\x02 \x01(\v2\x1d.functions.v1.FunctionVersionR\aversion\"\x9a\x02\n" +
 	"\x15UpdateFunctionRequest\x12\x1f\n" +
 	"\vfunction_id\x18\x01 \x01(\tR\n" +
 	"functionId\x12\x12\n" +
@@ -1896,7 +1916,8 @@ const file_functions_v1_functions_proto_rawDesc = "" +
 	"\vdescription\x18\x03 \x01(\tR\vdescription\x12\"\n" +
 	"\n" +
 	"timeout_ms\x18\x04 \x01(\x03H\x00R\ttimeoutMs\x88\x01\x01\x12,\n" +
-	"\x0fmax_concurrency\x18\x05 \x01(\x05H\x01R\x0emaxConcurrency\x88\x01\x01B\r\n" +
+	"\x0fmax_concurrency\x18\x05 \x01(\x05H\x01R\x0emaxConcurrency\x88\x01\x01\x125\n" +
+	"\tresources\x18\x06 \x01(\v2\x17.functions.v1.ResourcesR\tresourcesB\r\n" +
 	"\v_timeout_msB\x12\n" +
 	"\x10_max_concurrency\"L\n" +
 	"\x16UpdateFunctionResponse\x122\n" +
@@ -2011,38 +2032,40 @@ var file_functions_v1_functions_proto_depIdxs = []int32{
 	29, // 1: functions.v1.FunctionSpec.secrets:type_name -> functions.v1.FunctionSpec.SecretsEntry
 	32, // 2: functions.v1.FunctionSpec.protocol:type_name -> functions.v1.InvocationProtocol
 	33, // 3: functions.v1.FunctionSpec.contract:type_name -> functions.v1.Contract
-	34, // 4: functions.v1.FunctionSpec.resources:type_name -> functions.v1.Resources
-	2,  // 5: functions.v1.FunctionSpec.source:type_name -> functions.v1.Source
-	3,  // 6: functions.v1.Source.files:type_name -> functions.v1.SourceFile
-	4,  // 7: functions.v1.Source.layer:type_name -> functions.v1.SourceLayer
-	6,  // 8: functions.v1.Runtime.starters:type_name -> functions.v1.RuntimeStarters
-	5,  // 9: functions.v1.ListRuntimesResponse.runtimes:type_name -> functions.v1.Runtime
-	7,  // 10: functions.v1.ListRuntimesResponse.limits:type_name -> functions.v1.SourceLimits
-	1,  // 11: functions.v1.FunctionVersion.spec:type_name -> functions.v1.FunctionSpec
-	0,  // 12: functions.v1.FunctionVersion.status:type_name -> functions.v1.FunctionVersionStatus
-	10, // 13: functions.v1.Function.current_version:type_name -> functions.v1.FunctionVersion
-	10, // 14: functions.v1.Function.versions:type_name -> functions.v1.FunctionVersion
+	2,  // 4: functions.v1.FunctionSpec.source:type_name -> functions.v1.Source
+	3,  // 5: functions.v1.Source.files:type_name -> functions.v1.SourceFile
+	4,  // 6: functions.v1.Source.layer:type_name -> functions.v1.SourceLayer
+	6,  // 7: functions.v1.Runtime.starters:type_name -> functions.v1.RuntimeStarters
+	5,  // 8: functions.v1.ListRuntimesResponse.runtimes:type_name -> functions.v1.Runtime
+	7,  // 9: functions.v1.ListRuntimesResponse.limits:type_name -> functions.v1.SourceLimits
+	1,  // 10: functions.v1.FunctionVersion.spec:type_name -> functions.v1.FunctionSpec
+	0,  // 11: functions.v1.FunctionVersion.status:type_name -> functions.v1.FunctionVersionStatus
+	10, // 12: functions.v1.Function.current_version:type_name -> functions.v1.FunctionVersion
+	10, // 13: functions.v1.Function.versions:type_name -> functions.v1.FunctionVersion
+	34, // 14: functions.v1.Function.resources:type_name -> functions.v1.Resources
 	1,  // 15: functions.v1.CreateFunctionRequest.spec:type_name -> functions.v1.FunctionSpec
 	30, // 16: functions.v1.CreateFunctionRequest.secret_values:type_name -> functions.v1.CreateFunctionRequest.SecretValuesEntry
-	11, // 17: functions.v1.CreateFunctionResponse.function:type_name -> functions.v1.Function
-	10, // 18: functions.v1.CreateFunctionResponse.version:type_name -> functions.v1.FunctionVersion
-	11, // 19: functions.v1.UpdateFunctionResponse.function:type_name -> functions.v1.Function
-	11, // 20: functions.v1.GetFunctionResponse.function:type_name -> functions.v1.Function
-	35, // 21: functions.v1.ListFunctionsRequest.pagination:type_name -> functions.v1.PaginationRequest
-	11, // 22: functions.v1.ListFunctionsResponse.functions:type_name -> functions.v1.Function
-	36, // 23: functions.v1.ListFunctionsResponse.pagination:type_name -> functions.v1.PaginationResponse
-	1,  // 24: functions.v1.CreateFunctionVersionRequest.spec:type_name -> functions.v1.FunctionSpec
-	31, // 25: functions.v1.CreateFunctionVersionRequest.secret_values:type_name -> functions.v1.CreateFunctionVersionRequest.SecretValuesEntry
-	10, // 26: functions.v1.CreateFunctionVersionResponse.version:type_name -> functions.v1.FunctionVersion
-	10, // 27: functions.v1.GetFunctionVersionResponse.version:type_name -> functions.v1.FunctionVersion
-	35, // 28: functions.v1.ListFunctionVersionsRequest.pagination:type_name -> functions.v1.PaginationRequest
-	10, // 29: functions.v1.ListFunctionVersionsResponse.versions:type_name -> functions.v1.FunctionVersion
-	36, // 30: functions.v1.ListFunctionVersionsResponse.pagination:type_name -> functions.v1.PaginationResponse
-	31, // [31:31] is the sub-list for method output_type
-	31, // [31:31] is the sub-list for method input_type
-	31, // [31:31] is the sub-list for extension type_name
-	31, // [31:31] is the sub-list for extension extendee
-	0,  // [0:31] is the sub-list for field type_name
+	34, // 17: functions.v1.CreateFunctionRequest.resources:type_name -> functions.v1.Resources
+	11, // 18: functions.v1.CreateFunctionResponse.function:type_name -> functions.v1.Function
+	10, // 19: functions.v1.CreateFunctionResponse.version:type_name -> functions.v1.FunctionVersion
+	34, // 20: functions.v1.UpdateFunctionRequest.resources:type_name -> functions.v1.Resources
+	11, // 21: functions.v1.UpdateFunctionResponse.function:type_name -> functions.v1.Function
+	11, // 22: functions.v1.GetFunctionResponse.function:type_name -> functions.v1.Function
+	35, // 23: functions.v1.ListFunctionsRequest.pagination:type_name -> functions.v1.PaginationRequest
+	11, // 24: functions.v1.ListFunctionsResponse.functions:type_name -> functions.v1.Function
+	36, // 25: functions.v1.ListFunctionsResponse.pagination:type_name -> functions.v1.PaginationResponse
+	1,  // 26: functions.v1.CreateFunctionVersionRequest.spec:type_name -> functions.v1.FunctionSpec
+	31, // 27: functions.v1.CreateFunctionVersionRequest.secret_values:type_name -> functions.v1.CreateFunctionVersionRequest.SecretValuesEntry
+	10, // 28: functions.v1.CreateFunctionVersionResponse.version:type_name -> functions.v1.FunctionVersion
+	10, // 29: functions.v1.GetFunctionVersionResponse.version:type_name -> functions.v1.FunctionVersion
+	35, // 30: functions.v1.ListFunctionVersionsRequest.pagination:type_name -> functions.v1.PaginationRequest
+	10, // 31: functions.v1.ListFunctionVersionsResponse.versions:type_name -> functions.v1.FunctionVersion
+	36, // 32: functions.v1.ListFunctionVersionsResponse.pagination:type_name -> functions.v1.PaginationResponse
+	33, // [33:33] is the sub-list for method output_type
+	33, // [33:33] is the sub-list for method input_type
+	33, // [33:33] is the sub-list for extension type_name
+	33, // [33:33] is the sub-list for extension extendee
+	0,  // [0:33] is the sub-list for field type_name
 }
 
 func init() { file_functions_v1_functions_proto_init() }

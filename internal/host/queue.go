@@ -9,7 +9,11 @@ import (
 	"sync/atomic"
 	"time"
 
+	"google.golang.org/protobuf/proto"
+
+	functionsv1 "github.com/galaxy-io/alchemy/api/functions/v1"
 	hostv1 "github.com/galaxy-io/alchemy/api/host/v1"
+	"github.com/galaxy-io/alchemy/internal/artifact"
 	"github.com/galaxy-io/alchemy/internal/bus"
 )
 
@@ -30,6 +34,9 @@ const (
 	// retryDelay is how long an invocation this host could not take goes
 	// back to the queue for, so another host takes it.
 	retryDelay = 100 * time.Millisecond
+	// functionConfigFor is how long a host uses a function's config before
+	// it reads it again, so a change reaches queued invocations this fast.
+	functionConfigFor = time.Second
 )
 
 // openQueue opens the invoke queue, waiting for a server to create it,
@@ -96,6 +103,10 @@ func (h *Host) take(ctx context.Context, q *bus.InvokeQueue, p *bus.Pulled) {
 		return
 	}
 
+	cfg := h.functionConfig(ctx, q, req.GetInvocation(), log)
+	resize(req, cfg)
+	log = log.With("artifact_id", req.GetArtifact().GetId())
+
 	var lease atomic.Pointer[bus.Lease]
 	stop := h.keepAlive(ctx, p, &lease, log)
 	defer stop()
@@ -115,7 +126,7 @@ func (h *Host) take(ctx context.Context, q *bus.InvokeQueue, p *bus.Pulled) {
 	} else {
 		// The lease is taken only once the invocation can run, so a build
 		// holds none of the function's seats.
-		if limit := int(req.GetMaxConcurrency()); limit > 0 {
+		if limit := int(cfg.GetMaxConcurrency()); limit > 0 {
 			l, err := q.Lease(ctx, req.GetInvocation().GetFunctionId(), limit, leaseTTL)
 			if err != nil {
 				log.Warn("take lease", "err", err)
@@ -127,8 +138,10 @@ func (h *Host) take(ctx context.Context, q *bus.InvokeQueue, p *bus.Pulled) {
 			lease.Store(l)
 			defer func() { _ = l.Release(context.WithoutCancel(ctx)) }()
 		}
+		done := h.runningOne(req.GetInvocation())
 		var retry bool
 		resp, retry = h.invoke(h.background, req)
+		done()
 		if retry {
 			log.Info("handing invocation back to the queue", "reason", resp.GetError().GetMessage())
 			_ = p.Retry(retryDelay)
@@ -215,4 +228,80 @@ func (h *Host) keepAlive(ctx context.Context, p *bus.Pulled, lease *atomic.Point
 		}
 	})
 	return func() { close(done) }
+}
+
+// functionKey names one tenant's function.
+type functionKey struct{ tenant, function string }
+
+// runningOne counts inv as running until the returned func is called.
+func (h *Host) runningOne(inv *functionsv1.Invocation) (done func()) {
+	key := functionKey{inv.GetTenantId(), inv.GetFunctionId()}
+	h.mu.Lock()
+	h.running[key]++
+	h.mu.Unlock()
+	return func() {
+		h.mu.Lock()
+		h.running[key]--
+		if h.running[key] <= 0 {
+			delete(h.running, key)
+		}
+		h.mu.Unlock()
+	}
+}
+
+// runningByFunction is what the host is running, as its heartbeat says it.
+func (h *Host) runningByFunction() []*hostv1.FunctionRunning {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	out := make([]*hostv1.FunctionRunning, 0, len(h.running))
+	for key, n := range h.running {
+		out = append(out, &hostv1.FunctionRunning{TenantId: key.tenant, FunctionId: key.function, Count: n})
+	}
+	return out
+}
+
+// cachedFunctionConfig is a function's config and when it was read.
+type cachedFunctionConfig struct {
+	cfg *hostv1.FunctionConfig
+	at  time.Time
+}
+
+// functionConfig is inv's function's config, read from the queue at most
+// once every functionConfigFor. When it cannot be read, the last value
+// stands; nil means none was ever recorded.
+func (h *Host) functionConfig(ctx context.Context, q *bus.InvokeQueue, inv *functionsv1.Invocation, log *slog.Logger) *hostv1.FunctionConfig {
+	key := functionKey{inv.GetTenantId(), inv.GetFunctionId()}
+	h.mu.Lock()
+	cached, ok := h.functionConfigs[key]
+	h.mu.Unlock()
+	if ok && time.Since(cached.at) < functionConfigFor {
+		return cached.cfg
+	}
+	cfg, err := q.FunctionConfig(ctx, key.tenant, key.function)
+	if err != nil {
+		log.Warn("read function config", "err", err)
+		return cached.cfg
+	}
+	h.mu.Lock()
+	h.functionConfigs[key] = cachedFunctionConfig{cfg: cfg, at: time.Now()}
+	h.mu.Unlock()
+	return cfg
+}
+
+// resize has req run at its function's current resources. The server named
+// the artifact when it queued req; a change since makes it the artifact
+// those resources build, named as hosts name what they build.
+func resize(req *hostv1.InvokeRequest, cfg *hostv1.FunctionConfig) {
+	r := cfg.GetResources()
+	a := req.GetArtifact()
+	if r == nil || (r.GetVcpus() == a.GetVcpus() && r.GetMemoryMib() == a.GetMemoryMib()) {
+		return
+	}
+	a = proto.CloneOf(a)
+	a.Vcpus, a.MemoryMib = r.GetVcpus(), r.GetMemoryMib()
+	a.Id = artifact.ID(a)
+	req.Artifact = a
+	if req.GetBuild() != nil {
+		req.Build.Resources = r
+	}
 }

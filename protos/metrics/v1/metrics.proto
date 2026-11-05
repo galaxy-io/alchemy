@@ -9,6 +9,9 @@ package metrics.v1;
 service MetricsService {
   rpc QueryTimeseries(QueryTimeseriesRequest) returns (QueryTimeseriesResponse);
   rpc QueryAggregate(QueryAggregateRequest) returns (QueryAggregateResponse);
+  // GetQueue is what is in flight right now, from the queue rather than
+  // the invocations table: invocations waiting to start, and running.
+  rpc GetQueue(GetQueueRequest) returns (GetQueueResponse);
 }
 
 // Metric is an aggregatable measure over invocations. COUNT and the byte
@@ -100,4 +103,17 @@ message AggregateRow {
 
 message QueryAggregateResponse {
   repeated AggregateRow rows = 1;
+}
+
+// GetQueueRequest narrows the counts to function_ids, or every function of
+// the tenant when empty.
+message GetQueueRequest {
+  repeated string function_ids = 1;
+}
+
+message GetQueueResponse {
+  // queued is invocations waiting to start: in the queue, or taken by a host
+  // that is building the function or waiting on its max_concurrency.
+  int64 queued = 1;
+  int64 running = 2;
 }

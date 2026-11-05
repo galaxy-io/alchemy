@@ -41,6 +41,9 @@ CREATE TABLE functions (
   -- limit on concurrency.
   timeout_ms         BIGINT      NOT NULL,
   max_concurrency    INTEGER     NOT NULL DEFAULT 0,
+  -- vcpus and memory_mib size the microVM of every version.
+  vcpus              INTEGER     NOT NULL,
+  memory_mib         INTEGER     NOT NULL,
   -- A deleted function stays, flagged and renamed out of the way, so its
   -- versions and invocations keep their history.
   is_deleted         BOOLEAN     NOT NULL DEFAULT false,

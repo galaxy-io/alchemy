@@ -10,6 +10,7 @@ import {
 import type { FunctionContractKind } from "@/pages/functions/types";
 import { FunctionContractSide, FunctionSourceKind } from "@/pages/functions/types";
 
+import { formatMemory } from "@/utils/format";
 import { formatJson } from "@/utils/json";
 
 export const CREATE_FUNCTION_MODAL_RESOURCES_MAX_WIDTH = 560;
@@ -30,7 +31,10 @@ export const CREATE_FUNCTION_MODAL_MODE_TO_SKIPPED_STEPS_MAP: Record<
   CreateFunctionModalStep[]
 > = {
   [CreateFunctionModalMode.FUNCTION]: [],
-  [CreateFunctionModalMode.VERSION]: [CreateFunctionModalStep.DETAILS],
+  [CreateFunctionModalMode.VERSION]: [
+    CreateFunctionModalStep.RESOURCES,
+    CreateFunctionModalStep.DETAILS,
+  ],
 };
 
 export const CREATE_FUNCTION_MODAL_SOURCE_KIND_TO_SKIPPED_STEPS_MAP: Record<
@@ -216,3 +220,14 @@ export const CREATE_FUNCTION_MODAL_SECRET_DESCRIPTION = "Encrypted at rest, hidd
 
 export const CREATE_FUNCTION_MODAL_SOURCE_KIND_NAME = "create-function-source-kind";
 export const CREATE_FUNCTION_MODAL_COMMAND_SEPARATORS = [" ", ","];
+
+export const CREATE_FUNCTION_MODAL_VCPUS_SLIDER_MARKS = CREATE_FUNCTION_MODAL_VCPUS_MARKS.map(
+  (value) => ({
+    value,
+    label: String(value),
+  }),
+);
+
+export const CREATE_FUNCTION_MODAL_MEMORY_SLIDER_MARKS = CREATE_FUNCTION_MODAL_MEMORY_MIB_MARKS.map(
+  (value) => ({ value, label: formatMemory(value) }),
+);
