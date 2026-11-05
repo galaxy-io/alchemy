@@ -24,6 +24,7 @@ import {
 import {
   OBSERVABILITY_CHART_HEIGHT,
   OBSERVABILITY_DEFAULT_TRAFFIC_FILL,
+  OBSERVABILITY_REFRESH_INTERVAL_TO_MS_MAP,
 } from "@/pages/observability/constants";
 import { useObservabilityBucketStart } from "@/pages/observability/hooks/useObservabilityBucketStart";
 import type { ObservabilityTrafficFill } from "@/pages/observability/types";
@@ -35,11 +36,14 @@ import { useQueryTimeseriesQuery } from "@/api/queries/metrics";
 
 const ObservabilityTrafficWidget: FC = () => {
   const updateSearch = useAlchemySearchUpdate<ObservabilitySearch>();
-  const { traffic: fill } = useObservabilitySearch();
+  const { traffic: fill, refreshInterval } = useObservabilitySearch();
   const bucketStartMs = useObservabilityBucketStart(OBSERVABILITY_TRAFFIC_GRANULARITY);
 
   const input = useMemo(() => createObservabilityTrafficInput(bucketStartMs), [bucketStartMs]);
-  const { data, isLoading } = useQueryTimeseriesQuery({ input });
+  const { data, isLoading } = useQueryTimeseriesQuery({
+    input,
+    options: { refetchInterval: OBSERVABILITY_REFRESH_INTERVAL_TO_MS_MAP[refreshInterval] },
+  });
 
   const cells = useMemo(
     () => createObservabilityTrafficCells(data?.series ?? [], fill),

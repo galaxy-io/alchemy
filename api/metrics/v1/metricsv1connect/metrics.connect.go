@@ -39,12 +39,17 @@ const (
 	// MetricsServiceQueryAggregateProcedure is the fully-qualified name of the MetricsService's
 	// QueryAggregate RPC.
 	MetricsServiceQueryAggregateProcedure = "/metrics.v1.MetricsService/QueryAggregate"
+	// MetricsServiceGetQueueProcedure is the fully-qualified name of the MetricsService's GetQueue RPC.
+	MetricsServiceGetQueueProcedure = "/metrics.v1.MetricsService/GetQueue"
 )
 
 // MetricsServiceClient is a client for the metrics.v1.MetricsService service.
 type MetricsServiceClient interface {
 	QueryTimeseries(context.Context, *connect.Request[v1.QueryTimeseriesRequest]) (*connect.Response[v1.QueryTimeseriesResponse], error)
 	QueryAggregate(context.Context, *connect.Request[v1.QueryAggregateRequest]) (*connect.Response[v1.QueryAggregateResponse], error)
+	// GetQueue is what is in flight right now, from the queue rather than
+	// the invocations table: invocations waiting to start, and running.
+	GetQueue(context.Context, *connect.Request[v1.GetQueueRequest]) (*connect.Response[v1.GetQueueResponse], error)
 }
 
 // NewMetricsServiceClient constructs a client for the metrics.v1.MetricsService service. By
@@ -70,6 +75,12 @@ func NewMetricsServiceClient(httpClient connect.HTTPClient, baseURL string, opts
 			connect.WithSchema(metricsServiceMethods.ByName("QueryAggregate")),
 			connect.WithClientOptions(opts...),
 		),
+		getQueue: connect.NewClient[v1.GetQueueRequest, v1.GetQueueResponse](
+			httpClient,
+			baseURL+MetricsServiceGetQueueProcedure,
+			connect.WithSchema(metricsServiceMethods.ByName("GetQueue")),
+			connect.WithClientOptions(opts...),
+		),
 	}
 }
 
@@ -77,6 +88,7 @@ func NewMetricsServiceClient(httpClient connect.HTTPClient, baseURL string, opts
 type metricsServiceClient struct {
 	queryTimeseries *connect.Client[v1.QueryTimeseriesRequest, v1.QueryTimeseriesResponse]
 	queryAggregate  *connect.Client[v1.QueryAggregateRequest, v1.QueryAggregateResponse]
+	getQueue        *connect.Client[v1.GetQueueRequest, v1.GetQueueResponse]
 }
 
 // QueryTimeseries calls metrics.v1.MetricsService.QueryTimeseries.
@@ -89,10 +101,18 @@ func (c *metricsServiceClient) QueryAggregate(ctx context.Context, req *connect.
 	return c.queryAggregate.CallUnary(ctx, req)
 }
 
+// GetQueue calls metrics.v1.MetricsService.GetQueue.
+func (c *metricsServiceClient) GetQueue(ctx context.Context, req *connect.Request[v1.GetQueueRequest]) (*connect.Response[v1.GetQueueResponse], error) {
+	return c.getQueue.CallUnary(ctx, req)
+}
+
 // MetricsServiceHandler is an implementation of the metrics.v1.MetricsService service.
 type MetricsServiceHandler interface {
 	QueryTimeseries(context.Context, *connect.Request[v1.QueryTimeseriesRequest]) (*connect.Response[v1.QueryTimeseriesResponse], error)
 	QueryAggregate(context.Context, *connect.Request[v1.QueryAggregateRequest]) (*connect.Response[v1.QueryAggregateResponse], error)
+	// GetQueue is what is in flight right now, from the queue rather than
+	// the invocations table: invocations waiting to start, and running.
+	GetQueue(context.Context, *connect.Request[v1.GetQueueRequest]) (*connect.Response[v1.GetQueueResponse], error)
 }
 
 // NewMetricsServiceHandler builds an HTTP handler from the service implementation. It returns the
@@ -114,12 +134,20 @@ func NewMetricsServiceHandler(svc MetricsServiceHandler, opts ...connect.Handler
 		connect.WithSchema(metricsServiceMethods.ByName("QueryAggregate")),
 		connect.WithHandlerOptions(opts...),
 	)
+	metricsServiceGetQueueHandler := connect.NewUnaryHandler(
+		MetricsServiceGetQueueProcedure,
+		svc.GetQueue,
+		connect.WithSchema(metricsServiceMethods.ByName("GetQueue")),
+		connect.WithHandlerOptions(opts...),
+	)
 	return "/metrics.v1.MetricsService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case MetricsServiceQueryTimeseriesProcedure:
 			metricsServiceQueryTimeseriesHandler.ServeHTTP(w, r)
 		case MetricsServiceQueryAggregateProcedure:
 			metricsServiceQueryAggregateHandler.ServeHTTP(w, r)
+		case MetricsServiceGetQueueProcedure:
+			metricsServiceGetQueueHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
 		}
@@ -135,4 +163,8 @@ func (UnimplementedMetricsServiceHandler) QueryTimeseries(context.Context, *conn
 
 func (UnimplementedMetricsServiceHandler) QueryAggregate(context.Context, *connect.Request[v1.QueryAggregateRequest]) (*connect.Response[v1.QueryAggregateResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("metrics.v1.MetricsService.QueryAggregate is not implemented"))
+}
+
+func (UnimplementedMetricsServiceHandler) GetQueue(context.Context, *connect.Request[v1.GetQueueRequest]) (*connect.Response[v1.GetQueueResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("metrics.v1.MetricsService.GetQueue is not implemented"))
 }

@@ -47,10 +47,6 @@ func (s *Service) versionLayers(ctx context.Context, v *sqlcgen.FunctionVersion,
 		return nil, "", fmt.Errorf("artifacts bucket: %w", err)
 	}
 
-	hosts := s.placedHosts(v.FunctionID)
-	if len(hosts) == 0 {
-		return nil, "", errNoHosts
-	}
 	req := &hostv1.CompileRequest{
 		TenantId:  v.TenantID,
 		Image:     buildImage,
@@ -60,10 +56,10 @@ func (s *Service) versionLayers(ctx context.Context, v *sqlcgen.FunctionVersion,
 		Vcpus:     compileVCPUs,
 		MemoryMib: compileMemoryMiB,
 	}
-	// The first placed host that has room compiles. A compile that fails is
+	// The least busy host that has room compiles. A compile that fails is
 	// the source's fault and is not tried elsewhere.
 	err = errNoHosts
-	for _, name := range hosts {
+	for _, name := range s.hostsByLoad() {
 		resp := &hostv1.CompileResponse{}
 		reqCtx, cancel := context.WithTimeout(ctx, compileTimeout+time.Minute)
 		rerr := s.bus.Request(reqCtx, bus.HostCompileSubject(name), req, resp)

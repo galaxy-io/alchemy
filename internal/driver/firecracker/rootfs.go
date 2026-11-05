@@ -43,7 +43,7 @@ const supervisorPath = "/sbin/supervisor"
 // layers alone, cached by their digests. The guest overlays the second on
 // the first. No container daemon is involved; Firecracker only sees the
 // ext4 files.
-func (d *Driver) Build(ctx context.Context, spec *functionsv1.FunctionSpec, layers []driver.Layer) (*driver.Artifact, error) {
+func (d *Driver) Build(ctx context.Context, spec *functionsv1.FunctionSpec, resources *functionsv1.Resources, layers []driver.Layer) (*driver.Artifact, error) {
 	ref, err := name.ParseReference(spec.GetImage())
 	if err != nil {
 		return nil, fmt.Errorf("image %q: %w", spec.GetImage(), err)
@@ -112,8 +112,8 @@ func (d *Driver) Build(ctx context.Context, spec *functionsv1.FunctionSpec, laye
 		Env:         env,
 		WorkingDir:  conf.WorkingDir,
 		Protocol:    driver.SupervisorProtocol(spec.GetProtocol()),
-		VCPUs:       spec.GetResources().GetVcpus(),
-		MemoryMiB:   spec.GetResources().GetMemoryMib(),
+		VCPUs:       resources.GetVcpus(),
+		MemoryMiB:   resources.GetMemoryMib(),
 	}, nil
 }
 

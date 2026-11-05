@@ -14,7 +14,10 @@ import type { Function as AlchemyFunction } from "@/gen/functions/v1/functions_p
 import { INVOCATIONS_DEFAULT_TIMEFRAME } from "@/components/invocations/constants";
 
 import { FUNCTION_WORKBENCH_DEFAULT_FILE } from "@/pages/functions/workbench/constants";
-import { OBSERVABILITY_DEFAULT_TRAFFIC_FILL } from "@/pages/observability/constants";
+import {
+  OBSERVABILITY_DEFAULT_REFRESH_INTERVAL,
+  OBSERVABILITY_DEFAULT_TRAFFIC_FILL,
+} from "@/pages/observability/constants";
 
 import type { AlchemyPath } from "@/module/paths";
 import {
@@ -106,6 +109,7 @@ export const useObservabilitySearch = () =>
       return {
         timeframe: parsed.timeframe ?? INVOCATIONS_DEFAULT_TIMEFRAME,
         traffic: parsed.traffic ?? OBSERVABILITY_DEFAULT_TRAFFIC_FILL,
+        refreshInterval: parsed.refreshInterval ?? OBSERVABILITY_DEFAULT_REFRESH_INTERVAL,
         invocationsBucket: parsed.invocationsBucket,
         invocationsStatus: parsed.invocationsStatus,
       };

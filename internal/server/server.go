@@ -40,9 +40,14 @@ type Config struct {
 	GatherWindow time.Duration
 	// HostTTL is how long a host stays listed after its last heartbeat.
 	HostTTL time.Duration
-	// HostsPerFunction is how many hosts each function is built on and
-	// takes invocations from, when that many are live.
-	HostsPerFunction int
+	// InvokeDeadline is how long a call waits for its result when its caller
+	// sets no deadline of its own, queued and running together.
+	InvokeDeadline time.Duration
+	// InvokeMaxDeadline caps the deadline a caller may set, and is how long
+	// the queue keeps an invocation no host took.
+	InvokeMaxDeadline time.Duration
+	// InvokeReplicas is how many NATS servers keep each queued invocation.
+	InvokeReplicas int
 	// IdempotencyWindow is how long a call's idempotency key keeps later
 	// calls with the same key from running again.
 	IdempotencyWindow time.Duration
@@ -78,7 +83,9 @@ func DefaultConfig() Config {
 		BuildTimeout:        5 * time.Minute,
 		GatherWindow:        500 * time.Millisecond,
 		HostTTL:             10 * time.Second,
-		HostsPerFunction:    3,
+		InvokeDeadline:      5 * time.Minute,
+		InvokeMaxDeadline:   time.Hour,
+		InvokeReplicas:      1,
 		IdempotencyWindow:   24 * time.Hour,
 		LogRetention:        time.Hour,
 		LogMaxBytes:         1 << 30,
@@ -107,6 +114,7 @@ type Service struct {
 	secrets   secret.Secrets // nil when the server has no secret provider
 	log       *slog.Logger
 	tracker   *invocationTracker // invocations this server holds
+	queue     *bus.InvokeQueue
 
 	// background scopes builds and subscriptions to the service's life.
 	background context.Context
@@ -114,18 +122,21 @@ type Service struct {
 	tasks      sync.WaitGroup
 	subs       []*bus.Subscription
 
-	mu         sync.Mutex
-	versions   map[string]*compiledVersion // by version id
-	hosts      map[string]*knownHost       // by host name, from heartbeats
-	servers    map[string]*knownServer     // by server name, from heartbeats
-	hostBuilds map[string]time.Time        // builds sent to one host, by host/artifact
+	mu       sync.Mutex
+	versions map[string]*compiledVersion          // by version id
+	hosts    map[string]*knownHost                // by host name, from heartbeats
+	servers  map[string]*knownServer              // by server name, from heartbeats
+	waiting  map[string]chan *hostv1.InvokeResult // results this server waits on, by invocation id
 }
 
-// compiledVersion is the in-memory half of a ready version.
+// compiledVersion is the in-memory half of a ready version. resolve sets
+// timeout from the function on a copy for each call, so a change applies
+// to the next invocation.
 type compiledVersion struct {
 	row      *sqlcgen.FunctionVersion
 	spec     *functionsv1.FunctionSpec
 	artifact *hostv1.Artifact
+	timeout  time.Duration
 }
 
 // New returns a service backed by store and b, reading function logs from
@@ -150,7 +161,7 @@ func New(ctx context.Context, cfg Config, store *postgres.Store, b *bus.Bus, log
 		versions:   make(map[string]*compiledVersion),
 		hosts:      make(map[string]*knownHost),
 		servers:    make(map[string]*knownServer),
-		hostBuilds: make(map[string]time.Time),
+		waiting:    make(map[string]chan *hostv1.InvokeResult),
 	}
 
 	if err := b.EnsureLogStream(ctx, bus.LogStreamConfig{MaxAge: cfg.LogRetention, MaxBytes: cfg.LogMaxBytes}); err != nil {
@@ -158,6 +169,20 @@ func New(ctx context.Context, cfg Config, store *postgres.Store, b *bus.Bus, log
 		return nil, fmt.Errorf("%w (NATS must have JetStream enabled)", err)
 	}
 	if err := b.EnsureInvocationStream(ctx, bus.InvocationStreamConfig{MaxAge: cfg.InvocationRetention, Replicas: cfg.InvocationReplicas}); err != nil {
+		stop()
+		return nil, err
+	}
+	if err := b.EnsureInvokeQueue(ctx, bus.InvokeQueueConfig{Replicas: cfg.InvokeReplicas, MaxAge: cfg.InvokeMaxDeadline, AckWait: invokeAckWait}); err != nil {
+		stop()
+		return nil, err
+	}
+	queue, err := b.InvokeQueue(ctx)
+	if err != nil {
+		stop()
+		return nil, err
+	}
+	s.queue = queue
+	if err := s.syncFunctionConfigs(ctx); err != nil {
 		stop()
 		return nil, err
 	}
@@ -177,7 +202,7 @@ func New(ctx context.Context, cfg Config, store *postgres.Store, b *bus.Bus, log
 	}
 	s.tasks.Go(s.heartbeat)
 	s.tasks.Go(s.record)
-	s.tasks.Go(s.reconcileHosts)
+	s.tasks.Go(s.resumeBuilds)
 	s.tasks.Go(s.expireKeys)
 	return s, nil
 }

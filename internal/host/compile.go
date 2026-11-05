@@ -59,20 +59,20 @@ func (h *Host) handleCompile(ctx context.Context, data []byte) proto.Message {
 		memory = min(memory, uint32(min(h.cfg.MemoryMiB, math.MaxUint32))) //nolint:gosec // bounded above
 	}
 	spec := &functionsv1.FunctionSpec{
-		Image:     req.GetImage(),
-		Protocol:  functionsv1.InvocationProtocol_INVOCATION_PROTOCOL_EXEC,
-		Resources: &functionsv1.Resources{Vcpus: req.GetVcpus(), MemoryMib: memory},
+		Image:    req.GetImage(),
+		Protocol: functionsv1.InvocationProtocol_INVOCATION_PROTOCOL_EXEC,
 	}
+	resources := &functionsv1.Resources{Vcpus: req.GetVcpus(), MemoryMib: memory}
 	// Builds and evictions take the drives exclusively; this one holds them
 	// until the compiler has run.
 	h.drives.RLock()
 	defer h.drives.RUnlock()
-	built, err := h.driver.Build(ctx, spec, layers)
+	built, err := h.driver.Build(ctx, spec, resources, layers)
 	if err != nil {
 		return compileError("internal", fmt.Errorf("build %s: %w", req.GetImage(), err))
 	}
 	defer h.forgetCompile(built)
-	artifact := toProto(&hostv1.BuildRequest{TenantId: req.GetTenantId(), Spec: spec, Layers: []*hostv1.Layer{req.GetSource()}}, built)
+	artifact := toProto(&hostv1.BuildRequest{TenantId: req.GetTenantId(), Spec: spec, Resources: resources, Layers: []*hostv1.Layer{req.GetSource()}}, built)
 
 	live, err := h.admit(artifact)
 	if err != nil {

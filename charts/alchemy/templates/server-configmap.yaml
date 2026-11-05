@@ -8,10 +8,11 @@ metadata:
 data:
   # API
   ADDR: ":{{ .Values.server.service.port }}"
-  # Placement
-  HOSTS_PER_FUNCTION: {{ .Values.server.hostsPerFunction | quote }}
   # Invocations
   IDEMPOTENCY_WINDOW: {{ .Values.server.idempotencyWindow | quote }}
+  INVOKE_DEADLINE: {{ .Values.server.invoke.deadline | quote }}
+  INVOKE_MAX_DEADLINE: {{ .Values.server.invoke.maxDeadline | quote }}
+  INVOKE_QUEUE_REPLICAS: {{ .Values.server.invoke.queueReplicas | quote }}
   # Observability
   LOG_LEVEL: {{ .Values.server.logLevel | quote }}
   LOG_FORMAT: {{ .Values.server.logFormat | quote }}

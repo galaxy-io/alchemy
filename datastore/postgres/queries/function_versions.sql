@@ -63,6 +63,3 @@ SET status = $3, status_message = $4, image_digest = $5, rootfs_bytes = $6, buil
     artifact_id = $8, artifact = $9, build_ended_at = now()
 WHERE id = $1 AND status = 'building' AND build_started_at = $2
 RETURNING *;
-
--- name: GetFunctionVersionByArtifact :one
-SELECT * FROM function_versions WHERE tenant_id = $1 AND artifact_id = $2 ORDER BY version DESC LIMIT 1;

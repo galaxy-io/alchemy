@@ -15,6 +15,8 @@ import { useInvocationsTimeframeSince } from "@/components/invocations/hooks/use
 import InvocationStatusSwatch from "@/components/invocations/InvocationStatusSwatch";
 import { InvocationsTimeframe } from "@/components/invocations/types";
 
+import { useGetQueueQuery } from "@/api/queries/metrics";
+
 import { formatCount, formatMillis, formatRatio } from "@/utils/format";
 
 interface FunctionOverviewMetricsProps {
@@ -25,6 +27,7 @@ const FunctionOverviewMetrics: FC<FunctionOverviewMetricsProps> = ({ functionId 
   const sinceMs = useInvocationsTimeframeSince(InvocationsTimeframe.TWENTY_FOUR_HOURS);
   const metrics = useInvocationMetrics({ sinceMs, functionId });
   const succeeded = metrics.countByStatus.get(InvocationStatus.SUCCEEDED) ?? 0;
+  const { data: queue, isLoading: isQueueLoading } = useGetQueueQuery({ functionId });
 
   return (
     <BigNumberGroup
@@ -40,6 +43,18 @@ const FunctionOverviewMetrics: FC<FunctionOverviewMetricsProps> = ({ functionId 
         />
       }
     >
+      <BigNumber
+        label={INVOCATION_STATUS_TO_LABEL_MAP[InvocationStatus.PENDING]}
+        value={formatCount(Number(queue?.queued ?? 0n))}
+        suffix={<InvocationStatusSwatch status={InvocationStatus.PENDING} />}
+        isLoading={isQueueLoading}
+      />
+      <BigNumber
+        label={INVOCATION_STATUS_TO_LABEL_MAP[InvocationStatus.RUNNING]}
+        value={formatCount(Number(queue?.running ?? 0n))}
+        suffix={<InvocationStatusSwatch status={InvocationStatus.RUNNING} />}
+        isLoading={isQueueLoading}
+      />
       {INVOCATION_SETTLED_STATUSES.map((status) => (
         <BigNumber
           key={status}

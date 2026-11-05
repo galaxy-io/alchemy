@@ -10,7 +10,6 @@ import (
 
 	functionsv1 "github.com/galaxy-io/alchemy/api/functions/v1"
 	hostv1 "github.com/galaxy-io/alchemy/api/host/v1"
-	"github.com/galaxy-io/alchemy/datastore/postgres/sqlcgen"
 	"github.com/galaxy-io/alchemy/internal/bus"
 )
 
@@ -18,13 +17,13 @@ import (
 type knownHost struct {
 	host      *functionsv1.Host
 	artifacts map[string]*hostv1.ArtifactState // what it holds, by artifact id
+	running   []*hostv1.FunctionRunning        // what it runs, by function
 	seen      time.Time
 }
 
 // knownServer is what another server last said about itself.
 type knownServer struct {
-	pending int32
-	seen    time.Time
+	seen time.Time
 }
 
 // serverHeartbeatInterval is how often a server announces itself.
@@ -42,6 +41,7 @@ func (s *Service) listen() error {
 		{bus.HeartbeatWildcard, s.onHeartbeat, false},
 		{bus.ServerHeartbeatWildcard, s.onServerHeartbeat, false},
 		{bus.ServerStateSubject(s.cfg.Name), s.onInvocationState, false},
+		{bus.ServerResultSubject(s.cfg.Name), s.onResult, false},
 		{bus.ServerInvocationsSubject, s.handleActiveInvocations, true},
 		{bus.ServerSecretsSubject, s.handleSecrets, true},
 	}
@@ -72,7 +72,7 @@ func (s *Service) heartbeat() {
 	defer ticker.Stop()
 	for {
 		s.tracker.forget(time.Now())
-		hb := &hostv1.ServerHeartbeat{Name: s.cfg.Name, Pending: int32(s.tracker.pending())} //nolint:gosec // small
+		hb := &hostv1.ServerHeartbeat{Name: s.cfg.Name}
 		if err := s.bus.Publish(bus.ServerHeartbeatSubject(s.cfg.Name), hb); err != nil {
 			s.log.Warn("heartbeat", "err", err)
 		}
@@ -90,7 +90,7 @@ func (s *Service) onServerHeartbeat(_ context.Context, data []byte) proto.Messag
 		return nil
 	}
 	s.mu.Lock()
-	s.servers[msg.GetName()] = &knownServer{pending: msg.GetPending(), seen: time.Now()}
+	s.servers[msg.GetName()] = &knownServer{seen: time.Now()}
 	s.mu.Unlock()
 	return nil
 }
@@ -122,7 +122,7 @@ func (s *Service) onHeartbeat(_ context.Context, data []byte) proto.Message {
 		artifacts[st.GetId()] = st
 	}
 	s.mu.Lock()
-	s.hosts[msg.GetHost().GetHostname()] = &knownHost{host: msg.GetHost(), artifacts: artifacts, seen: time.Now()}
+	s.hosts[msg.GetHost().GetHostname()] = &knownHost{host: msg.GetHost(), artifacts: artifacts, running: msg.GetRunning(), seen: time.Now()}
 	s.mu.Unlock()
 	return nil
 }
@@ -139,6 +139,9 @@ func (s *Service) onInvocationState(_ context.Context, data []byte) proto.Messag
 	inv := s.tracker.update(ev.GetInvocationId(), func(inv *functionsv1.Invocation) {
 		if terminal(inv.GetStatus()) {
 			return
+		}
+		if h := ev.GetHost(); h != "" {
+			inv.Host = h
 		}
 		switch ev.GetStatus() {
 		case functionsv1.InvocationStatus_INVOCATION_STATUS_STARTING:
@@ -188,21 +191,14 @@ func (s *Service) ListInstances(ctx context.Context, req *connect.Request[functi
 		return nil, connect.NewError(connect.CodeUnavailable, err)
 	}
 	resp := &functionsv1.ListInstancesResponse{}
-	versions := map[string]*sqlcgen.FunctionVersion{}
 	for _, r := range replies {
 		for _, in := range r.(*hostv1.ListInstancesResponse).GetInstances() {
-			v, ok := versions[in.GetArtifactId()]
-			if !ok {
-				row, err := s.store.GetFunctionVersionByArtifact(ctx, sqlcgen.GetFunctionVersionByArtifactParams{TenantID: tenant, ArtifactID: in.GetArtifactId()})
-				if err == nil {
-					v = row
-				}
-				versions[in.GetArtifactId()] = v
+			// Hosts name the function and version each instance runs, which
+			// holds for an artifact a resource change derived and no version
+			// stores.
+			if in.GetTenantId() != tenant {
+				continue
 			}
-			if v == nil {
-				continue // another tenant's, or an artifact this server never built
-			}
-			in.FunctionId, in.Version = v.FunctionID, v.Version
 			if req.Msg.GetFunctionId() != "" && in.GetFunctionId() != req.Msg.GetFunctionId() {
 				continue
 			}
