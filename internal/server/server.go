@@ -108,6 +108,21 @@ func DefaultConfig() Config {
 	}
 }
 
+// maxRetryBackoff caps both retry backoff settings. A longer wait between
+// attempts mostly outlives the deadline it has to fit in.
+const maxRetryBackoff = time.Hour
+
+// Validate rejects settings the service cannot run with.
+func (c Config) Validate() error {
+	switch {
+	case c.RetryBackoff <= 0 || c.RetryBackoff > maxRetryBackoff:
+		return fmt.Errorf("retry backoff %s must be over 0 and at most %s", c.RetryBackoff, maxRetryBackoff)
+	case c.RetryBackoffMax < c.RetryBackoff || c.RetryBackoffMax > maxRetryBackoff:
+		return fmt.Errorf("retry backoff max %s must be at least the retry backoff %s and at most %s", c.RetryBackoffMax, c.RetryBackoff, maxRetryBackoff)
+	}
+	return nil
+}
+
 // Service is the control plane. Any number of them run side by side.
 // Functions and versions are in Postgres. Invocations are not written while
 // they run: the server that accepted one holds it in memory until it ends,

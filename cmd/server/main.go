@@ -268,5 +268,5 @@ func configure(cfg *server.Config) error {
 		}
 		cfg.InvokeReplicas = n
 	}
-	return nil
+	return cfg.Validate()
 }

@@ -38,6 +38,11 @@ const (
 	expireKeysEach = time.Hour
 )
 
+// keyClaimed is returned when another call with the same key claimed it first.
+func keyClaimed() error {
+	return connect.NewError(connect.CodeAborted, errors.New("idempotency key claimed by another call; retry"))
+}
+
 // claim is a key's live claim: the invocation holding it, the server that
 // made it, and the host the invocation was sent to, if it was.
 type claim struct {
@@ -140,7 +145,7 @@ func (s *Service) takeOver(ctx context.Context, start time.Time, inv *invocation
 		now, err := s.heldBy(ctx, cv, key)
 		if err != nil || now == nil || now.invocationID == held.invocationID {
 			inv.discard()
-			return nil, connect.NewError(connect.CodeAborted, errors.New("idempotency key changed hands; retry"))
+			return nil, keyClaimed()
 		}
 		return s.replay(ctx, start, inv, cv, raw, now)
 	}
@@ -187,7 +192,7 @@ func (s *Service) outcome(ctx context.Context, cv *compiledVersion, held *claim)
 				return nil, cerr
 			}
 			if now == nil || now.invocationID != held.invocationID {
-				return nil, connect.NewError(connect.CodeAborted, errors.New("idempotency key changed hands; retry"))
+				return nil, keyClaimed()
 			}
 			held = now
 		}

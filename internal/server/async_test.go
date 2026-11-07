@@ -89,3 +89,27 @@ func TestAttemptEnded(t *testing.T) {
 		})
 	}
 }
+
+func TestNeverRan(t *testing.T) {
+	tests := []struct {
+		name   string
+		status functionsv1.InvocationStatus
+		host   string
+		want   bool
+	}{
+		{"errored before queueing", functionsv1.InvocationStatus_INVOCATION_STATUS_ERRORED, "", true},
+		{"expired in the queue", functionsv1.InvocationStatus_INVOCATION_STATUS_CANCELED, "", true},
+		{"errored on a host", functionsv1.InvocationStatus_INVOCATION_STATUS_ERRORED, "host-a", false},
+		{"marked queued", functionsv1.InvocationStatus_INVOCATION_STATUS_ERRORED, queuedHost, false},
+		{"pending", functionsv1.InvocationStatus_INVOCATION_STATUS_PENDING, "", false},
+		{"failed", functionsv1.InvocationStatus_INVOCATION_STATUS_FAILED, "host-a", false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			inv := &functionsv1.Invocation{Status: tt.status, Host: tt.host}
+			if got := neverRan(inv); got != tt.want {
+				t.Errorf("neverRan() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
