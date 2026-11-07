@@ -71,7 +71,13 @@ export const useAlchemyFlowOpen = () => {
   const updateSearch = useAlchemySearchUpdate<AlchemyLayoutSearch>();
   return useCallback(
     (flow: Flow, functionId?: AlchemyFunction["id"]) =>
-      void updateSearch((prev) => ({ ...prev, invocationId: undefined, flow, functionId })),
+      void updateSearch((prev) => ({
+        ...prev,
+        invocationId: undefined,
+        invocationAttempt: undefined,
+        flow,
+        functionId,
+      })),
     [updateSearch],
   );
 };

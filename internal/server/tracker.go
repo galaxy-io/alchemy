@@ -61,6 +61,21 @@ func (t *invocationTracker) update(id string, fn func(*functionsv1.Invocation)) 
 	return proto.Clone(inv).(*functionsv1.Invocation) //nolint:errcheck // Clone preserves the type
 }
 
+// settle moves the invocation with id to recent without an end, for an
+// async invocation whose record the database holds from now on, and returns
+// a copy of it. It returns nil for an id this server does not track.
+func (t *invocationTracker) settle(id string) *functionsv1.Invocation {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	inv, ok := t.active[id]
+	if !ok {
+		return nil
+	}
+	delete(t.active, id)
+	t.recent[id] = &ended{inv: inv, at: time.Now()}
+	return proto.Clone(inv).(*functionsv1.Invocation) //nolint:errcheck // Clone preserves the type
+}
+
 // drop forgets an invocation that was tracked but never announced: a keyed
 // call that found its key taken.
 func (t *invocationTracker) drop(id string) {

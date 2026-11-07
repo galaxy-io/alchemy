@@ -78,9 +78,26 @@ func TestHostMayStillReport(t *testing.T) {
 	s := &Service{}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := s.hostMayStillReport(tt.inv, timeout); got != tt.want {
+			if got := s.hostMayStillReport(tt.inv, timeout+hostGrace); got != tt.want {
 				t.Errorf("hostMayStillReport = %v, want %v", got, tt.want)
 			}
 		})
+	}
+}
+
+func TestHostWindow(t *testing.T) {
+	s := &Service{cfg: Config{RetryBackoff: time.Second, RetryBackoffMax: 5 * time.Minute}}
+	tests := []struct {
+		retries int32
+		want    time.Duration
+	}{
+		{0, 30*time.Second + hostGrace},
+		{2, 3*(30*time.Second+hostGrace) + 1200*time.Millisecond + 6*time.Second},
+	}
+	for _, tt := range tests {
+		cv := &compiledVersion{timeout: 30 * time.Second, retries: tt.retries}
+		if got := s.hostWindow(cv); got != tt.want {
+			t.Errorf("hostWindow(retries %d) = %v, want %v", tt.retries, got, tt.want)
+		}
 	}
 }

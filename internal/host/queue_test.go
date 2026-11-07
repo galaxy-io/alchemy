@@ -1,7 +1,9 @@
 package host
 
 import (
+	"errors"
 	"testing"
+	"time"
 
 	"google.golang.org/protobuf/proto"
 
@@ -128,5 +130,76 @@ func TestFunctionError(t *testing.T) {
 				t.Errorf("message and type not carried: %v", got)
 			}
 		})
+	}
+}
+
+func TestRetryBackoff(t *testing.T) {
+	req := &hostv1.InvokeRequest{RetryBackoffMs: 1000, RetryBackoffMaxMs: 300_000}
+	tests := []struct {
+		failed int
+		want   time.Duration
+	}{
+		{1, time.Second},
+		{2, 5 * time.Second},
+		{3, 25 * time.Second},
+		{4, 125 * time.Second},
+		{5, 5 * time.Minute},
+		{10, 5 * time.Minute},
+	}
+	for _, tt := range tests {
+		t.Run(tt.want.String(), func(t *testing.T) {
+			for range 50 {
+				got := retryBackoff(req, tt.failed)
+				low, high := tt.want-tt.want/5, min(tt.want+tt.want/5, 5*time.Minute)
+				if got < low || got > high {
+					t.Fatalf("retryBackoff(%d) = %v, want within [%v, %v]", tt.failed, got, low, high)
+				}
+			}
+		})
+	}
+}
+
+func TestRetryBackoffWithoutBackoff(t *testing.T) {
+	if got := retryBackoff(&hostv1.InvokeRequest{}, 3); got != 0 {
+		t.Errorf("retryBackoff with no backoff = %v, want 0", got)
+	}
+}
+
+func TestRetryable(t *testing.T) {
+	fnErr := func(kind functionsv1.FunctionErrorKind) *hostv1.InvokeResponse {
+		return &hostv1.InvokeResponse{Result: &hostv1.InvokeResponse_FunctionError{FunctionError: &functionsv1.FunctionError{Kind: kind}}}
+	}
+	tests := []struct {
+		name string
+		resp *hostv1.InvokeResponse
+		want bool
+	}{
+		{"succeeded", &hostv1.InvokeResponse{Result: &hostv1.InvokeResponse_Output{Output: []byte("{}")}}, false},
+		{"platform error", invokeError("unavailable", errors.New("boot failed")), true},
+		{"aborted", invokeError("aborted", errors.New("instance went away")), true},
+		{"raised", fnErr(functionsv1.FunctionErrorKind_FUNCTION_ERROR_KIND_RAISED), true},
+		{"crashed", fnErr(functionsv1.FunctionErrorKind_FUNCTION_ERROR_KIND_CRASHED), true},
+		{"timeout", fnErr(functionsv1.FunctionErrorKind_FUNCTION_ERROR_KIND_TIMEOUT), true},
+		{"input invalid", fnErr(functionsv1.FunctionErrorKind_FUNCTION_ERROR_KIND_INPUT_INVALID), false},
+		{"output invalid", fnErr(functionsv1.FunctionErrorKind_FUNCTION_ERROR_KIND_OUTPUT_INVALID), false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := retryable(tt.resp); got != tt.want {
+				t.Errorf("retryable = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestEnded(t *testing.T) {
+	accepted := &functionsv1.Invocation{Id: "inv-1", Attempts: 2, Async: true}
+	got := ended("h1", accepted, functionsv1.InvocationStatus_INVOCATION_STATUS_CANCELED, "expired")
+	if got.GetHost() != "h1" || got.GetStatus() != functionsv1.InvocationStatus_INVOCATION_STATUS_CANCELED ||
+		got.GetPlatformError() != "expired" || got.GetEndedAt() == 0 || got.GetAttempts() != 2 || !got.GetAsync() {
+		t.Errorf("ended = %v", got)
+	}
+	if accepted.GetHost() != "" || accepted.GetEndedAt() != 0 {
+		t.Error("ended modified the accepted invocation")
 	}
 }

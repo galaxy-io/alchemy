@@ -17,17 +17,24 @@ export interface AlchemyLayoutProps {
 
 const AlchemyLayout: FC<AlchemyLayoutProps> = ({ sidebarFooter }) => {
   const updateSearch = useAlchemySearchUpdate<AlchemyLayoutSearch>();
-  const { flow, functionId, invocationId } = useAlchemyLayoutSearch();
+  const { flow, functionId, invocationId, invocationAttempt } = useAlchemyLayoutSearch();
 
   const handleCloseDrawer = useCallback(() => {
     void updateSearch(
       (prev) => {
-        const { invocationId: _, ...rest } = prev;
+        const { invocationId: _, invocationAttempt: __, ...rest } = prev;
         return rest;
       },
       { replace: true },
     );
   }, [updateSearch]);
+
+  const handleAttemptChange = useCallback(
+    (attempt: number) => {
+      void updateSearch((prev) => ({ ...prev, invocationAttempt: attempt }), { replace: true });
+    },
+    [updateSearch],
+  );
 
   const handleCloseFlow = useCallback(() => {
     void updateSearch(
@@ -46,8 +53,10 @@ const AlchemyLayout: FC<AlchemyLayoutProps> = ({ sidebarFooter }) => {
       </MainLayout>
       <InvocationDrawer
         invocationId={invocationId}
+        attempt={invocationAttempt}
         isOpen={!!invocationId}
         onClose={handleCloseDrawer}
+        onAttemptChange={handleAttemptChange}
       />
       <CreateFunctionModal
         isOpen={

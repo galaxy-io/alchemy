@@ -62,6 +62,9 @@ const (
 	FunctionsServiceListRuntimesProcedure = "/functions.v1.FunctionsService/ListRuntimes"
 	// FunctionsServiceInvokeProcedure is the fully-qualified name of the FunctionsService's Invoke RPC.
 	FunctionsServiceInvokeProcedure = "/functions.v1.FunctionsService/Invoke"
+	// FunctionsServiceInvokeAsyncProcedure is the fully-qualified name of the FunctionsService's
+	// InvokeAsync RPC.
+	FunctionsServiceInvokeAsyncProcedure = "/functions.v1.FunctionsService/InvokeAsync"
 	// FunctionsServiceGetInvocationProcedure is the fully-qualified name of the FunctionsService's
 	// GetInvocation RPC.
 	FunctionsServiceGetInvocationProcedure = "/functions.v1.FunctionsService/GetInvocation"
@@ -106,8 +109,16 @@ type FunctionsServiceClient interface {
 	// rejected (unknown function, input violates the contract, no capacity) or
 	// the platform failed. Input violations are INVALID_ARGUMENT with one
 	// ContractViolation error detail each. If the function ran, the RPC
-	// succeeds and the response carries its output or a FunctionError.
+	// succeeds and the response carries its output or a FunctionError. A
+	// function that raised, crashed or timed out, or a platform that could
+	// not run it, runs again up to the call's or the function's retries, with
+	// exponential backoff, while the call's deadline leaves room. An input
+	// that violates the contract never runs again.
 	Invoke(context.Context, *connect.Request[v1.InvokeRequest]) (*connect.Response[v1.InvokeResponse], error)
+	// InvokeAsync queues the invocation and returns its id without waiting.
+	// The output is dropped. It retries as Invoke does. An idempotency_key
+	// seen within the window returns the invocation it queued.
+	InvokeAsync(context.Context, *connect.Request[v1.InvokeAsyncRequest]) (*connect.Response[v1.InvokeAsyncResponse], error)
 	// Invocations; the persisted record of every Invoke, newest first.
 	GetInvocation(context.Context, *connect.Request[v1.GetInvocationRequest]) (*connect.Response[v1.GetInvocationResponse], error)
 	ListInvocations(context.Context, *connect.Request[v1.ListInvocationsRequest]) (*connect.Response[v1.ListInvocationsResponse], error)
@@ -192,6 +203,12 @@ func NewFunctionsServiceClient(httpClient connect.HTTPClient, baseURL string, op
 			connect.WithSchema(functionsServiceMethods.ByName("Invoke")),
 			connect.WithClientOptions(opts...),
 		),
+		invokeAsync: connect.NewClient[v1.InvokeAsyncRequest, v1.InvokeAsyncResponse](
+			httpClient,
+			baseURL+FunctionsServiceInvokeAsyncProcedure,
+			connect.WithSchema(functionsServiceMethods.ByName("InvokeAsync")),
+			connect.WithClientOptions(opts...),
+		),
 		getInvocation: connect.NewClient[v1.GetInvocationRequest, v1.GetInvocationResponse](
 			httpClient,
 			baseURL+FunctionsServiceGetInvocationProcedure,
@@ -249,6 +266,7 @@ type functionsServiceClient struct {
 	listFunctionVersions  *connect.Client[v1.ListFunctionVersionsRequest, v1.ListFunctionVersionsResponse]
 	listRuntimes          *connect.Client[v1.ListRuntimesRequest, v1.ListRuntimesResponse]
 	invoke                *connect.Client[v1.InvokeRequest, v1.InvokeResponse]
+	invokeAsync           *connect.Client[v1.InvokeAsyncRequest, v1.InvokeAsyncResponse]
 	getInvocation         *connect.Client[v1.GetInvocationRequest, v1.GetInvocationResponse]
 	listInvocations       *connect.Client[v1.ListInvocationsRequest, v1.ListInvocationsResponse]
 	getInvocationLogs     *connect.Client[v1.GetInvocationLogsRequest, v1.GetInvocationLogsResponse]
@@ -308,6 +326,11 @@ func (c *functionsServiceClient) Invoke(ctx context.Context, req *connect.Reques
 	return c.invoke.CallUnary(ctx, req)
 }
 
+// InvokeAsync calls functions.v1.FunctionsService.InvokeAsync.
+func (c *functionsServiceClient) InvokeAsync(ctx context.Context, req *connect.Request[v1.InvokeAsyncRequest]) (*connect.Response[v1.InvokeAsyncResponse], error) {
+	return c.invokeAsync.CallUnary(ctx, req)
+}
+
 // GetInvocation calls functions.v1.FunctionsService.GetInvocation.
 func (c *functionsServiceClient) GetInvocation(ctx context.Context, req *connect.Request[v1.GetInvocationRequest]) (*connect.Response[v1.GetInvocationResponse], error) {
 	return c.getInvocation.CallUnary(ctx, req)
@@ -364,8 +387,16 @@ type FunctionsServiceHandler interface {
 	// rejected (unknown function, input violates the contract, no capacity) or
 	// the platform failed. Input violations are INVALID_ARGUMENT with one
 	// ContractViolation error detail each. If the function ran, the RPC
-	// succeeds and the response carries its output or a FunctionError.
+	// succeeds and the response carries its output or a FunctionError. A
+	// function that raised, crashed or timed out, or a platform that could
+	// not run it, runs again up to the call's or the function's retries, with
+	// exponential backoff, while the call's deadline leaves room. An input
+	// that violates the contract never runs again.
 	Invoke(context.Context, *connect.Request[v1.InvokeRequest]) (*connect.Response[v1.InvokeResponse], error)
+	// InvokeAsync queues the invocation and returns its id without waiting.
+	// The output is dropped. It retries as Invoke does. An idempotency_key
+	// seen within the window returns the invocation it queued.
+	InvokeAsync(context.Context, *connect.Request[v1.InvokeAsyncRequest]) (*connect.Response[v1.InvokeAsyncResponse], error)
 	// Invocations; the persisted record of every Invoke, newest first.
 	GetInvocation(context.Context, *connect.Request[v1.GetInvocationRequest]) (*connect.Response[v1.GetInvocationResponse], error)
 	ListInvocations(context.Context, *connect.Request[v1.ListInvocationsRequest]) (*connect.Response[v1.ListInvocationsResponse], error)
@@ -446,6 +477,12 @@ func NewFunctionsServiceHandler(svc FunctionsServiceHandler, opts ...connect.Han
 		connect.WithSchema(functionsServiceMethods.ByName("Invoke")),
 		connect.WithHandlerOptions(opts...),
 	)
+	functionsServiceInvokeAsyncHandler := connect.NewUnaryHandler(
+		FunctionsServiceInvokeAsyncProcedure,
+		svc.InvokeAsync,
+		connect.WithSchema(functionsServiceMethods.ByName("InvokeAsync")),
+		connect.WithHandlerOptions(opts...),
+	)
 	functionsServiceGetInvocationHandler := connect.NewUnaryHandler(
 		FunctionsServiceGetInvocationProcedure,
 		svc.GetInvocation,
@@ -510,6 +547,8 @@ func NewFunctionsServiceHandler(svc FunctionsServiceHandler, opts ...connect.Han
 			functionsServiceListRuntimesHandler.ServeHTTP(w, r)
 		case FunctionsServiceInvokeProcedure:
 			functionsServiceInvokeHandler.ServeHTTP(w, r)
+		case FunctionsServiceInvokeAsyncProcedure:
+			functionsServiceInvokeAsyncHandler.ServeHTTP(w, r)
 		case FunctionsServiceGetInvocationProcedure:
 			functionsServiceGetInvocationHandler.ServeHTTP(w, r)
 		case FunctionsServiceListInvocationsProcedure:
@@ -571,6 +610,10 @@ func (UnimplementedFunctionsServiceHandler) ListRuntimes(context.Context, *conne
 
 func (UnimplementedFunctionsServiceHandler) Invoke(context.Context, *connect.Request[v1.InvokeRequest]) (*connect.Response[v1.InvokeResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("functions.v1.FunctionsService.Invoke is not implemented"))
+}
+
+func (UnimplementedFunctionsServiceHandler) InvokeAsync(context.Context, *connect.Request[v1.InvokeAsyncRequest]) (*connect.Response[v1.InvokeAsyncResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("functions.v1.FunctionsService.InvokeAsync is not implemented"))
 }
 
 func (UnimplementedFunctionsServiceHandler) GetInvocation(context.Context, *connect.Request[v1.GetInvocationRequest]) (*connect.Response[v1.GetInvocationResponse], error) {

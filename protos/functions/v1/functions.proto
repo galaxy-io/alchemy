@@ -151,6 +151,10 @@ message Function {
   // change applies to the next invocation; each host snapshots the function
   // again at the new size the first time it runs it.
   Resources resources = 13;
+  // retries is how many more times an invocation runs after its function
+  // raised, crashed or timed out, or the platform could not run it, with
+  // exponential backoff between attempts. A call may set its own.
+  int32 retries = 14;
 }
 
 // CreateFunction creates the function and version 1 from spec. It returns as
@@ -169,6 +173,8 @@ message CreateFunctionRequest {
   int64 timeout_ms = 5;
   int32 max_concurrency = 6;
   Resources resources = 7;
+  // retries is as on Function. Unset takes the default of 2.
+  optional int32 retries = 8;
 }
 
 message CreateFunctionResponse {
@@ -177,8 +183,8 @@ message CreateFunctionResponse {
 }
 
 // UpdateFunction changes a function's settings. They apply to the next
-// invocation of any version. timeout_ms, max_concurrency and resources
-// change only when set.
+// invocation of any version. timeout_ms, max_concurrency, resources and
+// retries change only when set.
 message UpdateFunctionRequest {
   string function_id = 1;
   string name = 2;
@@ -186,6 +192,7 @@ message UpdateFunctionRequest {
   optional int64 timeout_ms = 4;
   optional int32 max_concurrency = 5;
   Resources resources = 6;
+  optional int32 retries = 7;
 }
 
 message UpdateFunctionResponse {

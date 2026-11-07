@@ -6,7 +6,7 @@ import { useVirtualizer } from "@tanstack/react-virtual";
 
 import Divider from "@galaxy-io/dls/layout/Divider";
 import EmptyLayout, { EmptyLayoutSize } from "@galaxy-io/dls/layout/EmptyLayout";
-import Flex, { AlignItems, FlexDirection } from "@galaxy-io/dls/layout/Flex";
+import Flex, { AlignItems, FlexDirection, JustifyContent } from "@galaxy-io/dls/layout/Flex";
 import ScrollArea from "@galaxy-io/dls/layout/ScrollArea";
 import Text, { TextSize, TextVariant, TextWeight } from "@galaxy-io/dls/text/Text";
 import { FontFamily } from "@galaxy-io/dls/theme/enums";
@@ -20,6 +20,7 @@ import {
   INVOCATION_LOGS_INSET,
   INVOCATION_LOGS_LINE_GAP,
 } from "@/components/invocations/constants";
+import InvocationLogsAttemptSelect from "@/components/invocations/InvocationLogsAttemptSelect";
 import InvocationLogsLine from "@/components/invocations/InvocationLogsLine";
 import { getInvocationLogsShownLines } from "@/components/invocations/utils";
 
@@ -42,10 +43,19 @@ const InvocationLogsListLine = styled.div`
 
 interface InvocationLogsProps {
   invocationId: Invocation["id"];
+  attempts?: Invocation["attempts"];
+  attempt?: Invocation["attempts"];
+  onAttemptChange?: (attempt: Invocation["attempts"]) => void;
 }
 
-const InvocationLogs: FC<InvocationLogsProps> = ({ invocationId }) => {
-  const { logs, isStreaming, isError } = useGetInvocationLogsStream(invocationId);
+const InvocationLogs: FC<InvocationLogsProps> = ({
+  invocationId,
+  attempts = 0,
+  attempt,
+  onAttemptChange,
+}) => {
+  const shownAttempt = attempt && attempt <= attempts ? attempt : 0;
+  const { logs, isStreaming, isError } = useGetInvocationLogsStream(invocationId, shownAttempt);
   const lines = getInvocationLogsShownLines(logs.lines);
   const isEmpty = !isStreaming && lines.length === 0;
 
@@ -65,12 +75,20 @@ const InvocationLogs: FC<InvocationLogsProps> = ({ invocationId }) => {
     <Flex direction={FlexDirection.COLUMN} height="100%" overflow="hidden" fillWidth>
       <Flex
         alignItems={AlignItems.CENTER}
+        justifyContent={JustifyContent.SPACE_BETWEEN}
         padding={[0, INVOCATION_LOGS_INSET]}
         height={INVOCATION_LOGS_HEADER_HEIGHT}
       >
         <Text size={TextSize.BODY_SM} weight={TextWeight.MEDIUM}>
           Logs
         </Text>
+        {attempts > 1 && onAttemptChange && (
+          <InvocationLogsAttemptSelect
+            attempts={attempts}
+            value={shownAttempt || attempts}
+            onChange={onAttemptChange}
+          />
+        )}
       </Flex>
       <Divider />
       <Flex direction={FlexDirection.COLUMN} grow={1} basis={0} minHeight={0}>

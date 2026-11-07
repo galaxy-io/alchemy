@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strconv"
 	"time"
 
 	"github.com/nats-io/nats.go"
@@ -29,6 +30,15 @@ const (
 // LogSubject carries the log of one invocation.
 func LogSubject(tenantID, invocationID string) string {
 	return logPrefix + tenantID + "." + invocationID
+}
+
+// AttemptLogSubject carries the log of one attempt of an invocation. The
+// first attempt's is the invocation's.
+func AttemptLogSubject(tenantID, invocationID string, attempt int32) string {
+	if attempt <= 1 {
+		return LogSubject(tenantID, invocationID)
+	}
+	return LogSubject(tenantID, invocationID) + "." + strconv.Itoa(int(attempt))
 }
 
 // LogWildcard matches the log of every invocation.

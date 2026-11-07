@@ -31,8 +31,16 @@ service FunctionsService {
   // rejected (unknown function, input violates the contract, no capacity) or
   // the platform failed. Input violations are INVALID_ARGUMENT with one
   // ContractViolation error detail each. If the function ran, the RPC
-  // succeeds and the response carries its output or a FunctionError.
+  // succeeds and the response carries its output or a FunctionError. A
+  // function that raised, crashed or timed out, or a platform that could
+  // not run it, runs again up to the call's or the function's retries, with
+  // exponential backoff, while the call's deadline leaves room. An input
+  // that violates the contract never runs again.
   rpc Invoke(InvokeRequest) returns (InvokeResponse);
+  // InvokeAsync queues the invocation and returns its id without waiting.
+  // The output is dropped. It retries as Invoke does. An idempotency_key
+  // seen within the window returns the invocation it queued.
+  rpc InvokeAsync(InvokeAsyncRequest) returns (InvokeAsyncResponse);
 
   // Invocations; the persisted record of every Invoke, newest first.
   rpc GetInvocation(GetInvocationRequest) returns (GetInvocationResponse);

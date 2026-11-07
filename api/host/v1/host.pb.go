@@ -901,9 +901,20 @@ type InvokeRequest struct {
 	// holds the input, which was too large for the message. input is empty.
 	InputObject string `protobuf:"bytes,11,opt,name=input_object,json=inputObject,proto3" json:"input_object,omitempty"`
 	// build is what a host that lacks the artifact builds first.
-	Build         *BuildRequest `protobuf:"bytes,12,opt,name=build,proto3" json:"build,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	Build *BuildRequest `protobuf:"bytes,12,opt,name=build,proto3" json:"build,omitempty"`
+	// async is set when no server waits for the result, so the host records
+	// how the invocation is doing instead of telling a server.
+	Async bool `protobuf:"varint,13,opt,name=async,proto3" json:"async,omitempty"`
+	// A function that raised, crashed or timed out, or a platform failure,
+	// runs the invocation again up to retries, or the function's when unset,
+	// waiting retry_backoff_ms after the first failure, five times longer
+	// after each one since, and at most retry_backoff_max_ms, while the
+	// deadline leaves room for another attempt.
+	RetryBackoffMs    int64  `protobuf:"varint,14,opt,name=retry_backoff_ms,json=retryBackoffMs,proto3" json:"retry_backoff_ms,omitempty"`
+	RetryBackoffMaxMs int64  `protobuf:"varint,15,opt,name=retry_backoff_max_ms,json=retryBackoffMaxMs,proto3" json:"retry_backoff_max_ms,omitempty"`
+	Retries           *int32 `protobuf:"varint,16,opt,name=retries,proto3,oneof" json:"retries,omitempty"`
+	unknownFields     protoimpl.UnknownFields
+	sizeCache         protoimpl.SizeCache
 }
 
 func (x *InvokeRequest) Reset() {
@@ -1020,6 +1031,34 @@ func (x *InvokeRequest) GetBuild() *BuildRequest {
 	return nil
 }
 
+func (x *InvokeRequest) GetAsync() bool {
+	if x != nil {
+		return x.Async
+	}
+	return false
+}
+
+func (x *InvokeRequest) GetRetryBackoffMs() int64 {
+	if x != nil {
+		return x.RetryBackoffMs
+	}
+	return 0
+}
+
+func (x *InvokeRequest) GetRetryBackoffMaxMs() int64 {
+	if x != nil {
+		return x.RetryBackoffMaxMs
+	}
+	return 0
+}
+
+func (x *InvokeRequest) GetRetries() int32 {
+	if x != nil && x.Retries != nil {
+		return *x.Retries
+	}
+	return 0
+}
+
 // InvokeResult is how the host that ran an invocation answers the server
 // waiting on it.
 type InvokeResult struct {
@@ -1029,7 +1068,9 @@ type InvokeResult struct {
 	// output_object, when set, names the object in the invoke object store
 	// that holds the output, which was too large for the message. The server
 	// reads it and deletes it.
-	OutputObject  string `protobuf:"bytes,3,opt,name=output_object,json=outputObject,proto3" json:"output_object,omitempty"`
+	OutputObject string `protobuf:"bytes,3,opt,name=output_object,json=outputObject,proto3" json:"output_object,omitempty"`
+	// attempts is how many times the function ran for this result.
+	Attempts      int32 `protobuf:"varint,4,opt,name=attempts,proto3" json:"attempts,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1083,6 +1124,13 @@ func (x *InvokeResult) GetOutputObject() string {
 		return x.OutputObject
 	}
 	return ""
+}
+
+func (x *InvokeResult) GetAttempts() int32 {
+	if x != nil {
+		return x.Attempts
+	}
+	return 0
 }
 
 // InvokeResponse is returned whenever the host took the input, including
@@ -1229,7 +1277,13 @@ type InvocationEvent struct {
 	StartKind    v1.StartKind           `protobuf:"varint,4,opt,name=start_kind,json=startKind,proto3,enum=functions.v1.StartKind" json:"start_kind,omitempty"`
 	AcquireUs    int64                  `protobuf:"varint,5,opt,name=acquire_us,json=acquireUs,proto3" json:"acquire_us,omitempty"`
 	// host is the host that took the invocation from the queue.
-	Host          string `protobuf:"bytes,6,opt,name=host,proto3" json:"host,omitempty"`
+	Host string `protobuf:"bytes,6,opt,name=host,proto3" json:"host,omitempty"`
+	// attempts is the attempt this event is about. A PENDING event after one
+	// is the attempt failing, with error or platform_error saying why, before
+	// the next.
+	Attempts      int32             `protobuf:"varint,7,opt,name=attempts,proto3" json:"attempts,omitempty"`
+	Error         *v1.FunctionError `protobuf:"bytes,8,opt,name=error,proto3" json:"error,omitempty"`
+	PlatformError string            `protobuf:"bytes,9,opt,name=platform_error,json=platformError,proto3" json:"platform_error,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1302,6 +1356,27 @@ func (x *InvocationEvent) GetAcquireUs() int64 {
 func (x *InvocationEvent) GetHost() string {
 	if x != nil {
 		return x.Host
+	}
+	return ""
+}
+
+func (x *InvocationEvent) GetAttempts() int32 {
+	if x != nil {
+		return x.Attempts
+	}
+	return 0
+}
+
+func (x *InvocationEvent) GetError() *v1.FunctionError {
+	if x != nil {
+		return x.Error
+	}
+	return nil
+}
+
+func (x *InvocationEvent) GetPlatformError() string {
+	if x != nil {
+		return x.PlatformError
 	}
 	return ""
 }
@@ -1839,8 +1914,11 @@ type FunctionConfig struct {
 	// every host; 0 means no limit.
 	MaxConcurrency int32         `protobuf:"varint,1,opt,name=max_concurrency,json=maxConcurrency,proto3" json:"max_concurrency,omitempty"`
 	Resources      *v1.Resources `protobuf:"bytes,2,opt,name=resources,proto3" json:"resources,omitempty"`
-	unknownFields  protoimpl.UnknownFields
-	sizeCache      protoimpl.SizeCache
+	// retries is how many more times an invocation runs after a failed
+	// attempt, unless the call set its own.
+	Retries       int32 `protobuf:"varint,3,opt,name=retries,proto3" json:"retries,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *FunctionConfig) Reset() {
@@ -1885,6 +1963,13 @@ func (x *FunctionConfig) GetResources() *v1.Resources {
 		return x.Resources
 	}
 	return nil
+}
+
+func (x *FunctionConfig) GetRetries() int32 {
+	if x != nil {
+		return x.Retries
+	}
+	return 0
 }
 
 var File_host_v1_host_proto protoreflect.FileDescriptor
@@ -1968,7 +2053,7 @@ const file_host_v1_host_proto_rawDesc = "" +
 	"\x05layer\x18\x01 \x01(\v2\x0e.host.v1.LayerH\x00R\x05layer\x12&\n" +
 	"\x05error\x18\x02 \x01(\v2\x0e.host.v1.ErrorH\x00R\x05error\x12\x1b\n" +
 	"\tbuild_log\x18\x03 \x01(\tR\bbuildLogB\b\n" +
-	"\x06result\"\xca\x03\n" +
+	"\x06result\"\xe6\x04\n" +
 	"\rInvokeRequest\x128\n" +
 	"\n" +
 	"invocation\x18\x01 \x01(\v2\x18.functions.v1.InvocationR\n" +
@@ -1987,11 +2072,18 @@ const file_host_v1_host_proto_rawDesc = "" +
 	"\rreply_subject\x18\n" +
 	" \x01(\tR\freplySubject\x12!\n" +
 	"\finput_object\x18\v \x01(\tR\vinputObject\x12+\n" +
-	"\x05build\x18\f \x01(\v2\x15.host.v1.BuildRequestR\x05build\"\x8d\x01\n" +
+	"\x05build\x18\f \x01(\v2\x15.host.v1.BuildRequestR\x05build\x12\x14\n" +
+	"\x05async\x18\r \x01(\bR\x05async\x12(\n" +
+	"\x10retry_backoff_ms\x18\x0e \x01(\x03R\x0eretryBackoffMs\x12/\n" +
+	"\x14retry_backoff_max_ms\x18\x0f \x01(\x03R\x11retryBackoffMaxMs\x12\x1d\n" +
+	"\aretries\x18\x10 \x01(\x05H\x00R\aretries\x88\x01\x01B\n" +
+	"\n" +
+	"\b_retries\"\xa9\x01\n" +
 	"\fInvokeResult\x12#\n" +
 	"\rinvocation_id\x18\x01 \x01(\tR\finvocationId\x123\n" +
 	"\bresponse\x18\x02 \x01(\v2\x17.host.v1.InvokeResponseR\bresponse\x12#\n" +
-	"\routput_object\x18\x03 \x01(\tR\foutputObject\"\xb1\x02\n" +
+	"\routput_object\x18\x03 \x01(\tR\foutputObject\x12\x1a\n" +
+	"\battempts\x18\x04 \x01(\x05R\battempts\"\xb1\x02\n" +
 	"\x0eInvokeResponse\x12\x18\n" +
 	"\x06output\x18\x01 \x01(\fH\x00R\x06output\x12D\n" +
 	"\x0efunction_error\x18\x02 \x01(\v2\x1b.functions.v1.FunctionErrorH\x00R\rfunctionError\x12&\n" +
@@ -2003,7 +2095,7 @@ const file_host_v1_host_proto_rawDesc = "" +
 	"\n" +
 	"acquire_us\x18\x06 \x01(\x03R\tacquireUs\x12\x15\n" +
 	"\x06run_us\x18\a \x01(\x03R\x05runUsB\b\n" +
-	"\x06result\"\xfa\x01\n" +
+	"\x06result\"\xf0\x02\n" +
 	"\x0fInvocationEvent\x12#\n" +
 	"\rinvocation_id\x18\x01 \x01(\tR\finvocationId\x126\n" +
 	"\x06status\x18\x02 \x01(\x0e2\x1e.functions.v1.InvocationStatusR\x06status\x12\x1f\n" +
@@ -2013,7 +2105,10 @@ const file_host_v1_host_proto_rawDesc = "" +
 	"start_kind\x18\x04 \x01(\x0e2\x17.functions.v1.StartKindR\tstartKind\x12\x1d\n" +
 	"\n" +
 	"acquire_us\x18\x05 \x01(\x03R\tacquireUs\x12\x12\n" +
-	"\x04host\x18\x06 \x01(\tR\x04host\"\x11\n" +
+	"\x04host\x18\x06 \x01(\tR\x04host\x12\x1a\n" +
+	"\battempts\x18\a \x01(\x05R\battempts\x121\n" +
+	"\x05error\x18\b \x01(\v2\x1b.functions.v1.FunctionErrorR\x05error\x12%\n" +
+	"\x0eplatform_error\x18\t \x01(\tR\rplatformError\"\x11\n" +
 	"\x0fDescribeRequest\":\n" +
 	"\x10DescribeResponse\x12&\n" +
 	"\x04host\x18\x01 \x01(\v2\x12.functions.v1.HostR\x04host\"\x16\n" +
@@ -2039,10 +2134,11 @@ const file_host_v1_host_proto_rawDesc = "" +
 	"\x19ActiveInvocationsResponse\x12:\n" +
 	"\vinvocations\x18\x01 \x03(\v2\x18.functions.v1.InvocationR\vinvocations\"O\n" +
 	"\x11InvocationRecords\x12:\n" +
-	"\vinvocations\x18\x01 \x03(\v2\x18.functions.v1.InvocationR\vinvocations\"p\n" +
+	"\vinvocations\x18\x01 \x03(\v2\x18.functions.v1.InvocationR\vinvocations\"\x8a\x01\n" +
 	"\x0eFunctionConfig\x12'\n" +
 	"\x0fmax_concurrency\x18\x01 \x01(\x05R\x0emaxConcurrency\x125\n" +
-	"\tresources\x18\x02 \x01(\v2\x17.functions.v1.ResourcesR\tresourcesB\x86\x01\n" +
+	"\tresources\x18\x02 \x01(\v2\x17.functions.v1.ResourcesR\tresources\x12\x18\n" +
+	"\aretries\x18\x03 \x01(\x05R\aretriesB\x86\x01\n" +
 	"\vcom.host.v1B\tHostProtoP\x01Z/github.com/galaxy-io/alchemy/api/host/v1;hostv1\xa2\x02\x03HXX\xaa\x02\aHost.V1\xca\x02\aHost\\V1\xe2\x02\x13Host\\V1\\GPBMetadata\xea\x02\bHost::V1b\x06proto3"
 
 var (
@@ -2124,19 +2220,20 @@ var file_host_v1_host_proto_depIdxs = []int32{
 	35, // 21: host.v1.InvokeResponse.start_kind:type_name -> functions.v1.StartKind
 	36, // 22: host.v1.InvocationEvent.status:type_name -> functions.v1.InvocationStatus
 	35, // 23: host.v1.InvocationEvent.start_kind:type_name -> functions.v1.StartKind
-	37, // 24: host.v1.DescribeResponse.host:type_name -> functions.v1.Host
-	38, // 25: host.v1.ListInstancesResponse.instances:type_name -> functions.v1.Instance
-	37, // 26: host.v1.Heartbeat.host:type_name -> functions.v1.Host
-	20, // 27: host.v1.Heartbeat.artifacts:type_name -> host.v1.ArtifactState
-	19, // 28: host.v1.Heartbeat.running:type_name -> host.v1.FunctionRunning
-	33, // 29: host.v1.ActiveInvocationsResponse.invocations:type_name -> functions.v1.Invocation
-	33, // 30: host.v1.InvocationRecords.invocations:type_name -> functions.v1.Invocation
-	32, // 31: host.v1.FunctionConfig.resources:type_name -> functions.v1.Resources
-	32, // [32:32] is the sub-list for method output_type
-	32, // [32:32] is the sub-list for method input_type
-	32, // [32:32] is the sub-list for extension type_name
-	32, // [32:32] is the sub-list for extension extendee
-	0,  // [0:32] is the sub-list for field type_name
+	34, // 24: host.v1.InvocationEvent.error:type_name -> functions.v1.FunctionError
+	37, // 25: host.v1.DescribeResponse.host:type_name -> functions.v1.Host
+	38, // 26: host.v1.ListInstancesResponse.instances:type_name -> functions.v1.Instance
+	37, // 27: host.v1.Heartbeat.host:type_name -> functions.v1.Host
+	20, // 28: host.v1.Heartbeat.artifacts:type_name -> host.v1.ArtifactState
+	19, // 29: host.v1.Heartbeat.running:type_name -> host.v1.FunctionRunning
+	33, // 30: host.v1.ActiveInvocationsResponse.invocations:type_name -> functions.v1.Invocation
+	33, // 31: host.v1.InvocationRecords.invocations:type_name -> functions.v1.Invocation
+	32, // 32: host.v1.FunctionConfig.resources:type_name -> functions.v1.Resources
+	33, // [33:33] is the sub-list for method output_type
+	33, // [33:33] is the sub-list for method input_type
+	33, // [33:33] is the sub-list for extension type_name
+	33, // [33:33] is the sub-list for extension extendee
+	0,  // [0:33] is the sub-list for field type_name
 }
 
 func init() { file_host_v1_host_proto_init() }
@@ -2152,6 +2249,7 @@ func file_host_v1_host_proto_init() {
 		(*CompileResponse_Layer)(nil),
 		(*CompileResponse_Error)(nil),
 	}
+	file_host_v1_host_proto_msgTypes[10].OneofWrappers = []any{}
 	file_host_v1_host_proto_msgTypes[12].OneofWrappers = []any{
 		(*InvokeResponse_Output)(nil),
 		(*InvokeResponse_FunctionError)(nil),
