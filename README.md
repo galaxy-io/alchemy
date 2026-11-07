@@ -6,6 +6,12 @@
   <img alt="Alchemy: fast, isolated, strongly typed compute functions" src=".github/assets/alchemy-light.svg" width="520">
 </picture>
 
+[![Release](https://img.shields.io/github/v/release/galaxy-io/alchemy?filter=v*)](https://github.com/galaxy-io/alchemy/releases)
+[![Tests](https://github.com/galaxy-io/alchemy/actions/workflows/test.yaml/badge.svg)](https://github.com/galaxy-io/alchemy/actions/workflows/test.yaml)
+[![License: Apache 2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
+[![Ask DeepWiki](https://img.shields.io/badge/DeepWiki-Ask-7B3FE4)](https://deepwiki.com/galaxy-io/alchemy)
+[![Slack](https://img.shields.io/badge/slack-join-4A154B?logo=slack&logoColor=white)](https://join.slack.com/t/galaxy-io-community/shared_invite/zt-4fxisnwat-Nuve8yUp6GK2qfUeuh3Abw)
+
 </div>
 
 # Alchemy
