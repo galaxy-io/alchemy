@@ -48,6 +48,15 @@ type Config struct {
 	InvokeMaxDeadline time.Duration
 	// InvokeReplicas is how many NATS servers keep each queued invocation.
 	InvokeReplicas int
+	// AsyncMaxAge is how long an async invocation may wait in the queue and
+	// between its attempts. Past it, the host that takes it records it
+	// canceled instead of running it.
+	AsyncMaxAge time.Duration
+	// RetryBackoff is how long an invocation waits after its first failed
+	// attempt, five times longer after each one since, and at most
+	// RetryBackoffMax.
+	RetryBackoff    time.Duration
+	RetryBackoffMax time.Duration
 	// IdempotencyWindow is how long a call's idempotency key keeps later
 	// calls with the same key from running again.
 	IdempotencyWindow time.Duration
@@ -86,6 +95,9 @@ func DefaultConfig() Config {
 		InvokeDeadline:      5 * time.Minute,
 		InvokeMaxDeadline:   time.Hour,
 		InvokeReplicas:      1,
+		AsyncMaxAge:         24 * time.Hour,
+		RetryBackoff:        time.Second,
+		RetryBackoffMax:     5 * time.Minute,
 		IdempotencyWindow:   24 * time.Hour,
 		LogRetention:        time.Hour,
 		LogMaxBytes:         1 << 30,
@@ -94,6 +106,21 @@ func DefaultConfig() Config {
 		RuntimeImagePrefix:  "ghcr.io/galaxy-io/alchemy/runtime",
 		RuntimeIconBaseURL:  "https://cdn.getgalaxy.io/sources",
 	}
+}
+
+// maxRetryBackoff caps both retry backoff settings. A longer wait between
+// attempts mostly outlives the deadline it has to fit in.
+const maxRetryBackoff = time.Hour
+
+// Validate rejects settings the service cannot run with.
+func (c Config) Validate() error {
+	switch {
+	case c.RetryBackoff <= 0 || c.RetryBackoff > maxRetryBackoff:
+		return fmt.Errorf("retry backoff %s must be over 0 and at most %s", c.RetryBackoff, maxRetryBackoff)
+	case c.RetryBackoffMax < c.RetryBackoff || c.RetryBackoffMax > maxRetryBackoff:
+		return fmt.Errorf("retry backoff max %s must be at least the retry backoff %s and at most %s", c.RetryBackoffMax, c.RetryBackoff, maxRetryBackoff)
+	}
+	return nil
 }
 
 // Service is the control plane. Any number of them run side by side.
@@ -137,6 +164,7 @@ type compiledVersion struct {
 	spec     *functionsv1.FunctionSpec
 	artifact *hostv1.Artifact
 	timeout  time.Duration
+	retries  int32
 }
 
 // New returns a service backed by store and b, reading function logs from
@@ -172,7 +200,7 @@ func New(ctx context.Context, cfg Config, store *postgres.Store, b *bus.Bus, log
 		stop()
 		return nil, err
 	}
-	if err := b.EnsureInvokeQueue(ctx, bus.InvokeQueueConfig{Replicas: cfg.InvokeReplicas, MaxAge: cfg.InvokeMaxDeadline, AckWait: invokeAckWait}); err != nil {
+	if err := b.EnsureInvokeQueue(ctx, bus.InvokeQueueConfig{Replicas: cfg.InvokeReplicas, MaxAge: queueMaxAge(cfg), AckWait: invokeAckWait}); err != nil {
 		stop()
 		return nil, err
 	}

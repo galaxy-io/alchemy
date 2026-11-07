@@ -36,6 +36,8 @@ const InvocationDrawerFacts: FC<InvocationDrawerFactsProps> = ({ invocation }) =
       }
     />
     <KeyValueListRow label="Version" value={formatVersion(invocation.version)} />
+    <KeyValueListRow label="Call" value={invocation.async ? "Async" : "Sync"} />
+    <KeyValueListRow label="Attempts" value={invocation.attempts || EMPTY_VALUE} />
     <KeyValueListRow
       label="Start"
       value={<InvocationStartKind startKind={invocation.startKind} />}

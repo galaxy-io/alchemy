@@ -135,8 +135,8 @@ func (s *Service) insertParams(invs []*functionsv1.Invocation, override bool) sq
 	p := sqlcgen.InsertInvocationsParams{Override: override}
 	for _, inv := range invs {
 		status, ok := invocationStatusRow(inv.GetStatus())
-		if !ok || !terminal(inv.GetStatus()) {
-			s.log.Warn("invocation record with no final status", "invocation_id", inv.GetId(), "status", inv.GetStatus())
+		if !ok {
+			s.log.Warn("invocation record with no status", "invocation_id", inv.GetId(), "status", inv.GetStatus())
 			continue
 		}
 		var fe string
@@ -160,6 +160,8 @@ func (s *Service) insertParams(invs []*functionsv1.Invocation, override bool) sq
 		p.InstanceIds = append(p.InstanceIds, inv.GetInstanceId())
 		p.IdempotencyKeys = append(p.IdempotencyKeys, inv.GetIdempotencyKey())
 		p.Hosts = append(p.Hosts, inv.GetHost())
+		p.Attempts = append(p.Attempts, inv.GetAttempts())
+		p.Asyncs = append(p.Asyncs, inv.GetAsync())
 		p.CreatedByUserIds = append(p.CreatedByUserIds, inv.GetCreatedByUserId())
 		p.CreatedAts = append(p.CreatedAts, millis(inv.GetCreatedAt()))
 		p.StartedAts = append(p.StartedAts, millis(inv.GetStartedAt()))

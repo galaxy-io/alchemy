@@ -32,6 +32,7 @@ export enum CreateFunctionModalActionType {
   SET_MEMORY_MIB = "SET_MEMORY_MIB",
   SET_TIMEOUT_MS = "SET_TIMEOUT_MS",
   SET_MAX_CONCURRENCY = "SET_MAX_CONCURRENCY",
+  SET_RETRIES = "SET_RETRIES",
   GO_TO_STEP = "GO_TO_STEP",
   GO_BACK = "GO_BACK",
   GO_NEXT = "GO_NEXT",
@@ -137,6 +138,11 @@ export interface SetMaxConcurrencyAction {
   payload: CreateFunctionModalState["maxConcurrency"];
 }
 
+export interface SetRetriesAction {
+  type: CreateFunctionModalActionType.SET_RETRIES;
+  payload: CreateFunctionModalState["retries"];
+}
+
 export interface GoToStepAction {
   type: CreateFunctionModalActionType.GO_TO_STEP;
   payload: CreateFunctionModalStep;
@@ -175,6 +181,7 @@ export type CreateFunctionModalAction =
   | SetMemoryMibAction
   | SetTimeoutMsAction
   | SetMaxConcurrencyAction
+  | SetRetriesAction
   | GoToStepAction
   | GoBackAction
   | GoNextAction

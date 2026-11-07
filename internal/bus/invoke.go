@@ -22,7 +22,9 @@ import (
 // one shared consumer, one fetch per free slot, so the first host with room
 // takes the next invocation. A payload too large for a message rides in the
 // invoke object store and the message names it. A function's
-// max_concurrency is a set of leases in the invoke lease bucket.
+// max_concurrency is a set of leases in the invoke lease bucket. The failed
+// attempts of an async invocation are counted in the invoke attempts bucket,
+// since a message is also handed back for reasons that are no attempt.
 const (
 	// InvokeStream holds invocations until a host has run them.
 	InvokeStream = "INVOKE"
@@ -33,6 +35,8 @@ const (
 	// InvokeLeases holds the leases of functions that have a
 	// max_concurrency.
 	InvokeLeases = "INVOKE_LEASES"
+	// InvokeAttempts counts the failed attempts of async invocations.
+	InvokeAttempts = "INVOKE_ATTEMPTS"
 	// InlinePayloadBytes is the largest input or output a message carries
 	// itself. Larger ones go through the object store.
 	InlinePayloadBytes = 8 << 20
@@ -51,8 +55,9 @@ func ServerResultSubject(name string) string { return "server." + name + ".resul
 type InvokeQueueConfig struct {
 	// Replicas is how many NATS servers keep each invocation and payload.
 	Replicas int
-	// MaxAge is how long an invocation no host took is kept. It must outlast
-	// the longest deadline a caller may set.
+	// MaxAge is how long an invocation no host is done with is kept, and
+	// the count of its failed attempts. It must outlast the longest deadline
+	// a caller may set.
 	MaxAge time.Duration
 	// AckWait is how long a host may hold an invocation without reporting
 	// progress before the stream hands it to another host.
@@ -100,6 +105,14 @@ func (b *Bus) EnsureInvokeQueue(ctx context.Context, cfg InvokeQueueConfig) erro
 	}); err != nil {
 		return fmt.Errorf("bus: invoke leases: %w", err)
 	}
+	if _, err := js.CreateOrUpdateKeyValue(ctx, jetstream.KeyValueConfig{
+		Bucket:   InvokeAttempts,
+		TTL:      cfg.MaxAge,
+		Storage:  jetstream.FileStorage,
+		Replicas: replicas,
+	}); err != nil {
+		return fmt.Errorf("bus: invoke attempts: %w", err)
+	}
 	return nil
 }
 
@@ -110,6 +123,7 @@ type InvokeQueue struct {
 	consumer jetstream.Consumer
 	objects  jetstream.ObjectStore
 	leases   jetstream.KeyValue
+	attempts jetstream.KeyValue
 }
 
 // InvokeQueue opens the invoke queue, which EnsureInvokeQueue created.
@@ -130,7 +144,11 @@ func (b *Bus) InvokeQueue(ctx context.Context) (*InvokeQueue, error) {
 	if err != nil {
 		return nil, fmt.Errorf("bus: invoke leases: %w", err)
 	}
-	return &InvokeQueue{b: b, js: js, consumer: consumer, objects: objects, leases: leases}, nil
+	attempts, err := js.KeyValue(ctx, InvokeAttempts)
+	if err != nil {
+		return nil, fmt.Errorf("bus: invoke attempts: %w", err)
+	}
+	return &InvokeQueue{b: b, js: js, consumer: consumer, objects: objects, leases: leases, attempts: attempts}, nil
 }
 
 // Publish queues req and waits for the stream to have it. An input larger
@@ -215,6 +233,13 @@ func (p *Pulled) Done(ctx context.Context) error {
 // Retry hands the invocation back to the queue for another host after
 // delay.
 func (p *Pulled) Retry(delay time.Duration) error { return p.msg.NakWithDelay(delay) }
+
+// Redelivered reports whether the invocation was handed out before, so it
+// may have failed attempts behind it.
+func (p *Pulled) Redelivered() bool {
+	meta, err := p.msg.Metadata()
+	return err != nil || meta.NumDelivered > 1
+}
 
 // Working tells the stream this host still holds the invocation, so it is
 // not handed to another host after AckWait.
@@ -378,4 +403,63 @@ func leaseValue(until time.Time) []byte {
 
 func leaseExpiry(v []byte) time.Time {
 	return time.UnixMilli(int64(binary.BigEndian.Uint64(v))) //nolint:gosec // written by leaseValue
+}
+
+// attemptsKey is where an invocation's failed attempts are counted.
+func attemptsKey(invocationID string) string { return "attempts." + invocationID }
+
+// Failures is how many attempts of the invocation have failed.
+func (q *InvokeQueue) Failures(ctx context.Context, invocationID string) (int, error) {
+	entry, err := q.attempts.Get(ctx, attemptsKey(invocationID))
+	switch {
+	case errors.Is(err, jetstream.ErrKeyNotFound):
+		return 0, nil
+	case err != nil:
+		return 0, fmt.Errorf("bus: read attempts: %w", err)
+	}
+	n, err := strconv.Atoi(string(entry.Value()))
+	if err != nil {
+		return 0, fmt.Errorf("bus: read attempts: %w", err)
+	}
+	return n, nil
+}
+
+// Failed counts one more failed attempt of the invocation and returns how
+// many have failed. It is a compare and swap, so a host that holds the
+// invocation after another let it go never counts over it.
+func (q *InvokeQueue) Failed(ctx context.Context, invocationID string) (int, error) {
+	key := attemptsKey(invocationID)
+	for {
+		entry, err := q.attempts.Get(ctx, key)
+		if errors.Is(err, jetstream.ErrKeyNotFound) {
+			if _, err := q.attempts.Create(ctx, key, []byte("1")); err == nil {
+				return 1, nil
+			} else if !errors.Is(err, jetstream.ErrKeyExists) {
+				return 0, fmt.Errorf("bus: count attempt: %w", err)
+			}
+			continue
+		}
+		if err != nil {
+			return 0, fmt.Errorf("bus: count attempt: %w", err)
+		}
+		n, err := strconv.Atoi(string(entry.Value()))
+		if err != nil {
+			return 0, fmt.Errorf("bus: count attempt: %w", err)
+		}
+		n++
+		if _, err := q.attempts.Update(ctx, key, []byte(strconv.Itoa(n)), entry.Revision()); err == nil {
+			return n, nil
+		} else if !errors.Is(err, jetstream.ErrKeyExists) {
+			return 0, fmt.Errorf("bus: count attempt: %w", err)
+		}
+	}
+}
+
+// ForgetFailures drops the count of a finished invocation's failed
+// attempts.
+func (q *InvokeQueue) ForgetFailures(ctx context.Context, invocationID string) error {
+	if err := q.attempts.Purge(ctx, attemptsKey(invocationID)); err != nil && !errors.Is(err, jetstream.ErrKeyNotFound) {
+		return fmt.Errorf("bus: forget attempts: %w", err)
+	}
+	return nil
 }

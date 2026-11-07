@@ -11,6 +11,8 @@ import (
 	"errors"
 	"io"
 	"log/slog"
+	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -42,6 +44,15 @@ func OpenBucket(ctx context.Context, url string) (*blob.Bucket, error) {
 // function's logs for a day.
 func Key(tenantID, functionID string, created time.Time, invocationID string) string {
 	return tenantID + "/" + functionID + "/" + created.UTC().Format("2006/01/02") + "/" + invocationID + ".log.gz"
+}
+
+// AttemptKey is where the log of one attempt of the invocation whose log is
+// at key goes. The first attempt's is the invocation's.
+func AttemptKey(key string, attempt int32) string {
+	if attempt <= 1 {
+		return key
+	}
+	return strings.TrimSuffix(key, ".log.gz") + "." + strconv.Itoa(int(attempt)) + ".log.gz"
 }
 
 // Writer takes one invocation's log as the function writes it: each piece

@@ -199,6 +199,16 @@ server:
     maxDeadline: 1h
     # -- How many NATS servers keep each queued invocation.
     queueReplicas: 1
+    # -- How long an invocation waits after its first failed attempt. Each
+    # later wait is five times longer.
+    retryBackoff: 1s
+    # -- The longest wait between two attempts.
+    retryBackoffMax: 5m
+    async:
+      # -- How long an async invocation may wait in the queue and between
+      # its attempts before it is recorded canceled. The queue keeps
+      # invocations this long plus a margin.
+      maxAge: 24h
 
   # -- How long an invoke's idempotency key keeps a retry with the same key
   # from running the function again.

@@ -80,6 +80,7 @@ export const mapCreateFunctionModalStateToRequest = (
     secretValues: mapCreateFunctionModalStateToSecretValues(state),
     timeoutMs: BigInt(Math.round(state.timeoutMs)),
     maxConcurrency: state.maxConcurrency ?? 0,
+    retries: state.retries,
     resources: { vcpus: state.vcpus, memoryMib: state.memoryMib },
   });
 

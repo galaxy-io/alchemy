@@ -209,6 +209,7 @@ export const CREATE_FUNCTION_MODAL_DEFAULT_STATE: CreateFunctionModalState = {
   memoryMib: 256,
   timeoutMs: 30_000,
   maxConcurrency: null,
+  retries: 2,
   isSubmitting: false,
 };
 
@@ -231,3 +232,6 @@ export const CREATE_FUNCTION_MODAL_VCPUS_SLIDER_MARKS = CREATE_FUNCTION_MODAL_VC
 export const CREATE_FUNCTION_MODAL_MEMORY_SLIDER_MARKS = CREATE_FUNCTION_MODAL_MEMORY_MIB_MARKS.map(
   (value) => ({ value, label: formatMemory(value) }),
 );
+
+export const CREATE_FUNCTION_MODAL_RETRIES_MIN = 0;
+export const CREATE_FUNCTION_MODAL_RETRIES_MAX = 10;

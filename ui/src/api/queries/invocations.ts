@@ -165,14 +165,15 @@ export const useGetInvocationQuery = ({
   });
 };
 
-export const createGetInvocationLogsInput = (id: Invocation["id"]) =>
-  create(GetInvocationLogsRequestSchema, { id, follow: true });
+export const createGetInvocationLogsInput = (id: Invocation["id"], attempt = 0) =>
+  create(GetInvocationLogsRequestSchema, { id, follow: true, attempt });
 
 const createGetInvocationLogsQueryKey = (input: GetInvocationLogsRequest, transport: Transport) =>
   [
     ...createConnectQueryKey({ schema: FunctionsService, transport, cardinality: undefined }),
     FunctionsService.method.getInvocationLogs.name,
     input.id,
+    input.attempt,
   ] as const;
 
 const INITIAL_INVOCATION_LOGS: InvocationLogs = { lines: [], offset: 0 };
@@ -197,9 +198,9 @@ const appendInvocationLogs = (logs: InvocationLogs, chunks: string[]): Invocatio
   return { lines: lines.slice(trimmed), offset: logs.offset + trimmed };
 };
 
-export const useGetInvocationLogsStream = (invocationId: Invocation["id"]) => {
+export const useGetInvocationLogsStream = (invocationId: Invocation["id"], attempt = 0) => {
   const transport = useTransport();
-  const input = createGetInvocationLogsInput(invocationId);
+  const input = createGetInvocationLogsInput(invocationId, attempt);
   const { data, isFetching, isError } = useStreamedQuery({
     queryKey: createGetInvocationLogsQueryKey(input, transport),
     queryFn: streamedQuery({

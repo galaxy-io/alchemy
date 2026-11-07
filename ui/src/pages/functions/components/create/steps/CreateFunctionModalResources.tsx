@@ -18,6 +18,8 @@ import {
   CREATE_FUNCTION_MODAL_MEMORY_MIB_STEP,
   CREATE_FUNCTION_MODAL_MEMORY_SLIDER_MARKS,
   CREATE_FUNCTION_MODAL_RESOURCES_MAX_WIDTH,
+  CREATE_FUNCTION_MODAL_RETRIES_MAX,
+  CREATE_FUNCTION_MODAL_RETRIES_MIN,
   CREATE_FUNCTION_MODAL_TIMEOUT_MAX_MS,
   CREATE_FUNCTION_MODAL_TIMEOUT_MIN_MS,
   CREATE_FUNCTION_MODAL_VCPUS_MAX,
@@ -29,8 +31,8 @@ import { FUNCTION_LIMITS_COLUMNS } from "@/pages/functions/constants";
 import { formatMemory } from "@/utils/format";
 
 const CreateFunctionModalResources: FC = () => {
-  const { vcpus, memoryMib, timeoutMs, maxConcurrency } = useCreateFunctionModalState();
-  const { setVcpus, setMemoryMib, setTimeoutMs, setMaxConcurrency } =
+  const { vcpus, memoryMib, timeoutMs, maxConcurrency, retries } = useCreateFunctionModalState();
+  const { setVcpus, setMemoryMib, setTimeoutMs, setMaxConcurrency, setRetries } =
     useCreateFunctionModalActions();
 
   return (
@@ -88,6 +90,18 @@ const CreateFunctionModalResources: FC = () => {
             hasSteppers
             placeholder="No limit"
             onChange={setMaxConcurrency}
+            fillWidth
+          />
+          <NumberInput
+            label="Retries"
+            labelTooltip="Runs after an invocation fails, waiting longer before each"
+            value={retries}
+            min={CREATE_FUNCTION_MODAL_RETRIES_MIN}
+            max={CREATE_FUNCTION_MODAL_RETRIES_MAX}
+            step={1}
+            precision={0}
+            hasSteppers
+            onChange={(value) => setRetries(value ?? CREATE_FUNCTION_MODAL_RETRIES_MIN)}
             fillWidth
           />
         </Grid>

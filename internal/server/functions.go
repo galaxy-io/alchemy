@@ -41,6 +41,12 @@ func (s *Service) CreateFunction(ctx context.Context, req *connect.Request[funct
 	if err != nil {
 		return nil, err
 	}
+	retries := int32(defaultRetries)
+	if req.Msg.Retries != nil {
+		if retries, err = validRetries(req.Msg.GetRetries()); err != nil {
+			return nil, err
+		}
+	}
 	resources, err := s.validResources(req.Msg.GetResources())
 	if err != nil {
 		return nil, err
@@ -55,6 +61,7 @@ func (s *Service) CreateFunction(ctx context.Context, req *connect.Request[funct
 		Description:    req.Msg.GetDescription(),
 		TimeoutMs:      timeout,
 		MaxConcurrency: limit,
+		Retries:        retries,
 		Vcpus:          int32(resources.GetVcpus()),     //nolint:gosec // bounded by validResources
 		MemoryMib:      int32(resources.GetMemoryMib()), //nolint:gosec // bounded by validResources
 	})
@@ -77,9 +84,10 @@ func (s *Service) CreateFunction(ctx context.Context, req *connect.Request[funct
 	}), nil
 }
 
-// UpdateFunction changes a function's name, description, timeout and
-// concurrency limit. The last two change only when the request sets them,
-// and apply to the next invocation of any version.
+// UpdateFunction changes a function's name, description, timeout,
+// concurrency limit, resources and retries. All but the name and
+// description change only when the request sets them, and apply to the next
+// invocation of any version.
 func (s *Service) UpdateFunction(ctx context.Context, req *connect.Request[functionsv1.UpdateFunctionRequest]) (*connect.Response[functionsv1.UpdateFunctionResponse], error) {
 	tenant, err := tenantFromContext(ctx)
 	if err != nil {
@@ -108,6 +116,13 @@ func (s *Service) UpdateFunction(ctx context.Context, req *connect.Request[funct
 			return nil, err
 		}
 		params.MaxConcurrency = pgtype.Int4{Int32: limit, Valid: true}
+	}
+	if req.Msg.Retries != nil {
+		retries, err := validRetries(req.Msg.GetRetries())
+		if err != nil {
+			return nil, err
+		}
+		params.Retries = pgtype.Int4{Int32: retries, Valid: true}
 	}
 	if req.Msg.Resources != nil {
 		resources, err := s.validResources(req.Msg.GetResources())
@@ -415,7 +430,7 @@ func (s *Service) requestBuild(ctx context.Context, v *sqlcgen.FunctionVersion, 
 // hosts, which read them each time they take one of its invocations, so a
 // change applies to the ones already queued.
 func (s *Service) syncFunctionConfig(ctx context.Context, fn *sqlcgen.Function) error {
-	cfg := &hostv1.FunctionConfig{MaxConcurrency: fn.MaxConcurrency, Resources: functionResources(fn)}
+	cfg := &hostv1.FunctionConfig{MaxConcurrency: fn.MaxConcurrency, Resources: functionResources(fn), Retries: fn.Retries}
 	if err := s.queue.SetFunctionConfig(ctx, fn.TenantID, fn.ID, cfg); err != nil {
 		return connect.NewError(connect.CodeUnavailable, fmt.Errorf("the function is saved but hosts did not get its settings, save again: %w", err))
 	}
@@ -433,6 +448,7 @@ func (s *Service) syncFunctionConfigs(ctx context.Context) error {
 	for _, r := range rows {
 		cfg := &hostv1.FunctionConfig{
 			MaxConcurrency: r.MaxConcurrency,
+			Retries:        r.Retries,
 			Resources:      &functionsv1.Resources{Vcpus: uint32(r.Vcpus), MemoryMib: uint32(r.MemoryMib)}, //nolint:gosec // bounded by validResources
 		}
 		if err := s.queue.SetFunctionConfig(ctx, r.TenantID, r.ID, cfg); err != nil {
@@ -491,6 +507,22 @@ func functionResources(fn *sqlcgen.Function) *functionsv1.Resources {
 func validConcurrency(n int32) (int32, error) {
 	if n < 0 {
 		return 0, connect.NewError(connect.CodeInvalidArgument, errors.New("max_concurrency must not be negative"))
+	}
+	return n, nil
+}
+
+const (
+	// defaultRetries is a new function's retries.
+	defaultRetries = 2
+	// maxRetries bounds retries. With backoff growing five times per
+	// attempt, the last of them wait the backoff cap.
+	maxRetries = 10
+)
+
+// validRetries is a function's or a call's retries.
+func validRetries(n int32) (int32, error) {
+	if n < 0 || n > maxRetries {
+		return 0, connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("retries must be between 0 and %d", maxRetries))
 	}
 	return n, nil
 }

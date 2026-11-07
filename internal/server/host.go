@@ -128,9 +128,10 @@ func (s *Service) onHeartbeat(_ context.Context, data []byte) proto.Message {
 }
 
 // onInvocationState moves one of this server's invocations to STARTING or
-// RUNNING as the host reports it, for the live streams; the terminal state
-// comes with the invoke reply. A report for an invocation that has already
-// ended is dropped.
+// RUNNING as the host reports it, and back to PENDING with the error when
+// an attempt fails, for the live streams. The terminal state comes with the
+// invoke reply. A report for an invocation that has already ended, or about
+// an earlier attempt, is dropped.
 func (s *Service) onInvocationState(_ context.Context, data []byte) proto.Message {
 	ev := &hostv1.InvocationEvent{}
 	if err := proto.Unmarshal(data, ev); err != nil {
@@ -143,13 +144,25 @@ func (s *Service) onInvocationState(_ context.Context, data []byte) proto.Messag
 		if h := ev.GetHost(); h != "" {
 			inv.Host = h
 		}
+		if ev.GetAttempts() < inv.GetAttempts() {
+			return
+		}
 		switch ev.GetStatus() {
+		case functionsv1.InvocationStatus_INVOCATION_STATUS_PENDING:
+			inv.Status = ev.GetStatus()
+			inv.Attempts = ev.GetAttempts()
+			inv.Error = ev.GetError()
+			inv.PlatformError = ev.GetPlatformError()
+			inv.InstanceId = ""
 		case functionsv1.InvocationStatus_INVOCATION_STATUS_STARTING:
 			if inv.GetStatus() == functionsv1.InvocationStatus_INVOCATION_STATUS_PENDING {
 				inv.Status = ev.GetStatus()
+				inv.Attempts = ev.GetAttempts()
 			}
 		case functionsv1.InvocationStatus_INVOCATION_STATUS_RUNNING:
 			inv.Status = ev.GetStatus()
+			inv.Attempts = ev.GetAttempts()
+			inv.Error, inv.PlatformError = nil, ""
 			inv.StartKind = ev.GetStartKind()
 			inv.InstanceId = ev.GetInstanceId()
 			inv.StartedAt = time.Now().UnixMilli()
