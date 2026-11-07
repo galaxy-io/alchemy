@@ -1,0 +1,41 @@
+name: Release
+
+on:
+  push:
+    tags: ["v[0-9]+.[0-9]+.[0-9]+"]
+
+permissions:
+  attestations: write
+  contents: write
+  id-token: write
+  packages: write
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  # Release Please creates the tag and the GitHub release; this builds
+  # what the release ships.
+  release:
+    runs-on: ubuntu-latest
+    environment: release
+    outputs:
+      tag: ${{ github.ref_name }}
+    steps:
+      - run: echo "Releasing ${GITHUB_REF_NAME}"
+
+  images:
+    needs: release
+    uses: ./.github/workflows/images.yaml
+    with:
+      ref: ${{ needs.release.outputs.tag }}
+      tag: ${{ needs.release.outputs.tag }}
+      publish: true
+      prerelease: false
+    secrets: inherit
+
+  # After the images, so the chart never names a version that cannot be pulled.
+  chart:
+    needs: [release, images]
+    uses: ./.github/workflows/chart.yaml

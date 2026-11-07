@@ -3,6 +3,26 @@
   "skip-changelog": true,
   "bump-minor-pre-major": true,
   "packages": {
+    ".": {
+      "release-type": "go",
+      "release-as": "0.0.1",
+      "include-component-in-tag": false,
+      "exclude-paths": [
+        "examples"
+      ],
+      "extra-files": [
+        {
+          "type": "yaml",
+          "path": "charts/alchemy/Chart.yaml",
+          "jsonpath": "$.version"
+        },
+        {
+          "type": "yaml",
+          "path": "charts/alchemy/Chart.yaml",
+          "jsonpath": "$.appVersion"
+        }
+      ]
+    },
     "ui": {
       "release-type": "node",
       "component": "alchemy-ui",

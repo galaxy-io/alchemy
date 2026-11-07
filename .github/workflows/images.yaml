@@ -71,6 +71,26 @@ jobs:
             context: runtimes/static
             dockerfile: runtimes/static/Dockerfile
             version: "13"
+          # A compiled runtime is two images: the build stage compiles a
+          # version's source on a host, and the final stage runs the result.
+          - image: alchemy/runtime/go
+            context: runtimes/go
+            dockerfile: runtimes/go/Dockerfile
+            version: "1.27"
+          - image: alchemy/runtime/go
+            context: runtimes/go
+            dockerfile: runtimes/go/Dockerfile
+            version: "1.27-build"
+            target: build
+          - image: alchemy/runtime/rust
+            context: runtimes/rust
+            dockerfile: runtimes/rust/Dockerfile
+            version: "1.99"
+          - image: alchemy/runtime/rust
+            context: runtimes/rust
+            dockerfile: runtimes/rust/Dockerfile
+            version: "1.99-build"
+            target: build
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -141,6 +161,7 @@ jobs:
         with:
           context: ${{ matrix.context }}
           file: ${{ matrix.dockerfile }}
+          target: ${{ matrix.target }}
           push: ${{ inputs.publish }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
