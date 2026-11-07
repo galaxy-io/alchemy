@@ -2,7 +2,6 @@ package server
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"net/http"
 	"strings"
@@ -49,9 +48,12 @@ func (s *Service) invokeAsync(ctx context.Context, cv *compiledVersion, raw []by
 		return nil, err
 	}
 	for held != nil {
-		// A claim no live server will queue, because its owner died between
-		// claiming and sending, is taken over. Any other is the answer.
-		if held.host != "" || s.serverLive(held.server) {
+		abandoned, err := s.abandoned(ctx, held)
+		if err != nil {
+			inv.discard()
+			return nil, err
+		}
+		if !abandoned {
 			inv.discard()
 			return &functionsv1.InvokeAsyncResponse{InvocationId: held.invocationID, Replayed: true}, nil
 		}
@@ -72,10 +74,35 @@ func (s *Service) invokeAsync(ctx context.Context, cv *compiledVersion, raw []by
 		}
 		if held == nil {
 			inv.discard()
-			return nil, connect.NewError(connect.CodeAborted, errors.New("idempotency key changed hands; retry"))
+			return nil, keyClaimed()
 		}
 	}
 	return s.queueAsync(ctx, inv, cv, raw)
+}
+
+// abandoned reports whether the invocation holding held was never queued,
+// so a call may take its key over: it ended with no host, as when marking
+// the claim or publishing it failed, or it is nowhere and its owner died
+// before marking the claim. Any other holder is the call's answer.
+func (s *Service) abandoned(ctx context.Context, held *claim) (bool, error) {
+	inv, err := s.invocation(ctx, held.invocationID)
+	switch {
+	case err == nil:
+		return neverRan(inv), nil
+	case connect.CodeOf(err) != connect.CodeNotFound:
+		return false, err
+	}
+	return held.host == "" && !s.serverLive(held.server), nil
+}
+
+// neverRan is true for an invocation that ended before any host took it.
+func neverRan(inv *functionsv1.Invocation) bool {
+	switch inv.GetStatus() {
+	case functionsv1.InvocationStatus_INVOCATION_STATUS_ERRORED, functionsv1.InvocationStatus_INVOCATION_STATUS_CANCELED:
+		return inv.GetHost() == ""
+	default:
+		return false
+	}
 }
 
 // queueAsync publishes inv to the queue with no server waiting on it, and

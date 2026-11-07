@@ -326,22 +326,21 @@ func (i *invocation) discard() {
 // invocation, and for a keyed call on its claim, durably, so that a claim
 // with no host is known never to have run even when this server dies.
 func (i *invocation) sentTo(ctx context.Context, host string) error {
+	if key := i.accepted.GetIdempotencyKey(); key != "" {
+		n, err := i.s.store.MarkIdempotencyKeySent(ctx, sqlcgen.MarkIdempotencyKeySentParams{
+			TenantID: i.accepted.GetTenantId(), FunctionID: i.accepted.GetFunctionId(),
+			Key: key, InvocationID: i.accepted.GetId(), Host: host,
+		})
+		if err != nil {
+			return connect.NewError(connect.CodeUnavailable, fmt.Errorf("mark idempotency key sent: %w", err))
+		}
+		if n == 0 {
+			// A retry took the key over while this call was waiting to send,
+			// having found no sign of it. That retry runs; this one must not.
+			return keyClaimed()
+		}
+	}
 	i.s.tracker.update(i.accepted.GetId(), func(inv *functionsv1.Invocation) { inv.Host = host })
-	if i.accepted.GetIdempotencyKey() == "" {
-		return nil
-	}
-	n, err := i.s.store.MarkIdempotencyKeySent(ctx, sqlcgen.MarkIdempotencyKeySentParams{
-		TenantID: i.accepted.GetTenantId(), FunctionID: i.accepted.GetFunctionId(),
-		Key: i.accepted.GetIdempotencyKey(), InvocationID: i.accepted.GetId(), Host: host,
-	})
-	if err != nil {
-		return connect.NewError(connect.CodeUnavailable, fmt.Errorf("mark idempotency key sent: %w", err))
-	}
-	if n == 0 {
-		// A retry took the key over while this call was waiting to send,
-		// having found no sign of it. That retry runs; this one must not.
-		return connect.NewError(connect.CodeAborted, errors.New("idempotency key changed hands; retry"))
-	}
 	return nil
 }
 
