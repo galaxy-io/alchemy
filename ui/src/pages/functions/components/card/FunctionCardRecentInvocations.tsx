@@ -66,7 +66,7 @@ const FunctionCardRecentInvocations: FC<FunctionCardRecentInvocationsProps> = ({
 
   const handleInvocationClick = (event: MouseEvent, invocationId: Invocation["id"]) => {
     event.stopPropagation();
-    void updateSearch((prev) => ({ ...prev, invocationId }));
+    void updateSearch((prev) => ({ ...prev, invocationId, invocationAttempt: undefined }));
   };
 
   if (isLoading) {

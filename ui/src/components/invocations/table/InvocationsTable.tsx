@@ -29,7 +29,12 @@ const InvocationsTable: FC<InvocationsTableProps> = ({
   const { invocationId } = useAlchemyLayoutSearch();
 
   const handleRowClick = (row: Invocation) => {
-    void updateSearch((prev) => ({ ...prev, flow: undefined, invocationId: row.id }));
+    void updateSearch((prev) => ({
+      ...prev,
+      flow: undefined,
+      invocationId: row.id,
+      invocationAttempt: undefined,
+    }));
   };
 
   return (

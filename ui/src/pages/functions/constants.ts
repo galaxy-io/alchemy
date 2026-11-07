@@ -102,4 +102,4 @@ export const FUNCTION_SOURCE_EXTENSION_TO_RUNTIME_ID_MAP: Record<string, Runtime
   rs: "rust",
 };
 
-export const FUNCTION_LIMITS_COLUMNS = "minmax(0, 1fr) minmax(0, 1fr)";
+export const FUNCTION_LIMITS_COLUMNS = "minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1fr)";

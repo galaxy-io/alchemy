@@ -18,12 +18,18 @@ interface InvocationLogsSplitProps {
   id: string;
   storageKey: string;
   invocationId: Invocation["id"];
+  attempts?: Invocation["attempts"];
+  attempt?: Invocation["attempts"];
+  onAttemptChange?: (attempt: Invocation["attempts"]) => void;
 }
 
 const InvocationLogsSplit: FC<PropsWithChildren<InvocationLogsSplitProps>> = ({
   id,
   storageKey,
   invocationId,
+  attempts,
+  attempt,
+  onAttemptChange,
   children,
 }) => (
   <ResizablePanels orientation={Orientation.VERTICAL} storageKey={storageKey} hasDividers>
@@ -40,7 +46,12 @@ const InvocationLogsSplit: FC<PropsWithChildren<InvocationLogsSplitProps>> = ({
       min={INVOCATION_LOGS_SPLIT_LOGS_MIN_HEIGHT}
       ariaLabel="Logs"
     >
-      <InvocationLogs invocationId={invocationId} />
+      <InvocationLogs
+        invocationId={invocationId}
+        attempts={attempts}
+        attempt={attempt}
+        onAttemptChange={onAttemptChange}
+      />
     </ResizablePanel>
   </ResizablePanels>
 );
