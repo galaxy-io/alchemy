@@ -48,8 +48,9 @@ func dialVsock(ctx context.Context, socket string, port uint32) (net.Conn, error
 }
 
 // waitForGuest dials until the guest's supervisor accepts, which is the
-// readiness signal on a cold boot.
-func waitForGuest(ctx context.Context, socket string, port uint32) error {
+// readiness signal on a cold boot. It fails with errExited once exited is
+// closed, since a dead Firecracker never answers.
+func waitForGuest(ctx context.Context, socket string, port uint32, exited <-chan struct{}) error {
 	tick := time.NewTicker(2 * time.Millisecond)
 	defer tick.Stop()
 	for {
@@ -62,6 +63,8 @@ func waitForGuest(ctx context.Context, socket string, port uint32) error {
 		select {
 		case <-ctx.Done():
 			return fmt.Errorf("%w (last error: %v)", ctx.Err(), err)
+		case <-exited:
+			return errExited
 		case <-tick.C:
 		}
 	}

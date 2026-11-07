@@ -116,7 +116,9 @@ func (d *Driver) Snapshot(ctx context.Context, a *driver.Artifact) error {
 		return err
 	}
 	// The files are the jail's, written by its uid; they move into the
-	// cache before the jail goes, and every microVM uid must read them.
+	// cache before the jail goes, owned by root, since uids are reused and
+	// a later microVM with this one must not be able to change them. Every
+	// microVM uid must read them.
 	work, err := os.MkdirTemp(d.snapshotsDir(), ".snapshot-*")
 	if err != nil {
 		return err
@@ -124,6 +126,10 @@ func (d *Driver) Snapshot(ctx context.Context, a *driver.Artifact) error {
 	for _, name := range []string{jailVMState, jailMemory} {
 		dst := filepath.Join(work, filepath.Base(name))
 		if err := os.Rename(sb.jail.host(name), dst); err != nil {
+			_ = os.RemoveAll(work)
+			return err
+		}
+		if err := os.Chown(dst, 0, 0); err != nil {
 			_ = os.RemoveAll(work)
 			return err
 		}
@@ -168,7 +174,12 @@ func (s *instance) snapshot(ctx context.Context) error {
 // shares them. A running microVM holds hard links to all of them, so it is
 // unaffected.
 func (d *Driver) Forget(_ context.Context, a *driver.Artifact, keep []*driver.Artifact) error {
-	paths := []string{filepath.Join(d.snapshotsDir(), a.ID)}
+	var paths []string
+	// An artifact without an id has no snapshot, and joining "" would name
+	// the whole snapshot cache.
+	if a.ID != "" {
+		paths = append(paths, filepath.Join(d.snapshotsDir(), a.ID))
+	}
 	rootfsShared, layersShared := false, false
 	for _, k := range keep {
 		rootfsShared = rootfsShared || k.Digest == a.Digest

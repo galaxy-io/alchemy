@@ -112,6 +112,13 @@ type Host struct {
 	// removes a drive a build has found and is about to serve.
 	drives sync.RWMutex
 
+	// compiles orders the compiles of one source against each other: the
+	// last one to finish drops the source's layer drive, never one that
+	// another has found and is about to link. compiling counts those in
+	// flight, by source digest.
+	compiles  sync.Mutex
+	compiling map[string]int
+
 	// handlers counts the bus handlers running. Shutdown waits for them
 	// before it waits for tasks, so no handler starts a task after that.
 	handlers sync.WaitGroup
@@ -152,6 +159,7 @@ func New(cfg Config, d driver.Driver, b *bus.Bus, logBucket, artifactBucket *blo
 		instances:       make(map[string]*liveInstance),
 		warm:            make(map[string][]*liveInstance),
 		filling:         make(map[string]int),
+		compiling:       make(map[string]int),
 		building:        make(map[string]*pendingBuild),
 		running:         make(map[functionKey]int32),
 		functionConfigs: make(map[functionKey]cachedFunctionConfig),

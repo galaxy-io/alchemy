@@ -217,7 +217,11 @@ func (d *Driver) start(ctx context.Context, a *driver.Artifact, extra map[string
 		sb.Release(context.WithoutCancel(ctx))
 		return nil, err
 	}
-	if err := bring(sb, ctx, a); err != nil {
+	// Launching, configuring and starting the microVM share one deadline:
+	// callers such as an invocation's Acquire may pass a context with none.
+	bringCtx, cancel := context.WithTimeout(ctx, bootTimeout)
+	defer cancel()
+	if err := bring(sb, bringCtx, a); err != nil {
 		sb.Release(context.WithoutCancel(ctx))
 		return nil, err
 	}
@@ -232,7 +236,11 @@ type instance struct {
 	process   *exec.Cmd
 	transport *http.Transport
 	client    supervisorv1connect.SupervisorServiceClient
-	// keepDir preserves the jail on Release, for post-mortems.
+	// exited is closed once the jailer process has been waited on, with
+	// its exit in waitErr. It is nil until the process starts.
+	exited  chan struct{}
+	waitErr error
+	// keepDir preserves the jail's log on Release, for post-mortems.
 	keepDir bool
 }
 
@@ -251,8 +259,13 @@ func (s *instance) launch(ctx context.Context, a *driver.Artifact) (*api, error)
 	if err := s.process.Start(); err != nil {
 		return nil, fmt.Errorf("start jailer: %w", err)
 	}
+	s.exited = make(chan struct{})
+	go func() {
+		s.waitErr = s.process.Wait()
+		close(s.exited)
+	}()
 	apiSock := s.jail.host(jailAPISocket)
-	if err := waitForSocket(ctx, apiSock); err != nil {
+	if err := s.waitForSocket(ctx, apiSock); err != nil {
 		return nil, s.failed(fmt.Errorf("api socket: %w", err))
 	}
 	return newAPI(apiSock), nil
@@ -308,12 +321,10 @@ func (s *instance) boot(ctx context.Context, a *driver.Artifact) error {
 		}
 	}
 
-	bootCtx, cancel := context.WithTimeout(ctx, bootTimeout)
-	defer cancel()
-	if err := s.connect(bootCtx); err != nil {
+	if err := s.connect(ctx); err != nil {
 		return err
 	}
-	if _, err := s.client.Start(bootCtx, connect.NewRequest(a.StartRequest())); err != nil {
+	if _, err := s.client.Start(ctx, connect.NewRequest(a.StartRequest())); err != nil {
 		return s.failed(fmt.Errorf("supervisor start: %w", err))
 	}
 	return nil
@@ -333,15 +344,16 @@ func (s *instance) restore(ctx context.Context, a *driver.Artifact) error {
 	}); err != nil {
 		return s.failed(err)
 	}
-	restoreCtx, cancel := context.WithTimeout(ctx, bootTimeout)
-	defer cancel()
-	return s.connect(restoreCtx)
+	return s.connect(ctx)
 }
 
 // connect waits for the supervisor to accept on vsock and makes its client.
 func (s *instance) connect(ctx context.Context) error {
 	vsockPath := s.jail.host(jailVsock)
-	if err := waitForGuest(ctx, vsockPath, supervisorPort); err != nil {
+	if err := waitForGuest(ctx, vsockPath, supervisorPort, s.exited); err != nil {
+		if errors.Is(err, errExited) {
+			err = s.exitedErr()
+		}
 		return s.failed(fmt.Errorf("supervisor did not come up: %w", err))
 	}
 	s.transport = &http.Transport{
@@ -349,8 +361,24 @@ func (s *instance) connect(ctx context.Context) error {
 			return dialVsock(ctx, vsockPath, supervisorPort)
 		},
 	}
-	s.client = supervisorv1connect.NewSupervisorServiceClient(&http.Client{Transport: s.transport}, "http://supervisor")
+	s.client = supervisorv1connect.NewSupervisorServiceClient(&http.Client{Transport: s.transport}, "http://supervisor",
+		// The guest runs the function as root, so a function that takes over
+		// the supervisor could send any size; this bounds what the host reads.
+		connect.WithReadMaxBytes(maxSupervisorMessage))
 	return nil
+}
+
+// maxSupervisorMessage is the largest message the host reads from a
+// supervisor: the supervisor's 64 MiB cap on a function's output, with room
+// for the rest of the result.
+const maxSupervisorMessage = 64<<20 + 1<<20
+
+// exitedErr describes the jailer's exit once exited is closed.
+func (s *instance) exitedErr() error {
+	if s.waitErr != nil {
+		return fmt.Errorf("firecracker exited: %w", s.waitErr)
+	}
+	return errors.New("firecracker exited")
 }
 
 // logPath is Firecracker's output, kept beside the chroot so the guest
@@ -403,20 +431,24 @@ func (s *instance) Release(context.Context) {
 	if s.transport != nil {
 		s.transport.CloseIdleConnections()
 	}
-	if s.process != nil && s.process.Process != nil {
+	if s.exited != nil {
 		_ = s.process.Process.Kill()
-		_ = s.process.Wait()
+		<-s.exited
 		if err := os.Remove(s.driver.cgroup(s.id)); err != nil && !errors.Is(err, os.ErrNotExist) {
 			log.Warn("remove cgroup", "err", err)
 		}
 	}
 	s.driver.uids.give(s.uid)
+	// A failed microVM keeps its log, beside the chroot. The chroot goes
+	// either way: it holds hard links to the memory file, the rootfs and
+	// the layers, which would keep them on disk after Forget.
+	dir := s.jail.dir
 	if s.keepDir {
-		log.Warn("keeping jail for inspection", "dir", s.jail.dir)
-		return
+		dir = s.jail.root
+		log.Warn("keeping jail log for inspection", "log", s.logPath())
 	}
-	if err := os.RemoveAll(s.jail.dir); err != nil {
-		log.Warn("remove jail", "dir", s.jail.dir, "err", err)
+	if err := os.RemoveAll(dir); err != nil {
+		log.Warn("remove jail", "dir", dir, "err", err)
 	}
 }
 
@@ -446,9 +478,22 @@ func (d *Driver) Info(ctx context.Context) driver.HostInfo {
 }
 
 // waitForSocket returns once something accepts connections on the Unix
-// socket at path. The socket file appears before Firecracker listens on it,
-// so checking for the file alone races under load.
-func waitForSocket(ctx context.Context, path string) error {
+// socket at path, or fails once the jailer exits. The socket file appears
+// before Firecracker listens on it, so checking for the file alone races
+// under load.
+func (s *instance) waitForSocket(ctx context.Context, path string) error {
+	err := waitForSocket(ctx, path, s.exited)
+	if errors.Is(err, errExited) {
+		return s.exitedErr()
+	}
+	return err
+}
+
+// errExited is returned by the wait loops when the process they wait on
+// exits first.
+var errExited = errors.New("process exited")
+
+func waitForSocket(ctx context.Context, path string, exited <-chan struct{}) error {
 	tick := time.NewTicker(time.Millisecond)
 	defer tick.Stop()
 	for {
@@ -458,6 +503,8 @@ func waitForSocket(ctx context.Context, path string) error {
 		select {
 		case <-ctx.Done():
 			return ctx.Err()
+		case <-exited:
+			return errExited
 		case <-tick.C:
 		}
 	}
