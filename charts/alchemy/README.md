@@ -32,6 +32,16 @@ Hosts are added straight away. They are removed one per minute once demand has s
 
 A new host only runs once it has a KVM node. Run a node autoscaler such as Karpenter or Cluster Autoscaler on the KVM node pool, or pending hosts wait for a node indefinitely.
 
+## Installing
+
+Every release publishes the chart to `oci://ghcr.io/galaxy-io/charts/alchemy`, with server and host images of the same version under `ghcr.io/galaxy-io/alchemy`. The runtime images there are published apart from releases, whenever one changes, and carry their language version, such as `runtime/python:3.13`. The examples below install from a checkout. To install a release, use the OCI reference in place of `charts/alchemy`:
+
+```sh
+helm upgrade --install alchemy oci://ghcr.io/galaxy-io/charts/alchemy --set existingSecret=alchemy-runtime
+```
+
+Verify a release with `gh attestation verify --owner galaxy-io oci://ghcr.io/galaxy-io/charts/alchemy:<version>`. Without `--version`, Helm installs the newest release.
+
 ## Runtime configuration
 
 Alchemy needs a PostgreSQL DSN, a NATS URL and an encryption key for tenant secrets, a base64 AES key the server encrypts them with before they reach PostgreSQL. NATS must accept 64MB messages (`max_payload: 64MB`) and have JetStream enabled with file storage, which keeps recent function logs and invocation records no server has written yet. You can supply all three through an existing Secret:

@@ -67,12 +67,15 @@ func (h *Host) handleCompile(ctx context.Context, data []byte) proto.Message {
 	// until the compiler has run.
 	h.drives.RLock()
 	defer h.drives.RUnlock()
+	source := req.GetSource().GetSha256()
+	h.beginCompile(source)
 	built, err := h.driver.Build(ctx, spec, resources, layers)
 	if err != nil {
+		h.endCompile(source, nil)
 		return compileError("internal", fmt.Errorf("build %s: %w", req.GetImage(), err))
 	}
-	defer h.forgetCompile(built)
 	artifact := toProto(&hostv1.BuildRequest{TenantId: req.GetTenantId(), Spec: spec, Resources: resources, Layers: []*hostv1.Layer{req.GetSource()}}, built)
+	defer h.endCompile(source, built)
 
 	live, err := h.admit(artifact)
 	if err != nil {
@@ -117,10 +120,38 @@ func (h *Host) handleCompile(ctx context.Context, data []byte) proto.Message {
 	return &hostv1.CompileResponse{Result: &hostv1.CompileResponse_Layer{Layer: layer}, BuildLog: logs.String()}
 }
 
-// forgetCompile drops a compile's layer drive and keeps the build image's
-// root filesystem, which every compile on that image shares.
-func (h *Host) forgetCompile(a *driver.Artifact) {
+// beginCompile counts a compile of source as in flight, before its Build
+// finds or makes the source's layer drive.
+func (h *Host) beginCompile(source string) {
+	h.compiles.Lock()
+	defer h.compiles.Unlock()
+	h.compiling[source]++
+}
+
+// endCompile ends a compile of source. The last compile of a source to end
+// drops its layer drive, unless an artifact the host serves runs on it,
+// and every compile keeps the build image's root filesystem, which every
+// compile on that image shares. A nil a ends a compile that built nothing.
+func (h *Host) endCompile(source string, a *driver.Artifact) {
+	h.compiles.Lock()
+	defer h.compiles.Unlock()
+	h.compiling[source]--
+	others := h.compiling[source] > 0
+	if !others {
+		delete(h.compiling, source)
+	}
+	if a == nil {
+		return
+	}
 	keep := []*driver.Artifact{{Digest: a.Digest}}
+	if others {
+		keep = append(keep, &driver.Artifact{Layers: a.Layers})
+	}
+	h.mu.Lock()
+	for _, served := range h.artifacts {
+		keep = append(keep, fromProto(served))
+	}
+	h.mu.Unlock()
 	if err := h.driver.Forget(context.WithoutCancel(h.background), a, keep); err != nil {
 		h.log.Warn("forget compile", "image", a.Image, "err", err)
 	}
