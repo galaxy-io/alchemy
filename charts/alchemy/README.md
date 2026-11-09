@@ -34,7 +34,7 @@ A new host only runs once it has a KVM node. Run a node autoscaler such as Karpe
 
 ## Installing
 
-Every release publishes the chart to `oci://ghcr.io/galaxy-io/charts/alchemy`, with server and host images of the same version under `ghcr.io/galaxy-io/alchemy`. The runtime images there carry their language version, such as `runtime/python:3.13`. The examples below install from a checkout. To install a release, use the OCI reference in place of `charts/alchemy`:
+Every release publishes the chart to `oci://ghcr.io/galaxy-io/charts/alchemy`, with server and host images of the same version under `ghcr.io/galaxy-io/alchemy`. The runtime images there are published apart from releases, whenever one changes, and carry their language version, such as `runtime/python:3.13`. The examples below install from a checkout. To install a release, use the OCI reference in place of `charts/alchemy`:
 
 ```sh
 helm upgrade --install alchemy oci://ghcr.io/galaxy-io/charts/alchemy --set existingSecret=alchemy-runtime
