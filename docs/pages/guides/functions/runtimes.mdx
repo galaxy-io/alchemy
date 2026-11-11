@@ -1,0 +1,14 @@
+---
+title: "Runtimes"
+description: "The language runtime images Alchemy publishes."
+---
+
+| Runtime | Use it for |
+|---|---|
+| `runtime/python:3.13` | Python handlers |
+| `runtime/node:24` | TypeScript and JavaScript handlers |
+| `runtime/static:13` | A function that compiles to one static binary, such as Go or Rust |
+
+Each runtime ships its interpreter and the Arrow library. Any other image whose entrypoint speaks stdin and stdout works too.
+
+{/* TODO: per-runtime handler examples. */}

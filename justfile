@@ -113,6 +113,10 @@ server mode="":
 ui:
     cd ui && pnpm install && pnpm dev
 
+# run the docs site locally (mintlify preview at :3000; installs deps on first run)
+docs:
+    cd docs && pnpm install && pnpm dev
+
 # run hosts, server and the UI together; `just dev zitadel|keycloak|proxy` turns auth on; Ctrl-C stops them all
 dev mode="" count="3" memory="512" warm="5m" prewarm="0":
     #!/usr/bin/env bash

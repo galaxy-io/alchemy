@@ -1,0 +1,142 @@
+{
+  "$schema": "https://mintlify.com/docs.json",
+  "theme": "maple",
+  "name": "Alchemy",
+  "description": "Alchemy is a runtime for fast, isolated, strongly typed compute functions by Galaxy.",
+  "colors": {
+    "primary": "#005EFF",
+    "light": "#005EFF",
+    "dark": "#005EFF"
+  },
+  "logo": {
+    "light": "/assets/alchemy-light.svg",
+    "dark": "/assets/alchemy-dark.svg",
+    "href": "https://github.com/galaxy-io/alchemy"
+  },
+  "favicon": "/assets/favicon.svg",
+  "appearance": {
+    "default": "dark",
+    "strict": false
+  },
+  "background": {
+    "color": {
+      "light": "#FFFFFF",
+      "dark": "#0A0A0A"
+    }
+  },
+  "navbar": {
+    "links": [
+      {
+        "href": "https://github.com/galaxy-io/alchemy",
+        "type": "github"
+      },
+      {
+        "icon": "slack",
+        "href": "https://join.slack.com/t/galaxy-io-community/shared_invite/zt-45qln0zg5-9CTvKVXugvh3sEhpD6KzJQ",
+        "label": "Join the Slack community"
+      }
+    ]
+  },
+  "footer": {
+    "socials": {
+      "github": "https://github.com/galaxy-io/alchemy",
+      "slack": "https://join.slack.com/t/galaxy-io-community/shared_invite/zt-45qln0zg5-9CTvKVXugvh3sEhpD6KzJQ",
+      "website": "https://www.getgalaxy.io"
+    }
+  },
+  "search": {
+    "prompt": "Search"
+  },
+  "seo": {
+    "indexing": "navigable"
+  },
+  "fonts": {
+    "family": "ABC Diatype",
+    "weight": 400,
+    "source": "https://cdn.getgalaxy.io/fonts/Diatype/ABCDiatype-Regular.woff2",
+    "format": "woff2"
+  },
+  "icons": {
+    "library": "fontawesome"
+  },
+  "styling": {
+    "eyebrows": "section",
+    "codeblocks": {
+      "theme": {
+        "light": "github-light-default",
+        "dark": "github-dark-default"
+      }
+    }
+  },
+  "redirects": [
+    {
+      "source": "/",
+      "destination": "/pages/guides/get-started/introduction"
+    }
+  ],
+  "errors": {
+    "404": {
+      "redirect": false
+    }
+  },
+  "contextual": {
+    "options": [
+      "copy",
+      "view",
+      "claude",
+      "chatgpt",
+      "cursor",
+      "mcp"
+    ],
+    "display": "header"
+  },
+  "thumbnails": {
+    "appearance": "dark"
+  },
+  "interaction": {
+    "drilldown": true
+  },
+  "navigation": {
+    "groups": [
+      {
+        "group": "Get started",
+        "pages": [
+          "pages/guides/get-started/introduction",
+          "pages/guides/get-started/quickstart"
+        ]
+      },
+      {
+        "group": "Concepts",
+        "pages": [
+          "pages/guides/concepts/overview",
+          "pages/guides/concepts/architecture"
+        ]
+      },
+      {
+        "group": "Functions",
+        "pages": [
+          "pages/guides/functions/writing-a-function",
+          "pages/guides/functions/runtimes"
+        ]
+      },
+      {
+        "group": "Deployment",
+        "pages": [
+          "pages/guides/deployment/kubernetes"
+        ]
+      },
+      {
+        "group": "API reference",
+        "pages": [
+          "pages/api-reference/introduction"
+        ]
+      },
+      {
+        "group": "Contributing",
+        "pages": [
+          "pages/guides/contributing/local-development"
+        ]
+      }
+    ]
+  }
+}

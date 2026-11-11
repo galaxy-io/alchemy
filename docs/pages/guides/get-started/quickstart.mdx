@@ -1,0 +1,30 @@
+---
+title: "Quickstart"
+description: "Run Alchemy and its web UI on your machine."
+---
+
+To run Alchemy locally, install Go, Docker, `just`, Node.js, pnpm, and Lima. On macOS, the repository's `Brewfile` installs the toolchain.
+
+```sh
+brew bundle
+```
+
+Firecracker needs KVM, which Docker Desktop does not provide. On macOS the KVM host is a Lima VM with nested virtualization (Apple M3 or later, macOS 15 or later), and `just vm` creates it on first run.
+
+## Start Alchemy
+
+```sh
+just infra
+just vm
+just images
+just dev
+```
+
+Open [http://localhost:5173](http://localhost:5173) to use the web UI.
+
+## Stop Alchemy
+
+```sh
+just vm down
+just infra down
+```

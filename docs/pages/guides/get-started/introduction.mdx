@@ -1,0 +1,33 @@
+---
+title: "What is Alchemy?"
+sidebarTitle: "Introduction"
+description: "Alchemy is a runtime for fast, isolated, strongly typed compute functions by Galaxy."
+---
+
+Alchemy is a runtime for fast, isolated, strongly typed compute functions, built by [Galaxy](https://www.getgalaxy.io). It runs each invocation in its own Firecracker microVM, checks every input and output against the function's contract, and records the full lifecycle of every call.
+
+A function is an OCI image plus a contract. Alchemy builds it into a root filesystem once and boots it on demand. Run Alchemy as a service with its API and web UI, or deploy it to your own machines with KVM.
+
+## Where to go next
+
+<CardGroup cols={2}>
+  <Card title="Quickstart" icon="play" href="/pages/guides/get-started/quickstart">
+    Run Alchemy and its web UI locally.
+  </Card>
+
+  <Card title="Writing a function" icon="code" href="/pages/guides/functions/writing-a-function">
+    Package a handler as a function with a contract.
+  </Card>
+
+  <Card title="Architecture" icon="sitemap" href="/pages/guides/concepts/architecture">
+    How the server, hosts, and supervisor fit together.
+  </Card>
+
+  <Card title="Kubernetes" icon="dharmachakra" href="/pages/guides/deployment/kubernetes">
+    Deploy Alchemy with Helm on KVM-capable nodes.
+  </Card>
+</CardGroup>
+
+<Note>
+  Alchemy is pre-1.0. APIs may still change.
+</Note>

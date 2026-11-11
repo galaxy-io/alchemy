@@ -1,0 +1,14 @@
+---
+title: "Architecture"
+description: "How the Alchemy server, hosts, and supervisor fit together."
+---
+
+{/* TODO: diagram and invocation walkthrough. */}
+
+Alchemy builds a function's image into a root filesystem once, boots it once and snapshots the microVM, restores that snapshot per invocation, checks every input and output against the contract, and keeps every invocation's record and logs.
+
+- **Server** accepts functions and invocations over the API and places each function on a few hosts
+- **Hosts** own the KVM machines, build root filesystems, and run the microVMs
+- **Supervisor** runs inside each guest and runs the function
+- **PostgreSQL** stores functions, versions, and finished invocations
+- **NATS** carries everything between servers and hosts, so the database is never on the invocation path

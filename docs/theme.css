@@ -1,0 +1,59 @@
+/* ------------------------------------------------------------------
+   Layout: widen the main content column. Maple caps #content-area at
+   max-w-xl (576px), which wraps table cells onto extra lines. 48rem
+   keeps the line length readable while letting reference tables fit.
+   ------------------------------------------------------------------ */
+
+#content-area {
+  max-width: 48rem !important;
+}
+
+/* ------------------------------------------------------------------
+   Sidebar footer links. Maple renders a `type: "github"` navbar link
+   through its own component (8px inset, 8px icon gap) but a plain
+   {label, icon, href} link through the generic one (16px inline inset,
+   12px icon gap), so the two rows don't share a left edge. Match the
+   generic link to the GitHub row. The inline padding needs !important.
+   Scoped to the id-bearing <li> the generic links get, so any link
+   added to navbar.links later lines up too.
+   ------------------------------------------------------------------ */
+
+#sidebar li[id^="http"] > a {
+  padding-left: 0.5rem !important;
+  column-gap: 0.5rem !important;
+}
+
+/* Mermaid edge labels: drop the renderer's gray chip, color the text to
+   match the electric blue diagram in both themes. */
+
+#content-area svg .labelBkg {
+  background: transparent !important;
+}
+
+#content-area svg span.edgeLabel {
+  color: #005EFF !important;
+}
+
+html.dark #content-area svg span.edgeLabel {
+  color: #7AA5FF !important;
+}
+
+/* Mermaid node labels: subtle-fill nodes need theme-aware text. */
+
+#content-area svg .nodeLabel {
+  color: #0D0D0D !important;
+}
+
+html.dark #content-area svg .nodeLabel {
+  color: #EDEDED !important;
+}
+
+/* Mermaid edge labels: lift above the line instead of sitting on it. */
+
+#content-area svg .edgeLabel foreignObject {
+  overflow: visible;
+}
+
+#content-area svg .edgeLabel .labelBkg {
+  transform: translateY(-0.95em);
+}
