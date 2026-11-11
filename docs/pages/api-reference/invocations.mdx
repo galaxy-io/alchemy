@@ -1,0 +1,192 @@
+---
+title: "Invocations API"
+sidebarTitle: "Invocations"
+description: "Invoke functions synchronously or asynchronously, read invocation records, stream logs and tail live transitions."
+---
+
+An invocation is one call of one function version against one input. These
+RPCs are on `functions.v1.FunctionsService`, with messages in
+`protos/functions/v1/invocations.proto`. See
+[Invocations](/pages/concepts/invocations) for the lifecycle, and
+[HTTP endpoints](/pages/api-reference/http) for the same calls
+over plain HTTP.
+
+## RPCs
+
+| RPC | Description |
+|---|---|
+| `Invoke` | Run a function and wait for its result |
+| `InvokeAsync` | Queue an invocation and return its id without waiting |
+| `GetInvocation` | Read one invocation record |
+| `ListInvocations` | Page through invocations, newest first |
+| `GetInvocationLogs` | Server-stream one attempt's stderr |
+| `TailInvocations` | Server-stream invocation transitions live |
+
+## Invoke
+
+| Field | Type | Behavior |
+|---|---|---|
+| `function_id` | `string` | The function to run |
+| `version` | `int64` | 0 runs the function's `current_version`. Any other value pins that version |
+| `input` | `bytes` | A JSON value for a JSON Schema contract, an Arrow IPC stream for an Arrow contract. At most 64 MiB |
+| `idempotency_key` | `string` | Makes the call safe to retry. At most 255 bytes |
+| `retries` | `optional int32` | This call's retries, 0 to 10, instead of the function's |
+
+The input is checked against the version's contract before anything runs and
+the output after the function writes it. The call waits in the queue while
+every host is busy or the function is at its `max_concurrency`, until the
+call's deadline: `Connect-Timeout-Ms` when set, capped at
+`INVOKE_MAX_DEADLINE` (default 1 hour), or `INVOKE_DEADLINE` (default 5
+minutes).
+
+An RPC error means the function produced no result. If the function ran, the
+RPC succeeds and the response carries its output or a `FunctionError`.
+
+| `InvokeResponse` field | Meaning |
+|---|---|
+| `invocation_id` | The invocation's id |
+| `version` | The version that actually ran |
+| `output` | The result, already checked against the output schema |
+| `error` | A `FunctionError` when the function ran and failed. Exclusive with `output` |
+| `stats` | `start_kind`, plus `acquire_us`, `run_us` and `total_us` in microseconds |
+| `replayed` | The result is an earlier call's, found by `idempotency_key`. Nothing ran |
+| `attempts` | How many times the function ran for this result |
+
+`FunctionError` has a `kind`, a `message`, a function-supplied `type` (for
+`RAISED` only) and `violations` (for `OUTPUT_INVALID` only).
+
+| `FunctionErrorKind` | Meaning |
+|---|---|
+| `RAISED` | The function reported an error through its protocol |
+| `CRASHED` | The process died or exited non-zero without a result |
+| `TIMEOUT` | The function ran longer than its `timeout_ms` |
+| `OUTPUT_INVALID` | The output violates the output schema |
+| `INPUT_INVALID` | The input violates the input schema. Returned as an RPC error, not in the response |
+
+`StartKind` is `COLD_BOOT`, `SNAPSHOT_RESTORE` or `WARM`.
+
+### Retries
+
+An attempt that raised, crashed or timed out, or that the platform could not
+run, runs again up to the call's or the function's `retries`, while the
+deadline leaves room. The wait starts at `RETRY_BACKOFF` (default 1s), grows
+five times per attempt and stops growing at `RETRY_BACKOFF_MAX` (default 5m).
+An input that violates the contract never runs again.
+
+### Idempotency
+
+Within `IDEMPOTENCY_WINDOW` (default 24h), a call to the same function with
+the same key returns the invocation the first call started, with its output
+or error, and `replayed` set. A call still in flight is waited on. The key is
+released for a new run only when the platform never sent the invocation to a
+host. A call a host took but never reported on holds the key, and a retry gets
+`aborted`. Use a new key to run again.
+
+Keys on `Invoke` need a logs bucket (`LOGS_BUCKET`) to keep outputs in, or
+the call is `failed_precondition`.
+
+### Errors
+
+| Code | When |
+|---|---|
+| `not_found` | Unknown function, or a pinned version that does not exist |
+| `failed_precondition` | No ready version, a pinned version that is not `READY`, or a key with no logs bucket |
+| `invalid_argument` | Input over 64 MiB, a key over 255 bytes, `retries` outside 0 to 10, or an input that violates the contract, with one `ContractViolation` detail each |
+| `aborted` | The key is held by a call whose outcome is unknown, or whose output was not kept |
+| `deadline_exceeded` | No result before the deadline |
+| `canceled` | The caller went away |
+| `unavailable` | The platform failed to run it, or NATS was unreachable |
+
+A host can also refuse an invocation with `resource_exhausted`,
+`invalid_argument`, `unavailable`, `not_found`, `failed_precondition` or
+`aborted`, which the server passes through.
+
+## InvokeAsync
+
+Takes the same fields as `Invoke`. Returns once the invocation is queued, with
+`invocation_id` and `replayed`. Nothing waits for it and its output is dropped.
+Its status, attempts, error and logs are recorded. It retries as `Invoke`
+does and may wait in the queue and between attempts for up to `ASYNC_MAX_AGE`
+(default 24h), after which the host that takes it records it `CANCELED`.
+
+An `idempotency_key` seen within the window returns the invocation that call
+queued, with `replayed` set. Async keys do not need a logs bucket. Follow the
+invocation with `GetInvocation`.
+
+## GetInvocation
+
+Takes `id`. Returns the `Invocation` from the database, or from the server
+holding it while it runs and until its record is written. An unknown id is
+`not_found`.
+
+| `Invocation` field | Meaning |
+|---|---|
+| `status` | See the table below |
+| `function_id`, `version` | What ran |
+| `start_kind`, `stats` | How the microVM started and where the time went |
+| `created_at`, `started_at`, `ended_at` | Epoch milliseconds. `started_at` is when the function got its input |
+| `error` | The `FunctionError`, for `FAILED` and `REJECTED` |
+| `platform_error` | Why the platform could not run it, for `ERRORED` and `CANCELED` |
+| `input_bytes`, `output_bytes` | Payload sizes |
+| `instance_id` | The microVM that served it, while it exists |
+| `host` | The host it was sent to, empty when none took it |
+| `attempts` | How many times a host started to run it |
+| `async` | Set when the caller did not wait |
+| `idempotency_key`, `created_by_user_id` | The caller's key and user, when present |
+
+| `InvocationStatus` | Meaning |
+|---|---|
+| `PENDING` | Waiting for a host, or for its next attempt with the failed attempt's error set |
+| `STARTING` | A microVM is booting or restoring for it |
+| `RUNNING` | The function has its input |
+| `SUCCEEDED` | Finished with an output |
+| `FAILED` | The function ran and failed |
+| `ERRORED` | The platform could not run it |
+| `CANCELED` | The caller went away, or an async invocation outlived `ASYNC_MAX_AGE` |
+| `REJECTED` | The input violated the contract and nothing ran |
+
+## ListInvocations
+
+| Field | Behavior |
+|---|---|
+| `function_ids` | Empty lists every function in the tenant |
+| `statuses` | Empty lists every status. An unspecified value is `invalid_argument` |
+| `start_kinds` | Empty lists every start kind. An unspecified value is `invalid_argument` |
+| `since_ms`, `until_ms` | A window on `created_at`, inclusive and exclusive. 0 is unbounded |
+| `pagination` | See the [overview](/pages/api-reference/introduction#pagination) |
+
+Results are newest first. An invocation appears once its record reaches the
+database, after it ends or, for async invocations, once it is queued.
+
+## GetInvocationLogs
+
+A server-streaming RPC that sends what the function wrote to stderr as
+`data` chunks, in order. Chunks are not split on line boundaries.
+
+| Field | Behavior |
+|---|---|
+| `id` | The invocation |
+| `follow` | Keep the stream open while the attempt runs, and end when it does |
+| `attempt` | The attempt, counting from 1. 0 is the latest |
+
+An ended attempt is read from the logs bucket. A running one, or one whose
+upload has not completed, is read from NATS, which keeps only recent lines for
+`LOGS_RETENTION` (default 1h). An attempt below 0 or past the invocation's
+`attempts` is `not_found`. See [Logs](/pages/concepts/logs).
+
+## TailInvocations
+
+A server-streaming RPC of lifecycle transitions across every server, until the
+client goes away.
+
+| Field | Behavior |
+|---|---|
+| `function_id` | One function. Empty streams every function in the tenant |
+| `should_replay` | First send every non-terminal invocation the servers hold, marked `replay` |
+
+Each `TailInvocationsResponse` carries the `invocation`, an `event_type` (the
+status as a lowercase token such as `running` or `succeeded`), `replay` and
+`emitted_at` in epoch milliseconds. A slow client that falls 256 events behind
+loses events rather than holding up invocations. Reconnect with
+`should_replay` to catch up. If the servers cannot be asked for replay, the
+call is `unavailable`.

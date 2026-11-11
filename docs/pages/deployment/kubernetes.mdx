@@ -1,0 +1,169 @@
+---
+title: "Deploy Alchemy on Kubernetes"
+sidebarTitle: "Kubernetes"
+description: "Install Alchemy with its Helm chart: the server Deployment, one host per KVM node, and the Secret that connects them to PostgreSQL and NATS."
+---
+
+Kubernetes with Helm is the recommended way to run Alchemy. The chart deploys the server as a Deployment behind one Service, and the hosts as a Deployment with one pod per KVM node. It does not run PostgreSQL or NATS for production. Bring your own, or use the vendored charts on a test cluster.
+
+Before you install, label and taint the nodes hosts run on. See [KVM nodes](/pages/deployment/kvm-nodes).
+
+## Install the chart
+
+Every release publishes the chart to `oci://ghcr.io/galaxy-io/charts/alchemy`, with server and host images of the same version under `ghcr.io/galaxy-io/alchemy`. Without `--version`, Helm installs the newest release.
+
+Alchemy needs three values:
+
+| Secret key | Chart value | Purpose |
+|---|---|---|
+| `PERSISTENCE_DSN` | `persistence.postgresql.dsn` | PostgreSQL connection string |
+| `NATS_URL` | `eventBus.nats.url` | NATS connection URL |
+| `ENCRYPTION_KEY` | `secrets.datastore.encryptionKey` | Base64 AES key that encrypts tenant secrets before they reach PostgreSQL |
+
+Without `ENCRYPTION_KEY` the server still starts, with a warning, and refuses any function that uses secrets. The key must decode to 16, 24 or 32 bytes.
+
+The recommended setup keeps them in a Secret you manage, named by `existingSecret`:
+
+```sh
+kubectl create secret generic alchemy-runtime \
+  --from-literal=PERSISTENCE_DSN='postgresql://USER:PASSWORD@HOST:5432/alchemy?sslmode=require' \
+  --from-literal=NATS_URL='nats://nats.example.com:4222' \
+  --from-literal=ENCRYPTION_KEY="$(openssl rand -base64 32)"
+
+helm upgrade --install alchemy oci://ghcr.io/galaxy-io/charts/alchemy \
+  --set existingSecret=alchemy-runtime
+```
+
+With `existingSecret` set, the chart creates no Secret of its own. The server reads every key in it. Hosts read only `NATS_URL`. When [authentication](/pages/deployment/authentication) is on, put its credentials in the same Secret.
+
+Without `existingSecret`, the chart creates the Secret itself from the chart values above, named `alchemy-runtime` for a release named `alchemy`.
+
+<Warning>
+Keep `ENCRYPTION_KEY` safe and stable. Changing it makes every stored secret unreadable. Set `secrets.datastore.encryptionKeyId` to a new id when you rotate keys.
+</Warning>
+
+To keep tenant secrets in AWS Secrets Manager or GCP Secret Manager instead, set `secrets.type`. The server then uses the SDK's default credentials, such as its IRSA role or workload identity, and needs no `ENCRYPTION_KEY`. See [Configuration](/pages/deployment/configuration#secrets).
+
+## Test clusters
+
+For a local or test cluster, the chart vendors the Bitnami PostgreSQL and NATS charts:
+
+```sh
+helm dependency build charts/alchemy
+PG_PASSWORD="$(openssl rand -hex 24)"
+
+helm upgrade --install alchemy charts/alchemy \
+  --set postgresql.enabled=true \
+  --set nats.enabled=true \
+  --set-string postgresql.auth.password="$PG_PASSWORD" \
+  --set-string persistence.postgresql.dsn="postgresql://alchemy:${PG_PASSWORD}@alchemy-postgresql:5432/alchemy?sslmode=disable" \
+  --set-string eventBus.nats.url='nats://alchemy-nats:4222'
+```
+
+The vendored NATS is already set to `max_payload: 64MB`, which covers the 8 MiB messages Alchemy sends, with JetStream file storage on a 10Gi volume for the queue and records and 1Gi of memory storage for function logs. The password must match the one in the DSN.
+
+## What the chart creates
+
+| Resource | Notes |
+|---|---|
+| Server Deployment and Service | Port `server.service.port` (8780). `server.replicas` pods, or a HorizontalPodAutoscaler with `server.autoscaling.enabled` |
+| Server Ingress | With `server.ingress.enabled` |
+| Server PodDisruptionBudget | With `server.podDisruptionBudget.enabled` (the default), once there is more than one replica or autoscaling is on |
+| Host Deployment | `host.replicas` pods, at most one per node, on nodes matching `host.nodeSelector`. A KEDA `ScaledObject` sizes it instead with `host.autoscaling.enabled` |
+| ConfigMaps | One each for the server and hosts, rendered from chart values. See [Configuration](/pages/deployment/configuration) |
+| Secret | The runtime Secret, unless `existingSecret` is set |
+| ServiceAccounts | One each for the server and hosts, unless `server.serviceAccount.name` or `host.serviceAccount.name` names an existing one |
+
+The server runs as a non-root user with a read-only root filesystem and no capabilities. It needs no KVM and can run on any node. Hosts run privileged, with the node's `/dev/kvm` and an `emptyDir` for the kernel, the root filesystem cache and microVM jails. `host.data.sizeLimit` caps that volume.
+
+### Server
+
+Every server applies database migrations before it listens, one at a time under a PostgreSQL lock. There is no separate migration Job. The startup probe allows two minutes for a slow first install.
+
+The server answers `/healthz` with `204` once it listens. The startup, readiness and liveness probes all use it.
+
+To expose the API and UI, enable the Ingress and set its hosts, class and TLS:
+
+```yaml
+server:
+  ingress:
+    enabled: true
+    className: nginx
+    hosts:
+      - alchemy.example.com
+    tls:
+      - hosts: [alchemy.example.com]
+        secretName: alchemy-tls
+```
+
+A sync call holds its connection open until its result, for up to `server.invoke.deadline` (5 minutes by default), and the UI follows live logs over open streams. Set the load balancer's idle timeout above that deadline.
+
+### Hosts
+
+Hosts are a Deployment, not a DaemonSet, so pending hosts are what make a node autoscaler add KVM nodes. Anti-affinity keeps one host per node, and each host is named after its node.
+
+Rolling updates replace `host.maxUnavailable` hosts at a time with no surge, since a surged host would need a node of its own. On shutdown a host stops taking work, releases its warm instances and gives in-flight invocations up to 40 seconds to finish before it cancels them. `host.terminationGracePeriodSeconds` (60) covers that.
+
+Size `host.resources` for the microVMs, not the host process. See [KVM nodes](/pages/deployment/kvm-nodes#resources-and-the-memory-budget).
+
+## Cloud identity
+
+The server and hosts reach the buckets, and hosts reach ECR, Artifact Registry and GCR, through their ServiceAccounts' cloud identity. Annotate each one:
+
+```yaml
+server:
+  serviceAccount:
+    annotations:
+      eks.amazonaws.com/role-arn: arn:aws:iam::<account>:role/alchemy-server
+host:
+  serviceAccount:
+    annotations:
+      eks.amazonaws.com/role-arn: arn:aws:iam::<account>:role/alchemy-host
+```
+
+On GKE use `iam.gke.io/gcp-service-account` instead. See [Storage](/pages/deployment/storage) for which identity needs which access.
+
+## Upgrade
+
+Upgrade in place with the same command and a new `--version`:
+
+```sh
+helm upgrade alchemy oci://ghcr.io/galaxy-io/charts/alchemy --version <version> \
+  --reuse-values
+```
+
+Both Deployments carry checksums of their ConfigMap and the chart-created Secret, so changing a value through Helm rolls them even when the image tag stays the same. A Secret named by `existingSecret` is not checksummed. After you change it, restart both Deployments:
+
+```sh
+kubectl rollout restart deployment/alchemy-server deployment/alchemy-host
+```
+
+New servers apply any new migrations on start. Read the release notes before you upgrade.
+
+## Verify a release
+
+The release workflows attach build provenance attestations to the chart and the images. Verify the chart before you install it:
+
+```sh
+gh attestation verify --owner galaxy-io oci://ghcr.io/galaxy-io/charts/alchemy:<version>
+```
+
+## Values
+
+Every value is documented in `charts/alchemy/values.yaml`. The ones most deployments set:
+
+| Value | Default | Purpose |
+|---|---|---|
+| `existingSecret` | `""` | Secret with `PERSISTENCE_DSN`, `NATS_URL`, `ENCRYPTION_KEY` and auth credentials |
+| `functionLogs.bucket` | `""` | `s3://BUCKET?region=REGION` or `gs://BUCKET` for function logs |
+| `artifacts.bucket` | `""` | Same form, for build layers |
+| `runtimes.imagePrefix` | `ghcr.io/galaxy-io/alchemy/runtime` | Registry prefix of the runtime images |
+| `server.replicas` | `1` | Server pods without autoscaling |
+| `server.invoke.deadline` | `5m` | How long a call waits when its caller sets no deadline |
+| `host.replicas` | `1` | Hosts without autoscaling |
+| `host.maxInstances` | `8` | Slots per host |
+| `host.memoryBudgetMiB` | `0` | Guest memory a host may commit. 0 means no limit |
+| `host.nodeSelector` | `alchemy.getgalaxy.io/kvm: "true"` | Nodes that run a host |
+| `auth.enabled` | `false` | Turn on authentication |
+
+[Configuration](/pages/deployment/configuration) maps every value to the environment variable it sets.

@@ -1,0 +1,75 @@
+---
+title: "Logs"
+sidebarTitle: "Logs"
+description: "What a function writes to stderr is streamed live over NATS while it runs and kept in the logs bucket, one object per attempt."
+---
+
+A function's stdout is its output, so its logs are what it writes to stderr.
+Every attempt of every invocation has a log of its own, readable live while it
+runs and afterwards for as long as the logs bucket keeps it.
+
+## How a log is captured
+
+The supervisor streams the function's stderr to the host over vsock as the
+function writes it. A write blocks while the host is not reading. The host
+sends each piece two ways at once:
+
+- **to NATS**, on `logs.<tenant>.<invocation>` for the first attempt and
+  `logs.<tenant>.<invocation>.<attempt>` for later ones, where the `LOGS` stream
+  keeps the latest pieces for live and recent reads,
+- **to the logs bucket**, gzipped and uploaded in 5 MiB parts, completed when
+  the attempt ends.
+
+The end of each attempt's log is marked on its subject, so a reader following
+it knows when to stop. A failing upload is logged by the host and stops only
+the upload. The function never sees an error.
+
+The last 4 KiB of stderr also go into the error message of an attempt that
+exited non-zero, so a crash explains itself in the invocation's record.
+
+## Live logs on NATS
+
+The `LOGS` stream lives in memory. The bucket is what keeps logs, so a NATS
+restart loses nothing a finished invocation needs.
+
+| Limit | Default | Setting |
+|---|---|---|
+| Pieces kept per attempt | 320, about the latest 10 MiB | Fixed |
+| How long a piece is kept | 1 hour | `LOGS_RETENTION` |
+| Total size of the stream | 1 GiB, oldest pieces first | `LOGS_MAX_BYTES` |
+
+Without a logs bucket (`LOGS_BUCKET` unset), the stream is the only copy, and a
+log is gone once the stream drops it.
+
+## The logs bucket
+
+`LOGS_BUCKET` is a bucket URL: `s3://`, `gs://` or `file://`. Each attempt's log
+is one gzipped object, keyed by tenant, function and the UTC day the invocation
+was created, so one prefix lists a function's logs for a day:
+
+```text
+<tenant>/<function>/<yyyy>/<mm>/<dd>/<invocation>.log.gz      first attempt
+<tenant>/<function>/<yyyy>/<mm>/<dd>/<invocation>.2.log.gz    second attempt
+<tenant>/<function>/<yyyy>/<mm>/<dd>/<invocation>.out         output of a keyed call
+```
+
+The `.out` object holds the output of a call that carried an idempotency key, so
+a later call with the key can replay it. Only keyed calls write one.
+
+Alchemy never deletes from the bucket. Use the bucket's own lifecycle rules to
+move old logs to colder storage or expire them.
+
+## Reading logs
+
+`GetInvocationLogs` streams one attempt's log, the latest by default or the one
+`attempt` names, counting from 1. Pieces arrive in order but are not split on
+line boundaries.
+
+- An attempt that has ended is read from the bucket.
+- An attempt still running, or one whose upload has not completed, is read from
+  the stream, which holds only its latest pieces.
+- With `follow`, the call stays open while the attempt runs and ends when it
+  does.
+
+The web UI shows the same logs on each invocation. See
+[the web UI](/pages/usage/web).

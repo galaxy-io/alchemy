@@ -1,0 +1,140 @@
+---
+title: "Invocations"
+sidebarTitle: "Invocations"
+description: "Sync and async calls, how they wait in the queue, concurrency limits, retries with backoff, idempotency keys, statuses and attempts."
+---
+
+An invocation is one call of a function with one input. Every invocation is
+queued, taken by a host with a free slot and recorded when it ends, whether the
+caller waits for it or not.
+
+## Sync and async
+
+A **sync** call waits for the result. It is `FunctionsService.Invoke` on the API
+or a POST to `/functions/<function-id>/invoke` over HTTP, where the body is the
+input and the response body is the output.
+
+An **async** call returns as soon as the invocation is queued. It is
+`FunctionsService.InvokeAsync`, or the same POST with `Prefer: respond-async`:
+
+```sh
+curl -i localhost:8780/functions/<function-id>/invoke \
+  -H 'Content-Type: application/json' -H 'Prefer: respond-async' -d '{"id":"abc"}'
+```
+
+It answers 202 with the invocation id in the body and in `Alchemy-Invocation-Id`,
+and `Location: /invocations/<id>`. Nothing waits for an async invocation and
+its output is dropped, but its status, error, attempts and logs are recorded.
+`GetInvocation` follows it.
+
+## Queueing and deadlines
+
+Hosts take invocations from the queue whenever they have a free slot, so when
+every host is busy a call waits instead of failing. How long it may wait
+depends on the kind of call.
+
+| Call | Waits for | Setting |
+|---|---|---|
+| Sync | 5 minutes, queued and running together | `INVOKE_DEADLINE` |
+| Sync with its own deadline | The caller's deadline, at most 1 hour | `INVOKE_MAX_DEADLINE` |
+| Async | 24 hours in the queue and between attempts | `ASYNC_MAX_AGE` |
+
+A caller sets its own deadline through its ConnectRPC or gRPC client. A plain
+HTTP call gets the default. A sync call whose deadline passes fails without a
+result, and the host that takes it later drops it. An async invocation still
+queued past its age is recorded `CANCELED` without running.
+
+Separately from the deadline, each attempt has the function's `timeout_ms`,
+counted from the moment the function receives its input.
+
+## Concurrency
+
+A function's `max_concurrency` caps how many of its invocations run at once
+across every host. A host takes one of the function's seats before it runs an
+invocation and gives it back when the invocation ends. When every seat is held,
+the invocation goes back to the queue for 250 to 500 ms and waits its turn. A
+build holds no seat, and a seat a dead host held is free again within 30
+seconds.
+
+## Retries
+
+An attempt runs again when the function raised, crashed or timed out, or when
+the platform could not run it. A function's `retries`, 2 by default and at most
+10, is how many more times that may happen. A call can set its own with the
+`Alchemy-Retries` header or the `retries` field.
+
+The wait before the next attempt starts at `RETRY_BACKOFF`, 1 second, and is
+five times longer after each failure, up to `RETRY_BACKOFF_MAX`, 5 minutes, give
+or take a fifth for jitter. So the defaults wait about 1s, 5s, 25s and so on. A
+retry happens only while the deadline leaves room for the backoff and one more
+full timeout. Between attempts the invocation is `PENDING` again, with the
+failed attempt's error on it.
+
+An input or output that breaks the contract never runs again. A host that has
+no room for an invocation hands it back to the queue for another host, and that
+does not count as an attempt.
+
+## Idempotency keys
+
+An `Idempotency-Key` header, or `idempotency_key` on the API, makes a call safe
+to retry. A key is at most 255 bytes and holds for 24 hours
+(`IDEMPOTENCY_WINDOW`).
+
+- The first call with a key claims it in PostgreSQL and runs.
+- A later call to the same function with the same key returns the first call's
+  invocation, with its output or error, instead of running again. It waits for
+  the first one to end if it has not. The response carries
+  `Alchemy-Replayed: true`, or `replayed` on the API.
+- An async call with a key seen before returns the invocation that key queued.
+- The key is released to the next call only when the platform knows the
+  function never ran. A call a host took but never reported on has an unknown
+  outcome and holds the key: a retry gets `ABORTED`, 409, and a new key runs
+  again.
+
+<Note>
+A sync call with a key needs the server to have a logs bucket, since the output
+a later call replays is kept there. Without one the call is
+`FAILED_PRECONDITION`.
+</Note>
+
+## Statuses
+
+| Status | Meaning |
+|---|---|
+| `PENDING` | Accepted and waiting for a host, or waiting for its next attempt |
+| `STARTING` | A host is booting or restoring a microVM for it |
+| `RUNNING` | The function has its input |
+| `SUCCEEDED` | The function returned an output that passed the contract |
+| `FAILED` | The function ran and failed. `error` says how |
+| `ERRORED` | The platform could not run it. `platform_error` says why |
+| `CANCELED` | The caller went away before a result, or it expired in the queue |
+| `REJECTED` | The input broke the contract, so nothing ran |
+
+A `FAILED` invocation's `error.kind` is `RAISED`, `CRASHED`, `TIMEOUT` or
+`OUTPUT_INVALID`. `RAISED` carries the function's own error `type`.
+
+## Attempts
+
+`attempts` counts how many times a host started to run the invocation. Each
+attempt has its own log, and `GetInvocationLogs` reads one by number, the latest
+by default. See [Logs](/pages/concepts/logs).
+
+## Headers over HTTP
+
+| Header | Direction | Meaning |
+|---|---|---|
+| `Content-Type` | Request | Must be the contract's: `application/json` or `application/vnd.apache.arrow.stream` |
+| `Authorization` | Request | `Bearer <token>`, when auth is enabled |
+| `Idempotency-Key` | Request | Makes the call safe to retry |
+| `Alchemy-Retries` | Request | The call's own retries, 0 to 10 |
+| `Prefer` | Request | `respond-async` makes the call async |
+| `Alchemy-Invocation-Id` | Response | The invocation's id |
+| `Alchemy-Version` | Response | The version that ran, on a sync call |
+| `Alchemy-Attempts` | Response | How many runs the result took, on a sync call |
+| `Alchemy-Replayed` | Response | `true` when an earlier call's result was returned |
+| `Location`, `Preference-Applied` | Response | On an async call, where to follow it and `respond-async` |
+
+A function that ran and failed answers 500, or 504 when it timed out, with its
+error as JSON. Any other failure answers the status of its error code with a
+JSON body of `code` and `message`. The full mapping is in the
+[invoke over HTTP reference](/pages/api-reference/http).

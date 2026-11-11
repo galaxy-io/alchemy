@@ -1,0 +1,55 @@
+---
+title: "Alchemy concepts overview"
+sidebarTitle: "Overview"
+description: "The vocabulary Alchemy uses for functions, the versions they run and the machines that run them."
+---
+
+Alchemy runs typed functions in Firecracker microVMs. A handful of words cover
+almost everything the API, the web UI and these docs talk about.
+
+| Term | What it is |
+|---|---|
+| **Function** | A stable, named handle that callers invoke. It owns the settings every version runs with: `timeout_ms`, `max_concurrency`, `resources` and `retries`. |
+| **Version** | An immutable, numbered build of a function. Versions count up from 1. The newest version that reached `READY` is the function's `current_version`. |
+| **Spec** | What a version is built from: an OCI `image`, an optional `command`, `env`, `secrets`, a `protocol`, a `contract` and, for a function built from source, its `source` files. |
+| **Contract** | The typed boundary of a version: a JSON Schema or an Arrow schema for the input and another for the output. Every input and output is checked against it. |
+| **Runtime** | An image Alchemy publishes per language, with the interpreter or toolchain and the Arrow library in it. A function built from source lands on one. |
+| **Artifact** | What a host builds for a version at its function's resources: a root filesystem, a layer drive for its files and a snapshot. A change of resources is a new artifact. |
+| **Invocation** | One call of a function with one input. It has an id, a status and a record that outlives it. |
+| **Attempt** | One run of an invocation on a host. A failed attempt that can be retried is followed by another, up to the call's retries. |
+| **Host** | The process that owns one KVM machine. It pulls invocations from the queue whenever it has a free slot and runs them in microVMs. |
+| **Instance** | One Firecracker microVM of one artifact. It runs one invocation at a time, and may stay warm for the next one. |
+| **Snapshot** | A microVM's memory and device state, taken once per artifact on each host right after its supervisor started. Instances are restored from it instead of booting a kernel. |
+| **Supervisor** | The guest's init process. It listens on vsock for its host and runs the function's entrypoint for each invocation. |
+
+## How they fit together
+
+Say you create a function `enrich-company` from a Python handler and a JSON
+Schema contract. Alchemy stores the handler, builds version 1 and marks it
+`READY`. When you POST an input to the function, the call becomes an
+invocation. A host with a free slot takes it, checks the input against the
+contract, restores a microVM from the version's snapshot and runs the handler.
+The output is checked against the contract on the way back, and the record of
+the invocation lands in PostgreSQL.
+
+If the handler raises, the invocation runs again as a second attempt after a
+backoff. If you change the handler, you create version 2. Callers that pinned
+version 1 keep running it, and everyone else moves to version 2 once it is
+`READY`.
+
+## Choose what to learn next
+
+- [Architecture](/pages/concepts/architecture) follows one invocation
+  from the server through the queue to a microVM and back.
+- [Functions and versions](/pages/concepts/functions-and-versions)
+  covers the settings, the spec fields and how to pin a version.
+- [Contracts](/pages/concepts/contracts) explains the two schema kinds
+  and what happens when an input or output breaks one.
+- [Invocations](/pages/concepts/invocations) covers sync and async calls,
+  queueing, retries, idempotency keys and statuses.
+- [Runtimes and builds](/pages/concepts/runtimes-and-builds) explains how
+  an image or a set of source files becomes something a host can boot.
+- [Isolation](/pages/concepts/isolation) describes what separates one
+  invocation from another.
+- [Secrets](/pages/concepts/secrets) and [Logs](/pages/concepts/logs)
+  cover what a function receives and what it leaves behind.

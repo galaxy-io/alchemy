@@ -1,0 +1,130 @@
+---
+title: "Authentication and tenants"
+sidebarTitle: "Authentication"
+description: "Turn on authentication with Keycloak, Zitadel or a trusted gateway, mint tokens for service accounts, and understand how callers map to tenants."
+---
+
+Authentication is off by default. With it off, the API is open and every request runs in one built-in default tenant. Turn it on by choosing a provider with `AUTH_PROVIDER`, or `auth.enabled` and `auth.type` in the chart.
+
+| Mode | `AUTH_PROVIDER` | Who signs people in | Credentials on a request |
+|---|---|---|---|
+| Off | unset | Nobody | None |
+| Keycloak | `keycloak` | Alchemy, against a Keycloak realm | `Authorization: Bearer <token>` or the session cookie |
+| Zitadel | `zitadel` | Alchemy, against a Zitadel instance | `Authorization: Bearer <token>` or the session cookie |
+| Proxy | `proxy` | A gateway in front of Alchemy | Identity headers the gateway sets |
+
+Every Functions and Metrics RPC and `POST /functions/<id>/invoke` require credentials once a provider is set. `/healthz`, `/scaling` and the UI's static files do not.
+
+## How callers map to tenants
+
+The provider resolves each request to a caller and the caller's tenant: a Keycloak organization, a Zitadel organization or the gateway's tenant header. The first time the server sees a tenant, it creates a tenant row for it, and the same for each user within it. Functions, versions, invocations and secrets all belong to a tenant, and a caller sees only their own tenant's.
+
+A caller is a person or a service account. A service account acts on its own behalf and gets no user row.
+
+The providers also carry roles, admin, creator and viewer, which govern AuthService itself: members and service accounts. Alchemy does not check them on its own RPCs yet. Any authenticated caller in a tenant can use every Functions and Metrics RPC.
+
+Alchemy is meant to run one tenant per deployment. See [Overview](/pages/deployment/overview#one-tenant-per-cluster).
+
+## Keycloak
+
+Alchemy is Keycloak's only client. People sign in through Alchemy's own `Login` RPC with a password, which the server checks against the realm with the direct access grant, and the browser gets an HttpOnly session cookie, `alchemy_sid`. Nothing redirects to Keycloak, so Keycloak features beyond a password, such as MFA or federated login, are not reachable. Keycloak 26 or newer.
+
+```yaml
+auth:
+  enabled: true
+  type: keycloak
+  uiOrigin: https://alchemy.example.com
+  keycloak:
+    issuer: https://keycloak.example.com/realms/alchemy
+    clientId: alchemy
+    clientSecret: <client secret>
+```
+
+`issuer` is the realm URL and must match what the realm advertises. `clientId` and `clientSecret` name Alchemy's confidential client. Its service account administers the realm on Alchemy's behalf.
+
+With `keycloak.adminUser` and `keycloak.adminPassword`, the master-realm admin, the server creates the realm and client on boot when they are missing. Without them, the realm's owners create both, with the client's service account holding realm management rights. Either way the server converges organizations, its client roles and the token shape on every boot.
+
+A bearer token must carry exactly one organization. Request the `organization` scope, or `organization:<alias>` for a user in more than one.
+
+## Zitadel
+
+Alchemy is Zitadel's only client too. People sign in through Alchemy's `Login` RPC and the browser holds a session cookie.
+
+```yaml
+auth:
+  enabled: true
+  type: zitadel
+  uiOrigin: https://alchemy.example.com
+  zitadel:
+    issuer: https://zitadel.example.com
+    pat: <personal access token>
+```
+
+`issuer` is the Zitadel base URL and must equal the issuer Zitadel advertises. `pat` is a machine user's personal access token with instance rights. The server provisions its project in Zitadel on boot. A bearer token must carry the user's organization, which Zitadel adds when the client requests the `resourceowner` scope.
+
+## Proxy
+
+With `proxy`, a gateway in front of Alchemy signs people in and tells Alchemy who they are. Alchemy verifies nothing itself. It reads three headers:
+
+| Header | Meaning |
+|---|---|
+| `X-Forwarded-Tenant` | The caller's tenant. Required |
+| `X-Forwarded-User` | The person's stable user id. Required unless the next header is set |
+| `X-Forwarded-Service` | A trusted service calling on its own behalf |
+
+<Warning>
+The gateway must strip any copy of these headers a client sends, and the network must make the gateway the only way to reach the server. Anyone who can reach the server directly can claim any identity.
+</Warning>
+
+Set `auth.proxy.tenant` (`AUTH_PROXY_TENANT`) to pin the one tenant this deployment serves. A request for any other tenant is refused with `permission_denied`. Left empty, Alchemy accepts any tenant the gateway names.
+
+In proxy mode, AuthService has no sign-in of its own. `GetAuthConfig` answers with an empty issuer and the other AuthService RPCs are unimplemented.
+
+## Bootstrap a tenant
+
+A fresh deployment has no one in it. The bootstrap values create a tenant on every boot and let someone in:
+
+| Value | Variable | Effect |
+|---|---|---|
+| `auth.bootstrap.tenant` | `AUTH_BOOTSTRAP_TENANT` | The tenant to converge |
+| `auth.bootstrap.adminEmail` | `AUTH_BOOTSTRAP_ADMIN_EMAIL` | A person who administers it, created once with the password below and left alone after |
+| `auth.bootstrap.adminPassword` | `AUTH_BOOTSTRAP_ADMIN_PASSWORD` | That person's initial password |
+| `auth.keycloak.bootstrap.clientId` | `AUTH_BOOTSTRAP_CLIENT_ID` | Keycloak only. An admin service account on the tenant, so an SDK works before anyone signs in |
+| `auth.keycloak.bootstrap.clientSecret` | `AUTH_BOOTSTRAP_CLIENT_SECRET` | Its secret |
+
+A bootstrap admin closes sign-up. `Register` is refused and everyone else joins by invitation.
+
+## Credentials and secrets
+
+Passwords, client secrets and the PAT go in the runtime Secret, never the ConfigMap. Without `existingSecret`, the chart puts `AUTH_CLIENT_SECRET`, `AUTH_ADMIN_PASSWORD`, `AUTH_BOOTSTRAP_CLIENT_SECRET`, `AUTH_PAT` and `AUTH_BOOTSTRAP_ADMIN_PASSWORD` there from their values. With `existingSecret`, add the ones your provider uses to that Secret yourself.
+
+`auth.uiOrigin` (`AUTH_UI_ORIGIN`) is the origin the UI is served from, normally the ingress host. An https origin marks the session cookie Secure.
+
+## Tokens for code
+
+Code calls Alchemy with a bearer token. A service account exchanges its client id and secret for one through the server, so clients need no route to the provider:
+
+```sh
+curl https://alchemy.example.com/auth.v1.AuthService/GetToken \
+  -H 'Content-Type: application/json' \
+  -d '{"clientId":"<client id>","clientSecret":"<client secret>"}'
+```
+
+```json
+{"accessToken":"<token>","expiresIn":<seconds>}
+```
+
+Send it on every call, and mint a new one as it nears `expiresIn` seconds:
+
+```sh
+curl https://alchemy.example.com/functions/<function-id>/invoke \
+  -H "Authorization: Bearer $TOKEN" \
+  -H 'Content-Type: application/json' \
+  -d '{"id":"abc"}'
+```
+
+Tenant admins create service accounts with `CreateServiceAccount` and rotate them with `RotateServiceAccountSecret`. A secret is returned only by those two calls and cannot be read later.
+
+## The web UI
+
+The web UI that ships in the server has no sign-in page yet. With authentication on, its requests carry only a session cookie that some other page set, so it works behind a `proxy` gateway and not yet on its own with Keycloak or Zitadel.

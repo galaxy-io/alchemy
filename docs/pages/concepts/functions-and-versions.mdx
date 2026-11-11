@@ -1,0 +1,103 @@
+---
+title: "Functions and versions"
+sidebarTitle: "Functions and versions"
+description: "A function is a stable handle with its own settings, and each version is an immutable build of a spec that callers can pin."
+---
+
+A **function** is what callers invoke. It carries no behaviour of its own. Its
+**versions** do: each one is an immutable spec, built once, that never changes
+under a caller who pinned it.
+
+## Functions
+
+`CreateFunction` creates a function and its version 1 in one call. A function's
+name is required, at most 128 bytes and unique within its tenant. A second
+function with the same name is `ALREADY_EXISTS`.
+
+The function owns the settings every version runs with. `UpdateFunction`
+changes them, and a change applies to the next invocation of any version,
+including invocations already waiting in the queue.
+
+| Setting | Default | Bounds | Meaning |
+|---|---|---|---|
+| `timeout_ms` | 30000 | up to 300000 | How long one attempt may run, from the moment the function gets its input |
+| `max_concurrency` | 0 | 0 or more | How many invocations may run at once across every host. 0 means no limit |
+| `resources.vcpus` | 1 | up to 8 | vCPUs of every microVM the function runs in |
+| `resources.memory_mib` | 128 | 64 to 8192 | Memory of every microVM the function runs in |
+| `retries` | 2 | 0 to 10 | How many more times a failed attempt runs. A call may set its own |
+
+A change of resources makes every version a new artifact. Each host builds and
+snapshots it again at the new size the first time it runs it.
+
+`DeleteFunction` removes the function with its versions and its invocations.
+
+## Versions
+
+`CreateFunctionVersion` adds a version to an existing function. Versions are
+numbered from 1 and count up. A version returns as soon as it is accepted, in
+`BUILDING`, and moves to one of two outcomes:
+
+- `READY`: it built and can run. The newest `READY` version is the function's
+  `current_version`.
+- `FAILED`: it did not build. `status_message` says why and `build_log` holds
+  the tail of the build's output. A failed version stays failed. Fix the spec
+  and create a new version.
+
+A `READY` version records `image_digest`, the content digest its image resolved
+to at build time. The version always runs that digest, even when the tag moves
+later. Its contract is part of the version too, so a caller that pins a version
+always gets the contract it was written against.
+
+## The spec
+
+| Field | Meaning |
+|---|---|
+| `image` | An OCI reference. For a function built from source it is the runtime the files land on, such as `ghcr.io/galaxy-io/alchemy/runtime/python:3.13`. |
+| `command` | The process to run, as an argv. Empty runs the image's `Entrypoint` and `Cmd`. |
+| `env` | Variables added on top of the image's `Env`. They are part of the version and visible wherever it is, so they are not for secrets. |
+| `secrets` | Variable name to the name of a tenant secret. The host fetches the values at invocation. See [Secrets](/pages/concepts/secrets). |
+| `protocol` | How the supervisor talks to the function. `INVOCATION_PROTOCOL_EXEC` is required: one process per invocation, input on stdin, output on stdout. `INVOCATION_PROTOCOL_RUNTIME_API` is `UNIMPLEMENTED`. |
+| `contract` | The JSON Schema or Arrow contract. See [Contracts](/pages/concepts/contracts). |
+| `source` | The files of a function built from source, laid over the image under `/app`. See [Runtimes and builds](/pages/concepts/runtimes-and-builds). |
+
+The server validates a spec before it accepts the version. The contract must
+compile, every name in `secrets` must exist in the tenant, and a `source` needs
+the server to have an artifacts bucket. `GetFunctionVersion` returns the spec
+with the source files' content filled back in.
+
+## Pinning a version
+
+An invocation runs the function's `current_version` unless it pins one. Over
+plain HTTP, `?version=` pins it:
+
+```sh
+curl 'localhost:8780/functions/<function-id>/invoke?version=3' \
+  -H 'Content-Type: application/json' -d '{"id":"abc"}'
+```
+
+On the API, `version` on `InvokeRequest` does the same, and `0` means the
+current version. The response names the version that ran, in the
+`Alchemy-Version` header or the `version` field.
+
+| Case | Result |
+|---|---|
+| The version does not exist | `NOT_FOUND`, 404 |
+| The version is not `READY` | `FAILED_PRECONDITION`, 400 |
+| No version pinned and none is `READY` yet | `FAILED_PRECONDITION`, 400 |
+
+## Runtimes
+
+`ListRuntimes` returns the runtimes a function can be built from source on, each
+with its image, the handler file the image runs and a starter handler per
+contract kind. It also returns the limits a source is held to.
+
+| Runtime | Image | Handler |
+|---|---|---|
+| Python 3.13 | `runtime/python:3.13` | `handler.py` |
+| Node 24 | `runtime/node:24` | `handler.ts` |
+| Go 1.27 | `runtime/go:1.27` | `main.go` |
+| Rust 1.99 | `runtime/rust:1.99` | `main.rs` |
+
+The images live under `RUNTIME_IMAGE_PREFIX`, `ghcr.io/galaxy-io/alchemy/runtime`
+by default. `runtime/static:13` is not in the list: it runs a binary built
+elsewhere, so it is used as the base of an image function.

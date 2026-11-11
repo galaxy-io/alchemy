@@ -1,0 +1,186 @@
+---
+title: "Functions API"
+sidebarTitle: "Functions"
+description: "Create functions, add immutable versions, read their build status, and list the runtimes a source can build on."
+---
+
+A function is a stable, named handle that callers invoke. A version is an
+immutable spec (image, command, contract, secrets, source) that the server
+builds into a bootable artifact. These RPCs are on
+`functions.v1.FunctionsService`, with messages in
+`protos/functions/v1/functions.proto` and `protos/functions/v1/common.proto`.
+See [Functions and versions](/pages/concepts/functions-and-versions) for
+the model.
+
+## RPCs
+
+| RPC | Description |
+|---|---|
+| `CreateFunction` | Create a function and start building version 1 |
+| `UpdateFunction` | Change a function's name, description, timeout, concurrency, resources and retries |
+| `GetFunction` | Read one function, optionally with every version |
+| `ListFunctions` | Page through the tenant's functions, oldest first |
+| `DeleteFunction` | Remove a function, its versions and its invocations |
+| `CreateFunctionVersion` | Add a version and start building it |
+| `GetFunctionVersion` | Read one version, with its build status and source files |
+| `ListFunctionVersions` | Page through a function's versions, newest first |
+| `ListRuntimes` | List the runtimes for functions built from source, and the source limits |
+
+## FunctionSpec
+
+Every version is built from a `FunctionSpec`.
+
+| Field | Type | Behavior |
+|---|---|---|
+| `image` | `string` | An OCI reference. Required. With `source` set, the runtime image the files land on |
+| `command` | `repeated string` | The process argv. Empty runs the image's own entrypoint and command |
+| `env` | `map<string, string>` | Added on top of the image's environment. Visible wherever the version is, so not for secrets |
+| `secrets` | `map<string, string>` | Environment variable name to tenant secret name. See [Secrets](/pages/api-reference/secrets) |
+| `protocol` | `InvocationProtocol` | Required. Only `INVOCATION_PROTOCOL_EXEC` is accepted today |
+| `contract` | `Contract` | A `json_schema` (`input`, `output` as JSON Schema 2020-12) or an `arrow` (`input_schema`, `output_schema` as serialized Arrow IPC schemas) |
+| `source` | `Source` | Files extracted under `/app` over `image`, for a function built from source |
+
+`INVOCATION_PROTOCOL_RUNTIME_API` is defined in the protos but returns
+`unimplemented`. A missing `image` or `protocol`, or a contract that does not
+compile, is `invalid_argument`. See [Contracts](/pages/concepts/contracts)
+for writing one.
+
+A `Source` carries `files`, each with a `path` relative to `/app` and its
+`content`. The server packs them into a tar archive in the artifacts bucket,
+records the archive as `source.layer` (`key`, `sha256`), and keeps each file's
+`path` and `size` on the stored spec without its content. A spec that sends
+files with no content and names a `layer` reuses that archive, which is how a
+version's own spec is sent back to build it again. Source needs
+`ARTIFACTS_BUCKET` on the server, or the call is `failed_precondition`.
+
+| Source limit | Value |
+|---|---|
+| Files | 64 |
+| Total content | 1 MiB |
+| Path length | 255 bytes, relative, clean and unique |
+
+## Function settings
+
+These live on the function, not the version, and apply to the next invocation
+of any version.
+
+| Field | Default | Bounds |
+|---|---|---|
+| `timeout_ms` | 30000 when zero | At most 300000. Negative is `invalid_argument` |
+| `max_concurrency` | 0, no limit | Not negative. Invocations past it wait in the queue |
+| `resources.vcpus` | 1 when zero | At most 8 |
+| `resources.memory_mib` | 128 when zero | 64 to 8192 |
+| `retries` | 2 when unset | 0 to 10 |
+
+`name` is required, trimmed, at most 128 bytes and unique within the tenant.
+
+## CreateFunction
+
+Request fields: `name`, `description`, `spec`, `secret_values`, `timeout_ms`,
+`max_concurrency`, `resources` and `retries`. The response carries the new
+`function` and its first `version`, which returns in
+`FUNCTION_VERSION_STATUS_BUILDING`. The build runs in the background on the
+least busy live host.
+
+`secret_values` maps environment variable names to values. Each is stored as a
+new tenant secret and named in the version's `spec.secrets`. See
+[Secrets](/pages/api-reference/secrets).
+
+A name already in use is `already_exists`. If the function is saved but the
+server cannot hand its settings to the hosts, the call is `unavailable` and
+asks you to save again.
+
+```sh
+curl -X POST http://localhost:8780/functions.v1.FunctionsService/CreateFunction \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "enrich-company",
+    "spec": {
+      "image": "ghcr.io/galaxy-io/enrich-company:1.4.0",
+      "protocol": "INVOCATION_PROTOCOL_EXEC",
+      "contract": {"jsonSchema": {
+        "input": {"type": "object", "properties": {"id": {"type": "string"}}, "required": ["id"]},
+        "output": {"type": "object"}
+      }}
+    },
+    "timeoutMs": "10000"
+  }'
+```
+
+`int64` fields such as `timeoutMs` are strings in Connect JSON.
+
+## UpdateFunction
+
+Send `function_id` and the full `name` and `description`, which are always
+written. `timeout_ms`, `max_concurrency`, `resources` and `retries` change
+only when set, with the same defaults and bounds as on create. A resources
+change takes effect on the next invocation, and each host snapshots the
+function again at the new size the first time it runs it. An unknown
+`function_id` is `not_found`, and a name in use is `already_exists`.
+
+## GetFunction
+
+Takes `id` and `include_versions`. The `Function` carries its settings, its
+`current_version` (the newest version that reached `READY`, which `Invoke`
+runs by default), `created_by_user_id` and `updated_by_user_id`, and every
+version when `include_versions` is set. Stamps such as `created_at` are epoch
+milliseconds, with 0 meaning unset. An unknown id is `not_found`.
+
+## ListFunctions
+
+Takes `pagination` and `search`, which filters by name. Results are oldest
+first. Pagination is described in the
+[overview](/pages/api-reference/introduction#pagination).
+
+## DeleteFunction
+
+Takes `id`. Deletes the function with its versions and invocations. An unknown
+id is `not_found`.
+
+## CreateFunctionVersion
+
+Takes `function_id`, `spec` and `secret_values`, and returns the new `version`
+in `BUILDING`. Version numbers increase by one per function. The version
+becomes the function's `current_version` once it reaches `READY`. An unknown
+function is `not_found`.
+
+## GetFunctionVersion
+
+Takes `function_id` and `version`, the version number. For a function built
+from source, each file's `content` is read back from the artifacts bucket.
+A missing function or version is `not_found`.
+
+| `FunctionVersion` field | Meaning |
+|---|---|
+| `status` | `BUILDING`, then `READY` or `FAILED`. `FAILED` is terminal |
+| `status_message` | The build error, for `FAILED` |
+| `image_digest` | The `sha256:` digest `spec.image` resolved to. The version always runs this digest |
+| `build_started_at`, `build_ended_at` | Build stamps, epoch milliseconds |
+| `rootfs_bytes` | Size of the built root filesystem |
+| `build_log` | The tail of the build output |
+
+Builds are asynchronous. Poll `GetFunctionVersion` until `status` leaves
+`BUILDING`. A build is bounded at 5 minutes. A server that stops mid-build
+leaves it for another server to take over.
+
+## ListFunctionVersions
+
+Takes `function_id` and `pagination`. Results are newest first and omit file
+content. An unknown function is `not_found`.
+
+## ListRuntimes
+
+Takes no fields. Returns `runtimes` and the source `limits` (`max_files`,
+`max_bytes`).
+
+| `Runtime` field | Meaning |
+|---|---|
+| `id` | The runtime's name, such as `python`, `node`, `go` or `rust` |
+| `label` | A display name, such as `Python 3.13` |
+| `image` | The reference to set as `spec.image`, under `RUNTIME_IMAGE_PREFIX` |
+| `handler_path` | The file under `/app` the image runs, such as `handler.py` |
+| `dark_icon_url`, `light_icon_url` | Icons under `RUNTIME_ICON_BASE_URL` |
+| `starters` | A starter handler per contract kind, `json_schema` and `arrow` |
+
+See [Runtimes and builds](/pages/concepts/runtimes-and-builds) for what
+each runtime image provides.

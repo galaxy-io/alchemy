@@ -1,0 +1,78 @@
+---
+title: "What is Alchemy?"
+sidebarTitle: "Introduction"
+description: "Alchemy is an open-source (Apache 2.0) runtime by Galaxy for fast, isolated, strongly typed compute functions, each call in its own Firecracker microVM."
+---
+
+Alchemy is a runtime for fast, isolated, strongly typed compute functions. It
+is built by [Galaxy](https://www.getgalaxy.io), written in Go, licensed under
+Apache 2.0 and developed in the open on
+[GitHub](https://github.com/galaxy-io/alchemy).
+
+A function is an OCI image plus a contract. Alchemy builds the image into a
+root filesystem once, boots it once and snapshots the microVM, then starts
+new microVMs from that snapshot and keeps them warm between calls. You can bring your own image, or write a
+handler in Python, TypeScript, Go or Rust and let Alchemy build it on one of
+its runtime images.
+
+## Why Alchemy
+
+- **Isolation per call.** Every invocation runs in its own Firecracker
+  microVM, under Firecracker's jailer, in its own cgroup and as its own
+  unprivileged user. See [Isolation](/pages/concepts/isolation) for
+  what a warm microVM keeps between calls.
+- **Typed contracts.** Each version carries a contract, a JSON Schema or an
+  Arrow schema for its input and output. Alchemy checks the input before any
+  compute is acquired and the output before it reaches the caller.
+- **Full lifecycle records.** Every invocation is recorded with its status,
+  attempts, timings and error, and everything the function writes to stderr
+  is kept as its log.
+
+## How it fits together
+
+The server accepts functions and invocations over a ConnectRPC API and a
+plain HTTP invoke endpoint, and queues every invocation in a NATS JetStream
+stream. Hosts own the KVM machines and take invocations from the queue
+whenever they have a free slot, so a busy fleet makes calls wait rather than
+fail. A host builds a function's root filesystem the first time it takes one
+of its invocations, and a supervisor inside each guest runs the function.
+PostgreSQL stores functions, versions and finished invocations, and NATS
+carries everything between servers and hosts, so any number of servers run
+side by side and nothing is written to the database while a call runs.
+
+The web UI ships inside the server binary and as the npm module
+`@galaxy-io/alchemy-ui` for apps that mount it. Read
+[Architecture](/pages/concepts/architecture) to follow an invocation
+through these pieces.
+
+## Where to go next
+
+<CardGroup cols={2}>
+  <Card title="Quickstart" icon="play" href="/pages/get-started/quickstart">
+    Run Alchemy locally, create a Python function and invoke it.
+  </Card>
+  <Card title="Write a Python function" icon="python" href="/pages/guides/python-function">
+    Write a handler, give it a contract and call it over HTTP.
+  </Card>
+  <Card title="Concepts" icon="book" href="/pages/concepts/overview">
+    Functions, versions, contracts, invocations and how isolation works.
+  </Card>
+  <Card title="Deployment" icon="server" href="/pages/deployment/overview">
+    Run the server and hosts on Kubernetes with KVM nodes.
+  </Card>
+  <Card title="Installation" icon="download" href="/pages/get-started/installation">
+    The Helm chart and the published container images.
+  </Card>
+  <Card title="API reference" icon="code" href="/pages/api-reference/introduction">
+    Every RPC on the API and the HTTP invoke endpoint.
+  </Card>
+</CardGroup>
+
+<Card title="Join the Slack community" icon="slack" href="https://join.slack.com/t/galaxy-io-community/shared_invite/zt-45qln0zg5-9CTvKVXugvh3sEhpD6KzJQ">
+  Ask questions, report what breaks, and hear about releases before they land.
+</Card>
+
+<Note>
+  Alchemy is pre-1.0. The API, the protos and the chart values may still
+  change between releases.
+</Note>

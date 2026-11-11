@@ -1,0 +1,119 @@
+---
+title: "Contracts"
+sidebarTitle: "Contracts"
+description: "Every version has a JSON Schema or Arrow contract for its input and output, and Alchemy checks both sides of every invocation against it."
+---
+
+A contract is the typed boundary of a version. Alchemy checks the input before
+any microVM is acquired for it and the output before it reaches the caller. The
+contract is part of the version, so it never changes under a caller that
+pinned one.
+
+A contract is one of two kinds.
+
+## JSON Schema
+
+A `json_schema` contract has an `input` and an `output` schema, both JSON Schema
+draft 2020-12. The input is one JSON value and so is the output, on the API and
+on the function's stdin and stdout alike. Over HTTP the content type is
+`application/json`.
+
+```json
+{
+  "json_schema": {
+    "input": {
+      "type": "object",
+      "properties": { "id": { "type": "string" } },
+      "required": ["id"]
+    },
+    "output": {
+      "type": "object",
+      "properties": { "name": { "type": "string" } },
+      "required": ["name"]
+    }
+  }
+}
+```
+
+Each schema must be self-contained. A `$ref` may point inside its own document,
+and one that points anywhere else fails the version instead of reading a file
+or a URL.
+
+## Arrow
+
+An `arrow` contract types the boundary with Arrow schemas, for functions that
+work on a batch of rows at a time. `input_schema` and `output_schema` are each
+an Arrow IPC stream holding only the schema message, such as pyarrow's
+`schema.serialize()`. Over HTTP the content type is
+`application/vnd.apache.arrow.stream`.
+
+An input or output is an Arrow IPC stream holding exactly one record batch. Its
+schema is matched against the contract field by field:
+
+- Names and types must be equal. Field metadata is ignored.
+- A field the contract marks nullable accepts a non-nullable column. A nullable
+  column where the contract says non-nullable is a violation.
+- For list types, the child field's name and nullability are ignored, since
+  Arrow libraries disagree on their defaults.
+
+The output must be row-aligned with the input: the same number of rows in the
+same order. Bookkeeping the caller holds per row then applies to the output
+unchanged.
+
+## Where checks happen
+
+The server compiles the contract when a version is created, and a contract that
+does not compile is `INVALID_ARGUMENT`. Hosts check every invocation, in
+`internal/contract`, and keep each compiled contract in memory.
+
+1. The host takes the invocation from the queue and checks the input. An input
+   that breaks the contract ends the invocation here. No microVM is acquired and
+   the function never runs.
+2. The function runs and writes its output to stdout.
+3. The host checks the output against the contract and the size limit. What
+   passes is what the caller receives, byte for byte.
+
+## Violations
+
+Each violation names where it is. `instancePath` is a JSON Pointer into the
+value, `schemaPath` one into the schema, and `message` says what is wrong. Arrow
+violations carry a message only, plus `schemaPath` `rows` when the row counts
+differ.
+
+An input violation is the caller's mistake. The invocation is `REJECTED` and the
+call fails with `INVALID_ARGUMENT`, one `ContractViolation` error detail per
+violation. Over HTTP it is a 400 with the violations in the body:
+
+```json
+{
+  "code": "invalid_argument",
+  "message": "input violates the version's input schema",
+  "violations": [
+    { "instancePath": "", "schemaPath": "/required", "message": "missing property 'id'" }
+  ]
+}
+```
+
+An output violation is the function's mistake. The invocation is `FAILED` with
+a function error of kind `FUNCTION_ERROR_KIND_OUTPUT_INVALID` and the violations
+in it. Over HTTP a sync call answers 500 with that error as its JSON body.
+
+<Warning>
+A contract violation is never retried, on either side. The same input would
+break the contract again, and so would the same function. Retries apply only to
+functions that raised, crashed or timed out, and to attempts the platform could
+not run. See [Invocations](/pages/concepts/invocations).
+</Warning>
+
+## Content types and size limits
+
+A call over HTTP must carry the content type its version's contract takes. Any
+other is a 415.
+
+| Limit | Value | What happens past it |
+|---|---|---|
+| Input | 64 MiB | HTTP 413, or `INVALID_ARGUMENT` on the API |
+| Output | 64 MiB | The supervisor stops reading stdout and fails the attempt as crashed |
+
+Inputs and outputs over 8 MiB still work: they travel between servers and hosts
+through a NATS object store instead of inside the queue message.

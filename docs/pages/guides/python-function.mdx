@@ -1,0 +1,329 @@
+---
+title: "Write a Python function"
+sidebarTitle: "Python"
+description: "Write a Python handler for the python:3.13 runtime, deploy it from source or as an image with a JSON Schema or Arrow contract, and invoke it."
+---
+
+This guide takes a Python handler from a file on your machine to a deployed,
+invoked function. It covers both contract kinds and both ways to deploy:
+source files that Alchemy lays over the runtime image, and an OCI image you
+build yourself.
+
+The commands assume a server on `localhost:8780` with no auth, as in the
+[Quickstart](/pages/get-started/quickstart). With auth enabled, add
+`-H "Authorization: Bearer $TOKEN"` to every call.
+
+## The Python runtime
+
+| | |
+|---|---|
+| Image | `<imagePrefix>/python:3.13`, `ghcr.io/galaxy-io/alchemy/runtime/python:3.13` by default |
+| Base | `python:3.13-slim` |
+| Entrypoint | `python /app/handler.py` |
+| Libraries | The standard library and `pyarrow` 21.0.0 |
+
+Nothing is installed at build time. A function built from source can import
+the standard library, `pyarrow` and its own files under `/app`. A function
+that needs other packages ships as an [image](#deploy-as-an-image).
+
+The image prefix is the server's `RUNTIME_IMAGE_PREFIX` (`runtimes.imagePrefix`
+in the Helm chart). `ListRuntimes` returns the exact image for your server, so
+ask it rather than typing the reference:
+
+```sh
+curl -s localhost:8780/functions.v1.FunctionsService/ListRuntimes \
+  -H 'Content-Type: application/json' -d '{}' \
+  | jq -r '.runtimes[] | select(.id == "python") | .image'
+```
+
+## The protocol
+
+Every Alchemy function speaks the same protocol. For each invocation the
+supervisor in the microVM starts the entrypoint as a new process and:
+
+- writes the input to stdin, then closes it
+- takes everything the process writes to stdout as the output
+- streams stderr to the invocation's log
+- treats a non-zero exit as a crash, with the exit status and the last 4 KiB
+  of stderr as the error message
+
+The input and output encoding comes from the contract. A JSON Schema contract
+passes one JSON value each way. An Arrow contract passes one Arrow IPC stream
+holding exactly one record batch each way. The platform checks the input
+before the function runs and the output before the caller sees it. See
+[Contracts](/pages/concepts/contracts).
+
+Because each invocation starts a new process, keep module level work small.
+Interpreter start and imports are paid on every call.
+
+## Write a JSON handler
+
+This is the runtime's JSON Schema starter, which the web UI also offers. It
+reads one value, returns it unchanged and lets any exception exit non-zero:
+
+```python handler.py
+import json
+import sys
+
+
+def handler(event):
+    return event
+
+
+json.dump(handler(json.load(sys.stdin)), sys.stdout)
+```
+
+Replace `handler` with your logic. Print diagnostics with
+`print(..., file=sys.stderr)`. Anything printed to stdout becomes part of the
+output and will likely break the contract.
+
+## Write an Arrow handler
+
+An Arrow function receives a batch of rows and returns a batch with the same
+number of rows in the same order. The platform rejects an output whose row
+count differs from the input's.
+
+[`examples/embed/python/handler.py`](https://github.com/galaxy-io/alchemy/tree/main/examples/embed/python)
+is a complete one. It reads a batch with an `id` and a `text` column and
+returns, per row, the cleaned text, its token count and a 64-dimension
+embedding. Its shape is the runtime's Arrow starter:
+
+```python handler.py
+import sys
+
+import pyarrow as pa
+
+
+def handler(batch: pa.RecordBatch) -> pa.RecordBatch:
+    return batch
+
+
+output = handler(pa.ipc.open_stream(sys.stdin.buffer).read_next_batch())
+with pa.ipc.new_stream(sys.stdout.buffer, output.schema) as writer:
+    writer.write_batch(output)
+```
+
+An Arrow contract carries both schemas as serialized Arrow IPC schema
+messages. Write them for the embed example with `pyarrow`:
+
+```python schemas.py
+import base64
+import json
+import sys
+
+import pyarrow as pa
+
+INPUT = pa.schema([
+    pa.field("id", pa.string(), nullable=False),
+    pa.field("text", pa.string()),
+])
+OUTPUT = pa.schema([
+    pa.field("id", pa.string(), nullable=False),
+    pa.field("cleaned_text", pa.string(), nullable=False),
+    pa.field("token_count", pa.uint32(), nullable=False),
+    pa.field("embedding", pa.list_(pa.float64(), 64), nullable=False),
+    pa.field("model", pa.string(), nullable=False),
+])
+
+
+def encode(schema):
+    return base64.b64encode(schema.serialize().to_pybytes()).decode()
+
+
+if __name__ == "__main__":
+    json.dump({"inputSchema": encode(INPUT), "outputSchema": encode(OUTPUT)}, sys.stdout)
+```
+
+```sh
+python schemas.py > arrow.json
+```
+
+Fields are matched by position, name, type and nullability. A column the
+contract marks nullable accepts a non-nullable one, not the other way round.
+The web UI builds the same schemas from its field editor.
+
+## Deploy from source
+
+A function built from source has no image of its own. Its spec names the
+runtime image and carries the files. The server stores them as an archive in
+its artifacts bucket and hosts extract it over the image at `/app`. The files
+are limited to 64 per version and 1 MiB in total, and the runtime runs
+`handler.py`.
+
+<Note>
+  Source builds need the server's `ARTIFACTS_BUCKET` and the hosts' access to
+  it. Without one, `CreateFunction` answers `failed_precondition`: `the server
+  has no artifacts bucket, so functions are built from images only`.
+</Note>
+
+<Steps>
+  <Step title="Create the function">
+    <CodeGroup>
+    ```text Web UI
+    1. Click New function.
+    2. Choose Code and pick Python 3.13 as the language.
+    3. Define the contract: JSON Schema, or Arrow with the
+       fields from schemas.py.
+    4. Replace the starter handler with your handler.py.
+    5. Set resources and limits, name the function and click
+       Create function.
+    ```
+
+    ```sh API (JSON Schema)
+    IMAGE=$(curl -s localhost:8780/functions.v1.FunctionsService/ListRuntimes \
+      -H 'Content-Type: application/json' -d '{}' \
+      | jq -r '.runtimes[] | select(.id == "python") | .image')
+
+    jq -n --arg image "$IMAGE" --rawfile src handler.py '{
+      name: "echo-python",
+      spec: {
+        image: $image,
+        protocol: "INVOCATION_PROTOCOL_EXEC",
+        contract: {jsonSchema: {input: {type: "object"}, output: {type: "object"}}},
+        source: {files: [{path: "handler.py", content: ($src | @base64)}]}
+      }
+    }' | curl -s localhost:8780/functions.v1.FunctionsService/CreateFunction \
+      -H 'Content-Type: application/json' -d @- | jq '{id: .function.id, status: .version.status}'
+    ```
+
+    ```sh API (Arrow)
+    jq -n --arg image "$IMAGE" --rawfile src handler.py --slurpfile arrow arrow.json '{
+      name: "embed-python",
+      spec: {
+        image: $image,
+        protocol: "INVOCATION_PROTOCOL_EXEC",
+        contract: {arrow: $arrow[0]},
+        source: {files: [{path: "handler.py", content: ($src | @base64)}]}
+      }
+    }' | curl -s localhost:8780/functions.v1.FunctionsService/CreateFunction \
+      -H 'Content-Type: application/json' -d @- | jq '{id: .function.id, status: .version.status}'
+    ```
+    </CodeGroup>
+
+    `protocol` is required and `INVOCATION_PROTOCOL_EXEC` is the only one
+    implemented. `timeoutMs`, `maxConcurrency`, `retries` and `resources`
+    are optional on the request: zero takes the server defaults of a 30 s
+    timeout, no concurrency limit, 1 vCPU and 128 MiB, and an unset
+    `retries` takes 2.
+  </Step>
+  <Step title="Wait for the build">
+    The first version starts in `BUILDING`. A host pulls the runtime, lays
+    the files over it, boots the microVM and snapshots it. Only a `READY`
+    version can be invoked.
+
+    ```sh
+    curl -s localhost:8780/functions.v1.FunctionsService/GetFunctionVersion \
+      -H 'Content-Type: application/json' \
+      -d '{"functionId": "<function-id>", "version": 1}' \
+      | jq '.version | {status, statusMessage}'
+    ```
+
+    A `FAILED` version carries the reason in `statusMessage` and the tail of
+    the build output in `buildLog`.
+  </Step>
+</Steps>
+
+To change the code, send a new spec with `CreateFunctionVersion`, or click
+**New version** on the function. The new version becomes current once it is
+`READY`, and the previous one keeps serving until then.
+
+## Deploy as an image
+
+Ship an image when the function needs packages the runtime does not have.
+Build on the runtime so the entrypoint stays `python /app/handler.py`. The
+embed example's Dockerfile is two lines:
+
+```dockerfile Dockerfile
+FROM ghcr.io/galaxy-io/alchemy/runtime/python:3.13
+COPY handler.py /app/
+```
+
+Add a `RUN pip install ...` line for extra packages. Build for the hosts'
+architecture and push to a registry the hosts can pull from:
+
+```sh
+docker build --platform linux/amd64 -t registry.example.com/embed-python:1 examples/embed/python
+docker push registry.example.com/embed-python:1
+```
+
+Then create the function with that image and no `source`:
+
+```sh
+jq -n --slurpfile arrow arrow.json '{
+  name: "embed-python",
+  spec: {
+    image: "registry.example.com/embed-python:1",
+    protocol: "INVOCATION_PROTOCOL_EXEC",
+    contract: {arrow: $arrow[0]}
+  }
+}' | curl -s localhost:8780/functions.v1.FunctionsService/CreateFunction \
+  -H 'Content-Type: application/json' -d @- | jq '{id: .function.id, status: .version.status}'
+```
+
+In the web UI, choose **Image** instead of **Code** and enter the reference.
+The version resolves the tag to a digest when it builds and always runs that
+digest, so pushing the tag again changes nothing until you create a new
+version. See [Deploy any OCI image](/pages/guides/image-function) for private
+registries.
+
+<Note>
+  With the local setup, push to `localhost:5001` and reference the image as
+  `192.168.5.2:5001/...` in the spec. That is the address the hosts in the
+  Lima VM reach the compose registry by.
+</Note>
+
+## Invoke it
+
+POST the input to `/functions/<function-id>/invoke` with the contract's
+content type. The response body is the output.
+
+<CodeGroup>
+```sh JSON
+curl -i localhost:8780/functions/<function-id>/invoke \
+  -H 'Content-Type: application/json' -d '{"hello": "world"}'
+```
+
+```sh Arrow
+python - <<'EOF'
+import pyarrow as pa
+from schemas import INPUT
+
+batch = pa.record_batch([pa.array(["a", "b"]), pa.array(["Hello  World", None])], schema=INPUT)
+with pa.OSFile("input.arrows", "wb") as sink, pa.ipc.new_stream(sink, INPUT) as writer:
+    writer.write_batch(batch)
+EOF
+
+curl -s localhost:8780/functions/<function-id>/invoke \
+  -H 'Content-Type: application/vnd.apache.arrow.stream' \
+  --data-binary @input.arrows -o output.arrows
+
+python -c 'import pyarrow as pa; print(pa.ipc.open_stream(open("output.arrows", "rb")).read_all())'
+```
+</CodeGroup>
+
+The response names the invocation in `Alchemy-Invocation-Id` and the version
+that ran in `Alchemy-Version`. A function that exits non-zero answers `500`
+with its error as JSON, and one that runs past its timeout answers `504`. Open
+the function's **Invocations** tab to read the call's stderr, or use the
+**Workbench** tab to invoke it from the browser.
+
+The same call is `FunctionsService.Invoke` on the API, with the input as
+bytes. See [HTTP invoke](/pages/usage/http) for pinning versions,
+retries, idempotency keys and async calls.
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="Troubleshooting" icon="wrench" href="/pages/guides/troubleshooting">
+    Read contract violations, crashes, timeouts and build failures.
+  </Card>
+  <Card title="Runtimes and builds" icon="hammer" href="/pages/concepts/runtimes-and-builds">
+    How a spec becomes a root filesystem and a snapshot.
+  </Card>
+  <Card title="Secrets" icon="key" href="/pages/concepts/secrets">
+    Give a function credentials without putting them in its spec.
+  </Card>
+  <Card title="Invocations" icon="bolt" href="/pages/concepts/invocations">
+    Queueing, retries, start kinds and the invocation lifecycle.
+  </Card>
+</CardGroup>

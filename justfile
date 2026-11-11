@@ -123,6 +123,10 @@ dev mode="" count="3" memory="512" warm="5m" prewarm="0":
     until curl -sf http://localhost:8780/healthz > /dev/null 2>&1; do sleep 0.5; done
     just ui
 
+# run the docs site
+docs:
+    cd docs && pnpm install && pnpm dev
+
 # generate all checked-in generated code
 gen: proto sqlc ui-gen
 

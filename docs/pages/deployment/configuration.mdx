@@ -1,0 +1,132 @@
+---
+title: "Server and host configuration"
+sidebarTitle: "Configuration"
+description: "Every environment variable the Alchemy server and host read, with its default and the Helm chart value that sets it."
+---
+
+The server and the host read their configuration from environment variables. The Helm chart renders them from chart values into a ConfigMap per component, and puts credentials in a Secret. Other platforms set them directly.
+
+Durations use Go syntax, such as `30s`, `5m` or `24h`. An invalid value stops the process at start.
+
+## Shared
+
+Both the server and the host read these.
+
+| Variable | Default | Chart value | Description |
+|---|---|---|---|
+| `NATS_URL` | `nats://localhost:4223` | `eventBus.nats.url` (Secret) | NATS connection URL |
+| `LOGS_BUCKET` | unset | `functionLogs.bucket` | Bucket for function logs and replayed outputs, `s3://BUCKET?region=REGION` or `gs://BUCKET`. Unset keeps logs on NATS only |
+| `ARTIFACTS_BUCKET` | unset | `artifacts.bucket` | Bucket for build layers, in the same form. Unset means functions are built from images only |
+| `LOG_LEVEL` | `INFO` | `server.logLevel`, `host.logLevel` | `DEBUG`, `INFO`, `WARN` or `ERROR` |
+| `LOG_FORMAT` | `json` | `server.logFormat`, `host.logFormat` | `json` or `text` |
+
+The default URLs point at the local development stack. Set them in every real deployment.
+
+## Server
+
+### API and storage
+
+| Variable | Default | Chart value | Description |
+|---|---|---|---|
+| `ADDR` | `:8780` | `server.service.port` | Address the API, invoke endpoint and UI listen on |
+| `PERSISTENCE_DSN` | local development DSN | `persistence.postgresql.dsn` (Secret) | PostgreSQL connection string. Migrations run on start |
+| `SERVER_NAME` | the hostname | | Name the server is known by on the bus. Must be unique per server |
+
+### Invocations
+
+| Variable | Default | Chart value | Description |
+|---|---|---|---|
+| `INVOKE_DEADLINE` | `5m` | `server.invoke.deadline` | How long a call waits for its result, queued and running, when the caller sets no deadline |
+| `INVOKE_MAX_DEADLINE` | `1h` | `server.invoke.maxDeadline` | The longest deadline a caller may set, and how long the queue keeps an invocation no host has taken |
+| `ASYNC_MAX_AGE` | `24h` | `server.invoke.async.maxAge` | How long an async invocation may wait in the queue and between attempts before it is recorded canceled |
+| `RETRY_BACKOFF` | `1s` | `server.invoke.retryBackoff` | Wait after the first failed attempt. Each later wait is five times longer. Over 0 and at most `1h` |
+| `RETRY_BACKOFF_MAX` | `5m` | `server.invoke.retryBackoffMax` | The longest wait between attempts. At least `RETRY_BACKOFF` and at most `1h` |
+| `INVOKE_QUEUE_REPLICAS` | `1` | `server.invoke.queueReplicas` | NATS servers that keep each queued invocation |
+| `IDEMPOTENCY_WINDOW` | `24h` | `server.idempotencyWindow` | How long an idempotency key keeps a retry from running the function again |
+| `INVOCATION_STREAM_RETENTION` | `24h` | | How long NATS keeps an invocation record no server has written to PostgreSQL yet |
+| `INVOCATION_STREAM_REPLICAS` | `1` | | NATS servers that keep each unwritten record |
+
+### Function logs
+
+| Variable | Default | Chart value | Description |
+|---|---|---|---|
+| `LOGS_RETENTION` | `1h` | `functionLogs.retention` | How long NATS keeps about the latest 10 MiB of every invocation's log, for live and recent reads |
+| `LOGS_MAX_BYTES` | `1073741824` | `functionLogs.maxBytes` | Memory NATS may use for function logs across all invocations. The oldest lines go first |
+
+### Runtimes
+
+| Variable | Default | Chart value | Description |
+|---|---|---|---|
+| `RUNTIME_IMAGE_PREFIX` | `ghcr.io/galaxy-io/alchemy/runtime` | `runtimes.imagePrefix` | Registry prefix of the runtime images. A runtime's image is `<prefix>/python:3.13` |
+| `RUNTIME_ICON_BASE_URL` | `https://cdn.getgalaxy.io/sources` | `runtimes.iconBaseUrl` | Where runtime icons are served from, as `<url>/source-icon-<runtime>-<dark\|light>.svg` |
+
+### Secrets
+
+| Variable | Default | Chart value | Description |
+|---|---|---|---|
+| `SECRET_PROVIDER` | `datastore` | `secrets.type` | `datastore`, `aws-secrets-manager` or `gcp-secret-manager`. The chart sets it only for the external ones |
+| `ENCRYPTION_KEY` | unset | `secrets.datastore.encryptionKey` (Secret) | Base64 AES key, 16, 24 or 32 bytes, for `datastore`. Unset means functions cannot use secrets, with a warning at start |
+| `ENCRYPTION_KEY_ID` | `default` | `secrets.datastore.encryptionKeyId` | Id stored with each secret for the key that encrypted it. Change it when rotating the key |
+| `SECRETS_PREFIX` | `alchemy` | `secrets.prefix` | Root name external stores give every secret |
+| `AWS_REGION` | SDK default | `secrets.aws.region` | Region for AWS Secrets Manager |
+| `GCP_PROJECT_ID` | unset | `secrets.gcp.projectId` | Project for GCP Secret Manager. The chart requires it for `gcp-secret-manager` |
+| `GCP_REGION` | unset | `secrets.gcp.region` | Region for GCP Secret Manager. The chart requires it for `gcp-secret-manager` |
+
+The external providers use their SDK's default credential chain, such as the server's IRSA role or workload identity. See [Secrets](/pages/concepts/secrets).
+
+### Authentication
+
+| Variable | Default | Chart value | Description |
+|---|---|---|---|
+| `AUTH_PROVIDER` | unset | `auth.type`, when `auth.enabled` | `keycloak`, `zitadel` or `proxy`. Unset leaves the API unauthenticated |
+| `AUTH_ISSUER` | unset | `auth.keycloak.issuer`, `auth.zitadel.issuer` | Keycloak realm URL or Zitadel base URL |
+| `AUTH_UI_ORIGIN` | `http://localhost:5173` | `auth.uiOrigin` | Origin the UI is served from. An https origin marks the session cookie Secure |
+| `AUTH_CLIENT_ID` | unset | `auth.keycloak.clientId` | Keycloak confidential client. Required for `keycloak` |
+| `AUTH_CLIENT_SECRET` | unset | `auth.keycloak.clientSecret` (Secret) | Its secret. Required for `keycloak` |
+| `AUTH_ADMIN_USERNAME` | unset | `auth.keycloak.adminUser` | Keycloak master-realm admin. With its password, the server creates the realm and client on boot |
+| `AUTH_ADMIN_PASSWORD` | unset | `auth.keycloak.adminPassword` (Secret) | Its password |
+| `AUTH_PAT` | unset | `auth.zitadel.pat` (Secret) | Zitadel machine-user personal access token with instance rights. Required for `zitadel` |
+| `AUTH_PROXY_TENANT` | unset | `auth.proxy.tenant` | The one gateway tenant a `proxy` deployment serves. Unset accepts any |
+| `AUTH_BOOTSTRAP_TENANT` | unset | `auth.bootstrap.tenant` | Tenant converged on every boot |
+| `AUTH_BOOTSTRAP_ADMIN_EMAIL` | unset | `auth.bootstrap.adminEmail` | Person who administers it. Closes sign-up |
+| `AUTH_BOOTSTRAP_ADMIN_PASSWORD` | unset | `auth.bootstrap.adminPassword` (Secret) | That person's initial password |
+| `AUTH_BOOTSTRAP_CLIENT_ID` | unset | `auth.keycloak.bootstrap.clientId` | Keycloak admin service account on the bootstrap tenant |
+| `AUTH_BOOTSTRAP_CLIENT_SECRET` | unset | `auth.keycloak.bootstrap.clientSecret` (Secret) | Its secret |
+
+See [Authentication](/pages/deployment/authentication) for how the modes work.
+
+## Host
+
+| Variable | Default | Chart value | Description |
+|---|---|---|---|
+| `HOST_NAME` | the hostname | the node name | Name the host is known by. Must be unique per host |
+| `MAX_INSTANCES` | `8` | `host.maxInstances` | Instances a host runs at once, busy and warm together |
+| `MEMORY_BUDGET_MIB` | `0` | `host.memoryBudgetMiB` | Guest memory in MiB the host may commit across its instances. `0` means no limit |
+| `WARM_INSTANCE_TTL` | `5m` | `host.warmInstanceTTL` | How long a finished instance stays booted for the next invocation. `0s` starts every invocation afresh |
+| `PREWARM_COUNT` | `0` | `host.prewarmCount` | Idle instances kept booted per function before any invocation arrives |
+| `SNAPSHOTS_ENABLED` | `true` | `host.snapshots.enabled` | Snapshot every version after its build and restore it per invocation instead of booting a kernel |
+| `CONSOLE_ENABLED` | `true` | `host.console.enabled` (`false`) | Keep the guest serial console on. Observable, slower boot |
+| `KEPT_VERSIONS` | `2` | `host.eviction.keptVersions` | Newest versions of each function a host keeps built whatever their use |
+| `VERSION_IDLE_TTL` | `24h` | `host.eviction.versionIdleTTL` | How long an older version goes without an invocation before the host drops its snapshot and drives. `0s` keeps every version |
+| `SECRETS_REFRESH_INTERVAL` | `5m` | `host.secretsRefreshInterval` | How long a host uses a fetched secret value before asking a server again |
+| `DATA_DIR` | `/var/lib/alchemy` | | Kernel, root filesystem cache and microVM jails. Must be one filesystem |
+| `KERNEL_IMAGE` | newest `/var/lib/firecracker/vmlinux-*` | | Guest kernel. The host image ships one |
+| `FIRECRACKER_BIN` | `/usr/local/bin/firecracker` | | Firecracker binary |
+| `JAILER_BIN` | `/usr/local/bin/jailer` | | Jailer binary |
+| `SUPERVISOR_BIN` | `supervisor` next to the host binary | | In-VM supervisor, copied into every root filesystem as init |
+| `UID_BASE` | `10000000` | | First of the 65536 uids microVMs run as |
+
+The binary's default for `CONSOLE_ENABLED` is `true`. The chart's is `false`.
+
+Hosts read nothing from PostgreSQL and need no Secret beyond `NATS_URL`. They fetch secret values from a server over NATS.
+
+## Fixed limits
+
+These are not configurable:
+
+| Limit | Value |
+|---|---|
+| Input and output size | 64 MiB per invocation |
+| Retries per function or call | 0 to 10 |
+| Idempotency key length | 255 bytes |
+| Recent log kept on NATS per invocation | About 10 MiB |

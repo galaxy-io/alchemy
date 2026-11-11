@@ -1,0 +1,115 @@
+---
+title: "Use the web UI"
+sidebarTitle: "Web UI"
+description: "Create functions, ship versions, run them in the workbench, triage invocations and watch hosts from Alchemy's web UI."
+---
+
+The web UI is served by the server at `/` on the same port as the API, 8780 by default. Release images of the server embed it. In local development, `just dev` runs it on [localhost:5173](http://localhost:5173) and proxies the API to the server.
+
+The sidebar has four sections: Observability, Functions, Hosts and Invocations. `/` opens Observability. Every view keeps its state in the URL, so a link to a filtered list, a selected version or an open invocation reopens exactly that view.
+
+## Functions
+
+**Functions** lists every function as a card with its current version, invocations in the last 24 hours, success rate, mean duration and its last ten statuses. The search box filters the list and is kept in `?q=`.
+
+### Create a function
+
+**New function** opens a wizard with these steps:
+
+<Steps>
+  <Step title="Choose source">
+    Pick **Code** and a language to write the handler in the browser, or **Image** and an OCI image reference. Under the source, the Environment section holds Variables, which go to the version's `spec.env`, and Secrets, which are stored apart from the spec. Advanced holds the Command.
+  </Step>
+  <Step title="Define contract">
+    Write the input and output schemas, as JSON Schema or as Arrow fields. See [Contracts](/pages/concepts/contracts).
+  </Step>
+  <Step title="Write code">
+    Code only. One tab per file over a full height editor, seeded with a handler generated from the contract.
+  </Step>
+  <Step title="Set resources">
+    vCPUs, memory, timeout, max concurrency and retries.
+  </Step>
+  <Step title="Name function">
+    A name and an optional description.
+  </Step>
+</Steps>
+
+A secret's value is never shown again once it is entered. The Settings spec JSON holds references only.
+
+## Function detail
+
+A function page has a heading with a version select, a banner while a version builds, and two actions. **New version** opens the same wizard without the name step. **Invoke** opens the workbench and is disabled until the function has a ready version. `?version=` selects the version the heading, workbench, contract and settings show.
+
+| Tab | What it shows |
+|---|---|
+| Overview | KPIs for the last 24 hours and the function's invocations |
+| Workbench | The version's files, an editor and the result of a run |
+| Contract | The input and output schemas as read-only type signatures, each with a copy button for the source schema |
+| Versions | Every version with its status, image, vCPUs, memory, build time and creation time |
+| Invocations | The function's invocations, filtered by status and timeframe |
+| Settings | General, Limits, Runtime and Danger zone |
+
+### Workbench
+
+The file tree lists the version's source files first, then `input.json`, `contract/input.json`, `contract/output.json` and `spec.json`. Source files and `input.json` are editable, the rest are read-only. `?file=` selects a file.
+
+**Run** (or `⌘↵`) invokes the ready version with `input.json`. The result shows the invocation id, which opens its drawer, the outcome, the output and a resizable logs strip. On a failure the outcome shows the reason and one line per contract violation, with its path and message.
+
+**Build** ships edited source files as a new version. Builds run on a host, and the function page polls while a version is building.
+
+### Versions
+
+Expand a row to see the image digest, contract, files with their runtime, command, timeout and root filesystem size. Each row's menu has:
+
+- **Open in workbench**, for a ready version.
+- **View contract**.
+- **Retry build**, for a failed version.
+
+See [Functions and versions](/pages/concepts/functions-and-versions) for what a version is and how it builds.
+
+### Settings
+
+| Section | What you can change |
+|---|---|
+| General | The function's name and description. The ID is shown with a copy button. Callers invoke by id, so renaming is safe |
+| Limits | vCPUs, memory, timeout, max concurrency and retries. Invocations past max concurrency wait in the queue |
+| Runtime | The version's spec as JSON, read-only |
+| Danger zone | Delete the function |
+
+## Invocations
+
+**Invocations** lists every invocation in the tenant, newest first. Filter by status and by timeframe (1 hour, 24 hours or 7 days). Both are kept in the URL.
+
+Click a row to open the invocation drawer, which `?invocationId=` keeps open across reloads. It shows:
+
+- The outcome, with the failure reason and contract violations when there are any, and a phase bar of where the time went.
+- Facts: function, version, call (sync or async), attempts, start kind, instance and creation time.
+- The logs, as a resizable strip at the bottom. For an invocation that retried, an attempt select switches between each attempt's log (`?invocationAttempt=`).
+
+Statuses are Queued, Starting, Running, Succeeded, Failed, Errored, Canceled and Rejected. See [Invocations](/pages/concepts/invocations) for what each means and [Logs](/pages/concepts/logs) for where logs are kept.
+
+## Observability
+
+**Observability** is the dashboard. From the top:
+
+- A KPI row: invocations running now, a count per final status, average duration, average acquire time and the share of warm starts.
+- Invocations by status over the timeframe.
+- Mean latency by start kind, cold boot or snapshot restore.
+- A weekday by hour traffic heatmap, filled by volume or by cold boots.
+- History, an infinite invocations table for the timeframe that takes over the scroll.
+
+Click a bucket or a status in the invocations chart to filter History to it. The page refreshes on an interval you pick, from every minute to every hour.
+
+## Hosts
+
+**Hosts** shows one card per live host:
+
+- A slot map. A busy slot opens the invocation it runs.
+- Capacity: instances, committed memory, cached images and root filesystem cache size.
+- Runtime: uptime, Firecracker version and kernel.
+
+Below the cards, the Instances table lists every microVM with its status, function, version, start kind, vCPUs, memory and age.
+
+## Command palette
+
+The command palette goes to any section, opens a function by name and starts **New function**. In the standalone app it also switches between the dark and light themes.

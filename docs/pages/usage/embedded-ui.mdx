@@ -1,0 +1,149 @@
+---
+title: "Embed the UI in your app"
+sidebarTitle: "Embedded UI"
+description: "Mount the @galaxy-io/alchemy-ui module under any path of a React host app built on TanStack Router and ConnectRPC."
+---
+
+The web UI also ships as `@galaxy-io/alchemy-ui` on npm, a module a host app mounts under any path. It is the same source tree the server embeds, so the screens, URLs and behavior match the [web UI](/pages/usage/web). The host owns the router, the query client and the transport. Alchemy brings its routes, pages and shell.
+
+`ui/fixtures/host` in the repository is the reference host. `pnpm check:host` type-checks and builds it against the package, so it is the executable copy of this page.
+
+## What the package exports
+
+| Subpath | What |
+|---|---|
+| `./paths` | `AlchemyPath`, the module-relative path of every page, and `createAlchemyHref` |
+| `./routes` | One `*RouteOptions` per page, plus `alchemyLayoutRouteOptions` and `alchemyNotFoundRouteOptions` |
+| `./AlchemyLayout` | The shell: its sidebar, and the URL-driven invocation drawer and create wizard |
+| `./commands` | `useAlchemyCommandItems({ base, transport })` for a host command palette |
+| `./pages/<Page>` | `ObservabilityPage`, `FunctionsPage`, `FunctionPage`, `FunctionOverviewPage`, `FunctionWorkbenchPage`, `FunctionContractPage`, `FunctionVersionsPage`, `FunctionInvocationsPage`, `FunctionSettingsPage`, `InvocationsPage`, `HostsPage`, `NotFoundPage` |
+| `./styles.css` | Every class the module renders, all prefixed `alchemy-` |
+
+The `exports` map in `ui/package.json` is the public API. Nothing else is importable.
+
+## Mount the module
+
+<Steps>
+  <Step title="Install the package and its peers">
+    Install `@galaxy-io/alchemy-ui` and every peer dependency listed in its `package.json`: React 18, TanStack Router, Query, Table and Virtual, ConnectRPC with `@connectrpc/connect-query`, `@galaxy-io/dls`, CodeMirror and d3. The host `tsconfig` uses `"moduleResolution": "bundler"`, and the host bundler must replace `process.env.NODE_ENV`.
+  </Step>
+  <Step title="Import the CSS once">
+    At the app entry, in this order:
+
+    ```tsx
+    import "@galaxy-io/dls/styles.css";
+    import "@galaxy-io/dls/tokens.css";
+    import "@galaxy-io/dls/fonts.css";
+    import "@galaxy-io/alchemy-ui/styles.css";
+    ```
+  </Step>
+  <Step title="Mount the providers">
+    `GalaxyProvider` owns the theme. Under it go `QueryClientProvider` and `RouterProvider`.
+  </Step>
+  <Step title="Own the query client">
+    Skip retries for `NotFound`, `PermissionDenied`, `Unauthenticated`, `InvalidArgument` and `Unimplemented`, or a missing function retries for about 7 seconds before its not-found page shows. A `staleTime` of 30 seconds is recommended.
+  </Step>
+  <Step title="Give Alchemy a transport">
+    Alchemy reads the connect-query transport from context. When the host's global transport does not reach Alchemy's services, nest a `TransportProvider` in the layout route's component.
+  </Step>
+  <Step title="Add the routes">
+    A layout route, one child per page, a not-found splat and an index redirect. See the example below.
+  </Step>
+  <Step title="Proxy the API">
+    Route `/functions.v1.FunctionsService` and `/metrics.v1.MetricsService` to the Alchemy server at the transport's `baseUrl`. When another product the host mounts also serves `metrics.v1.MetricsService`, put one of them behind a prefix.
+  </Step>
+  <Step title="Give the layout a box">
+    `AlchemyLayout` fills its parent, so the parent needs a definite height, such as a flex child with `min-height: 0`.
+  </Step>
+</Steps>
+
+## Routes
+
+Spread each page's route options into a route and give it the page as its component. The options carry Alchemy's search schemas and its own pending, error and not-found components, so the host needs no `defaultPendingComponent`, `defaultErrorComponent` or `defaultNotFoundComponent`.
+
+```tsx
+import AlchemyLayout from "@galaxy-io/alchemy-ui/AlchemyLayout";
+import {
+  alchemyLayoutRouteOptions,
+  alchemyNotFoundRouteOptions,
+  functionsRouteOptions,
+  observabilityRouteOptions,
+} from "@galaxy-io/alchemy-ui/routes";
+import { TransportProvider } from "@connectrpc/connect-query";
+import { createConnectTransport } from "@connectrpc/connect-web";
+import { createRoute, lazyRouteComponent, redirect } from "@tanstack/react-router";
+
+const alchemyTransport = createConnectTransport({ baseUrl: "" });
+
+const mountRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "alchemy",
+  ...alchemyLayoutRouteOptions,
+  component: () => (
+    <TransportProvider transport={alchemyTransport}>
+      <AlchemyLayout />
+    </TransportProvider>
+  ),
+});
+
+const mountIndexRoute = createRoute({
+  getParentRoute: () => mountRoute,
+  path: "/",
+  beforeLoad: () => {
+    throw redirect({ to: "/alchemy/observability" });
+  },
+});
+
+const observabilityRoute = createRoute({
+  getParentRoute: () => mountRoute,
+  path: "observability",
+  ...observabilityRouteOptions,
+  component: lazyRouteComponent(() => import("@galaxy-io/alchemy-ui/pages/ObservabilityPage")),
+});
+
+const functionsRoute = createRoute({
+  getParentRoute: () => mountRoute,
+  path: "functions",
+  ...functionsRouteOptions,
+  component: lazyRouteComponent(() => import("@galaxy-io/alchemy-ui/pages/FunctionsPage")),
+});
+
+const notFoundRoute = createRoute({
+  getParentRoute: () => mountRoute,
+  path: "$",
+  ...alchemyNotFoundRouteOptions,
+  component: lazyRouteComponent(() => import("@galaxy-io/alchemy-ui/pages/NotFoundPage")),
+});
+```
+
+Add the remaining pages the same way. `functions/$id` takes `functionRouteOptions` and `FunctionPage`, and its children are `/` (the overview, not a redirect), `workbench`, `contract`, `versions`, `invocations` and `settings`. `invocations` and `hosts` sit beside `functions`. `ui/fixtures/host/router.tsx` has the full tree.
+
+The redirect from the mount's index to `observability` is the host's, with an absolute path. Alchemy's own links are relative to wherever it is mounted.
+
+## Link into Alchemy
+
+Link from host pages with `AlchemyPath` and `from` set to the mount path:
+
+```tsx
+import { AlchemyPath } from "@galaxy-io/alchemy-ui/paths";
+
+<Link from="/alchemy" to={AlchemyPath.FUNCTION_WORKBENCH} params={{ id: functionId }}>
+  Open in workbench
+</Link>
+```
+
+`createAlchemyHref(AlchemyPath.FUNCTION, { id })` builds the same path as a string for places that take an href.
+
+## Command palette
+
+`useAlchemyCommandItems` returns items for a DLS `CommandPalette`: go to each section, open a function by name and start **New function**. When the palette lives outside the mount, pass the mount path as `base` and the same transport the layout uses:
+
+```tsx
+const commandItems = useAlchemyCommandItems({ base: "/alchemy", transport: alchemyTransport });
+```
+
+`AlchemyLayout` also takes a `sidebarFooter` for host content under its navigation.
+
+## Versions
+
+`@galaxy-io/alchemy-ui` is released from `ui/` through release-please, apart from the server and host releases.

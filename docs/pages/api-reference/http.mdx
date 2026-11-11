@@ -1,0 +1,178 @@
+---
+title: "HTTP endpoints"
+sidebarTitle: "HTTP endpoints"
+description: "The plain HTTP routes the server serves beside ConnectRPC: invoke, health, the autoscaling feed and the web UI."
+---
+
+Beside the [ConnectRPC services](/pages/api-reference/introduction),
+the server's listener (`ADDR`, default `:8780`) serves a few plain HTTP routes.
+They are registered in `cmd/server/main.go` and implemented in
+`internal/server`.
+
+| Route | Auth | Purpose |
+|---|---|---|
+| `POST /functions/{function}/invoke` | Yes | Invoke a function with the raw input as the body |
+| `GET /healthz` | No | Liveness |
+| `GET /scaling` | No | Host demand for KEDA |
+| `/` (anything else) | No | The web UI |
+
+There is no API route for `/invocations/{id}`. See
+[Location](#location) below.
+
+## POST /functions/\{function\}/invoke
+
+`FunctionsService.Invoke` over plain HTTP. The request body is the input and
+the response body is the output, both in the contract's encoding, with no
+envelope. With `Prefer: respond-async` it is `FunctionsService.InvokeAsync`
+instead. Only `POST` is routed. Other methods on this path fall through to the
+web UI.
+
+```sh
+curl -X POST localhost:8780/functions/<function-id>/invoke \
+  -H 'Content-Type: application/json' \
+  -d '{"id":"abc"}'
+```
+
+### Path and query
+
+| Parameter | Behavior |
+|---|---|
+| `{function}` | The function id |
+| `version` | Optional. A version number of 1 or more pins that version. Absent runs the function's `current_version`. Anything else is 400 |
+
+### Request headers
+
+| Header | Behavior |
+|---|---|
+| `Content-Type` | Required. `application/json` for a JSON Schema contract, `application/vnd.apache.arrow.stream` for an Arrow contract. Parameters such as `charset` are ignored. Anything else is 415 |
+| `Idempotency-Key` | Optional. Works as `idempotency_key` on `Invoke` and `InvokeAsync`. At most 255 bytes |
+| `Alchemy-Retries` | Optional. This call's retries, an integer from 0 to 10, instead of the function's |
+| `Prefer` | `respond-async` (RFC 7240) queues the call and answers 202 at once. Other preferences are ignored |
+| `Authorization` | `Bearer <token>` when a `zitadel` or `keycloak` provider is configured |
+| `X-Forwarded-Tenant`, `X-Forwarded-User`, `X-Forwarded-Service` | Set by the gateway with the `proxy` provider |
+
+A browser cannot send these content types cross-site without a CORS
+preflight, which the server never grants, so a session cookie alone cannot
+invoke from another origin.
+
+The body may be at most 64 MiB. The call waits for its result for up to
+`INVOKE_DEADLINE` (default 5 minutes). Plain HTTP has no way to set a shorter
+or longer deadline. Use `Invoke` with `Connect-Timeout-Ms` for that.
+Disconnecting cancels the wait.
+
+### Responses
+
+| Status | Body | When |
+|---|---|---|
+| 200 | The output, in the contract's content type | The function ran and succeeded |
+| 202 | `{"invocationId": "..."}` | `Prefer: respond-async` and the invocation is queued, or a replayed key |
+| 500 | The `FunctionError` as JSON | The function ran and raised, crashed or returned an invalid output |
+| 504 | The `FunctionError` as JSON | The function ran past its `timeout_ms` |
+| 4xx, 5xx | The [error body](#error-body) | The call was refused or the platform failed. See the table below |
+
+A `FunctionError` body uses the protobuf JSON names:
+
+```json
+{"kind": "FUNCTION_ERROR_KIND_RAISED", "message": "company not found", "type": "LookupError"}
+```
+
+### Response headers
+
+On a sync call that ran (200, 500 or 504):
+
+| Header | Value |
+|---|---|
+| `Content-Type` | The contract's content type on 200, `application/json` on 500 and 504 |
+| `Alchemy-Invocation-Id` | The invocation's id |
+| `Alchemy-Version` | The version that ran |
+| `Alchemy-Attempts` | How many runs the result took, when above 0 |
+| `Alchemy-Replayed` | `true` when the result is an earlier call's, found by `Idempotency-Key` |
+
+On 202:
+
+| Header | Value |
+|---|---|
+| `Content-Type` | `application/json` |
+| `Preference-Applied` | `respond-async` |
+| `Location` | `/invocations/<id>` |
+| `Alchemy-Invocation-Id` | The invocation's id |
+| `Alchemy-Replayed` | `true` when an earlier call with the same key queued it. The body then also has `"replayed": true` |
+
+### Location
+
+The `Location` on a 202 names `/invocations/<id>`, but the server has no API
+route there. A `GET` falls through to the web UI handler, which serves the app
+(or a placeholder page in a binary built without `-tags embedui`). To follow an
+async invocation programmatically, call `GetInvocation` with the id from
+`Alchemy-Invocation-Id`.
+
+### Error body
+
+Every failure that is not a function's own error answers `application/json`:
+
+```json
+{
+  "code": "invalid_argument",
+  "message": "input violates the version's input schema",
+  "violations": [
+    {"instancePath": "/id", "schemaPath": "/properties/id/type", "message": "<validation message>"}
+  ]
+}
+```
+
+`code` is the Connect code name. `violations` appears only when the input
+broke the contract, one `ContractViolation` per failure.
+
+### Status codes
+
+The status follows the Connect protocol's mapping for the code.
+
+| Status | Code | Causes on this route |
+|---|---|---|
+| 400 | `invalid_argument` | Bad `version` query, bad `Alchemy-Retries`, a key over 255 bytes, an input that violates the contract, an unreadable body |
+| 400 | `failed_precondition` | No ready version, a pinned version that is not `READY`, or `Idempotency-Key` on a sync call with no logs bucket |
+| 401 | `unauthenticated` | Missing or rejected credentials, or a token with no tenant |
+| 403 | `permission_denied` | The `proxy` provider got a tenant other than `AUTH_PROXY_TENANT` |
+| 404 | `not_found` | Unknown function or pinned version |
+| 409 | `aborted` | The key is held by a call whose outcome is unknown, or whose output was not kept |
+| 413 | `invalid_argument` | The body is over 64 MiB |
+| 415 | `invalid_argument` | `Content-Type` is not the contract's |
+| 429 | `resource_exhausted` | A host refused the invocation for lack of capacity |
+| 499 | `canceled` | The caller went away |
+| 500 | `internal` | A database or storage failure |
+| 503 | `unavailable` | The platform could not run it, NATS was unreachable, or no result came within `INVOKE_DEADLINE` |
+
+The checks run in this order: authentication, the `version` query, the
+function and version lookup, `Alchemy-Retries`, `Content-Type`, then the body.
+
+## GET /healthz
+
+Answers 204 with no body while the process serves HTTP. It checks no
+dependency. It is not authenticated.
+
+## GET /scaling
+
+The demand KEDA's metrics-api scaler sizes the host Deployment on
+(`host.autoscaling` in the Helm chart). Every server gives the same answer,
+since the queue depth is read from NATS. It is not authenticated.
+
+```json
+{"hosts": 2, "slots": 16, "slotsInUse": 9, "waiting": 3, "demand": 12}
+```
+
+| Field | Meaning |
+|---|---|
+| `hosts` | Hosts that heartbeated within the last 10 seconds |
+| `slots` | Their slots between them |
+| `slotsInUse` | What they last reported busy |
+| `waiting` | Invocations queued that no host has taken |
+| `demand` | Invocations queued plus those hosts hold, the slots wanted now |
+
+If the queue cannot be read, it answers 503 with the error as plain text. See
+[Autoscaling](/pages/deployment/autoscaling).
+
+## The web UI
+
+Every other path is the web UI. A binary built with `-tags embedui` serves
+`ui/build` with a fallback to `index.html` for client routes. Without the tag
+it serves a placeholder page that says how to build the UI.

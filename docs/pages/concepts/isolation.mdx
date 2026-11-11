@@ -1,0 +1,103 @@
+---
+title: "Isolation"
+sidebarTitle: "Isolation"
+description: "Each invocation runs in a jailed Firecracker microVM with its own kernel, restored from a snapshot, and this page says what is and is not shared between invocations."
+---
+
+Alchemy runs every invocation in a Firecracker microVM: a guest with its own
+Linux kernel on KVM, not a container on the host's kernel. Several layers sit
+between a function and anything else on the machine.
+
+## The microVM
+
+A microVM gets exactly what its function's `resources` ask for: `vcpus` and
+`memory_mib`. Its devices are:
+
+- a read-only root drive, the function's image flattened into ext4,
+- a read-only layer drive, when the version has source files or a compiled
+  layer,
+- a vsock to its host, and a virtio-rng device for entropy.
+
+The driver configures no network interface, so a guest has no network. Its one
+channel out is the vsock, where the supervisor serves the host.
+
+Inside, the supervisor is PID 1. It overlays the layer drive on the root
+filesystem read-only, mounts `/proc`, `/sys`, and a tmpfs on `/tmp` and `/run`,
+and runs the function as one process per invocation.
+
+## The jailer
+
+Every microVM runs under Firecracker's jailer, which the host drives as root:
+
+- **chroot**: Firecracker runs inside its own directory under
+  `<DATA_DIR>/jail/firecracker/<id>/root`, holding hard links to the kernel and
+  the drives and nothing else. Its log stays outside the chroot.
+- **cgroup**: each microVM gets its own cgroup v2 under the host's, with
+  `cpu.max` set to its vCPU count, so it cannot take more CPU time than it asked
+  for.
+- **uid**: each microVM runs as its own unprivileged uid and gid, taken from a
+  range of 65536 starting at `UID_BASE`, 10000000 by default. No two running
+  microVMs share one, so a process that escaped one guest cannot signal or read
+  another.
+
+When an instance is released, the host kills the Firecracker process and
+removes its cgroup, its jail and its uid.
+
+## Snapshot restore
+
+After a version builds, the host boots it once, waits for the supervisor to
+start, pauses the microVM and writes a full snapshot of its memory and device
+state. Each new instance restores that snapshot instead of booting a kernel. The
+memory file is shared read-only between restores, and each restore maps it
+privately, so what one instance writes no other sees.
+
+A snapshot is only good for the Firecracker, kernel and supervisor it was taken
+with, so the cache is keyed by those three and older snapshots are dropped when
+a host starts. A restore that fails falls back to a cold boot. `SNAPSHOTS_ENABLED`
+turns snapshots off.
+
+Every instance restored from one snapshot wakes with the same kernel random
+state and the clock of the moment it was taken. Before each invocation the
+supervisor corrects the guest clock when it is more than a second off the
+host's, and reseeds the kernel's random generator from the virtio-rng device, so
+two instances never hand out the same random bytes.
+
+## Memory and vCPU budgeting
+
+| Setting | Default | Meaning |
+|---|---|---|
+| `MAX_INSTANCES` | 8 | Invocations a host runs at once, one per slot |
+| `MEMORY_BUDGET_MIB` | 0 (no limit) | Guest memory a host may commit across booting, busy and warm instances |
+
+A host counts each instance at its full `memory_mib`. When a new instance would
+go over the budget, the host evicts warm instances of other artifacts, least
+recently used first. When there is nothing left to evict, it hands the
+invocation back to the queue for another host.
+
+## What is shared between invocations
+
+A host keeps an instance warm after an invocation, for `WARM_INSTANCE_TTL`, 5
+minutes by default, and the next invocation of the same artifact reuses it.
+That makes the next call fast, and it decides what two invocations can share.
+
+| | Separate instances | The same warm instance |
+|---|---|---|
+| Kernel, memory | Separate | The same guest kernel |
+| Root and layer drives | Shared read-only | Shared read-only |
+| Processes | Separate | None. The supervisor kills every process after each invocation |
+| `/tmp` and `/run` | Separate | Kept from one invocation to the next |
+| Secret values | Passed per invocation | Passed per invocation |
+
+An instance belongs to one artifact, which is one version of one function in
+one tenant, so a warm instance is only ever reused by invocations of that
+version. It runs one invocation at a time.
+
+<Note>
+Set `WARM_INSTANCE_TTL` to `0s` to release every instance after one invocation.
+Every call then starts from a fresh snapshot restore, and nothing a function
+writes reaches the next call.
+</Note>
+
+`PREWARM_COUNT` keeps that many idle instances booted per artifact before any
+invocation arrives. They are booted from free memory only, never by evicting
+other instances.
