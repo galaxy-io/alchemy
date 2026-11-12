@@ -1,0 +1,129 @@
+---
+title: "Local development"
+sidebarTitle: "Local development"
+description: "The repository layout, the toolchain and the just recipes for building, generating and running Alchemy from source."
+---
+
+## Toolchain
+
+The `Brewfile` installs Go, `just`, `buf`, `golangci-lint`, `jq`, the RustFS
+`rc` client and Lima:
+
+```sh
+brew bundle
+```
+
+You also need:
+
+- Docker. The recipes use its `default` context for Compose and image builds.
+- Node.js 22 or later and pnpm, for the UI and the docs.
+- `sqlc`, for `just sqlc`.
+- `protoc-gen-go` and `protoc-gen-connect-go` on your `PATH`, for
+  `just proto`. `buf.gen.yaml` runs them as local plugins.
+
+Running hosts needs an Apple silicon Mac with an M3 or later and macOS 15 or
+later. See the [Quickstart](/pages/get-started/quickstart) for why.
+
+## Repository layout
+
+| Path | What lives there |
+|---|---|
+| `cmd/server`, `internal/server` | The server: the API, the invoke endpoint, builds and the invocation queue |
+| `cmd/host`, `internal/host` | The host, which takes invocations and runs microVMs |
+| `internal/driver/firecracker` | Firecracker and jailer management on a host |
+| `cmd/supervisor`, `internal/supervisor` | The init process inside every guest, which runs the function |
+| `internal/bus` | NATS JetStream streams, consumers and KV between servers and hosts |
+| `internal/contract` | JSON Schema and Arrow contract checks |
+| `internal/runtimes` | The runtime catalog and the starter handlers |
+| `protos/` | Protobuf definitions. `api/` holds the generated Go |
+| `datastore/postgres` | Migrations, sqlc queries and the generated `sqlcgen` package |
+| `ui/` | The React web UI and the `@galaxy-io/alchemy-ui` module |
+| `runtimes/` | Dockerfiles for the runtime images |
+| `charts/alchemy` | The Helm chart |
+| `examples/embed` | One function written in Python, TypeScript, Go and Rust |
+| `docs/` | This site |
+
+The repository has three Go modules: the root, `examples/embed/go` and
+`runtimes/go`. Recipes that run per module set `GOWORK=off`.
+
+## How the pieces run in development
+
+`just dev` runs everything at once. Each piece also has its own recipe:
+
+| Piece | Recipe | Where it runs |
+|---|---|---|
+| Infrastructure | `just infra` | Compose on the Mac: PostgreSQL on `5435`, NATS on `4223`, RustFS on `9000` (console `9001`), a registry on `5001` |
+| KVM VM | `just vm` | The `alchemy` Lima VM, mounting the repository at the same path |
+| Hosts | `just host [count] [memory] [warm] [prewarm]` | Inside the VM as root, each in its own systemd scope |
+| Server | `just server [mode]` | On the Mac with `go run ./cmd/server`, on `:8780` |
+| UI | `just ui` | Vite on `:5173`, proxying the API to `:8780` |
+
+`just host` cross-compiles the host and supervisor into `bin/linux-arm64/`
+first, then stops any running hosts and starts `count` new ones (1 by
+default) with `memory` MiB each (512). `warm` is how long an instance is kept
+for reuse (`5m`, and `0s` always cold boots) and `prewarm` how many to keep
+booted per function (0). `just dev` passes the same arguments after its mode
+and defaults to 3 hosts. The hosts reach Compose at `host.lima.internal`.
+
+`just server` points at the Compose services by default, and every variable
+can be overridden from the environment or a `.env` file. Its `mode` turns
+auth on: `zitadel` or `keycloak` after `just infra zitadel` or
+`just infra keycloak`, or `proxy`. See
+[Authentication](/pages/deployment/authentication).
+
+`just status` shows the VM, the running hosts and the number of microVMs.
+
+### The local registry for runtimes
+
+`just images` builds every runtime and pushes it to the Compose registry as
+`localhost:5001/galaxy-io/alchemy/runtime/<tag>`. Hosts in the VM pull the same
+images from `192.168.5.2:5001`, the Mac's address on the Lima network, which
+needs no TLS. `just server` sets `RUNTIME_IMAGE_PREFIX` to
+`192.168.5.2:5001/galaxy-io/alchemy/runtime`, so a function created from source
+lands on the local build. Run `just images` again after changing anything
+under `runtimes/`.
+
+<Note>
+`just server` falls back to a fixed `ENCRYPTION_KEY` so the secrets API works
+out of the box. It is a published development key. Never reuse it outside
+local development.
+</Note>
+
+## Recipes
+
+| Recipe | What it does |
+|---|---|
+| `just gen` | Runs `proto`, `sqlc` and `ui-gen` |
+| `just proto` | `buf generate`: Go and ConnectRPC stubs into `api/` |
+| `just sqlc` | Generates `datastore/postgres/sqlcgen` from the migrations and queries |
+| `just ui-gen` | `pnpm codegen` in `ui/`: TypeScript clients into `ui/src/gen/` |
+| `just proto-lint` | `buf lint` |
+| `just proto-format [check]` | `buf format`, writing or checking |
+| `just proto-check` | Regenerates the Go stubs and fails if `api/` changed |
+| `just test` | `go test ./...` in every Go module |
+| `just format [check]` | Go, UI and proto formatting |
+| `just lint [check]` | Go and UI linters |
+| `just ui-check` | Every UI gate: types, lint, format, both builds, the package checks and the committed route tree |
+| `just ui-build` | Builds the UI into `ui/build/` |
+| `just build-linux [arch]` | Builds the host and supervisor for the VM into `bin/linux-<arch>/` |
+| `just binaries [arch]` | Builds the Linux server, host and supervisor into `bin/alchemy/`, the server with the UI embedded |
+| `just images [arch]` | Builds the server and host images and pushes the runtimes to the local registry |
+| `just tidy` | `go mod tidy` in every Go module |
+| `just docs` | Runs this docs site locally with Mintlify |
+
+`just` with no arguments lists every recipe.
+
+## Building the UI in
+
+The server serves the web UI from `ui.Handler()`. Built with `-tags embedui`,
+it embeds `ui/build` and serves the app. Without the tag it serves a
+placeholder page, so `go build ./...` needs no Node toolchain. `just binaries`
+and the release images build the server with the tag:
+
+```sh
+just ui-build
+go build -tags embedui -o bin/server ./cmd/server
+```
+
+In development the UI runs from Vite instead. Set `API_PROXY_TARGET` to
+proxy it to a server other than `http://localhost:8780`.

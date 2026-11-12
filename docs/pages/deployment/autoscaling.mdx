@@ -1,0 +1,85 @@
+---
+title: "Autoscale servers and hosts"
+sidebarTitle: "Autoscaling"
+description: "Scale servers on CPU with a HorizontalPodAutoscaler and hosts on queue demand with KEDA, and add KVM nodes with a node autoscaler."
+---
+
+Servers and hosts scale on different signals. Servers are CPU-bound request handlers, so a HorizontalPodAutoscaler sizes them. Hosts are slots for microVMs, so KEDA sizes them on how many slots the queue wants. Both are off by default.
+
+## Servers
+
+Any server replica serves any request, so servers scale freely. Enable the HorizontalPodAutoscaler and give the server a CPU request, which the target is a percent of:
+
+```yaml
+server:
+  resources:
+    requests:
+      cpu: 500m
+  autoscaling:
+    enabled: true
+    minReplicas: 2
+    maxReplicas: 5
+    targetCPUUtilizationPercentage: 70
+```
+
+With autoscaling on, the chart also keeps a PodDisruptionBudget with `server.podDisruptionBudget.minAvailable` (1).
+
+A server holds the sync calls it accepted in memory until their results arrive. On shutdown it stops taking requests and gives open ones up to 30 seconds to finish. A sync call still waiting after that is cut off. The function still runs on its host, and its record still reaches the database.
+
+## Hosts
+
+With `host.autoscaling.enabled`, a KEDA `ScaledObject` sizes the host Deployment instead of `host.replicas`. [KEDA](https://keda.sh) must already be installed in the cluster.
+
+```yaml
+host:
+  maxInstances: 8
+  autoscaling:
+    enabled: true
+    minReplicas: 1
+    maxReplicas: 10
+    targetUtilization: 75
+    pollingInterval: 15
+    scaleDownStabilizationSeconds: 300
+```
+
+### The demand signal
+
+KEDA's metrics-api scaler reads `GET /scaling` on the server's Service every `pollingInterval` seconds:
+
+```json
+{"hosts": 3, "slots": 24, "slotsInUse": 20, "waiting": 6, "demand": 26}
+```
+
+| Field | Meaning |
+|---|---|
+| `hosts` | Hosts heartbeating now |
+| `slots` | Slots across those hosts, `maxInstances` each |
+| `slotsInUse` | Slots hosts last reported busy |
+| `waiting` | Invocations queued that no host has taken |
+| `demand` | Invocations queued plus the ones hosts hold: the slots wanted right now |
+
+Every server gives the same answer, since the queue's depth is read from NATS. The endpoint is not authenticated, like `/healthz`, so KEDA needs no credentials. Keep the server's Service off the public internet, or block `/scaling` at the ingress.
+
+### The math
+
+KEDA sets hosts to `demand` divided by the busy slots wanted per host, between `minReplicas` and `maxReplicas`:
+
+```text
+hosts = ceil(demand / floor(maxInstances × targetUtilization / 100))
+```
+
+With 8 slots per host at 75%, each host should keep 6 slots busy, so 26 slots of demand means 5 hosts. Lower `targetUtilization` to leave more headroom for bursts.
+
+### Scaling up and down
+
+Hosts are added as soon as demand appears, with no stabilization window.
+
+They are removed one per minute once demand has stayed low for `scaleDownStabilizationSeconds`. A host that is told to stop takes no new invocations, releases its warm instances and gives in-flight invocations up to 40 seconds to finish before it cancels them. `host.terminationGracePeriodSeconds` (60) covers that. A canceled invocation retries if the function or call allows it.
+
+Keep `minReplicas` at 1 or more. A new KVM node takes minutes to come up, and with no host at all every call waits for it.
+
+## KVM nodes
+
+A new host only runs once it has a KVM node, and each host needs a node of its own. Run a node autoscaler such as Karpenter or Cluster Autoscaler on the KVM node pool, or pending hosts wait for a node indefinitely.
+
+The chart runs hosts as a Deployment rather than a DaemonSet for this reason: a pending host pod is what asks the node autoscaler for another node. Give the pool the `alchemy.getgalaxy.io/kvm=true` label and taint, an instance type with KVM, and a maximum size at least `host.autoscaling.maxReplicas`. See [KVM nodes](/pages/deployment/kvm-nodes).

@@ -1,0 +1,272 @@
+---
+title: "Troubleshooting"
+sidebarTitle: "Troubleshooting"
+description: "Find the cause of failed builds, rejected inputs, crashes, timeouts, queue waits and host start failures from the errors Alchemy returns."
+---
+
+Every failure Alchemy reports carries a code and a message. This page lists
+the ones you are likely to meet, where they show up and what to change. The
+messages are quoted as the code writes them. Parts in angle brackets vary.
+
+## Read an error
+
+A call to `/functions/<id>/invoke` fails in one of two shapes.
+
+**The platform refused or could not run it.** The status is the Connect code's
+HTTP status and the body names the code:
+
+```json
+{"code": "invalid_argument", "message": "input violates the version's input schema",
+ "violations": [{"instancePath": "<pointer>", "schemaPath": "<pointer>", "message": "<reason>"}]}
+```
+
+**The function ran and failed.** The status is `500`, or `504` when it timed
+out, and the body is the function's error:
+
+```json
+{"kind": "FUNCTION_ERROR_KIND_CRASHED", "message": "function exited with status 1: <stderr tail>"}
+```
+
+Both carry `Alchemy-Invocation-Id` when an invocation was created. Look it up
+on the **Invocations** page or with `GetInvocation` for its status, attempts,
+`error` and `platformError`, and read its stderr in the UI or with
+`GetInvocationLogs`. On the API, `Invoke` returns a function's failure in the
+response's `error` field and platform failures as Connect errors with the
+same codes.
+
+## The version fails to build
+
+`CreateFunction` returns while the version is `BUILDING`. A build that fails
+turns the version `FAILED` with the reason in `statusMessage` and the tail of
+the build output in `buildLog`:
+
+```sh
+curl -s localhost:8780/functions.v1.FunctionsService/GetFunctionVersion \
+  -H 'Content-Type: application/json' \
+  -d '{"functionId": "<function-id>", "version": <n>}' \
+  | jq -r '.version | .statusMessage, .buildLog'
+```
+
+| `statusMessage` | Cause |
+|---|---|
+| `no host is available` | No host heartbeated within the last 10 seconds. Start one, or see [Hosts do not start](#hosts-do-not-start) |
+| `resolve <reference>: ...` | The image could not be pulled. See [Image pull failures](#image-pull-failures) |
+| `image has no Entrypoint or Cmd and spec.command is empty` | Set `spec.command` or give the image an entrypoint |
+| `compile failed: function exited with status <n>: ...` | A Go or Rust source did not compile. `buildLog` has the compiler's output |
+| `compile exceeded 3m0s` | The compile ran past its 3 minutes |
+| `the build has layers and this host has no artifact bucket` | A source version reached a host without `ARTIFACTS_BUCKET` |
+
+A failed version stays failed. Fix the spec and create a new version. The
+function keeps running its last ready version meanwhile.
+
+Some specs are refused before anything builds. `CreateFunction` and
+`CreateFunctionVersion` answer `invalid_argument` or `failed_precondition`
+with messages such as:
+
+| Message | Fix |
+|---|---|
+| `spec.protocol is required` | Set `protocol: "INVOCATION_PROTOCOL_EXEC"` |
+| `spec.image is required` | Name an image, or the runtime image for a source |
+| `spec.arrow.input_schema: not an Arrow IPC schema: ...` | Send a serialized Arrow schema, base64 encoded in JSON |
+| `spec.json_schema.input: ...` | Fix the JSON Schema. `$ref` may only point inside the document |
+| `spec.source.files hold more than 1048576 bytes` | A source is at most 64 files and 1 MiB |
+| `the server has no artifacts bucket, so functions are built from images only` | Set `ARTIFACTS_BUCKET` on the server, or ship an image |
+| `timeout_ms exceeds the maximum of 300000ms` | A function's timeout is at most 5 minutes |
+| `resources.memory_mib must be between 64 and 8192` | Memory is 64 to 8192 MiB, and vCPUs at most 8 |
+
+## The function is not ready
+
+| Status | Message |
+|---|---|
+| `400 failed_precondition` | `function "<id>" has no ready version` |
+| `400 failed_precondition` | `version <n> of function "<id>" is not ready` |
+
+The function has no `READY` version yet, or the pinned one is still
+building or failed. Wait for the build, or check its `statusMessage`.
+
+## The input is rejected
+
+The host checks the input before it spends a microVM on it. Nothing runs, the
+invocation is `REJECTED` and it is never retried.
+
+| Status | Message | Cause |
+|---|---|---|
+| `400 invalid_argument` | `input violates the version's input schema` | `violations` lists each failure with JSON Pointers into the input and the schema |
+| `415 invalid_argument` | `this function takes application/json` | The `Content-Type` does not match the contract. Arrow takes `application/vnd.apache.arrow.stream` |
+| `413 invalid_argument` | `input is over the 67108864 byte limit` | Inputs and outputs are at most 64 MiB |
+
+For an Arrow contract the violations read like `input is not an Arrow IPC
+stream: ...`, `input stream holds more than one record batch`, `field "id" has
+type int64, want utf8` or `field "id" is nullable, but the contract does not
+allow nulls`. Fields are compared by position, so a column in the wrong place
+is reported as a wrong name.
+
+## The output is rejected
+
+The function ran but its output broke the contract. The call answers `500`
+with kind `FUNCTION_ERROR_KIND_OUTPUT_INVALID`, and it is not retried because
+it would fail the same way.
+
+| Message | Cause |
+|---|---|
+| `output violates the version's contract` | `violations` lists what failed |
+| `output is not a JSON value: ...` | Something other than the result went to stdout, such as a debug print |
+| `output has <n> rows; the input had <m> and the output must be row-aligned` | An Arrow function must return one row per input row, in order |
+| `output is <n> bytes; the limit is <m>` | The output is over the server's payload limit, 64 MiB by default |
+
+Write diagnostics to stderr. Everything on stdout is the output.
+
+## The function crashes
+
+A process that exits non-zero answers `500` with kind
+`FUNCTION_ERROR_KIND_CRASHED`. The message holds the exit status and the last
+4 KiB of stderr:
+
+```text
+function exited with status 1: Traceback (most recent call last): ...
+```
+
+| Message | Cause |
+|---|---|
+| `function exited with status <n>: <stderr>` | An uncaught exception, panic or explicit non-zero exit |
+| `function exited with status -1: <stderr>` | The process was killed by a signal, most often for running out of memory |
+| `function could not be run: <error>` | The command does not exist or is not executable, such as a Go or Rust source on an image that was not compiled |
+| `function output exceeds 67108864 bytes` | The process wrote more than 64 MiB to stdout |
+
+A crash is retried up to the function's `retries`, 2 by default, after about
+1 s, then 5 s, then 25 s, up to 5 minutes. The response's `Alchemy-Attempts`
+says how many runs the result took, and each attempt keeps its own log.
+
+### Out of memory
+
+Alchemy has no error of its own for memory. When the function outgrows the
+microVM, the guest kernel kills it and the call reports a crash with status
+`-1`. If the whole guest stops answering instead, the call ends as a timeout
+or an `aborted` platform error (`409`). Files in `/tmp` and `/run` live in memory and
+count against the same limit.
+
+Raise the function's memory with `UpdateFunction`, which applies to the next
+invocation of every version:
+
+```sh
+curl -s localhost:8780/functions.v1.FunctionsService/UpdateFunction \
+  -H 'Content-Type: application/json' \
+  -d '{"functionId": "<function-id>", "name": "<name>", "resources": {"vcpus": 1, "memoryMib": 512}}'
+```
+
+`UpdateFunction` sets `name` and `description` on every call, so send the
+current ones. Send both resource fields: a zero one takes the server default
+again. Memory defaults to 128 MiB and goes up to 8192 MiB.
+
+## The function times out
+
+A function that runs past its `timeoutMs`, 30 s by default, is killed with
+everything it started. The call answers `504` with kind
+`FUNCTION_ERROR_KIND_TIMEOUT`:
+
+```text
+function exceeded its 30000ms timeout
+```
+
+When the microVM itself stops answering, the message is `function exceeded
+its <n>ms timeout and the instance stopped responding`. A timeout is retried
+like a crash. Raise `timeoutMs` with `UpdateFunction`, up to 5 minutes, or
+make the work smaller per call.
+
+## The call waits, then fails with a deadline
+
+```json
+{"code": "unavailable", "message": "no result for invocation <id> by its deadline: context deadline exceeded"}
+```
+
+The function never returned in time, usually because it never started. Over
+plain HTTP this answers `503` with code `unavailable`. An `Invoke` call whose
+own timeout expired gets `deadline_exceeded` instead. Every call waits in a
+queue until a host has a free slot, and the call's deadline covers that wait,
+the build on a new host and every attempt.
+
+| Caller | Deadline |
+|---|---|
+| `POST /functions/<id>/invoke` | Always the server's `INVOKE_DEADLINE`, 5 minutes by default |
+| `Invoke` over Connect or gRPC | The caller's own timeout, such as `Connect-Timeout-Ms`, capped at `INVOKE_MAX_DEADLINE`, 1 hour by default. Without one, `INVOKE_DEADLINE` |
+
+Common causes:
+
+- **No hosts take work.** Calls queue even with no hosts running. Check the
+  **Hosts** page and [Hosts do not start](#hosts-do-not-start).
+- **Every slot is busy.** Each host runs up to `MAX_INSTANCES` invocations at
+  once, 8 by default, within its `MEMORY_BUDGET_MIB`. A host without room
+  hands the invocation back to the queue for another host. Add hosts.
+- **The function is at `max_concurrency`.** Invocations past the limit wait in
+  the queue, `PENDING`, until a running one finishes. There is no error for
+  this. Raise or clear the limit with `UpdateFunction` (`maxConcurrency: 0`
+  means no limit).
+- **Retries filled the deadline.** A retry runs only while the deadline leaves
+  room for its backoff and another full timeout.
+
+An async call (`Prefer: respond-async`) waits up to `ASYNC_MAX_AGE`, 24 hours
+by default. One that no host took in time ends `CANCELED` with
+`expired in the queue before it could run`. Follow an async call with
+`GetInvocation` and the id from the `202` body. The `Location` header names
+`/invocations/<id>`, which the server does not serve.
+
+## Image pull failures
+
+Hosts pull images themselves. A pull that fails turns the version `FAILED`
+with a `statusMessage` such as:
+
+```text
+resolve registry.example.com/team/enrich:1.4.0: GET https://registry.example.com/...: UNAUTHORIZED: ...
+```
+
+| Registry error | Fix |
+|---|---|
+| `UNAUTHORIZED` or `DENIED` | Give the hosts credentials. See [Private registries](/pages/guides/image-function#private-registries) |
+| `MANIFEST_UNKNOWN` or `NAME_UNKNOWN` | The tag or repository does not exist |
+
+An image with no build for the hosts' architecture also fails here. Hosts
+resolve `linux` and their own CPU architecture.
+
+A version that built on one host can still fail to build on another, such as
+one without the same registry credentials. Its invocations there fail with
+`version <n> can no longer be built: <reason>; create a new version`. Give
+every host the same access, then create a new version.
+
+## Secrets are not available
+
+A version whose `spec.secrets` names a secret a host cannot fetch fails each
+attempt with `unavailable`:
+
+```text
+secrets: secret "<name>" is not available
+```
+
+The attempt is retried, and the call answers `503` once retries run out.
+Check that the secret exists for the tenant and that the server has a secret
+provider. See [Secrets](/pages/concepts/secrets).
+
+## Hosts do not start
+
+A host checks its machine before it joins. On failure it logs the reason and
+exits with status 1:
+
+| Log | Fix |
+|---|---|
+| `firecracker driver: kvm: open /dev/kvm: no such file or directory (firecracker needs read-write access to /dev/kvm)` | The node has no KVM. Use bare metal or a VM with nested virtualization, and mount `/dev/kvm` |
+| `firecracker driver: kvm: open /dev/kvm: permission denied (...)` | The process cannot open `/dev/kvm` read-write |
+| `firecracker driver: the host must run as root: ...` | Run the host as root. The chart runs it privileged |
+| `firecracker driver: kernel: ...` | No guest kernel. Set `KERNEL_IMAGE`, or put one at `/var/lib/firecracker/vmlinux-*` |
+
+On Kubernetes, a host pod that stays `Pending` usually has no node with the
+`alchemy.getgalaxy.io/kvm=true` label. See
+[KVM nodes](/pages/deployment/kvm-nodes).
+
+## Idempotency keys
+
+| Status | Message |
+|---|---|
+| `409 aborted` | `idempotency key claimed by another call; retry` |
+| `409 aborted` | `invocation <id> was sent to host <host> and its outcome is unknown; the key is held, use a new key to run again` |
+| `400 failed_precondition` | `idempotency keys need a function logs bucket to keep outputs in` |
+
+See [HTTP invoke](/pages/usage/http) for how keys work.

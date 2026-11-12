@@ -1,0 +1,93 @@
+---
+title: "Prepare KVM nodes"
+sidebarTitle: "KVM nodes"
+description: "Get Kubernetes nodes ready to run Alchemy hosts: KVM, cgroup v2, labels and taints, and resource limits sized for the microVMs."
+---
+
+Hosts boot Firecracker microVMs, so they need KVM. Every node a host runs on must expose `/dev/kvm`. The server needs none of this and runs on any node.
+
+## Node requirements
+
+| Requirement | Why |
+|---|---|
+| `/dev/kvm` | Firecracker runs every microVM on KVM. The host pod mounts the node's `/dev/kvm` as a character device |
+| cgroup v2 at `/sys/fs/cgroup` | Each microVM runs in its own cgroup, capped at its vCPUs. The host refuses to start without cgroup v2 |
+| Privileged pods allowed | The jailer chroots each microVM, makes its device nodes, manages its cgroup and drops it to its own uid |
+
+Bare-metal nodes have KVM. Cloud VMs have it only when the instance type and hypervisor offer nested virtualization and it is enabled. Check from a shell on the node:
+
+```sh
+ls -l /dev/kvm
+stat -fc %T /sys/fs/cgroup   # cgroup2fs on cgroup v2
+```
+
+## Label and taint the nodes
+
+Label the KVM nodes so hosts schedule there, and taint them so nothing else does:
+
+```sh
+kubectl label node <node> alchemy.getgalaxy.io/kvm=true
+kubectl taint node <node> alchemy.getgalaxy.io/kvm=true:NoSchedule
+```
+
+The chart's defaults match:
+
+```yaml
+host:
+  nodeSelector:
+    alchemy.getgalaxy.io/kvm: "true"
+  tolerations:
+    - key: alchemy.getgalaxy.io/kvm
+      operator: Equal
+      value: "true"
+      effect: NoSchedule
+```
+
+For a managed node pool, set the label and taint on the pool, so every node it adds has them. With [host autoscaling](/pages/deployment/autoscaling), the node autoscaler must launch nodes with them too.
+
+Anti-affinity keeps one host per node, and each host is named after its node. `host.affinity` is merged with that rule, so you can add zone or instance-type preferences without losing it.
+
+## How the host isolates microVMs
+
+The host container runs as root with every capability. That privilege is what isolates the microVMs. Each one runs under Firecracker's jailer:
+
+- chrooted into its own directory under the host's data volume,
+- in its own cgroup, with `cpu.max` capped at its vCPUs,
+- as its own unprivileged uid, from a range of 65536 starting at `UID_BASE` (10000000).
+
+An escaped guest lands in a process that sees only its own kernel and root filesystem and cannot signal or read any other microVM. See [Isolation](/pages/concepts/isolation).
+
+## Resources and the memory budget
+
+Guest memory and vCPUs are charged to the host pod, not to the host process. Size `host.resources` for the microVMs a host runs at once.
+
+Two settings bound what a host commits:
+
+| Value | Variable | Default | Effect |
+|---|---|---|---|
+| `host.maxInstances` | `MAX_INSTANCES` | `8` | Instances a host runs at once, busy and warm together. Each is a slot |
+| `host.memoryBudgetMiB` | `MEMORY_BUDGET_MIB` | `0` | Guest memory in MiB a host may commit across its instances. `0` means no limit |
+
+A host with a budget stops its oldest warm instances to make room for a new one, and fails the start when only busy instances are left. Without a budget, nothing stops the microVMs from committing more memory than the pod's limit, and the pod is OOM killed when they do.
+
+Set `host.resources.limits.memory` to cover `host.memoryBudgetMiB` plus the host process on top of it:
+
+```yaml
+host:
+  maxInstances: 8
+  memoryBudgetMiB: 4096
+  resources:
+    requests:
+      cpu: "8"
+      memory: 5Gi
+    limits:
+      memory: 5Gi
+```
+
+When `memoryBudgetMiB` is set and `host.resources` names no memory request or limit, the chart uses the budget as the pod's memory request.
+
+The data volume is an `emptyDir` holding the kernel, the root filesystem cache and the jails. It must be one filesystem, since jails hard-link the kernel and root filesystems. Cap it with `host.data.sizeLimit`. Losing it only means rebuilding on the next invocation.
+
+## Images and registries
+
+Hosts pull function and runtime images themselves, with no container daemon. ECR, Artifact Registry and GCR authenticate with the host ServiceAccount's cloud identity. Other registries are pulled anonymously unless a Docker config on the host carries credentials. `host.image.pullSecrets` applies only to the host image itself.

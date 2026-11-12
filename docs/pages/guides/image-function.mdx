@@ -1,0 +1,149 @@
+---
+title: "Deploy any OCI image"
+sidebarTitle: "Any OCI image"
+description: "Run any OCI image whose entrypoint reads stdin and writes stdout as an Alchemy function, from public or private registries."
+---
+
+Any OCI image can be a function if its process reads one input on stdin,
+writes one output on stdout and exits. No SDK is needed and the image does
+not have to start from an Alchemy runtime. This guide covers what the image
+must do, how hosts pull it, including from private registries, and what its
+size costs.
+
+## What the image must do
+
+| Requirement | Detail |
+|---|---|
+| A command | The image's `Entrypoint` plus `Cmd`, or `spec.command` when set. With neither, the build fails with `image has no Entrypoint or Cmd and spec.command is empty` |
+| Linux on the hosts' architecture | A multi-arch image resolves to `linux` and the host's CPU architecture. A single-arch image must match it |
+| Input on stdin | One JSON value, or one Arrow IPC stream with one record batch, as the contract says |
+| Output on stdout | The same encoding. Anything else written to stdout breaks the contract |
+| Exit 0 on success | A non-zero exit is a crash, reported with the exit status and the last 4 KiB of stderr |
+| Logs on stderr | Streamed to the invocation's log |
+
+Each invocation starts the command as a new process in the image's working
+directory, with the image's `Env` plus `spec.env`. The guest is not a normal
+container host:
+
+- The root filesystem is read-only. `/tmp` and `/run` are writable in-memory
+  filesystems, so what you write there counts against the microVM's memory.
+- An instance is reused for the next call of the same version while it is
+  warm, so files left in `/tmp` and `/run` can still be there on the next
+  call. Do not rely on them either way.
+- The guest has no network interface. A function cannot reach other services,
+  so fetch everything it needs at image build time.
+
+## The spec
+
+An image function's spec has no `source`:
+
+| Field | Purpose |
+|---|---|
+| `image` | The reference, such as `registry.example.com/team/enrich:1.4.0` |
+| `command` | The argv to run instead of the image's `Entrypoint` and `Cmd` |
+| `env` | Variables added on top of the image's. Stored with the version, so not for secrets |
+| `secrets` | Variable name to secret name. The host fetches the values when it runs an invocation. See [Secrets](/pages/concepts/secrets) |
+| `protocol` | Required. `INVOCATION_PROTOCOL_EXEC` is the only protocol implemented |
+| `contract` | A `jsonSchema` or an `arrow` contract. See [Contracts](/pages/concepts/contracts) |
+
+Create the function with the API or the web UI, where you choose **Image** and
+enter the reference:
+
+```sh
+jq -n '{
+  name: "enrich",
+  spec: {
+    image: "registry.example.com/team/enrich:1.4.0",
+    command: ["/usr/local/bin/enrich", "--stdin"],
+    env: {LOG_LEVEL: "info"},
+    protocol: "INVOCATION_PROTOCOL_EXEC",
+    contract: {jsonSchema: {
+      input:  {type: "object", properties: {id: {type: "string"}}, required: ["id"]},
+      output: {type: "object"}
+    }}
+  },
+  timeoutMs: 10000,
+  resources: {vcpus: 1, memoryMib: 256}
+}' | curl -s localhost:8780/functions.v1.FunctionsService/CreateFunction \
+  -H 'Content-Type: application/json' -d @- | jq '{id: .function.id, status: .version.status}'
+```
+
+The version builds on a host, which resolves the tag, records the digest as
+the version's `imageDigest` and always runs that digest. Pushing a new image
+under the same tag changes nothing until you create a new version with
+`CreateFunctionVersion` or **New version** in the UI.
+
+Then invoke it like any function:
+
+```sh
+curl -i localhost:8780/functions/<function-id>/invoke \
+  -H 'Content-Type: application/json' -d '{"id": "abc"}'
+```
+
+## Private registries
+
+Hosts pull images themselves, in process, without a container daemon. For
+each registry they look for credentials in this order:
+
+1. **Docker config.** `config.json` in `$DOCKER_CONFIG`, or `~/.docker` when
+   it is unset, including its credential helpers. Explicit credentials here
+   win over the cloud providers.
+2. **Amazon ECR.** The AWS credential chain of the host process: EKS Pod
+   Identity, IRSA or the instance role.
+3. **Google Artifact Registry and Container Registry.** Application Default
+   Credentials: Workload Identity or the node's service account.
+
+A registry none of them claims is pulled anonymously. On Kubernetes, give the
+host ServiceAccount pull access through workload identity for ECR, Artifact
+Registry or GCR. The Helm chart has no value for a Docker config, so other
+private registries need `DOCKER_CONFIG` and a mounted `config.json` added to
+the host Deployment yourself.
+
+A pull that fails, such as an image that does not exist or credentials the
+registry refuses, fails the version's build. Its `statusMessage` starts with
+`resolve <reference>:` and carries the registry's error. See
+[Troubleshooting](/pages/guides/troubleshooting#image-pull-failures).
+
+<Note>
+  Function images are pulled by hosts, not by Kubernetes, so
+  `imagePullSecrets` on the host pod do not apply to them.
+</Note>
+
+## Image size and start time
+
+A host turns the image into a root filesystem once per image digest:
+
+1. It resolves the reference and pulls the image's layers.
+2. It flattens them into an ext4 file with the supervisor inside, plus 64 MiB
+   of free space for runtime caches. The version reports its size as
+   `rootfsBytes`.
+3. It boots a microVM on it and snapshots it.
+
+The root filesystem is cached on the host under `DATA_DIR` and shared by every
+version on the same digest. One host builds it when the version is created,
+and every other host builds it the first time it takes an invocation of the
+version. That first call on each host pays for the pull and the flattening,
+so a larger image makes it slower and takes more disk on every host.
+
+After that, size matters little. An invocation runs on a warm instance of the
+version when one is idle, or restores the version's snapshot. The cost that
+remains on every call is starting the process, which is why an interpreter
+with heavy imports is slower per call than a static binary. Each invocation
+reports how its microVM started as `startKind`: `START_KIND_WARM`,
+`START_KIND_SNAPSHOT_RESTORE` or `START_KIND_COLD_BOOT`.
+
+To keep images small, start from a slim base such as the Alchemy runtimes or
+`static:13`, and leave build tools in a separate build stage as the
+[Go](/pages/guides/go-function) and [Rust](/pages/guides/rust-function)
+examples do.
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="Runtimes and builds" icon="hammer" href="/pages/concepts/runtimes-and-builds">
+    The full build path from spec to snapshot.
+  </Card>
+  <Card title="Isolation" icon="shield" href="/pages/concepts/isolation">
+    What separates one microVM from another and from the host.
+  </Card>
+</CardGroup>

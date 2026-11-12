@@ -1,0 +1,67 @@
+---
+title: "Hosts API"
+sidebarTitle: "Hosts"
+description: "List the live KVM hosts and the microVM instances they are running right now."
+---
+
+Hosts are the KVM processes that build artifacts and run microVMs. Nothing
+here is persisted: the server answers from the heartbeats hosts publish over
+NATS and from asking every host directly. These RPCs are on
+`functions.v1.FunctionsService`, with messages in
+`protos/functions/v1/host.proto`. See
+[Architecture](/pages/concepts/architecture) for how hosts and servers
+talk.
+
+## RPCs
+
+| RPC | Description |
+|---|---|
+| `ListInstances` | Ask every host for the microVMs it runs, in the caller's tenant |
+| `ListHosts` | List every live host |
+| `GetHost` | Return the first live host by hostname |
+
+## ListInstances
+
+Takes an optional `function_id`. Empty lists every function's instances. The
+server asks every host over NATS and gathers the replies that arrive within
+500ms, so a slow host can be missing from one response. Instances belong to
+the caller's tenant only, ordered by `started_at`. If the request cannot be
+sent, the call is `unavailable`.
+
+| `Instance` field | Meaning |
+|---|---|
+| `id` | The microVM's id |
+| `function_id`, `version` | What it runs |
+| `status` | `BOOTING`, `READY`, `BUSY` or `RELEASING` |
+| `start_kind` | `COLD_BOOT`, `SNAPSHOT_RESTORE` or `WARM` |
+| `started_at` | Epoch milliseconds |
+| `invocation_id` | The invocation it serves, while `BUSY` |
+| `vcpus`, `memory_mib` | Its size |
+| `artifact_id` | The built artifact it booted from |
+| `host` | The host it runs on |
+| `tenant_id` | Its tenant |
+
+Instances die with the host process.
+
+## ListHosts
+
+Takes no fields. Returns every host that heartbeated within the last 10
+seconds, sorted by hostname. Hosts are shared by every tenant of the
+deployment, so the list is not tenant-scoped.
+
+| `Host` field | Meaning |
+|---|---|
+| `hostname` | The host's name |
+| `started_at` | When the host process started, epoch milliseconds |
+| `slots` | How many invocations may hold an instance at once |
+| `slots_in_use` | How many do right now |
+| `memory_mib_committed` | Guest memory of all live instances |
+| `firecracker_version` | The Firecracker binary's version |
+| `kernel` | The guest kernel |
+| `rootfs_cache_bytes`, `rootfs_cache_images` | The size and count of cached root filesystems |
+
+## GetHost
+
+Takes no fields. Returns the first live host by hostname, or `unavailable`
+when no host is live. It predates multiple hosts and `ListHosts` supersedes
+it.

@@ -1,0 +1,90 @@
+---
+title: "Install Alchemy"
+sidebarTitle: "Installation"
+description: "Install Alchemy on Kubernetes with the Helm chart and the published server, host and runtime images, and verify their attestations."
+---
+
+Kubernetes with Helm is the recommended way to run Alchemy. Hosts need
+`/dev/kvm`, so they run on bare-metal nodes or on VMs with nested
+virtualization. The server runs anywhere. To run Alchemy on your own machine
+from source, follow the [Quickstart](/pages/get-started/quickstart)
+instead.
+
+## Helm chart
+
+Every release publishes the chart to `oci://ghcr.io/galaxy-io/charts/alchemy`.
+The chart's version matches the release, and it deploys the server and host
+images of that same version.
+
+Alchemy needs a PostgreSQL DSN, a NATS URL and an encryption key for tenant
+secrets. Put them in a Secret and point the chart at it:
+
+```sh
+kubectl create secret generic alchemy-runtime \
+  --from-literal=PERSISTENCE_DSN='postgresql://USER:PASSWORD@HOST:5432/alchemy?sslmode=require' \
+  --from-literal=NATS_URL='nats://nats.example.com:4222' \
+  --from-literal=ENCRYPTION_KEY="$(openssl rand -base64 32)"
+
+helm upgrade --install alchemy oci://ghcr.io/galaxy-io/charts/alchemy \
+  --set existingSecret=alchemy-runtime
+```
+
+Without `--version`, Helm installs the newest release. NATS must have
+JetStream enabled with file and memory storage and a `max_payload` above
+8 MiB. See [Storage](/pages/deployment/storage).
+
+Before the hosts can schedule, label and taint the KVM nodes. The chart's
+hosts select and tolerate `alchemy.getgalaxy.io/kvm=true` by default:
+
+```sh
+kubectl label node <node> alchemy.getgalaxy.io/kvm=true
+kubectl taint node <node> alchemy.getgalaxy.io/kvm=true:NoSchedule
+```
+
+[Kubernetes](/pages/deployment/kubernetes) covers the chart in full,
+including the vendored PostgreSQL and NATS for test clusters, and
+[KVM nodes](/pages/deployment/kvm-nodes) covers preparing the nodes.
+
+## Container images
+
+The images live under `ghcr.io/galaxy-io/alchemy`:
+
+| Image | Purpose |
+|---|---|
+| `ghcr.io/galaxy-io/alchemy/server` | API, invoke endpoint and the embedded web UI |
+| `ghcr.io/galaxy-io/alchemy/host` | Host process, Firecracker and its jailer, a guest kernel and the supervisor |
+| `ghcr.io/galaxy-io/alchemy/runtime/python:3.13` | Python runtime with the Arrow library |
+| `ghcr.io/galaxy-io/alchemy/runtime/node:24` | Node runtime for TypeScript and JavaScript functions |
+| `ghcr.io/galaxy-io/alchemy/runtime/static:13` | Distroless Debian 13 for a function that is one static binary |
+| `ghcr.io/galaxy-io/alchemy/runtime/go:1.27` | Runs a Go function built from source, which `go:1.27-build` compiles |
+| `ghcr.io/galaxy-io/alchemy/runtime/rust:1.99` | Runs a Rust function built from source, which `rust:1.99-build` compiles |
+
+The server and host images are tagged with the release version, such as
+`0.0.1`, and with `sha-<commit>`. Use the same version for both. The chart
+defaults their tags to its own app version.
+
+The runtime images are published apart from releases, whenever one changes
+on `main`. Each carries its language version as its tag, plus that version
+with a hash of the runtime's source tree. Point the chart's
+`runtimes.imagePrefix` at a registry of your own to serve the runtimes from
+there. See [Runtimes and builds](/pages/concepts/runtimes-and-builds).
+
+## Verify a release
+
+The chart and every published image carry a build provenance attestation.
+Verify them with the GitHub CLI:
+
+```sh
+gh attestation verify --owner galaxy-io oci://ghcr.io/galaxy-io/charts/alchemy:<version>
+gh attestation verify --owner galaxy-io oci://ghcr.io/galaxy-io/alchemy/server:<version>
+gh attestation verify --owner galaxy-io oci://ghcr.io/galaxy-io/alchemy/host:<version>
+```
+
+## Next steps
+
+- [Deployment overview](/pages/deployment/overview) to choose how to
+  size and run the server and hosts.
+- [Configuration](/pages/deployment/configuration) for every
+  environment variable the server and host read.
+- [Authentication](/pages/deployment/authentication) to put the API
+  behind an identity provider.

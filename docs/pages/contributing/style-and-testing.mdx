@@ -1,0 +1,109 @@
+---
+title: "Style and testing"
+sidebarTitle: "Style & testing"
+description: "How Alchemy is formatted, linted and tested, how proto and migration changes are checked, and how pull request titles drive releases."
+---
+
+## Formatting and linting
+
+The check variant of each recipe is a mode argument, not a separate recipe:
+
+```sh
+just format          # fix formatting: Go, UI and proto
+just format check    # verify without writing
+just lint            # run the Go and UI linters with --fix
+just lint check      # verify without fixing
+```
+
+| Area | Tool | Configuration |
+|---|---|---|
+| Go formatting | `gofumpt` and `goimports` through `golangci-lint fmt` | `.golangci.yaml` |
+| Go linting | `golangci-lint`, run once with `GOOS=linux` and once with `GOOS=darwin` | `.golangci.yaml` |
+| UI | Biome | `ui/biome.json` |
+| Protobuf | `buf format` and `buf lint` | `buf.yaml` |
+
+Go linting runs for both operating systems so files built only on Linux, such
+as the supervisor's guest code, are checked too. `buf lint` runs through
+`just proto-lint`.
+
+## Testing
+
+```sh
+just test
+```
+
+`just test` runs `go test ./...` in every Go module with `GOWORK=off`. The
+tests are unit tests. They need no KVM, Docker, PostgreSQL or NATS, so they
+run the same on a Mac as in CI.
+
+To see a change work end to end, run the stack with `just dev` and invoke a
+function, as in the [Quickstart](/pages/get-started/quickstart).
+
+The UI's checks run together:
+
+```sh
+just ui-check
+```
+
+It type-checks the app and the library, runs Biome, builds the standalone
+app and the `@galaxy-io/alchemy-ui` module, checks the package with `publint`,
+builds the fixture host against it, and fails if the committed route tree is
+out of date.
+
+## What CI runs
+
+| Check | Runs when | What it does |
+|---|---|---|
+| Build | Every pull request | `go build ./...` for Linux |
+| Unit tests | Every pull request | `just test` |
+| Go lint | Go files, `go.mod`, `.golangci.yaml` or the justfile change | `just go-lint check` and `just go-format check` |
+| UI | `ui/`, `protos/` or the justfile change | `just ui-check` |
+| Chart | `charts/` changes | `helm lint`, `helm template` across the main value combinations, `helm package` |
+| Migrations | A migration changes | Validates with goose and checks the rules below |
+| PR title | Every pull request | Enforces Conventional Commits |
+
+## Changing protos
+
+The protos in `protos/` drive both the Go API and the UI's types. After a
+change, regenerate both and commit the output:
+
+```sh
+just proto     # Go stubs into api/
+just ui-gen    # TypeScript clients into ui/src/gen/
+```
+
+`just proto-check` fails if `api/` is out of date. The UI job in CI runs on
+any change under `protos/`, so a proto change without a fresh `ui/src/gen/`
+shows up there. A new service also needs a proxy entry in
+`ui/vite.config.ts`.
+
+## Changing the database
+
+Migrations live in `datastore/postgres/migrations` and run when the server
+starts. CI holds them to three rules:
+
+- They pass `goose validate`.
+- Versions are unique and contiguous from `00001`.
+- A shipped migration is never modified, renamed or deleted. Add a new one.
+
+After changing a migration or a query, run `just sqlc` and commit
+`datastore/postgres/sqlcgen`.
+
+## Pull request titles and releases
+
+Pull requests squash-merge with the title as the commit message, so the title
+must follow [Conventional Commits](https://www.conventionalcommits.org), such
+as `feat(api): ...`, `fix(host): ...` or `chore(tests): ...`. A check on every
+pull request enforces the format.
+
+Release Please reads those commits on `main` and keeps a release pull request
+open for each component:
+
+| Component | Tag | What a release publishes |
+|---|---|---|
+| Alchemy | `v<version>` | The server and host images, then the Helm chart, whose version and app version Release Please bumps to match |
+| `alchemy-ui` | `alchemy-ui-<version>` | `@galaxy-io/alchemy-ui` to npm, after `just ui-check` passes |
+
+Before 1.0, a breaking change bumps the minor version, not the major. Changes under `examples/` do not
+release Alchemy. The runtime images are not part of a release: they publish
+whenever something under `runtimes/` changes on `main`.

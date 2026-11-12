@@ -1,0 +1,120 @@
+---
+title: "Runtimes and builds"
+sidebarTitle: "Runtimes and builds"
+description: "How an OCI image or a set of source files becomes a root filesystem and a snapshot a host can boot, and how the runtime images are published."
+---
+
+Every version runs an OCI image. There are three ways to give it one:
+
+- **An image function** names any image whose entrypoint reads its input on
+  stdin and writes its output on stdout.
+- **A source function on an interpreted runtime** sends its files, and Alchemy
+  lays them over the Python or Node runtime image.
+- **A source function on a compiled runtime** sends its Go or Rust files, and
+  Alchemy compiles them once before laying the result over the runtime image.
+
+## Runtime images
+
+Alchemy publishes one runtime image per language, built from `runtimes/` in the
+repository, under `ghcr.io/galaxy-io/alchemy/runtime`.
+
+| Image | Base | Runs |
+|---|---|---|
+| `python:3.13` | `python:3.13-slim` with pyarrow | `python /app/handler.py` |
+| `node:24` | `node:24-alpine` with apache-arrow | `node /app/handler.ts` |
+| `go:1.27` | distroless static Debian 13 | `/app/handler` |
+| `rust:1.99` | distroless static Debian 13 | `/app/handler` |
+| `static:13` | distroless static Debian 13 | `/app/handler` |
+
+`go:1.27-build` and `rust:1.99-build` are the matching build images. They hold
+the toolchain and the Arrow library with their dependencies already fetched, so
+a compile runs offline.
+
+## Source builds
+
+A spec with `source` carries the files of one handler, not its dependencies,
+which come from the runtime image. Nothing is installed at build time.
+
+| Limit | Value |
+|---|---|
+| Files | 64 |
+| Total size | 1 MiB |
+| Path | Relative, clean, unique, at most 255 bytes |
+
+The server packs the files into a tar under `app/`, sorted by path with fixed
+timestamps and modes, so the same files always give the same digest. It keeps
+the archive in the artifacts bucket (`ARTIFACTS_BUCKET`) at
+`<tenant>/layers/<sha256>.tar` and leaves the spec naming the archive, with each
+file's path and size but not its content. A server without an artifacts bucket
+refuses a `source` with `FAILED_PRECONDITION`.
+
+## Compiled runtimes
+
+When `spec.image` is the Go or Rust runtime, the server compiles the source
+first, once for every host that will run the version:
+
+1. It asks the least busy live host to run the build image over the source, in
+   a microVM of its own with 2 vCPUs, 2048 MiB and a 3 minute timeout.
+2. The build image writes a tar of the compiled files to stdout, and everything
+   else to stderr, which becomes the build log.
+3. The host keeps the tar in the artifacts bucket at
+   `<tenant>/compiled/<key>.tar`, where the key is a digest of the build image
+   reference and the source's digest.
+4. The version gets the compiled layer in place of its source.
+
+The same files on the same build image compile once per tenant. A compile that fails fails
+the version, with the compiler's output in `build_log`.
+
+## Image functions
+
+Any OCI image works. `command` replaces the image's `Entrypoint` and `Cmd`, and
+`env` is added on top of its `Env`. A multi-arch image resolves to the host's
+architecture.
+
+Hosts find registry credentials in the Docker config first, then through the
+AWS and GCP providers for their own registries, and pull anonymously otherwise.
+
+## What a build makes
+
+A build turns a version into an **artifact** on one host:
+
+1. The host resolves the image to its digest and flattens it into a read-only
+   ext4 root filesystem with the supervisor inside. It is cached by image digest
+   and shared by every version on that image.
+2. When the version has layers, the host extracts them into a second read-only
+   ext4 drive, cached by the layers' digests. The guest overlays it on the root
+   filesystem at boot.
+3. The host boots the microVM once and snapshots it. See
+   [Isolation](/pages/concepts/isolation).
+
+No container daemon is involved. Firecracker only sees the two ext4 files.
+
+When a version is created, the server sends its build to the least busy live
+host, and the version is `READY` once that host is done. Every other host builds
+the artifact itself the first time it takes one of the version's invocations,
+from the image pinned to its digest, so a tag that moved since never changes
+what runs. Invocations that arrive during that build wait for it.
+
+The artifact's id hashes the version and everything that went into it: the
+image digest, the command, `env`, the layers, the resources and the secret names.
+A change of the function's resources is a new artifact.
+
+Hosts keep the newest 2 versions of each function built (`KEPT_VERSIONS`). An
+older version that goes 24 hours without an invocation (`VERSION_IDLE_TTL`) is
+dropped with its snapshot and drives, and the next invocation builds it again.
+
+## How runtime images are published
+
+`.github/workflows/runtimes.yaml` runs on every push to `main` that touches
+`runtimes/`. For each runtime it computes a tag of the version and the git tree
+hash of the runtime's directory, such as `3.13-<treehash>`.
+
+- When that tag is already published, the runtime has not changed and nothing
+  is built.
+- Otherwise the image is built and pushed as both `<version>` and
+  `<version>-<treehash>`, with a build provenance attestation.
+
+A manual run with `force` rebuilds every runtime. A function that needs a
+runtime to stay fixed can name the `<version>-<treehash>` tag, while
+`<version>` follows the latest build. Either way a version runs the digest it
+resolved at build time.

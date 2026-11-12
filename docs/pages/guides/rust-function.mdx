@@ -1,0 +1,274 @@
+---
+title: "Write a Rust function"
+sidebarTitle: "Rust"
+description: "Deploy a Rust handler as source that a host compiles on the rust:1.99 runtime, or as a static binary on the static:13 image, and invoke it."
+---
+
+A Rust function is a static binary that reads its input on stdin and writes
+its output on stdout. Alchemy runs it two ways:
+
+- **From source.** You send `main.rs`. A host compiles it in a microVM on the
+  `rust:1.99-build` image and the version runs the binary on `rust:1.99`.
+- **As an image.** You compile the binary yourself and copy it into an image
+  on `static:13`.
+
+The commands assume a server on `localhost:8780` with no auth, as in the
+[Quickstart](/pages/get-started/quickstart). With auth enabled, add
+`-H "Authorization: Bearer $TOKEN"` to every call.
+
+## The Rust runtime
+
+| Image | What it is |
+|---|---|
+| `<imagePrefix>/rust:1.99` | Distroless static Debian 13 that runs `/app/handler` |
+| `<imagePrefix>/rust:1.99-build` | `rust:1.99-alpine` with the crate's dependencies compiled |
+| `<imagePrefix>/static:13` | The same distroless base, for binaries built elsewhere |
+
+The default prefix is `ghcr.io/galaxy-io/alchemy/runtime`, set by the server's
+`RUNTIME_IMAGE_PREFIX`. Ask the server for the exact image:
+
+```sh
+curl -s localhost:8780/functions.v1.FunctionsService/ListRuntimes \
+  -H 'Content-Type: application/json' -d '{}' \
+  | jq -r '.runtimes[] | select(.id == "rust") | .image'
+```
+
+Compiles run offline with `cargo build --release --offline`. Your files land
+in a crate named `handler`, edition 2024, whose binary is built from
+`main.rs`. Its dependencies are fixed:
+
+| Crate | Version | Features |
+|---|---|---|
+| `arrow` | 60 | `ipc` only |
+| `serde` | 1 | `derive` |
+| `serde_json` | 1 | default |
+
+A function that needs other crates ships as an [image](#deploy-as-an-image).
+
+## The protocol
+
+For each invocation the supervisor starts `/app/handler` as a new process,
+writes the input to stdin and closes it, takes stdout as the output and
+streams stderr to the invocation's log. A non-zero exit, including a panic,
+is a crash, reported with the exit status and the last 4 KiB of stderr. A
+JSON Schema contract passes one JSON value each way, an Arrow contract one IPC
+stream with exactly one record batch. See
+[Contracts](/pages/concepts/contracts).
+
+## Write a handler
+
+The runtime's JSON Schema starter:
+
+```rust main.rs
+use std::error::Error;
+use std::io;
+use std::process;
+
+use serde_json::Value;
+
+fn handler(event: Value) -> Result<Value, Box<dyn Error>> {
+    Ok(event)
+}
+
+fn main() {
+    if let Err(err) = run() {
+        eprintln!("{err}");
+        process::exit(1);
+    }
+}
+
+fn run() -> Result<(), Box<dyn Error>> {
+    let event: Value = serde_json::from_reader(io::stdin().lock())?;
+    let output = handler(event)?;
+    serde_json::to_writer(io::stdout().lock(), &output)?;
+    Ok(())
+}
+```
+
+The Arrow starter has the same shape around `RecordBatch`:
+
+```rust main.rs
+use std::error::Error;
+use std::io;
+use std::process;
+
+use arrow::ipc::reader::StreamReader;
+use arrow::ipc::writer::StreamWriter;
+use arrow::record_batch::RecordBatch;
+
+fn handler(batch: RecordBatch) -> Result<RecordBatch, Box<dyn Error>> {
+    Ok(batch)
+}
+
+fn main() {
+    if let Err(err) = run() {
+        eprintln!("{err}");
+        process::exit(1);
+    }
+}
+
+fn run() -> Result<(), Box<dyn Error>> {
+    let mut reader = StreamReader::try_new(io::stdin().lock(), None)?;
+    let batch = reader.next().ok_or("input holds no record batch")??;
+    let output = handler(batch)?;
+    let mut writer = StreamWriter::try_new(io::stdout().lock(), &output.schema())?;
+    writer.write(&output)?;
+    writer.finish()?;
+    Ok(())
+}
+```
+
+The output batch must have as many rows as the input, in the same order.
+[`examples/embed/rust`](https://github.com/galaxy-io/alchemy/tree/main/examples/embed/rust)
+is a complete Arrow function that returns the cleaned text, its token count
+and a 64-dimension embedding per row. It is a standalone crate on `arrow` 57,
+built as an image below.
+
+The Arrow contract's schemas are serialized Arrow IPC. Build them as in the
+[Python guide](/pages/guides/python-function), which writes `arrow.json` for
+the embed example, or define the fields in the web UI.
+
+## Deploy from source
+
+A source version names `rust:1.99` as its image and carries `main.rs`. When
+the version builds, the server compiles it first:
+
+1. The least busy host boots `rust:1.99-build` in a microVM of its own, with
+   2 vCPUs and 2 GiB, or the host's whole memory budget when that is smaller.
+2. The build image copies your files into the crate and runs
+   `cargo build --release --offline`. The compiler's output is the build log.
+3. The host stores the binary as a layer in the artifacts bucket, and the
+   version is built from `rust:1.99` with that layer at `/app/handler`.
+
+A compile has 3 minutes. Its result is kept by build image and source digest,
+so the same files on the same build image compile once.
+
+<Steps>
+  <Step title="Create the function">
+    <CodeGroup>
+    ```text Web UI
+    1. Click New function.
+    2. Choose Code and pick Rust 1.99 as the language.
+    3. Define the contract.
+    4. Replace the starter with your main.rs.
+    5. Set resources and limits, name the function and click
+       Create function.
+    ```
+
+    ```sh API
+    IMAGE=$(curl -s localhost:8780/functions.v1.FunctionsService/ListRuntimes \
+      -H 'Content-Type: application/json' -d '{}' \
+      | jq -r '.runtimes[] | select(.id == "rust") | .image')
+
+    jq -n --arg image "$IMAGE" --rawfile src main.rs '{
+      name: "echo-rust",
+      spec: {
+        image: $image,
+        protocol: "INVOCATION_PROTOCOL_EXEC",
+        contract: {jsonSchema: {input: {type: "object"}, output: {type: "object"}}},
+        source: {files: [{path: "main.rs", content: ($src | @base64)}]}
+      }
+    }' | curl -s localhost:8780/functions.v1.FunctionsService/CreateFunction \
+      -H 'Content-Type: application/json' -d @- | jq '{id: .function.id, status: .version.status}'
+    ```
+    </CodeGroup>
+
+    Modules declared with `mod` in `main.rs` can be sent as more `.rs`
+    files next to it. Do not send a `Cargo.toml` or `Cargo.lock`: they
+    replace the crate's, and a dependency the build image has not compiled
+    fails the offline build.
+  </Step>
+  <Step title="Wait for the build">
+    ```sh
+    curl -s localhost:8780/functions.v1.FunctionsService/GetFunctionVersion \
+      -H 'Content-Type: application/json' \
+      -d '{"functionId": "<function-id>", "version": 1}' \
+      | jq -r '.version | .status, .statusMessage, .buildLog'
+    ```
+
+    A compile error fails the version. `statusMessage` starts with
+    `compile failed:` and `buildLog` holds cargo's output.
+  </Step>
+</Steps>
+
+<Warning>
+  Only the exact image `ListRuntimes` returns is compiled. A source on any
+  other reference to the Rust runtime is laid over the image uncompiled, and
+  every invocation crashes because `/app/handler` does not exist.
+</Warning>
+
+## Deploy as an image
+
+Build the binary yourself for other crates or build settings. The embed
+example builds against musl and copies the binary onto `static:13`:
+
+```dockerfile Dockerfile
+FROM rust:1-alpine AS build
+RUN apk add --no-cache musl-dev
+WORKDIR /src
+COPY Cargo.toml Cargo.lock ./
+COPY src ./src
+RUN cargo build --release --locked
+
+FROM ghcr.io/galaxy-io/alchemy/runtime/static:13
+COPY --from=build /src/target/release/embed /app/handler
+```
+
+`static:13` has no libc, so the binary must be fully static, which the
+Alpine (musl) toolchain gives by default. Build for the hosts' architecture
+and push:
+
+```sh
+docker build --platform linux/amd64 -t registry.example.com/embed-rust:1 examples/embed/rust
+docker push registry.example.com/embed-rust:1
+```
+
+Create the function with that image and no `source`:
+
+```sh
+jq -n --slurpfile arrow arrow.json '{
+  name: "embed-rust",
+  spec: {
+    image: "registry.example.com/embed-rust:1",
+    protocol: "INVOCATION_PROTOCOL_EXEC",
+    contract: {arrow: $arrow[0]}
+  }
+}' | curl -s localhost:8780/functions.v1.FunctionsService/CreateFunction \
+  -H 'Content-Type: application/json' -d @- | jq '{id: .function.id, status: .version.status}'
+```
+
+See [Deploy any OCI image](/pages/guides/image-function) for private
+registries.
+
+## Invoke it
+
+POST the input with the contract's content type:
+
+<CodeGroup>
+```sh JSON
+curl -i localhost:8780/functions/<function-id>/invoke \
+  -H 'Content-Type: application/json' -d '{"hello": "world"}'
+```
+
+```sh Arrow
+curl -s localhost:8780/functions/<function-id>/invoke \
+  -H 'Content-Type: application/vnd.apache.arrow.stream' \
+  --data-binary @input.arrows -o output.arrows
+```
+</CodeGroup>
+
+Write `input.arrows` as in the [Python guide](/pages/guides/python-function).
+The response carries `Alchemy-Invocation-Id` and `Alchemy-Version`. A handler
+that panics or exits non-zero answers `500`, and one past its timeout `504`.
+See [HTTP invoke](/pages/usage/http).
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="Troubleshooting" icon="wrench" href="/pages/guides/troubleshooting">
+    Read compile failures, crashes and contract violations.
+  </Card>
+  <Card title="Runtimes and builds" icon="hammer" href="/pages/concepts/runtimes-and-builds">
+    How a spec becomes a root filesystem and a snapshot.
+  </Card>
+</CardGroup>

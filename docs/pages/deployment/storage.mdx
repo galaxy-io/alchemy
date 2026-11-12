@@ -1,0 +1,96 @@
+---
+title: "PostgreSQL, NATS and buckets"
+sidebarTitle: "Storage"
+description: "What Alchemy keeps in PostgreSQL, NATS JetStream and its two buckets, what each one needs, and how to set them up."
+---
+
+Alchemy keeps state in four places. PostgreSQL holds what must last. NATS JetStream carries everything between servers and hosts and keeps it until it is written or no longer needed. Two buckets hold function logs and build layers.
+
+| Store | Holds | Who needs it |
+|---|---|---|
+| PostgreSQL | Functions, versions, tenants, users, finished invocation records, idempotency keys, and tenant secrets with the `datastore` provider | Server |
+| NATS JetStream | The invoke queue and its payloads, invocation records not yet written, recent function logs | Server and hosts |
+| Function logs bucket | One gzipped log per invocation, and outputs kept for idempotent replays | Hosts write, server reads |
+| Artifacts bucket | Build layers, such as a function's source files | Server writes, hosts read |
+
+## PostgreSQL
+
+Give the server a database and a user that owns it, and pass the DSN as `PERSISTENCE_DSN`:
+
+```text
+postgresql://USER:PASSWORD@HOST:5432/alchemy?sslmode=require
+```
+
+Every server applies migrations when it starts, before it listens. Migrations take a PostgreSQL session lock, so servers starting together apply them one at a time and the rest wait. There is no separate migration step. The user needs the rights to create and alter tables in its schema.
+
+Nothing is written to PostgreSQL while an invocation runs. A call reads its function and version, hosts publish each invocation's record to NATS when it ends, and servers write records in batches. The one write a call makes is the claim on its idempotency key, and only keyed calls make it. Hosts never connect to PostgreSQL.
+
+## NATS
+
+Alchemy needs a NATS server or cluster with JetStream enabled. Two settings are required:
+
+| Setting | Why |
+|---|---|
+| `max_payload` above 8 MiB | Queue and result messages carry inputs and outputs up to 8 MiB inline. Larger ones go through the queue's object store. The chart and the vendored NATS use `64MB` |
+| JetStream file and memory storage | The queue and records live on disk, recent logs in memory |
+
+The servers create every stream and bucket they use on start, and bring existing ones to the configured settings. Hosts that start first wait for them.
+
+| Stream or bucket | Storage | Kept for |
+|---|---|---|
+| Invoke queue, its object store and attempt counts | File | `max(INVOKE_MAX_DEADLINE, ASYNC_MAX_AGE)` plus 10 minutes |
+| Concurrency leases | File | Until released |
+| Invocation records | File | `INVOCATION_STREAM_RETENTION` (24 hours), or until a server writes them |
+| Function logs | Memory | `LOGS_RETENTION` (1 hour), capped at `LOGS_MAX_BYTES` (1 GiB) |
+
+Inputs and outputs over 8 MiB go through the queue's object store instead of the message itself.
+
+Size JetStream file storage for the queue at its deepest, plus a day of invocation records at your call rate. Size memory storage to cover `LOGS_MAX_BYTES`. The vendored NATS chart sets 10Gi of file storage and 1Gi of memory.
+
+`INVOKE_QUEUE_REPLICAS` and `INVOCATION_STREAM_REPLICAS` set how many NATS servers keep each queued invocation and each record. Both default to 1. Raise them on a NATS cluster so a lost NATS server loses no work.
+
+<Note>
+The function logs stream is in memory on purpose. The bucket is the lasting copy, so a NATS restart loses only what a live view would show.
+</Note>
+
+## Buckets
+
+Both buckets take a URL. Use an S3 or GCS bucket:
+
+```text
+s3://BUCKET?region=REGION
+gs://BUCKET
+```
+
+S3-compatible stores work with the S3 URL options, such as `endpoint=` and `use_path_style=true`, as the local development stack does with RustFS.
+
+The server and hosts reach the buckets through their ServiceAccounts' cloud identity, IRSA or Pod Identity on AWS and Workload Identity on GCP. Annotate `server.serviceAccount.annotations` and `host.serviceAccount.annotations`. Neither bucket needs public access.
+
+### Function logs
+
+Set `functionLogs.bucket` (`LOGS_BUCKET`) on the server and hosts. Hosts need write access and the server read access.
+
+While an invocation runs, its host sends the log to NATS so the UI can follow it live, and uploads the whole log to the bucket as one gzipped object:
+
+```text
+<tenant>/<function>/<YYYY>/<MM>/<DD>/<invocation>.log.gz
+```
+
+The date is the day the invocation was created, in UTC. Each retried attempt after the first gets its own object, `<invocation>.<attempt>.log.gz`. The log appears when the invocation ends, and after that it is read from the bucket.
+
+The same bucket keeps the output of every call with an idempotency key, as `<invocation>.out`, so a retry can replay it. Without a bucket, logs last only as long as NATS keeps them and sync calls with an idempotency key are refused.
+
+Older logs move to colder storage through the bucket's own lifecycle rules. Add two:
+
+- Transition objects to Glacier (S3) or Archive (GCS) after as long as you want logs to stay quick to read. Keep it past `server.idempotencyWindow` (24 hours), so replayed outputs stay readable.
+- Abort incomplete multipart uploads after a day. A host that dies mid-invocation leaves its upload incomplete, and S3 charges for the parts until it is aborted.
+
+### Artifacts
+
+Set `artifacts.bucket` (`ARTIFACTS_BUCKET`) on the server and hosts. The server needs write access and hosts read access.
+
+A build can extract layers over a function's image: tar archives kept in this bucket, each checked against its digest. They are how a function built from source reaches its root filesystem. The server writes the function's files as one archive, and the hosts that build the version read it. Without a bucket, functions are built from images only.
+
+<Warning>
+Give the artifacts bucket no expiry rule. A version uses its layers for as long as it exists. Keep it separate from the function logs bucket, whose lifecycle rules do expire objects.
+</Warning>

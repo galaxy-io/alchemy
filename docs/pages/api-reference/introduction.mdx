@@ -1,0 +1,162 @@
+---
+title: "API reference overview"
+sidebarTitle: "Overview"
+description: "Call the Alchemy API over ConnectRPC, with its protocols, authentication, tenancy, pagination and error codes."
+---
+
+Alchemy's API is [ConnectRPC](https://connectrpc.com), generated from the
+protobuf definitions in `protos/functions/v1/` and `protos/metrics/v1/`.
+The server mounts three services on one listener:
+
+| Service | What it covers |
+|---|---|
+| `functions.v1.FunctionsService` | Functions, versions, runtimes, invocations, logs and hosts |
+| `metrics.v1.MetricsService` | Read-only aggregations over invocations, and the live queue |
+| `auth.v1.AuthService` | Sign-in, members and service accounts, from `github.com/galaxy-io/modules/identity` |
+
+The built-in web UI and the `@galaxy-io/alchemy-ui` module call this same API.
+
+Every RPC has a Connect HTTP POST route at `/<package.Service>/<Method>`:
+
+```
+POST /functions.v1.FunctionsService/CreateFunction
+POST /metrics.v1.MetricsService/QueryTimeseries
+```
+
+The `server` binary listens on `ADDR` (default `:8780`). The same listener also
+serves the plain HTTP invoke endpoint, `/healthz`, `/scaling` and the web UI,
+described in [HTTP endpoints](/pages/api-reference/http).
+
+## Protocols
+
+The server accepts HTTP/1.1 and unencrypted HTTP/2 (h2c) on the same plaintext
+port, so all three ConnectRPC wire protocols work against it directly.
+
+| Protocol | Works out of the box |
+|---|---|
+| Connect (JSON or binary) | Yes |
+| gRPC-Web | Yes |
+| gRPC | Yes, over h2c |
+
+A proxy in front of the server must speak HTTP/2 to it for plain gRPC to pass
+through.
+
+The Connect protocol is JSON over POST, so any HTTP client works for unary
+RPCs. Field names are lowerCamelCase in JSON, and `bytes` fields such as
+`input` are base64:
+
+```sh
+curl -X POST http://localhost:8780/functions.v1.FunctionsService/Invoke \
+  -H "Content-Type: application/json" \
+  -H "Connect-Protocol-Version: 1" \
+  -d '{"functionId": "<function-id>", "input": "eyJpZCI6ImFiYyJ9"}'
+```
+
+Here `input` is `{"id":"abc"}` in base64. The streaming RPCs,
+`GetInvocationLogs` and `TailInvocations`, use Connect's streaming envelope and
+need a Connect, gRPC or gRPC-Web client. For invoking from scripts, the
+[HTTP invoke endpoint](/pages/api-reference/http) takes the raw
+input as the body instead.
+
+Unary calls may set a deadline with `Connect-Timeout-Ms` (or `grpc-timeout`).
+`Invoke` waits for its result until that deadline, capped at
+`INVOKE_MAX_DEADLINE` (default 1 hour), or `INVOKE_DEADLINE` (default 5
+minutes) when the call sets none.
+
+## Authentication
+
+With `AUTH_PROVIDER` unset, the API is unauthenticated and every request runs
+in the default tenant. Keep such deployments private or protect them at the
+network layer.
+
+With a provider configured, every RPC requires a caller except the
+`AuthService` session procedures: `GetAuthConfig`, `Login`, `GetToken`,
+`Logout`, `Register` and `AcceptInvite`. How the caller is read depends on the
+provider:
+
+| `AUTH_PROVIDER` | Credentials |
+|---|---|
+| `zitadel`, `keycloak` | `Authorization: Bearer <token>`, or the `alchemy_sid` session cookie the UI's login sets |
+| `proxy` | `X-Forwarded-Tenant`, plus `X-Forwarded-User` or `X-Forwarded-Service`, set by an authenticating gateway |
+
+The same check guards the HTTP invoke endpoint. See
+[Authentication](/pages/deployment/authentication) for configuring a
+provider.
+
+## Tenancy
+
+The tenant comes from the caller. A token's organization (or the gateway's
+tenant header) resolves to an Alchemy tenant, created on first sight. With
+authentication disabled, every request uses the built-in default tenant.
+Request bodies never select a tenant. Functions, versions, invocations,
+instances, secrets and metrics are scoped to it. `ListHosts` and `GetHost`
+report the cluster's hosts, which every tenant of the deployment shares.
+
+## Pagination
+
+`ListFunctions`, `ListFunctionVersions` and `ListInvocations` take an optional
+`PaginationRequest`.
+
+| Field | Behavior |
+|---|---|
+| `page_size` | 50 when zero or unset. Values above 200 are clamped to 200 |
+| `cursor` | Opaque token from a previous response. Absent means the first page |
+
+The response's `PaginationResponse` carries `total`, the count before the page
+was cut, and `previous_cursor` and `next_cursor` when a page exists in that
+direction. Omitting `pagination` returns every row, up to 10,000. A cursor the
+server cannot decode is `invalid_argument`.
+
+## Errors
+
+Failures are standard [Connect error codes](https://connectrpc.com/docs/protocol#error-codes).
+These are the codes the server returns.
+
+| Code | When |
+|---|---|
+| `invalid_argument` | A missing or out-of-range field, a contract that does not compile, an input that violates its contract, a bad cursor |
+| `not_found` | No function, version, invocation or attempt with that id in the caller's tenant |
+| `already_exists` | A function with that name already exists in the tenant |
+| `failed_precondition` | The request is valid but the deployment or state refuses it |
+| `aborted` | An `idempotency_key` is held by a call whose outcome is unknown or still settling |
+| `unauthenticated` | Missing or rejected credentials, or a token that carries no tenant |
+| `permission_denied` | The `proxy` provider got a tenant other than `AUTH_PROXY_TENANT` |
+| `unavailable` | No host answered, or NATS could not be reached |
+| `deadline_exceeded` | `Invoke` got no result before the call's deadline |
+| `canceled` | The caller went away before `Invoke` had a result |
+| `unimplemented` | `INVOCATION_PROTOCOL_RUNTIME_API`, or an `AuthService` RPC the provider does not serve |
+| `internal` | A database or storage failure |
+
+Some specifics worth knowing:
+
+- An input that violates its contract is `invalid_argument` with one
+  `functions.v1.ContractViolation` error detail per failure.
+- `failed_precondition` covers invoking a function with no ready version or a
+  version that is not ready, `spec.secrets` or `secret_values` on a server with
+  no secret provider, `spec.source` on a server with no artifacts bucket, and an
+  `idempotency_key` on `Invoke` when the server has no logs bucket.
+- A function that ran and failed is not an RPC error. `Invoke` succeeds and
+  its response carries a `FunctionError`.
+
+## API areas
+
+<CardGroup cols={2}>
+  <Card title="Functions" href="/pages/api-reference/functions">
+    Functions, their immutable versions, and the runtimes a source can build on.
+  </Card>
+  <Card title="Invocations" href="/pages/api-reference/invocations">
+    Invoking, reading invocation records, streaming logs and live transitions.
+  </Card>
+  <Card title="Hosts" href="/pages/api-reference/hosts">
+    The live hosts and the microVMs they are running.
+  </Card>
+  <Card title="Secrets" href="/pages/api-reference/secrets">
+    How a function version names and creates tenant secrets.
+  </Card>
+  <Card title="Metrics" href="/pages/api-reference/metrics">
+    Timeseries, aggregates and the in-flight queue.
+  </Card>
+  <Card title="HTTP endpoints" href="/pages/api-reference/http">
+    Plain HTTP invoke, health and the autoscaling feed.
+  </Card>
+</CardGroup>

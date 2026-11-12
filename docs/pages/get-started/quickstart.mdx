@@ -1,0 +1,210 @@
+---
+title: "Quickstart"
+sidebarTitle: "Quickstart"
+description: "Run Alchemy from source on a Mac, create a Python function from source, invoke it with curl and see the call in the web UI."
+---
+
+This guide runs the whole stack on your machine: PostgreSQL, NATS, an object
+store and a registry in Docker, KVM hosts in a Lima VM, and the server and web
+UI on the Mac. Then it creates a Python function and invokes it.
+
+## Requirements
+
+Firecracker needs `/dev/kvm`, which Docker Desktop does not provide. The
+justfile runs the hosts in a Lima VM with nested virtualization, which needs:
+
+- An Apple silicon Mac with an M3 chip or later
+- macOS 15 or later
+
+The local setup is built for macOS. The `vm` and `host` recipes drive Lima and
+run the `linux-arm64` host build inside it, and there is no recipe for running
+hosts directly on a Linux machine with `/dev/kvm`.
+
+You also need:
+
+- Docker, used through its `default` context
+- Node.js 22 or later with pnpm, for the UI
+- The rest of the toolchain from the repository's `Brewfile`: Go, `just`,
+  `buf`, `golangci-lint`, `jq`, the RustFS `rc` client and Lima
+
+```sh
+brew bundle
+```
+
+## Run it
+
+<Steps>
+  <Step title="Start local infrastructure">
+    Starts PostgreSQL, NATS with JetStream, RustFS and a registry through
+    Compose, then makes the `alchemy-logs` and `alchemy-artifacts` buckets.
+
+    ```sh
+    just infra
+    ```
+
+    | Service | Port on the Mac |
+    |---|---|
+    | PostgreSQL | `5435` |
+    | NATS | `4223` |
+    | RustFS (S3 API) | `9000` |
+    | RustFS console | `9001` |
+    | Registry | `5001` |
+
+    Each port can be moved with its `ALCHEMY_*_PORT` variable in
+    `docker-compose.yaml`.
+  </Step>
+  <Step title="Start the KVM host VM">
+    Creates the `alchemy` Lima VM on first run from `lima.yaml`, with 4 CPUs,
+    8 GiB of memory, Firecracker, its jailer and a guest kernel. Later runs
+    start the existing VM.
+
+    ```sh
+    just vm
+    ```
+  </Step>
+  <Step title="Build the images">
+    Builds the server and host images, then builds every runtime (Python,
+    Node, static, Go and Rust) and pushes them to the local registry, where
+    the hosts pull them.
+
+    ```sh
+    just images
+    ```
+  </Step>
+  <Step title="Run Alchemy">
+    Starts 3 hosts in the VM with 512 MiB each, starts the server on `:8780`,
+    waits for its `/healthz`, then starts the UI dev server. The server
+    applies database migrations when it starts. Ctrl-C stops everything.
+
+    ```sh
+    just dev
+    ```
+
+    Open [http://localhost:5173](http://localhost:5173). The UI dev server
+    proxies the API to the server on `:8780`.
+  </Step>
+</Steps>
+
+<Note>
+  `just server` falls back to a fixed `ENCRYPTION_KEY` so the secrets API works
+  out of the box. It is a published development key. Never use it outside
+  local development.
+</Note>
+
+## Create a function
+
+A function built from source is a handler laid over a runtime image at
+`/app`. The Python runtime runs `/app/handler.py`, which reads one JSON value
+on stdin and writes one on stdout.
+
+<Steps>
+  <Step title="Write the handler">
+    Save this as `handler.py`:
+
+    ```python handler.py
+    import json
+    import sys
+
+    event = json.load(sys.stdin)
+    json.dump({"greeting": f"Hello, {event['name']}"}, sys.stdout)
+    ```
+  </Step>
+  <Step title="Create the function">
+    <CodeGroup>
+    ```text Web UI
+    1. Click New function.
+    2. Choose Code and pick Python 3.13 as the language.
+    3. Define a JSON Schema contract: the input requires a
+       string "name", the output a string "greeting".
+    4. Replace the starter handler with handler.py.
+    5. Keep the default resources, name the function greet
+       and click Create function.
+    ```
+
+    ```sh API
+    IMAGE=$(curl -s localhost:8780/functions.v1.FunctionsService/ListRuntimes \
+      -H 'Content-Type: application/json' -d '{}' \
+      | jq -r '.runtimes[] | select(.id == "python") | .image')
+
+    jq -n --arg image "$IMAGE" --rawfile src handler.py '{
+      name: "greet",
+      spec: {
+        image: $image,
+        protocol: "INVOCATION_PROTOCOL_EXEC",
+        contract: {jsonSchema: {
+          input:  {type: "object", properties: {name: {type: "string"}}, required: ["name"]},
+          output: {type: "object", properties: {greeting: {type: "string"}}, required: ["greeting"]}
+        }},
+        source: {files: [{path: "handler.py", content: ($src | @base64)}]}
+      }
+    }' | curl -s localhost:8780/functions.v1.FunctionsService/CreateFunction \
+      -H 'Content-Type: application/json' -d @- | jq '{id: .function.id, status: .version.status}'
+    ```
+    </CodeGroup>
+
+    The function's first version starts in `BUILDING`. A host pulls the
+    runtime, lays the handler over it, boots it and snapshots the microVM.
+    The version turns `READY` when that finishes, and only a ready version
+    can be invoked.
+  </Step>
+  <Step title="Wait for the build">
+    Watch the version on the function's **Versions** tab, or ask the API:
+
+    ```sh
+    curl -s localhost:8780/functions.v1.FunctionsService/GetFunctionVersion \
+      -H 'Content-Type: application/json' \
+      -d '{"functionId": "<function-id>", "version": 1}' | jq -r .version.status
+    ```
+  </Step>
+</Steps>
+
+## Invoke it
+
+POST the input to the function's invoke endpoint with the content type its
+contract takes. The response body is the output.
+
+```sh
+curl -i localhost:8780/functions/<function-id>/invoke \
+  -H 'Content-Type: application/json' -d '{"name": "Ada"}'
+```
+
+```http
+HTTP/1.1 200 OK
+Alchemy-Invocation-Id: <invocation-id>
+Alchemy-Version: 1
+Content-Type: application/json
+
+{"greeting": "Hello, Ada"}
+```
+
+An input that breaks the contract is rejected before any microVM is used. Try
+`-d '{}'` to see the violation. See [HTTP invoke](/pages/usage/http)
+for versions, retries, idempotency keys and async calls.
+
+## See it in the UI
+
+Open the function and select **Invocations** to see the call with its status,
+attempts and duration, and open it to read its log. The **Workbench** tab
+invokes the function from the browser. **Invocations** in the sidebar lists
+calls across every function.
+
+## Stop everything
+
+Ctrl-C stops `just dev`. Then stop the VM and the infrastructure:
+
+```sh
+just vm down
+just infra down
+```
+
+`just infra down volumes` also drops the data, and `just vm delete` removes the
+VM.
+
+## Next steps
+
+- [Write a Python function](/pages/guides/python-function) covers handlers,
+  Arrow contracts and logs in more depth.
+- [Architecture](/pages/concepts/architecture) follows an invocation
+  from the server through a host to the microVM.
+- [Local development](/pages/contributing/local-development) lists
+  every recipe and how each piece runs in development.

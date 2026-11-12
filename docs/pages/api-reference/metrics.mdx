@@ -1,0 +1,110 @@
+---
+title: "Metrics API"
+sidebarTitle: "Metrics"
+description: "Query invocation counts, durations and bytes as timeseries or aggregates, and read what is in flight now."
+---
+
+Use `metrics.v1.MetricsService` to answer questions such as "how many
+invocations failed in the last hour?" and "how long do cold boots take by
+day?" The web UI's dashboards use the same three read-only RPCs. Their
+messages are defined in `protos/metrics/v1/metrics.proto`.
+
+`QueryTimeseries` and `QueryAggregate` read the invocations table in
+PostgreSQL, so an invocation counts once its record is written. `GetQueue`
+reads the queue on NATS instead. Every query is scoped to the caller's tenant.
+
+## RPCs
+
+| RPC | Description |
+|---|---|
+| `QueryTimeseries` | Return minute, hourly or daily values for charts |
+| `QueryAggregate` | Return one value per metric and group for totals or stat cards |
+| `GetQueue` | Count invocations waiting to start and running right now |
+
+## Metrics
+
+| Metric | Aggregation |
+|---|---|
+| `METRIC_INVOCATION_COUNT` | Count of invocations |
+| `METRIC_INVOCATION_ACQUIRE_DURATION` | Mean `acquire_us` in milliseconds |
+| `METRIC_INVOCATION_RUN_DURATION` | Mean `run_us` in milliseconds |
+| `METRIC_INVOCATION_TOTAL_DURATION` | Mean `total_us` in milliseconds |
+| `METRIC_INVOCATION_INPUT_BYTES` | Sum of input bytes |
+| `METRIC_INVOCATION_OUTPUT_BYTES` | Sum of output bytes |
+
+Duration means skip invocations that never reached the phase. An errored call
+with no acquire does not pull the acquire mean toward zero.
+
+## Dimensions
+
+| Dimension | Values |
+|---|---|
+| `METRIC_DIMENSION_TENANT_ID` | Tenant UUIDs |
+| `METRIC_DIMENSION_FUNCTION_ID` | Function UUIDs |
+| `METRIC_DIMENSION_STATUS` | Lowercase tokens: `pending`, `starting`, `running`, `succeeded`, `failed`, `errored`, `canceled`, `rejected` |
+| `METRIC_DIMENSION_START_KIND` | Lowercase tokens: `cold_boot`, `snapshot_restore`, `warm`. Invocations with none group under `""` |
+
+Since every query is scoped to the caller's tenant, grouping by tenant returns
+one group.
+
+## QueryTimeseries
+
+| Field | Behavior |
+|---|---|
+| `metrics` | Computed together per bucket. At least one is required |
+| `since_ms` | Window start, inclusive. Required |
+| `until_ms` | Window end, exclusive. Unset means now. Must be after `since_ms`, at most 90 days later |
+| `granularity` | `MINUTE`, `HOUR` or `DAY`. Required |
+| `tz_offset_minutes` | The viewer's offset east of UTC, so `DAY` buckets match the local calendar day |
+| `group_by` | One series per value of a dimension. Unspecified returns one series with key `""` |
+| `filters` | `MetricFilter`s, each a `dimension` and the `values` to keep |
+
+Every series has the same ascending buckets over the window, zero-filled, so
+points at the same index refer to the same bucket. Each point's `values`
+follow the order of `metrics`. When a filter covers the `group_by` dimension,
+the response has one series per requested value, in request order, even when
+a value has no invocations.
+
+```sh
+curl -X POST http://localhost:8780/metrics.v1.MetricsService/QueryTimeseries \
+  -H "Content-Type: application/json" \
+  -d '{
+    "metrics": ["METRIC_INVOCATION_COUNT", "METRIC_INVOCATION_RUN_DURATION"],
+    "sinceMs": "1762819200000",
+    "granularity": "METRIC_GRANULARITY_HOUR",
+    "groupBy": "METRIC_DIMENSION_STATUS",
+    "filters": [{"dimension": "METRIC_DIMENSION_STATUS", "values": ["succeeded", "failed"]}]
+  }'
+```
+
+A shortened response looks like this:
+
+```json
+{
+  "series": [
+    {"key": "succeeded", "points": [{"bucketStartMs": "1762819200000", "values": [42, 18.5]}]},
+    {"key": "failed", "points": [{"bucketStartMs": "1762819200000", "values": [3, 120.2]}]}
+  ]
+}
+```
+
+## QueryAggregate
+
+Takes the same fields except `granularity` and `tz_offset_minutes`. The
+response has one `AggregateRow` per group for the whole window, with `key` and
+`values` in the order of `metrics`.
+
+## GetQueue
+
+Takes `function_ids`, or every function of the tenant when empty. Returns
+`queued`, invocations waiting to start (in the queue, or taken by a host that
+is building the function or waiting on its `max_concurrency`), and `running`,
+from what live hosts last reported. If the queue cannot be read, the call is
+`unavailable`.
+
+## Errors
+
+A missing `since_ms`, an `until_ms` not after it, a window over 90 days, no
+metrics, an unsupported metric or a missing `granularity` are each
+`invalid_argument`. A failed query against PostgreSQL is also reported as
+`invalid_argument`.

@@ -1,0 +1,165 @@
+---
+title: "Call functions over HTTP"
+sidebarTitle: "HTTP"
+description: "Invoke a function with a plain HTTP POST, pin versions, retry safely, queue async calls and handle errors."
+---
+
+Every function can be called with a plain `POST` to the server. The request body is the function's input and the response body is its output, in the encoding its contract takes, with no envelope. No client library is needed.
+
+```text
+POST /functions/<function-id>/invoke
+```
+
+The same call is `FunctionsService.Invoke` on the API. This page covers the common tasks. [Invoke over HTTP](/pages/api-reference/http) lists every header, status and field.
+
+## Make a call
+
+Send the input with the content type the function's contract takes:
+
+| Contract | Content-Type |
+|---|---|
+| JSON Schema | `application/json` |
+| Arrow | `application/vnd.apache.arrow.stream` |
+
+<CodeGroup>
+
+```sh JSON
+curl https://alchemy.example.com/functions/<function-id>/invoke \
+  -H 'Content-Type: application/json' \
+  -d '{"id":"abc"}'
+```
+
+```sh Arrow
+curl https://alchemy.example.com/functions/<function-id>/invoke \
+  -H 'Content-Type: application/vnd.apache.arrow.stream' \
+  --data-binary @input.arrows
+```
+
+</CodeGroup>
+
+Any other content type answers `415`. The input may be up to 64 MiB, and a larger one answers `413`.
+
+A successful call answers `200` with the output in the same content type. These headers say what ran:
+
+| Header | Value |
+|---|---|
+| `Alchemy-Invocation-Id` | The invocation's id. Use it to find the invocation and its logs |
+| `Alchemy-Version` | The version that ran |
+| `Alchemy-Attempts` | How many runs the result took, when it was retried |
+| `Alchemy-Replayed` | `true` when the result is an earlier call's, replayed for its idempotency key |
+
+When every host is busy, the call waits in the queue. A call over plain HTTP waits for up to the server's `INVOKE_DEADLINE`, 5 minutes by default. A function's max concurrency also caps how many of its calls run at once, and the rest wait. To set a deadline per call, use `FunctionsService.Invoke` with a Connect or gRPC timeout instead. The server caps it at `INVOKE_MAX_DEADLINE`.
+
+## Pin a version
+
+Without a version, a call runs the function's current version. Add `?version=` to run a specific one:
+
+```sh
+curl 'https://alchemy.example.com/functions/<function-id>/invoke?version=3' \
+  -H 'Content-Type: application/json' -d '{"id":"abc"}'
+```
+
+The version must be ready. A version that is still building or that failed answers `400` with `failed_precondition`.
+
+## Retry safely
+
+Add an `Idempotency-Key` header, up to 255 bytes, to make a call safe to retry. The first call with a key runs the function. A later call with the same key, within the server's idempotency window (24 hours by default), runs nothing and answers with the first call's result, with `Alchemy-Replayed: true`. If the first call is still running, the later one waits for it.
+
+```sh
+curl https://alchemy.example.com/functions/<function-id>/invoke \
+  -H 'Content-Type: application/json' \
+  -H 'Idempotency-Key: order-1234' \
+  -d '{"id":"abc"}'
+```
+
+A synchronous call with a key needs a function logs bucket, where hosts keep the output to replay. Without one it answers `400` with `failed_precondition`. Two calls that race for the same key may see `409` with `aborted`. Retry it and it replays.
+
+## Set retries
+
+A call whose function raises, crashes or times out, or that the platform cannot run, runs again up to the function's retries, with a wait that grows five times longer after each failure. `Alchemy-Retries` sets a call's own, from 0 to 10:
+
+```sh
+curl https://alchemy.example.com/functions/<function-id>/invoke \
+  -H 'Content-Type: application/json' \
+  -H 'Alchemy-Retries: 0' \
+  -d '{"id":"abc"}'
+```
+
+A call whose input breaks the contract never runs again. See [Invocations](/pages/concepts/invocations) for how retries fit in the deadline.
+
+## Queue an async call
+
+Add `Prefer: respond-async` and the call returns at once with `202`. Nothing waits for the function, and its output is dropped. Its status, error, attempts and logs are still recorded.
+
+```sh
+curl -i https://alchemy.example.com/functions/<function-id>/invoke \
+  -H 'Content-Type: application/json' \
+  -H 'Prefer: respond-async' \
+  -d '{"id":"abc"}'
+```
+
+```http
+HTTP/1.1 202 Accepted
+Preference-Applied: respond-async
+Location: /invocations/<invocation-id>
+Alchemy-Invocation-Id: <invocation-id>
+Content-Type: application/json
+
+{"invocationId":"<invocation-id>"}
+```
+
+An async call may wait in the queue, retries included, for up to the server's `ASYNC_MAX_AGE`, 24 hours by default. With an `Idempotency-Key` seen before, it returns the invocation that key queued, with `"replayed": true`, and queues nothing.
+
+The server serves no route at the `Location` path. To follow the invocation, read it with `GetInvocation` over the Connect protocol:
+
+```sh
+curl https://alchemy.example.com/functions.v1.FunctionsService/GetInvocation \
+  -H 'Content-Type: application/json' \
+  -d '{"id":"<invocation-id>"}'
+```
+
+## Handle errors
+
+There are two kinds of failure, and they answer differently.
+
+**The function ran and failed.** The response carries the function's error as JSON with `500`, or `504` when it timed out. The `Alchemy-*` headers are still set.
+
+```json
+{"kind":"FUNCTION_ERROR_KIND_RAISED","message":"order not found","type":"KeyError"}
+```
+
+`kind` is `FUNCTION_ERROR_KIND_RAISED`, `FUNCTION_ERROR_KIND_CRASHED`, `FUNCTION_ERROR_KIND_TIMEOUT` or `FUNCTION_ERROR_KIND_OUTPUT_INVALID`. An output that broke the contract also lists its `violations`.
+
+**The call was refused or the platform failed.** The response is a JSON body with a `code` and a `message`, under the HTTP status the Connect protocol gives that code. Input that breaks the contract answers `400` with each violation:
+
+```json
+{
+  "code": "invalid_argument",
+  "message": "input violates the version's input schema",
+  "violations": [{"instancePath": "/id", "schemaPath": "/properties/id/type", "message": "expected string"}]
+}
+```
+
+| Status | Code | Common cause |
+|---|---|---|
+| `400` | `invalid_argument` | Input breaks the contract, a bad `?version=` or `Alchemy-Retries` |
+| `400` | `failed_precondition` | No ready version, or a keyed call with no logs bucket |
+| `401` | `unauthenticated` | Missing or invalid credentials |
+| `404` | `not_found` | No such function or version |
+| `409` | `aborted` | Another call holds the same idempotency key |
+| `413` | `invalid_argument` | Input over 64 MiB |
+| `415` | `invalid_argument` | Wrong content type for the contract |
+| `503` | `unavailable` | No host could run it, or no result came before the call's deadline |
+
+## Authenticate
+
+With [authentication](/pages/deployment/authentication) enabled, send a bearer token:
+
+```sh
+curl https://alchemy.example.com/functions/<function-id>/invoke \
+  -H "Authorization: Bearer $ALCHEMY_TOKEN" \
+  -H 'Content-Type: application/json' \
+  -d '{"id":"abc"}'
+```
+
+Behind a gateway with the `proxy` provider, the gateway sets the identity headers instead. Because the request must carry the contract's content type, a browser on another site cannot invoke with a session cookie alone.
