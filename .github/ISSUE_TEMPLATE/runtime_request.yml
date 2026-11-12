@@ -1,0 +1,52 @@
+name: Runtime request
+description: Request a runtime image for a new language or language version.
+title: "[runtime]: "
+labels:
+  - enhancement
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Alchemy ships runtime images for Python, TypeScript, Go and Rust. Tell us which language or version you need and how your functions would use it.
+
+  - type: input
+    id: language
+    attributes:
+      label: Language and version
+      placeholder: Java 21
+    validations:
+      required: true
+
+  - type: dropdown
+    id: kind
+    attributes:
+      label: Runtime kind
+      description: Interpreted runtimes run source as it is. Compiled runtimes build source on a host first.
+      options:
+        - Interpreted
+        - Compiled
+        - Not sure
+    validations:
+      required: true
+
+  - type: textarea
+    id: use_case
+    attributes:
+      label: Use case
+      description: What would your functions do, and why does an image function not cover it?
+    validations:
+      required: true
+
+  - type: textarea
+    id: libraries
+    attributes:
+      label: Libraries
+      description: Libraries the runtime would need to ship, such as an Arrow implementation.
+
+  - type: checkboxes
+    id: contribution
+    attributes:
+      label: Contribution
+      options:
+        - label: I can help test this runtime.
+        - label: I would be willing to help build this runtime.
