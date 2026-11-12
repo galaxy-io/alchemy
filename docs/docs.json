@@ -62,7 +62,8 @@
       "chatgpt",
       "cursor",
       "mcp"
-    ]
+    ],
+    "display": "header"
   },
   "navbar": {
     "links": [
@@ -80,7 +81,8 @@
   "footer": {
     "socials": {
       "github": "https://github.com/galaxy-io/alchemy",
-      "slack": "https://join.slack.com/t/galaxy-io-community/shared_invite/zt-45qln0zg5-9CTvKVXugvh3sEhpD6KzJQ"
+      "slack": "https://join.slack.com/t/galaxy-io-community/shared_invite/zt-45qln0zg5-9CTvKVXugvh3sEhpD6KzJQ",
+      "website": "https://www.getgalaxy.io"
     }
   },
   "seo": {
