@@ -121,8 +121,7 @@
         "group": "Usage",
         "pages": [
           "pages/usage/web",
-          "pages/usage/http",
-          "pages/usage/embedded-ui"
+          "pages/usage/http"
         ]
       },
       {
