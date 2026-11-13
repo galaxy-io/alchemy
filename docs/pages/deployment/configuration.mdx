@@ -43,8 +43,8 @@ The default URLs point at the local development stack. Set them in every real de
 | `RETRY_BACKOFF_MAX` | `5m` | `server.invoke.retryBackoffMax` | The longest wait between attempts. At least `RETRY_BACKOFF` and at most `1h` |
 | `INVOKE_QUEUE_REPLICAS` | `1` | `server.invoke.queueReplicas` | NATS servers that keep each queued invocation |
 | `IDEMPOTENCY_WINDOW` | `24h` | `server.idempotencyWindow` | How long an idempotency key keeps a retry from running the function again |
-| `INVOCATION_STREAM_RETENTION` | `24h` | | How long NATS keeps an invocation record no server has written to PostgreSQL yet |
-| `INVOCATION_STREAM_REPLICAS` | `1` | | NATS servers that keep each unwritten record |
+| `INVOCATION_STREAM_RETENTION` | `24h` | `server.invocationStream.retention` | How long NATS keeps an invocation record no server has written to PostgreSQL yet |
+| `INVOCATION_STREAM_REPLICAS` | `1` | `server.invocationStream.replicas` | NATS servers that keep each unwritten record |
 
 ### Function logs
 

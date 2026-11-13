@@ -20,7 +20,6 @@ import (
 
 	functionsv1 "github.com/galaxy-io/alchemy/api/functions/v1"
 	hostv1 "github.com/galaxy-io/alchemy/api/host/v1"
-	"github.com/galaxy-io/alchemy/datastore/postgres/sqlcgen"
 )
 
 // SecretScope is the namespace alchemy mints secret refs under:
@@ -33,7 +32,7 @@ var (
 )
 
 // checkSecrets validates spec.secrets: every variable is a valid name and
-// every secret exists in the tenant.
+// every secret exists in the tenant's secret provider.
 func (s *Service) checkSecrets(ctx context.Context, spec *functionsv1.FunctionSpec) error {
 	tenant, err := tenantFromContext(ctx)
 	if err != nil {
@@ -52,8 +51,11 @@ func (s *Service) checkSecrets(ctx context.Context, spec *functionsv1.FunctionSp
 		if !secretName.MatchString(name) {
 			return invalid("spec.secrets[%s]: %q is not a secret name", variable, name)
 		}
-		if _, err := s.store.GetSecret(ctx, sqlcgen.GetSecretParams{TenantID: tenant, Ref: SecretScope.Ref(tenant, name)}); err != nil {
-			return notFound(err, "spec.secrets[%s]: secret %q not found", variable, name)
+		if _, err := s.secrets.Read(ctx, SecretScope.Ref(tenant, name)); err != nil {
+			if errors.Is(err, secret.ErrNotFound) {
+				return connect.NewError(connect.CodeNotFound, fmt.Errorf("spec.secrets[%s]: secret %q not found", variable, name))
+			}
+			return connect.NewError(connect.CodeUnavailable, fmt.Errorf("spec.secrets[%s]: %w", variable, err))
 		}
 	}
 	return nil

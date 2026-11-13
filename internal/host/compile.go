@@ -8,9 +8,11 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"runtime"
 	"time"
 
 	"gocloud.dev/blob"
+	"gocloud.dev/gcerrors"
 	"google.golang.org/protobuf/proto"
 
 	functionsv1 "github.com/galaxy-io/alchemy/api/functions/v1"
@@ -35,7 +37,7 @@ func (h *Host) handleCompile(ctx context.Context, data []byte) proto.Message {
 	if h.layers == nil {
 		return compileError("failed_precondition", errors.New("this host has no artifact bucket"))
 	}
-	log := h.log.With("image", req.GetImage(), "key", req.GetKey())
+	log := h.log.With("image", req.GetImage())
 	start := time.Now()
 
 	select {
@@ -77,6 +79,11 @@ func (h *Host) handleCompile(ctx context.Context, data []byte) proto.Message {
 	artifact := toProto(&hostv1.BuildRequest{TenantId: req.GetTenantId(), Spec: spec, Resources: resources, Layers: []*hostv1.Layer{req.GetSource()}}, built)
 	defer h.endCompile(source, built)
 
+	key := compiledKey(req.GetTenantId(), built.Digest, source)
+	if kept := h.keptLayer(ctx, key); kept != nil {
+		return kept
+	}
+
 	live, err := h.admit(artifact)
 	if err != nil {
 		return compileError("resource_exhausted", err)
@@ -107,17 +114,49 @@ func (h *Host) handleCompile(ctx context.Context, data []byte) proto.Message {
 		return &hostv1.CompileResponse{Result: &hostv1.CompileResponse_Error{Error: &hostv1.Error{Code: "internal", Message: "compile wrote no output"}}, BuildLog: logs.String()}
 	}
 
-	out := res.GetOutput()
+	layer, err := h.keepLayer(ctx, key, res.GetOutput())
+	if err != nil {
+		return compileError("internal", err)
+	}
+	log.Info("compile ready", "key", key, "bytes", len(res.GetOutput()), "took", time.Since(start).Round(time.Millisecond))
+	return &hostv1.CompileResponse{Result: &hostv1.CompileResponse_Layer{Layer: layer}, BuildLog: logs.String()}
+}
+
+// keptLayer answers a compile whose layer is already kept at key, and is
+// nil when there is none to reuse.
+func (h *Host) keptLayer(ctx context.Context, key string) *hostv1.CompileResponse {
+	attrs, err := h.layers.Attributes(ctx, key)
+	switch {
+	case gcerrors.Code(err) == gcerrors.NotFound:
+		return nil
+	case err != nil:
+		return compileError("unavailable", fmt.Errorf("artifacts bucket: %w", err))
+	case attrs.Metadata[bus.LayerDigestMetadata] == "":
+		return nil
+	}
+	h.log.Info("compile reused", "key", key)
+	return &hostv1.CompileResponse{Result: &hostv1.CompileResponse_Layer{Layer: &hostv1.Layer{Key: key, Sha256: attrs.Metadata[bus.LayerDigestMetadata]}}}
+}
+
+// keepLayer writes a compile's tar to key.
+func (h *Host) keepLayer(ctx context.Context, key string, out []byte) (*hostv1.Layer, error) {
 	sum := sha256.Sum256(out)
-	layer := &hostv1.Layer{Key: req.GetKey(), Sha256: hex.EncodeToString(sum[:])}
-	if err := h.layers.WriteAll(ctx, layer.GetKey(), out, &blob.WriterOptions{
+	layer := &hostv1.Layer{Key: key, Sha256: hex.EncodeToString(sum[:])}
+	if err := h.layers.WriteAll(ctx, key, out, &blob.WriterOptions{
 		ContentType: "application/x-tar",
 		Metadata:    map[string]string{bus.LayerDigestMetadata: layer.GetSha256()},
 	}); err != nil {
-		return compileError("internal", fmt.Errorf("keep compiled layer: %w", err))
+		return nil, fmt.Errorf("keep compiled layer: %w", err)
 	}
-	log.Info("compile ready", "bytes", len(out), "took", time.Since(start).Round(time.Millisecond))
-	return &hostv1.CompileResponse{Result: &hostv1.CompileResponse_Layer{Layer: layer}, BuildLog: logs.String()}
+	return layer, nil
+}
+
+// compiledKey is where a compile's layer is kept: by the build image's
+// digest, not its tag, so a republished build image compiles afresh, and by
+// arch, since a multi-arch image has one digest for all of them.
+func compiledKey(tenant, buildDigest, source string) string {
+	sum := sha256.Sum256([]byte(buildDigest + "\x00" + runtime.GOARCH + "\x00" + source))
+	return tenant + "/compiled/" + hex.EncodeToString(sum[:]) + ".tar"
 }
 
 // beginCompile counts a compile of source as in flight, before its Build

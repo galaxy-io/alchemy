@@ -214,6 +214,13 @@ server:
   # from running the function again.
   idempotencyWindow: 24h
 
+  invocationStream:
+    # -- How long NATS keeps an invocation record no server has written to
+    # PostgreSQL yet.
+    retention: 24h
+    # -- How many NATS servers keep each unwritten record.
+    replicas: 1
+
   autoscaling:
     # -- Scale servers with a HorizontalPodAutoscaler on CPU. Needs
     # `server.resources.requests.cpu`.

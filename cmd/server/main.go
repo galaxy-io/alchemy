@@ -151,7 +151,7 @@ func run(log *slog.Logger) error {
 	return nil
 }
 
-// routes serves the API and Invoke over plain HTTP, behind one interceptor
+// routes serves the API, and Invoke and GetInvocation over plain HTTP, behind one interceptor
 // that authenticates both, and the UI.
 func routes(svc *server.Service, auth authv1connect.AuthServiceHandler, interceptor *server.AuthInterceptor) *http.ServeMux {
 	opts := connect.WithInterceptors(interceptor)
@@ -160,6 +160,7 @@ func routes(svc *server.Service, auth authv1connect.AuthServiceHandler, intercep
 	mux.Handle(metricsv1connect.NewMetricsServiceHandler(svc.NewMetricsService(), opts))
 	mux.Handle(authv1connect.NewAuthServiceHandler(auth, opts))
 	mux.Handle("POST /functions/{function}/invoke", interceptor.Handler(functionsv1connect.FunctionsServiceInvokeProcedure, http.HandlerFunc(svc.InvokeHTTP)))
+	mux.Handle("GET /invocations/{id}", interceptor.Handler(functionsv1connect.FunctionsServiceGetInvocationProcedure, http.HandlerFunc(svc.GetInvocationHTTP)))
 	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusNoContent)
 	})
