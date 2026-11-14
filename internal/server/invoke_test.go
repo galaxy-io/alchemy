@@ -3,6 +3,7 @@ package server
 import (
 	"context"
 	"errors"
+	"fmt"
 	"testing"
 	"time"
 
@@ -41,15 +42,17 @@ func TestPlatformError(t *testing.T) {
 	tests := []struct {
 		name string
 		ctx  context.Context
+		err  error
 		want connect.Code
 	}{
-		{"deadline passed", expired, connect.CodeDeadlineExceeded},
-		{"caller went away", canceled, connect.CodeCanceled},
-		{"platform at fault", context.Background(), connect.CodeUnavailable},
+		{"deadline passed", expired, errors.New("no result"), connect.CodeDeadlineExceeded},
+		{"dispatch deadline passed", context.Background(), fmt.Errorf("no result: %w", context.DeadlineExceeded), connect.CodeDeadlineExceeded},
+		{"caller went away", canceled, errors.New("no result"), connect.CodeCanceled},
+		{"platform at fault", context.Background(), errors.New("no result"), connect.CodeUnavailable},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := platformError(tt.ctx, errors.New("no result"))
+			err := platformError(tt.ctx, tt.err)
 			if got := connect.CodeOf(err); got != tt.want {
 				t.Errorf("code = %v, want %v", got, tt.want)
 			}
