@@ -25,7 +25,7 @@ curl -i localhost:8780/functions/<function-id>/invoke \
 It answers 202 with the invocation id in the body and in `Alchemy-Invocation-Id`,
 and `Location: /invocations/<id>`. Nothing waits for an async invocation and
 its output is dropped, but its status, error, attempts and logs are recorded.
-`GetInvocation` follows it.
+`GET` on the `Location`, or `GetInvocation`, follows it.
 
 ## Queueing and deadlines
 

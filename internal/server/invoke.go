@@ -259,13 +259,15 @@ func inputViolation(violations []*functionsv1.ContractViolation) error {
 }
 
 // platformError classifies a failure in which the function produced no
-// result: either the caller stopped waiting or the platform is at fault.
+// result: either the caller stopped waiting, the call's deadline passed, or
+// the platform is at fault. dispatch keeps its deadline on a context of its
+// own, so err is checked as well as ctx.
 func platformError(ctx context.Context, err error) error {
 	switch {
-	case errors.Is(ctx.Err(), context.DeadlineExceeded):
-		return connect.NewError(connect.CodeDeadlineExceeded, err)
 	case errors.Is(ctx.Err(), context.Canceled):
 		return connect.NewError(connect.CodeCanceled, err)
+	case errors.Is(ctx.Err(), context.DeadlineExceeded), errors.Is(err, context.DeadlineExceeded):
+		return connect.NewError(connect.CodeDeadlineExceeded, err)
 	default:
 		return connect.NewError(connect.CodeUnavailable, err)
 	}

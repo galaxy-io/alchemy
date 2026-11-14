@@ -12,12 +12,10 @@ They are registered in `cmd/server/main.go` and implemented in
 | Route | Auth | Purpose |
 |---|---|---|
 | `POST /functions/{function}/invoke` | Yes | Invoke a function with the raw input as the body |
+| `GET /invocations/{id}` | Yes | Read one invocation, where an async invoke's `Location` points |
 | `GET /healthz` | No | Liveness |
 | `GET /scaling` | No | Host demand for KEDA |
 | `/` (anything else) | No | The web UI |
-
-There is no API route for `/invocations/{id}`. See
-[Location](#location) below.
 
 ## POST /functions/\{function\}/invoke
 
@@ -100,11 +98,8 @@ On 202:
 
 ### Location
 
-The `Location` on a 202 names `/invocations/<id>`, but the server has no API
-route there. A `GET` falls through to the web UI handler, which serves the app
-(or a placeholder page in a binary built without `-tags embedui`). To follow an
-async invocation programmatically, call `GetInvocation` with the id from
-`Alchemy-Invocation-Id`.
+The `Location` on a 202 names `/invocations/<id>`, which
+`GET /invocations/{id}` below serves.
 
 ### Error body
 
@@ -140,10 +135,23 @@ The status follows the Connect protocol's mapping for the code.
 | 429 | `resource_exhausted` | A host refused the invocation for lack of capacity |
 | 499 | `canceled` | The caller went away |
 | 500 | `internal` | A database or storage failure |
-| 503 | `unavailable` | The platform could not run it, NATS was unreachable, or no result came within `INVOKE_DEADLINE` |
+| 503 | `unavailable` | The platform could not run it, or NATS was unreachable |
+| 504 | `deadline_exceeded` | No result came within `INVOKE_DEADLINE` |
 
 The checks run in this order: authentication, the `version` query, the
 function and version lookup, `Alchemy-Retries`, `Content-Type`, then the body.
+
+## GET /invocations/\{id\}
+
+`FunctionsService.GetInvocation` over plain HTTP. It answers 200 with the
+invocation as JSON, the same message `GetInvocation` returns, while it waits,
+runs and after it ends. An unknown id, or one in another tenant, answers 404
+with the error body above.
+
+```sh
+curl https://alchemy.example.com/invocations/<invocation-id> \
+  -H 'Authorization: Bearer <token>'
+```
 
 ## GET /healthz
 

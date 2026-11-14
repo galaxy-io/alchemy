@@ -110,12 +110,10 @@ Content-Type: application/json
 
 An async call may wait in the queue, retries included, for up to the server's `ASYNC_MAX_AGE`, 24 hours by default. With an `Idempotency-Key` seen before, it returns the invocation that key queued, with `"replayed": true`, and queues nothing.
 
-The server serves no route at the `Location` path. To follow the invocation, read it with `GetInvocation` over the Connect protocol:
+To follow the invocation, `GET` the `Location`. It answers the invocation as JSON, the same message `GetInvocation` returns:
 
 ```sh
-curl https://alchemy.example.com/functions.v1.FunctionsService/GetInvocation \
-  -H 'Content-Type: application/json' \
-  -d '{"id":"<invocation-id>"}'
+curl https://alchemy.example.com/invocations/<invocation-id>
 ```
 
 ## Handle errors
@@ -149,7 +147,8 @@ There are two kinds of failure, and they answer differently.
 | `409` | `aborted` | Another call holds the same idempotency key |
 | `413` | `invalid_argument` | Input over 64 MiB |
 | `415` | `invalid_argument` | Wrong content type for the contract |
-| `503` | `unavailable` | No host could run it, or no result came before the call's deadline |
+| `503` | `unavailable` | No host could run it |
+| `504` | `deadline_exceeded` | No result came before the call's deadline |
 
 ## Authenticate
 

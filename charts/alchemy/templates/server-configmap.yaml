@@ -13,6 +13,8 @@ data:
   INVOKE_DEADLINE: {{ .Values.server.invoke.deadline | quote }}
   INVOKE_MAX_DEADLINE: {{ .Values.server.invoke.maxDeadline | quote }}
   INVOKE_QUEUE_REPLICAS: {{ .Values.server.invoke.queueReplicas | quote }}
+  INVOCATION_STREAM_RETENTION: {{ .Values.server.invocationStream.retention | quote }}
+  INVOCATION_STREAM_REPLICAS: {{ .Values.server.invocationStream.replicas | quote }}
   ASYNC_MAX_AGE: {{ .Values.server.invoke.async.maxAge | quote }}
   RETRY_BACKOFF: {{ .Values.server.invoke.retryBackoff | quote }}
   RETRY_BACKOFF_MAX: {{ .Values.server.invoke.retryBackoffMax | quote }}

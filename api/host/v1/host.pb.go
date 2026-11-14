@@ -683,17 +683,17 @@ func (*BuildResponse_Error) isBuildResponse_Result() {}
 
 // CompileRequest turns a source into the layer a version runs: image boots
 // once with source under /app and writes a tar of the compiled files to
-// stdout. The host keeps the tar at key in the artifacts bucket.
+// stdout. The host keeps the tar in the artifacts bucket under the build
+// image's digest and the source's, and reuses it when it is already there.
 type CompileRequest struct {
 	state    protoimpl.MessageState `protogen:"open.v1"`
 	TenantId string                 `protobuf:"bytes,1,opt,name=tenant_id,json=tenantId,proto3" json:"tenant_id,omitempty"`
 	// image is the build image, e.g. .../runtime/go:1.27-build.
 	Image         string `protobuf:"bytes,2,opt,name=image,proto3" json:"image,omitempty"`
 	Source        *Layer `protobuf:"bytes,3,opt,name=source,proto3" json:"source,omitempty"`
-	Key           string `protobuf:"bytes,4,opt,name=key,proto3" json:"key,omitempty"`
-	TimeoutMs     int64  `protobuf:"varint,5,opt,name=timeout_ms,json=timeoutMs,proto3" json:"timeout_ms,omitempty"`
-	Vcpus         uint32 `protobuf:"varint,6,opt,name=vcpus,proto3" json:"vcpus,omitempty"`
-	MemoryMib     uint32 `protobuf:"varint,7,opt,name=memory_mib,json=memoryMib,proto3" json:"memory_mib,omitempty"`
+	TimeoutMs     int64  `protobuf:"varint,4,opt,name=timeout_ms,json=timeoutMs,proto3" json:"timeout_ms,omitempty"`
+	Vcpus         uint32 `protobuf:"varint,5,opt,name=vcpus,proto3" json:"vcpus,omitempty"`
+	MemoryMib     uint32 `protobuf:"varint,6,opt,name=memory_mib,json=memoryMib,proto3" json:"memory_mib,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -747,13 +747,6 @@ func (x *CompileRequest) GetSource() *Layer {
 		return x.Source
 	}
 	return nil
-}
-
-func (x *CompileRequest) GetKey() string {
-	if x != nil {
-		return x.Key
-	}
-	return ""
 }
 
 func (x *CompileRequest) GetTimeoutMs() int64 {
@@ -2038,17 +2031,16 @@ const file_host_v1_host_proto_rawDesc = "" +
 	"\bartifact\x18\x01 \x01(\v2\x11.host.v1.ArtifactH\x00R\bartifact\x12&\n" +
 	"\x05error\x18\x02 \x01(\v2\x0e.host.v1.ErrorH\x00R\x05error\x12\x1b\n" +
 	"\tbuild_log\x18\x03 \x01(\tR\bbuildLogB\b\n" +
-	"\x06result\"\xd1\x01\n" +
+	"\x06result\"\xbf\x01\n" +
 	"\x0eCompileRequest\x12\x1b\n" +
 	"\ttenant_id\x18\x01 \x01(\tR\btenantId\x12\x14\n" +
 	"\x05image\x18\x02 \x01(\tR\x05image\x12&\n" +
-	"\x06source\x18\x03 \x01(\v2\x0e.host.v1.LayerR\x06source\x12\x10\n" +
-	"\x03key\x18\x04 \x01(\tR\x03key\x12\x1d\n" +
+	"\x06source\x18\x03 \x01(\v2\x0e.host.v1.LayerR\x06source\x12\x1d\n" +
 	"\n" +
-	"timeout_ms\x18\x05 \x01(\x03R\ttimeoutMs\x12\x14\n" +
-	"\x05vcpus\x18\x06 \x01(\rR\x05vcpus\x12\x1d\n" +
+	"timeout_ms\x18\x04 \x01(\x03R\ttimeoutMs\x12\x14\n" +
+	"\x05vcpus\x18\x05 \x01(\rR\x05vcpus\x12\x1d\n" +
 	"\n" +
-	"memory_mib\x18\a \x01(\rR\tmemoryMib\"\x88\x01\n" +
+	"memory_mib\x18\x06 \x01(\rR\tmemoryMib\"\x88\x01\n" +
 	"\x0fCompileResponse\x12&\n" +
 	"\x05layer\x18\x01 \x01(\v2\x0e.host.v1.LayerH\x00R\x05layer\x12&\n" +
 	"\x05error\x18\x02 \x01(\v2\x0e.host.v1.ErrorH\x00R\x05error\x12\x1b\n" +

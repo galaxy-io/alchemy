@@ -176,12 +176,12 @@ make the work smaller per call.
 ## The call waits, then fails with a deadline
 
 ```json
-{"code": "unavailable", "message": "no result for invocation <id> by its deadline: context deadline exceeded"}
+{"code": "deadline_exceeded", "message": "no result for invocation <id> by its deadline: context deadline exceeded"}
 ```
 
 The function never returned in time, usually because it never started. Over
-plain HTTP this answers `503` with code `unavailable`. An `Invoke` call whose
-own timeout expired gets `deadline_exceeded` instead. Every call waits in a
+plain HTTP this answers `504` with code `deadline_exceeded`, and over RPC
+`deadline_exceeded`. Every call waits in a
 queue until a host has a free slot, and the call's deadline covers that wait,
 the build on a new host and every attempt.
 
@@ -206,9 +206,8 @@ Common causes:
 
 An async call (`Prefer: respond-async`) waits up to `ASYNC_MAX_AGE`, 24 hours
 by default. One that no host took in time ends `CANCELED` with
-`expired in the queue before it could run`. Follow an async call with
-`GetInvocation` and the id from the `202` body. The `Location` header names
-`/invocations/<id>`, which the server does not serve.
+`expired in the queue before it could run`. Follow an async call by
+reading the `Location` header, `/invocations/<id>`, or with `GetInvocation`.
 
 ## Image pull failures
 

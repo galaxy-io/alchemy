@@ -109,8 +109,9 @@ first:
 3. The host stores the binary as a layer in the artifacts bucket, and the
    version is built from `go:1.27` with that layer at `/app/handler`.
 
-A compile has 3 minutes. Its result is kept by build image and source digest,
-so the same files on the same build image compile once. The version's spec
+A compile has 3 minutes. Its result is kept by the build image's digest and
+the source's, so the same files on the same build image compile once. A
+republished build image compiles afresh. The version's spec
 keeps your source, which `GetFunctionVersion` returns.
 
 <Steps>

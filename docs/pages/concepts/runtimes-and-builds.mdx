@@ -58,8 +58,9 @@ first, once for every host that will run the version:
 2. The build image writes a tar of the compiled files to stdout, and everything
    else to stderr, which becomes the build log.
 3. The host keeps the tar in the artifacts bucket at
-   `<tenant>/compiled/<key>.tar`, where the key is a digest of the build image
-   reference and the source's digest.
+   `<tenant>/compiled/<key>.tar`, where the key is a digest of the build image's
+   digest and the source's. If the tar is already there, the host reuses it
+   and runs no compile.
 4. The version gets the compiled layer in place of its source.
 
 The same files on the same build image compile once per tenant. A compile that fails fails

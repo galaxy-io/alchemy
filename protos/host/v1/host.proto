@@ -156,16 +156,16 @@ message BuildResponse {
 
 // CompileRequest turns a source into the layer a version runs: image boots
 // once with source under /app and writes a tar of the compiled files to
-// stdout. The host keeps the tar at key in the artifacts bucket.
+// stdout. The host keeps the tar in the artifacts bucket under the build
+// image's digest and the source's, and reuses it when it is already there.
 message CompileRequest {
   string tenant_id = 1;
   // image is the build image, e.g. .../runtime/go:1.27-build.
   string image = 2;
   Layer source = 3;
-  string key = 4;
-  int64 timeout_ms = 5;
-  uint32 vcpus = 6;
-  uint32 memory_mib = 7;
+  int64 timeout_ms = 4;
+  uint32 vcpus = 5;
+  uint32 memory_mib = 6;
 }
 
 message CompileResponse {

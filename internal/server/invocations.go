@@ -3,10 +3,12 @@ package server
 import (
 	"context"
 	"errors"
+	"net/http"
 	"time"
 
 	"connectrpc.com/connect"
 	"github.com/jackc/pgx/v5"
+	"google.golang.org/protobuf/encoding/protojson"
 
 	functionsv1 "github.com/galaxy-io/alchemy/api/functions/v1"
 	"github.com/galaxy-io/alchemy/datastore/postgres/sqlcgen"
@@ -19,6 +21,19 @@ func (s *Service) GetInvocation(ctx context.Context, req *connect.Request[functi
 		return nil, err
 	}
 	return connect.NewResponse(&functionsv1.GetInvocationResponse{Invocation: inv}), nil
+}
+
+// GetInvocationHTTP serves GET /invocations/{id}, where an async invoke's
+// Location points.
+func (s *Service) GetInvocationHTTP(w http.ResponseWriter, r *http.Request) {
+	inv, err := s.invocation(r.Context(), r.PathValue("id"))
+	if err != nil {
+		writeError(w, err)
+		return
+	}
+	body, _ := protojson.Marshal(inv)
+	w.Header().Set("Content-Type", jsonContentType)
+	_, _ = w.Write(body) //nolint:gosec // protojson of a stored invocation, served as application/json
 }
 
 // invocation finds one invocation: in the database, or on the server
