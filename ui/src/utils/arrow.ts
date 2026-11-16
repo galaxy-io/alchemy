@@ -6,10 +6,12 @@ import {
   DateDay,
   DateMillisecond,
   DateUnit,
+  Decimal,
   Field,
   FixedSizeList,
   Float,
   Int,
+  LargeBinary,
   LargeUtf8,
   List,
   makeBuilder,
@@ -19,6 +21,7 @@ import {
   type Schema,
   Struct,
   Table,
+  Time,
   Timestamp,
   TimeUnit,
   Type,
@@ -62,11 +65,17 @@ export const formatArrowType = (type: DataType): string => {
   if (DataType.isUtf8(type)) return "utf8";
   if (DataType.isLargeUtf8(type)) return "large_utf8";
   if (DataType.isBinary(type)) return "binary";
+  if (DataType.isLargeBinary(type)) return "large_binary";
   if (DataType.isBool(type)) return "bool";
   if (DataType.isInt(type)) return `${type.isSigned ? "int" : "uint"}${type.bitWidth}`;
   if (DataType.isFloat(type)) return `float${PRECISION_TO_BIT_WIDTH_MAP[type.precision]}`;
   if (DataType.isDate(type)) return type.unit === DateUnit.DAY ? "date32" : "date64";
-  if (DataType.isTimestamp(type)) return `timestamp[${TIME_UNIT_TO_TOKEN_MAP[type.unit]}]`;
+  if (DataType.isTimestamp(type)) {
+    const unit = TIME_UNIT_TO_TOKEN_MAP[type.unit];
+    return type.timezone ? `timestamp[${unit}, tz=${type.timezone}]` : `timestamp[${unit}]`;
+  }
+  if (DataType.isTime(type)) return `time${type.bitWidth}[${TIME_UNIT_TO_TOKEN_MAP[type.unit]}]`;
+  if (DataType.isDecimal(type)) return `decimal${type.bitWidth}(${type.precision}, ${type.scale})`;
   if (DataType.isList(type)) return `list<${formatArrowType(type.valueType)}>`;
   if (DataType.isFixedSizeList(type)) {
     return `fixed_size_list<${formatArrowType(type.valueType)}>[${type.listSize}]`;
@@ -87,8 +96,15 @@ export const parseArrowType = (token: string): DataType | undefined => {
       item && new FixedSizeList(Number(fixedSizeList[2]), new Field(LIST_ITEM_NAME, item, true))
     );
   }
-  const timestamp = /^timestamp\[(s|ms|us|ns)\]$/.exec(token);
-  if (timestamp?.[1]) return new Timestamp(TOKEN_TO_TIME_UNIT_MAP[timestamp[1]]);
+  const timestamp = /^timestamp\[(s|ms|us|ns)(?:, tz=(.+))?\]$/.exec(token);
+  if (timestamp?.[1]) return new Timestamp(TOKEN_TO_TIME_UNIT_MAP[timestamp[1]], timestamp[2]);
+  const time = /^time(?:32\[(s|ms)\]|64\[(us|ns)\])$/.exec(token);
+  if (time?.[1]) return new Time(TOKEN_TO_TIME_UNIT_MAP[time[1]], 32);
+  if (time?.[2]) return new Time(TOKEN_TO_TIME_UNIT_MAP[time[2]], 64);
+  const decimal = /^decimal(128|256)\((\d+), ?(\d+)\)$/.exec(token);
+  if (decimal?.[1] && decimal[2] && decimal[3]) {
+    return new Decimal(Number(decimal[3]), Number(decimal[2]), Number(decimal[1]));
+  }
   const int = /^(u?)int(8|16|32|64)$/.exec(token);
   if (int?.[2]) return new Int(int[1] === "", Number(int[2]) as 8 | 16 | 32 | 64);
   const float = /^float(16|32|64)$/.exec(token);
@@ -100,6 +116,8 @@ export const parseArrowType = (token: string): DataType | undefined => {
       return new LargeUtf8();
     case "binary":
       return new Binary();
+    case "large_binary":
+      return new LargeBinary();
     case "bool":
       return new Bool();
     case "date32":

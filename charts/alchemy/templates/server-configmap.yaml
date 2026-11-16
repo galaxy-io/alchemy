@@ -8,6 +8,8 @@ metadata:
 data:
   # API
   ADDR: ":{{ .Values.server.service.port }}"
+  # UI
+  UI_RETURN_ORIGINS: {{ join "," .Values.server.ui.returnOrigins | quote }}
   # Invocations
   IDEMPOTENCY_WINDOW: {{ .Values.server.idempotencyWindow | quote }}
   INVOKE_DEADLINE: {{ .Values.server.invoke.deadline | quote }}

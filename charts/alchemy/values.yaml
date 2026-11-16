@@ -243,6 +243,12 @@ server:
   # -- Server log format: `json` or `text`.
   logFormat: json
 
+  ui:
+    # -- Origins of other apps, such as a standalone Filament, that may open
+    # an Alchemy flow and get the user back when it ends
+    # (`UI_RETURN_ORIGINS`). The UI's own origin is always allowed.
+    returnOrigins: []
+
   service:
     # -- Service type.
     type: ClusterIP

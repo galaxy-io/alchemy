@@ -143,11 +143,12 @@ const CreateFunctionModalProvider: FC<PropsWithChildren<CreateFunctionModalSeed>
   version,
   runtimes,
   limits,
+  flowSeed,
   children,
 }) => {
   const [state, dispatch] = useReducer(
     createFunctionModalReducer,
-    { alchemyFunction, version, runtimes, limits },
+    { alchemyFunction, version, runtimes, limits, flowSeed },
     createInitialCreateFunctionModalState,
   );
 

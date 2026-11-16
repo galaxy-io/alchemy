@@ -10,7 +10,7 @@ import BulletedList from "@galaxy-io/dls/lists/BulletedList";
 import { ToastVariant } from "@galaxy-io/dls/toast/Toast";
 import { useToast } from "@galaxy-io/dls/toast/useToast";
 
-import type { Function as AlchemyFunction } from "@/gen/functions/v1/functions_pb";
+import type { Function as AlchemyFunction, FunctionVersion } from "@/gen/functions/v1/functions_pb";
 
 import {
   useCreateFunctionModalActions,
@@ -26,8 +26,7 @@ import {
 } from "@/pages/functions/components/create/serialize";
 import { CreateFunctionModalMode } from "@/pages/functions/components/create/types";
 
-import { useAlchemyNavigate } from "@/module/hooks";
-import { AlchemyPath } from "@/module/paths";
+import type { AlchemyReturnSearch } from "@/module/paths";
 
 import { useCreateFunctionVersionMutation } from "@/api/queries/function_versions";
 import { useCreateFunctionMutation } from "@/api/queries/functions";
@@ -36,11 +35,10 @@ import { getErrorMessage } from "@/utils/errors";
 import { formatVersion } from "@/utils/format";
 
 interface CreateFunctionModalFooterProps {
-  onClose: () => void;
+  onCreated: (result: AlchemyReturnSearch) => void;
 }
 
-const CreateFunctionModalFooter: FC<CreateFunctionModalFooterProps> = ({ onClose }) => {
-  const navigate = useAlchemyNavigate();
+const CreateFunctionModalFooter: FC<CreateFunctionModalFooterProps> = ({ onCreated }) => {
   const { toast } = useToast();
   const state = useCreateFunctionModalState();
   const { goBack, goNext, setSubmitting } = useCreateFunctionModalActions();
@@ -49,10 +47,10 @@ const CreateFunctionModalFooter: FC<CreateFunctionModalFooterProps> = ({ onClose
   const { mode, spec, functionId, hints, isFirstStep, isLastStep, isNextDisabled, isSubmitting } =
     state;
 
-  const handleCreated = (id: AlchemyFunction["id"], version: bigint) => {
-    onClose();
-    void navigate({ to: AlchemyPath.FUNCTION_VERSIONS, params: { id }, search: { version } });
-  };
+  const handleCreated = (
+    alchemyFunctionId: AlchemyFunction["id"],
+    alchemyFunctionVersion: FunctionVersion["version"],
+  ) => onCreated({ alchemyFunctionId, alchemyFunctionVersion });
 
   const handleError = (error: unknown) => {
     setSubmitting(false);

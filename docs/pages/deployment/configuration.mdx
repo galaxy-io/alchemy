@@ -32,6 +32,12 @@ The default URLs point at the local development stack. Set them in every real de
 | `PERSISTENCE_DSN` | local development DSN | `persistence.postgresql.dsn` (Secret) | PostgreSQL connection string. Migrations run on start |
 | `SERVER_NAME` | the hostname | | Name the server is known by on the bus. Must be unique per server |
 
+### UI
+
+| Variable | Default | Chart value | Description |
+|---|---|---|---|
+| `UI_RETURN_ORIGINS` | unset | `server.ui.returnOrigins` | Comma-separated origins of other apps, such as `https://filament.example.com`, that may open an Alchemy flow and get the user back when it ends. The UI's own origin is always allowed. An entry with a path, query or other scheme stops the server at start |
+
 ### Invocations
 
 | Variable | Default | Chart value | Description |

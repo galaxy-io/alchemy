@@ -1,3 +1,4 @@
+import type { JsonValue } from "@bufbuild/protobuf";
 import { match } from "ts-pattern";
 
 import { formatBytes } from "@galaxy-io/dls/utils/format";
@@ -10,6 +11,7 @@ import type {
 } from "@/gen/functions/v1/functions_pb";
 
 import {
+  CREATE_FUNCTION_MODAL_CONTRACT_DEFAULT_CALLER,
   CREATE_FUNCTION_MODAL_CONTRACT_SIDE_TO_LABEL_MAP,
   CREATE_FUNCTION_MODAL_CONTRACT_SIDES,
   CREATE_FUNCTION_MODAL_DEFAULT_STATE,
@@ -27,6 +29,7 @@ import {
 } from "@/pages/functions/components/create/constants";
 import {
   type CreateFunctionModalDerivedState,
+  type CreateFunctionModalFlowSeed,
   CreateFunctionModalMode,
   type CreateFunctionModalState,
   CreateFunctionModalStep,
@@ -35,7 +38,11 @@ import {
   FUNCTION_CONTRACT_KIND_TO_LABEL_MAP,
   FUNCTION_SOURCE_KIND_TO_LABEL_MAP,
 } from "@/pages/functions/constants";
-import { FunctionContractSide, FunctionSourceKind } from "@/pages/functions/types";
+import {
+  type FunctionArrowField,
+  FunctionContractSide,
+  FunctionSourceKind,
+} from "@/pages/functions/types";
 import {
   createFunctionSourceStarter,
   decodeFunctionArrowFields,
@@ -44,26 +51,74 @@ import {
   getFunctionRuntime,
 } from "@/pages/functions/utils";
 
+import type { AlchemyFlowContract } from "@/module/schemas";
+
+import { parseArrowType } from "@/utils/arrow";
 import { formatMemory, formatMillis } from "@/utils/format";
-import { formatJson } from "@/utils/json";
+import { formatJson, isJsonObject, parseJson } from "@/utils/json";
 
 export interface CreateFunctionModalSeed {
   alchemyFunction: AlchemyFunction | undefined;
   version: FunctionVersion | undefined;
   runtimes: Runtime[];
   limits: SourceLimits | undefined;
+  flowSeed?: CreateFunctionModalFlowSeed;
 }
+
+const mapCreateFunctionModalArrowFields = (
+  input: FunctionArrowField[],
+  output: FunctionArrowField[],
+): CreateFunctionModalState["arrowFields"] => ({
+  [FunctionContractSide.INPUT]: input.map((field, index) => ({ ...field, id: `in_${index}` })),
+  [FunctionContractSide.OUTPUT]: output.map((field, index) => ({ ...field, id: `out_${index}` })),
+});
+
+const mapCreateFunctionModalSchemaTexts = (
+  input: JsonValue,
+  output: JsonValue,
+): CreateFunctionModalState["schemaTexts"] => ({
+  [FunctionContractSide.INPUT]: formatJson(input),
+  [FunctionContractSide.OUTPUT]: formatJson(output),
+});
+
+const mapCreateFunctionModalFlowContract = (
+  contract: AlchemyFlowContract | undefined,
+): Partial<CreateFunctionModalState> | undefined =>
+  match(contract)
+    .with(undefined, () => undefined)
+    .with({ kind: "jsonSchema" }, ({ kind, input, output }) => {
+      const inputSchema = parseJson(input).value;
+      const outputSchema = parseJson(output).value;
+      return isJsonObject(inputSchema) && isJsonObject(outputSchema)
+        ? {
+            contractKind: kind,
+            schemaTexts: mapCreateFunctionModalSchemaTexts(inputSchema, outputSchema),
+          }
+        : undefined;
+    })
+    .with({ kind: "arrow" }, ({ kind, input, output }) =>
+      [...input, ...output].every(({ type }) => parseArrowType(type))
+        ? { contractKind: kind, arrowFields: mapCreateFunctionModalArrowFields(input, output) }
+        : undefined,
+    )
+    .exhaustive();
 
 export const createInitialCreateFunctionModalState = ({
   alchemyFunction,
   version,
   runtimes,
   limits,
+  flowSeed = {},
 }: CreateFunctionModalSeed): CreateFunctionModalState => {
   const spec = version?.spec;
   const contract = spec?.contract?.kind;
-  const runtime = getFunctionRuntime(runtimes, spec?.image) ?? runtimes[0];
-  const contractKind = contract?.case ?? "jsonSchema";
+  const seed = alchemyFunction ? {} : flowSeed;
+  const seededContract = mapCreateFunctionModalFlowContract(seed.contract);
+  const runtime =
+    getFunctionRuntime(runtimes, spec?.image) ??
+    runtimes.find(({ id }) => id === seed.runtime) ??
+    runtimes[0];
+  const contractKind = contract?.case ?? seededContract?.contractKind ?? "jsonSchema";
   const starterFiles = runtime ? createFunctionSourceStarter(runtime, contractKind) : [];
   const sourceFiles = spec?.source ? decodeFunctionSourceFiles(spec.source.files) : starterFiles;
   const state: CreateFunctionModalState = {
@@ -73,6 +128,12 @@ export const createInitialCreateFunctionModalState = ({
     runtime: runtime?.id ?? "",
     sourceFiles,
     sourceFile: sourceFiles[0]?.path ?? "",
+    name: seed.functionName ?? "",
+    description: seed.functionDescription ?? "",
+    ...seededContract,
+    contractCaller: seededContract
+      ? seed.returnLabel || CREATE_FUNCTION_MODAL_CONTRACT_DEFAULT_CALLER
+      : undefined,
   };
   if (!alchemyFunction) return state;
   return {
@@ -93,21 +154,14 @@ export const createInitialCreateFunctionModalState = ({
     contractKind,
     schemaTexts:
       contract?.case === "jsonSchema"
-        ? {
-            [FunctionContractSide.INPUT]: formatJson(contract.value.input ?? {}),
-            [FunctionContractSide.OUTPUT]: formatJson(contract.value.output ?? {}),
-          }
+        ? mapCreateFunctionModalSchemaTexts(contract.value.input ?? {}, contract.value.output ?? {})
         : state.schemaTexts,
     arrowFields:
       contract?.case === "arrow"
-        ? {
-            [FunctionContractSide.INPUT]: decodeFunctionArrowFields(contract.value.inputSchema).map(
-              (field, index) => ({ ...field, id: `in_${index}` }),
-            ),
-            [FunctionContractSide.OUTPUT]: decodeFunctionArrowFields(
-              contract.value.outputSchema,
-            ).map((field, index) => ({ ...field, id: `out_${index}` })),
-          }
+        ? mapCreateFunctionModalArrowFields(
+            decodeFunctionArrowFields(contract.value.inputSchema),
+            decodeFunctionArrowFields(contract.value.outputSchema),
+          )
         : state.arrowFields,
     vcpus: state.vcpus,
     memoryMib: state.memoryMib,

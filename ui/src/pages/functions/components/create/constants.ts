@@ -125,6 +125,8 @@ export const CREATE_FUNCTION_MODAL_MODE_TO_SUBMIT_ICON_MAP: Record<CreateFunctio
     [CreateFunctionModalMode.VERSION]: HammerIcon,
   };
 
+export const CREATE_FUNCTION_MODAL_CONTRACT_DEFAULT_CALLER = "the calling app";
+
 export const CREATE_FUNCTION_MODAL_CONTRACT_SIDE_TO_LABEL_MAP: Record<
   FunctionContractSide,
   string
@@ -160,7 +162,10 @@ export const CREATE_FUNCTION_MODAL_ARROW_TYPES = [
   "float64",
   "bool",
   "timestamp[us]",
+  "timestamp[us, tz=UTC]",
   "date32",
+  "time64[us]",
+  "decimal128(38, 9)",
   "binary",
   "list<utf8>",
   "fixed_size_list<float32>[384]",
@@ -200,6 +205,7 @@ export const CREATE_FUNCTION_MODAL_DEFAULT_STATE: CreateFunctionModalState = {
   secrets: [],
   secretNames: {},
   contractKind: "jsonSchema",
+  contractCaller: undefined,
   schemaTexts: {
     [FunctionContractSide.INPUT]: formatJson(CREATE_FUNCTION_MODAL_DEFAULT_SCHEMA),
     [FunctionContractSide.OUTPUT]: formatJson(CREATE_FUNCTION_MODAL_DEFAULT_SCHEMA),

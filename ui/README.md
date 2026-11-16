@@ -41,7 +41,8 @@ pnpm check:host      # type-check and build the fixture host against the package
 
 | Subpath | What |
 |---|---|
-| `./paths` | `AlchemyPath` and `createAlchemyHref` |
+| `./paths` | `AlchemyPath`, `createAlchemyHref`, `Flow`, `createAlchemyFlowSearch` and the `AlchemyReturnSearch` type |
+| `./links` | `createAlchemyFunctionHref` and `parseAlchemyReturnSearch`, the link format other products use. No components |
 | `./routes` | one `*RouteOptions` per page, plus `alchemyLayoutRouteOptions` and `alchemyNotFoundRouteOptions` |
 | `./AlchemyLayout` | the shell, its sidebar and the URL-driven drawer and modals |
 | `./commands` | `useAlchemyCommandItems({ base, transport })` for a host command palette |
@@ -63,6 +64,14 @@ pnpm check:host      # type-check and build the fixture host against the package
 6. **Own the query client.** Skip retries for `NotFound`, `PermissionDenied`, `Unauthenticated`, `InvalidArgument` and `Unimplemented`, or a missing function retries for about 7s before its not-found page. A `staleTime` of 30s is recommended.
 7. **Proxy** `/functions.v1.FunctionsService` and `/metrics.v1.MetricsService` to the Alchemy API at the transport's `baseUrl`. When another product the host mounts also serves `metrics.v1.MetricsService`, put one product behind a prefix.
 8. **Give the layout a box.** `AlchemyLayout` fills its parent, so the parent needs a definite height (a flex child with `min-height: 0`).
+
+### Deep links into a flow
+
+Another product opens Alchemy's create wizard with `createAlchemyFunctionHref(alchemyUrl, returnTo, seed)` from `./links`. `alchemyUrl` is Alchemy's mount path on the same origin or its full URL on its own domain. A host that mounts Alchemy itself can link in-app with `createAlchemyFlowSearch(Flow.CREATE_FUNCTION, seed)` on the module's `./functions` route instead. The seed carries a suggested `functionName` and `functionDescription`, a `runtime` id and the function's `contract`. Arrow contracts list their fields as `{ name, type, nullable }` with Arrow type tokens such as `utf8`, `int64` or `timestamp[us, tz=UTC]`. JSON Schema contracts carry each side as JSON text. A seeded contract is locked in the wizard, so the function always matches what the caller sends. A contract that does not parse is dropped and the wizard opens as usual.
+
+`returnTo` is where the user goes back to, and `returnLabel` names the caller in the wizard. It is a path in the host app or a full URL. A full URL on another origin is followed only when that origin is in `AlchemyLayout`'s `returnOrigins` prop, and any other `returnTo` is ignored so the wizard closes in place. The host's own origin moves within the router and an allowed origin loads the page. The server writes its runtime config into `index.html` as the JSON script `alchemy-runtime-config`, and the standalone app passes its `returnOrigins`, set by `UI_RETURN_ORIGINS`, to the layout. So a standalone Filament on its own domain gets its users back. Cancel returns to `returnTo` as it is. Create returns to it with `alchemyFunctionId` and `alchemyFunctionVersion` added to its search, which the caller reads with `parseAlchemyReturnSearch` as an `AlchemyReturnSearch`. The new version may still be building. Seeds never carry environment values or secrets.
+
+`fixtures/host/` links to a seeded create that returns to the host home and shows the function it got back.
 
 ### Releasing
 

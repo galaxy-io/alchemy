@@ -16,6 +16,8 @@ import type {
   FunctionSourceKind,
 } from "@/pages/functions/types";
 
+import type { AlchemyFlowSeed } from "@/module/schemas";
+
 export enum CreateFunctionModalStep {
   SOURCE = "SOURCE",
   CONTRACT = "CONTRACT",
@@ -53,6 +55,7 @@ export interface CreateFunctionModalState {
   secrets: KeyValueInputPair[];
   secretNames: NonNullable<FunctionSpec["secrets"]>;
   contractKind: FunctionContractKind;
+  contractCaller: AlchemyFlowSeed["returnLabel"];
   schemaTexts: Record<FunctionContractSide, string>;
   arrowFields: Record<FunctionContractSide, CreateFunctionModalArrowField[]>;
   vcpus: Resources["vcpus"];
@@ -77,3 +80,8 @@ export interface CreateFunctionModalDerivedState {
 
 export type CreateFunctionModalContextValue = CreateFunctionModalState &
   CreateFunctionModalDerivedState;
+
+export type CreateFunctionModalFlowSeed = Pick<
+  AlchemyFlowSeed,
+  "functionName" | "functionDescription" | "runtime" | "contract" | "returnLabel"
+>;

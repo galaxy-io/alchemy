@@ -25,10 +25,13 @@ import CreateFunctionModalDetails from "@/pages/functions/components/create/step
 import CreateFunctionModalResources from "@/pages/functions/components/create/steps/CreateFunctionModalResources";
 import CreateFunctionModalSource from "@/pages/functions/components/create/steps/CreateFunctionModalSource";
 import {
+  type CreateFunctionModalFlowSeed,
   CreateFunctionModalMode,
   CreateFunctionModalStep,
 } from "@/pages/functions/components/create/types";
 import { getFunctionCurrentVersion } from "@/pages/functions/utils";
+
+import type { AlchemyReturnSearch } from "@/module/paths";
 
 import {
   createGetFunctionVersionInput,
@@ -42,9 +45,14 @@ import { useOverlaySession } from "@/hooks/useOverlaySession";
 interface CreateFunctionModalContentProps {
   isOpen: boolean;
   onClose: () => void;
+  onCreated: (result: AlchemyReturnSearch) => void;
 }
 
-const CreateFunctionModalContent: FC<CreateFunctionModalContentProps> = ({ isOpen, onClose }) => {
+const CreateFunctionModalContent: FC<CreateFunctionModalContentProps> = ({
+  isOpen,
+  onClose,
+  onCreated,
+}) => {
   const { mode, step, name, isSubmitting } = useCreateFunctionModalState();
 
   const renderBody = () => {
@@ -79,7 +87,7 @@ const CreateFunctionModalContent: FC<CreateFunctionModalContentProps> = ({ isOpe
       subheader={mode === CreateFunctionModalMode.VERSION ? name : undefined}
       isDismissable={!isSubmitting}
       sidebar={<CreateFunctionModalSidebar />}
-      footer={<CreateFunctionModalFooter onClose={onClose} />}
+      footer={<CreateFunctionModalFooter onCreated={onCreated} />}
       hasDividers
       isFlush
       onOpenChange={(open) => {
@@ -96,10 +104,18 @@ const CreateFunctionModalContent: FC<CreateFunctionModalContentProps> = ({ isOpe
 interface CreateFunctionModalProps {
   isOpen: boolean;
   functionId?: AlchemyFunction["id"];
+  flowSeed: CreateFunctionModalFlowSeed;
   onClose: () => void;
+  onCreated: (result: AlchemyReturnSearch) => void;
 }
 
-const CreateFunctionModal: FC<CreateFunctionModalProps> = ({ isOpen, functionId, onClose }) => {
+const CreateFunctionModal: FC<CreateFunctionModalProps> = ({
+  isOpen,
+  functionId,
+  flowSeed,
+  onClose,
+  onCreated,
+}) => {
   const session = useOverlaySession(isOpen);
 
   const { data } = useGetFunctionQuery({
@@ -150,8 +166,9 @@ const CreateFunctionModal: FC<CreateFunctionModalProps> = ({ isOpen, functionId,
       version={version}
       runtimes={runtimesData.runtimes}
       limits={runtimesData.limits}
+      flowSeed={flowSeed}
     >
-      <CreateFunctionModalContent isOpen={isOpen} onClose={onClose} />
+      <CreateFunctionModalContent isOpen={isOpen} onClose={onClose} onCreated={onCreated} />
     </CreateFunctionModalProvider>
   );
 };

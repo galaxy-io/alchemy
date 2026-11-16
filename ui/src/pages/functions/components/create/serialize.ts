@@ -14,7 +14,9 @@ import { getCreateFunctionModalRuntime } from "@/pages/functions/components/crea
 import { FunctionContractSide, FunctionSourceKind } from "@/pages/functions/types";
 import { createFunctionSource, encodeFunctionArrowFields } from "@/pages/functions/utils";
 
-const mapCreateFunctionModalStateToContract = (state: CreateFunctionModalState): Contract =>
+export const mapCreateFunctionModalStateToContract = (
+  state: Pick<CreateFunctionModalState, "contractKind" | "schemaTexts" | "arrowFields">,
+): Contract =>
   state.contractKind === "jsonSchema"
     ? create(ContractSchema, {
         kind: {

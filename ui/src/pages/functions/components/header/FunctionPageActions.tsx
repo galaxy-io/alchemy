@@ -26,7 +26,7 @@ const FunctionPageActions: FC<FunctionPageActionsProps> = ({ alchemyFunction }) 
         label="New version"
         icon={PlusIcon}
         variant={ButtonVariant.SECONDARY}
-        onClick={() => openFlow(Flow.CREATE_FUNCTION_VERSION, alchemyFunction.id)}
+        onClick={() => openFlow(Flow.CREATE_FUNCTION_VERSION, { functionId: alchemyFunction.id })}
       />
       <Button
         label="Invoke"
