@@ -81,6 +81,7 @@ export const mapCreateFunctionModalStateToRequest = (
     timeoutMs: BigInt(Math.round(state.timeoutMs)),
     maxConcurrency: state.maxConcurrency ?? 0,
     retries: state.retries,
+    network: state.network,
     resources: { vcpus: state.vcpus, memoryMib: state.memoryMib },
   });
 

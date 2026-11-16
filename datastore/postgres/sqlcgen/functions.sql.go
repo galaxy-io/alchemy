@@ -29,9 +29,9 @@ func (q *Queries) CountFunctions(ctx context.Context, arg CountFunctionsParams) 
 }
 
 const createFunction = `-- name: CreateFunction :one
-INSERT INTO functions (tenant_id, name, description, timeout_ms, max_concurrency, retries, vcpus, memory_mib, created_by_user_id, updated_by_user_id)
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $9)
-RETURNING id, tenant_id, name, description, timeout_ms, max_concurrency, retries, vcpus, memory_mib, is_deleted, deleted_at, deleted_by_user_id, created_by_user_id, updated_by_user_id, created_at, updated_at
+INSERT INTO functions (tenant_id, name, description, timeout_ms, max_concurrency, retries, vcpus, memory_mib, network, created_by_user_id, updated_by_user_id)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $10)
+RETURNING id, tenant_id, name, description, timeout_ms, max_concurrency, retries, vcpus, memory_mib, network, is_deleted, deleted_at, deleted_by_user_id, created_by_user_id, updated_by_user_id, created_at, updated_at
 `
 
 type CreateFunctionParams struct {
@@ -43,6 +43,7 @@ type CreateFunctionParams struct {
 	Retries         int32
 	Vcpus           int32
 	MemoryMib       int32
+	Network         int32
 	CreatedByUserID pgtype.Text
 }
 
@@ -56,6 +57,7 @@ func (q *Queries) CreateFunction(ctx context.Context, arg CreateFunctionParams) 
 		arg.Retries,
 		arg.Vcpus,
 		arg.MemoryMib,
+		arg.Network,
 		arg.CreatedByUserID,
 	)
 	var i Function
@@ -69,6 +71,7 @@ func (q *Queries) CreateFunction(ctx context.Context, arg CreateFunctionParams) 
 		&i.Retries,
 		&i.Vcpus,
 		&i.MemoryMib,
+		&i.Network,
 		&i.IsDeleted,
 		&i.DeletedAt,
 		&i.DeletedByUserID,
@@ -104,7 +107,7 @@ func (q *Queries) DeleteFunction(ctx context.Context, arg DeleteFunctionParams) 
 }
 
 const getFunction = `-- name: GetFunction :one
-SELECT id, tenant_id, name, description, timeout_ms, max_concurrency, retries, vcpus, memory_mib, is_deleted, deleted_at, deleted_by_user_id, created_by_user_id, updated_by_user_id, created_at, updated_at FROM functions WHERE tenant_id = $1 AND id = $2 AND NOT is_deleted
+SELECT id, tenant_id, name, description, timeout_ms, max_concurrency, retries, vcpus, memory_mib, network, is_deleted, deleted_at, deleted_by_user_id, created_by_user_id, updated_by_user_id, created_at, updated_at FROM functions WHERE tenant_id = $1 AND id = $2 AND NOT is_deleted
 `
 
 type GetFunctionParams struct {
@@ -125,6 +128,7 @@ func (q *Queries) GetFunction(ctx context.Context, arg GetFunctionParams) (*Func
 		&i.Retries,
 		&i.Vcpus,
 		&i.MemoryMib,
+		&i.Network,
 		&i.IsDeleted,
 		&i.DeletedAt,
 		&i.DeletedByUserID,
@@ -137,7 +141,7 @@ func (q *Queries) GetFunction(ctx context.Context, arg GetFunctionParams) (*Func
 }
 
 const listFunctionConfigs = `-- name: ListFunctionConfigs :many
-SELECT tenant_id, id, max_concurrency, retries, vcpus, memory_mib FROM functions
+SELECT tenant_id, id, max_concurrency, retries, vcpus, memory_mib, network FROM functions
 WHERE NOT is_deleted
 `
 
@@ -148,6 +152,7 @@ type ListFunctionConfigsRow struct {
 	Retries        int32
 	Vcpus          int32
 	MemoryMib      int32
+	Network        int32
 }
 
 // What hosts read about every live function.
@@ -167,6 +172,7 @@ func (q *Queries) ListFunctionConfigs(ctx context.Context) ([]*ListFunctionConfi
 			&i.Retries,
 			&i.Vcpus,
 			&i.MemoryMib,
+			&i.Network,
 		); err != nil {
 			return nil, err
 		}
@@ -179,7 +185,7 @@ func (q *Queries) ListFunctionConfigs(ctx context.Context) ([]*ListFunctionConfi
 }
 
 const listFunctions = `-- name: ListFunctions :many
-SELECT id, tenant_id, name, description, timeout_ms, max_concurrency, retries, vcpus, memory_mib, is_deleted, deleted_at, deleted_by_user_id, created_by_user_id, updated_by_user_id, created_at, updated_at FROM functions
+SELECT id, tenant_id, name, description, timeout_ms, max_concurrency, retries, vcpus, memory_mib, network, is_deleted, deleted_at, deleted_by_user_id, created_by_user_id, updated_by_user_id, created_at, updated_at FROM functions
 WHERE tenant_id = $1 AND NOT is_deleted AND ($2::text = '' OR name ILIKE '%' || $2 || '%')
 ORDER BY created_at, id
 LIMIT $4 OFFSET $3
@@ -216,6 +222,7 @@ func (q *Queries) ListFunctions(ctx context.Context, arg ListFunctionsParams) ([
 			&i.Retries,
 			&i.Vcpus,
 			&i.MemoryMib,
+			&i.Network,
 			&i.IsDeleted,
 			&i.DeletedAt,
 			&i.DeletedByUserID,
@@ -250,9 +257,10 @@ SET name = $3, description = $4, updated_by_user_id = $5, updated_at = now(),
     max_concurrency = COALESCE($7, max_concurrency),
     retries = COALESCE($8, retries),
     vcpus = COALESCE($9, vcpus),
-    memory_mib = COALESCE($10, memory_mib)
+    memory_mib = COALESCE($10, memory_mib),
+    network = COALESCE($11, network)
 WHERE tenant_id = $1 AND id = $2 AND NOT is_deleted
-RETURNING id, tenant_id, name, description, timeout_ms, max_concurrency, retries, vcpus, memory_mib, is_deleted, deleted_at, deleted_by_user_id, created_by_user_id, updated_by_user_id, created_at, updated_at
+RETURNING id, tenant_id, name, description, timeout_ms, max_concurrency, retries, vcpus, memory_mib, network, is_deleted, deleted_at, deleted_by_user_id, created_by_user_id, updated_by_user_id, created_at, updated_at
 `
 
 type UpdateFunctionParams struct {
@@ -266,6 +274,7 @@ type UpdateFunctionParams struct {
 	Retries         pgtype.Int4
 	Vcpus           pgtype.Int4
 	MemoryMib       pgtype.Int4
+	Network         pgtype.Int4
 }
 
 func (q *Queries) UpdateFunction(ctx context.Context, arg UpdateFunctionParams) (*Function, error) {
@@ -280,6 +289,7 @@ func (q *Queries) UpdateFunction(ctx context.Context, arg UpdateFunctionParams) 
 		arg.Retries,
 		arg.Vcpus,
 		arg.MemoryMib,
+		arg.Network,
 	)
 	var i Function
 	err := row.Scan(
@@ -292,6 +302,7 @@ func (q *Queries) UpdateFunction(ctx context.Context, arg UpdateFunctionParams) 
 		&i.Retries,
 		&i.Vcpus,
 		&i.MemoryMib,
+		&i.Network,
 		&i.IsDeleted,
 		&i.DeletedAt,
 		&i.DeletedByUserID,

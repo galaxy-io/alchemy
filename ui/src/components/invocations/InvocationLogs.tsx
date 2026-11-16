@@ -32,6 +32,7 @@ const InvocationLogsList = styled.div`
   position: relative;
   flex-shrink: 0;
   width: 100%;
+  height: var(--gx-invocation-logs-height);
 `;
 
 const InvocationLogsListLine = styled.div`
@@ -39,6 +40,7 @@ const InvocationLogsListLine = styled.div`
   top: 0;
   left: 0;
   width: 100%;
+  transform: translateY(var(--gx-invocation-logs-line-top));
 `;
 
 interface InvocationLogsProps {
@@ -107,13 +109,15 @@ const InvocationLogs: FC<InvocationLogsProps> = ({
               padding={[8, INVOCATION_LOGS_INSET]}
             >
               {lines.length > 0 && (
-                <InvocationLogsList style={{ height: virtualizer.getTotalSize() }}>
+                <InvocationLogsList
+                  style={{ "--gx-invocation-logs-height": `${virtualizer.getTotalSize()}px` }}
+                >
                   {virtualizer.getVirtualItems().map((item) => (
                     <InvocationLogsListLine
                       key={item.key}
                       ref={virtualizer.measureElement}
                       data-index={item.index}
-                      style={{ transform: `translateY(${item.start}px)` }}
+                      style={{ "--gx-invocation-logs-line-top": `${item.start}px` }}
                     >
                       <InvocationLogsLine
                         number={logs.offset + item.index + 1}

@@ -30,8 +30,9 @@ container host:
 - An instance is reused for the next call of the same version while it is
   warm, so files left in `/tmp` and `/run` can still be there on the next
   call. Do not rely on them either way.
-- The guest has no network interface. A function cannot reach other services,
-  so fetch everything it needs at image build time.
+- The guest has no network unless the function sets `network: EGRESS`, which
+  reaches the internet but not private addresses or the cluster. See
+  [Isolation](/pages/concepts/isolation#egress).
 
 ## The spec
 

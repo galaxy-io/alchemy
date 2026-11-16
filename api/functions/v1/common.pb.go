@@ -78,6 +78,60 @@ func (InvocationProtocol) EnumDescriptor() ([]byte, []int) {
 	return file_functions_v1_common_proto_rawDescGZIP(), []int{0}
 }
 
+// Network is what a function's microVM can reach.
+type Network int32
+
+const (
+	// UNSPECIFIED is NONE.
+	Network_NETWORK_UNSPECIFIED Network = 0
+	// NONE gives the microVM no network device.
+	Network_NETWORK_NONE Network = 1
+	// EGRESS reaches the internet. Private, link-local and the cluster's own
+	// addresses stay unreachable.
+	Network_NETWORK_EGRESS Network = 2
+)
+
+// Enum value maps for Network.
+var (
+	Network_name = map[int32]string{
+		0: "NETWORK_UNSPECIFIED",
+		1: "NETWORK_NONE",
+		2: "NETWORK_EGRESS",
+	}
+	Network_value = map[string]int32{
+		"NETWORK_UNSPECIFIED": 0,
+		"NETWORK_NONE":        1,
+		"NETWORK_EGRESS":      2,
+	}
+)
+
+func (x Network) Enum() *Network {
+	p := new(Network)
+	*p = x
+	return p
+}
+
+func (x Network) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (Network) Descriptor() protoreflect.EnumDescriptor {
+	return file_functions_v1_common_proto_enumTypes[1].Descriptor()
+}
+
+func (Network) Type() protoreflect.EnumType {
+	return &file_functions_v1_common_proto_enumTypes[1]
+}
+
+func (x Network) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use Network.Descriptor instead.
+func (Network) EnumDescriptor() ([]byte, []int) {
+	return file_functions_v1_common_proto_rawDescGZIP(), []int{1}
+}
+
 // Contract is the typed I/O boundary of a function version. The platform
 // enforces it on both sides: input before any compute is acquired, output
 // before it is returned to the caller. It is a oneof so that other schema
@@ -428,7 +482,11 @@ const file_functions_v1_common_proto_rawDesc = "" +
 	"\x12InvocationProtocol\x12#\n" +
 	"\x1fINVOCATION_PROTOCOL_UNSPECIFIED\x10\x00\x12\x1c\n" +
 	"\x18INVOCATION_PROTOCOL_EXEC\x10\x01\x12#\n" +
-	"\x1fINVOCATION_PROTOCOL_RUNTIME_API\x10\x02B\xab\x01\n" +
+	"\x1fINVOCATION_PROTOCOL_RUNTIME_API\x10\x02*H\n" +
+	"\aNetwork\x12\x17\n" +
+	"\x13NETWORK_UNSPECIFIED\x10\x00\x12\x10\n" +
+	"\fNETWORK_NONE\x10\x01\x12\x12\n" +
+	"\x0eNETWORK_EGRESS\x10\x02B\xab\x01\n" +
 	"\x10com.functions.v1B\vCommonProtoP\x01Z9github.com/galaxy-io/alchemy/api/functions/v1;functionsv1\xa2\x02\x03FXX\xaa\x02\fFunctions.V1\xca\x02\fFunctions\\V1\xe2\x02\x18Functions\\V1\\GPBMetadata\xea\x02\rFunctions::V1b\x06proto3"
 
 var (
@@ -443,22 +501,23 @@ func file_functions_v1_common_proto_rawDescGZIP() []byte {
 	return file_functions_v1_common_proto_rawDescData
 }
 
-var file_functions_v1_common_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
+var file_functions_v1_common_proto_enumTypes = make([]protoimpl.EnumInfo, 2)
 var file_functions_v1_common_proto_msgTypes = make([]protoimpl.MessageInfo, 5)
 var file_functions_v1_common_proto_goTypes = []any{
 	(InvocationProtocol)(0),    // 0: functions.v1.InvocationProtocol
-	(*Contract)(nil),           // 1: functions.v1.Contract
-	(*JsonSchemaContract)(nil), // 2: functions.v1.JsonSchemaContract
-	(*ArrowContract)(nil),      // 3: functions.v1.ArrowContract
-	(*Resources)(nil),          // 4: functions.v1.Resources
-	(*ContractViolation)(nil),  // 5: functions.v1.ContractViolation
-	(*structpb.Struct)(nil),    // 6: google.protobuf.Struct
+	(Network)(0),               // 1: functions.v1.Network
+	(*Contract)(nil),           // 2: functions.v1.Contract
+	(*JsonSchemaContract)(nil), // 3: functions.v1.JsonSchemaContract
+	(*ArrowContract)(nil),      // 4: functions.v1.ArrowContract
+	(*Resources)(nil),          // 5: functions.v1.Resources
+	(*ContractViolation)(nil),  // 6: functions.v1.ContractViolation
+	(*structpb.Struct)(nil),    // 7: google.protobuf.Struct
 }
 var file_functions_v1_common_proto_depIdxs = []int32{
-	2, // 0: functions.v1.Contract.json_schema:type_name -> functions.v1.JsonSchemaContract
-	3, // 1: functions.v1.Contract.arrow:type_name -> functions.v1.ArrowContract
-	6, // 2: functions.v1.JsonSchemaContract.input:type_name -> google.protobuf.Struct
-	6, // 3: functions.v1.JsonSchemaContract.output:type_name -> google.protobuf.Struct
+	3, // 0: functions.v1.Contract.json_schema:type_name -> functions.v1.JsonSchemaContract
+	4, // 1: functions.v1.Contract.arrow:type_name -> functions.v1.ArrowContract
+	7, // 2: functions.v1.JsonSchemaContract.input:type_name -> google.protobuf.Struct
+	7, // 3: functions.v1.JsonSchemaContract.output:type_name -> google.protobuf.Struct
 	4, // [4:4] is the sub-list for method output_type
 	4, // [4:4] is the sub-list for method input_type
 	4, // [4:4] is the sub-list for extension type_name
@@ -480,7 +539,7 @@ func file_functions_v1_common_proto_init() {
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_functions_v1_common_proto_rawDesc), len(file_functions_v1_common_proto_rawDesc)),
-			NumEnums:      1,
+			NumEnums:      2,
 			NumMessages:   5,
 			NumExtensions: 0,
 			NumServices:   0,

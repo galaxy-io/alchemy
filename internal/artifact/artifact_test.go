@@ -5,6 +5,7 @@ import (
 
 	"google.golang.org/protobuf/proto"
 
+	functionsv1 "github.com/galaxy-io/alchemy/api/functions/v1"
 	hostv1 "github.com/galaxy-io/alchemy/api/host/v1"
 )
 
@@ -36,6 +37,7 @@ func TestIDChangesWithEachInput(t *testing.T) {
 		{"working dir", func(a *hostv1.Artifact) { a.WorkingDir = "/srv" }},
 		{"vcpus", func(a *hostv1.Artifact) { a.Vcpus = 2 }},
 		{"memory", func(a *hostv1.Artifact) { a.MemoryMib = 256 }},
+		{"network", func(a *hostv1.Artifact) { a.Network = functionsv1.Network_NETWORK_EGRESS }},
 		{"argv", func(a *hostv1.Artifact) { a.Argv = []string{"python", "main.py"} }},
 		{"env value", func(a *hostv1.Artifact) { a.Env["A"] = "9" }},
 		{"layer", func(a *hostv1.Artifact) { a.Layers = append(a.Layers, &hostv1.Layer{Sha256: "l2"}) }},

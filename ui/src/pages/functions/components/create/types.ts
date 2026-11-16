@@ -1,6 +1,6 @@
 import type { KeyValueInputPair } from "@galaxy-io/dls/inputs/KeyValueInput";
 
-import type { Resources } from "@/gen/functions/v1/common_pb";
+import type { Network, Resources } from "@/gen/functions/v1/common_pb";
 import type {
   Function as AlchemyFunction,
   FunctionSpec,
@@ -60,6 +60,7 @@ export interface CreateFunctionModalState {
   timeoutMs: number;
   maxConcurrency: number | null;
   retries: number;
+  network: Network;
   isSubmitting: boolean;
 }
 

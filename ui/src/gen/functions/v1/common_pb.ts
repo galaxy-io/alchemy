@@ -11,7 +11,7 @@ import type { JsonObject, Message } from "@bufbuild/protobuf";
  * Describes the file functions/v1/common.proto.
  */
 export const file_functions_v1_common: GenFile = /*@__PURE__*/
-  fileDesc("ChlmdW5jdGlvbnMvdjEvY29tbW9uLnByb3RvEgxmdW5jdGlvbnMudjEieQoIQ29udHJhY3QSNwoLanNvbl9zY2hlbWEYASABKAsyIC5mdW5jdGlvbnMudjEuSnNvblNjaGVtYUNvbnRyYWN0SAASLAoFYXJyb3cYAiABKAsyGy5mdW5jdGlvbnMudjEuQXJyb3dDb250cmFjdEgAQgYKBGtpbmQiZQoSSnNvblNjaGVtYUNvbnRyYWN0EiYKBWlucHV0GAEgASgLMhcuZ29vZ2xlLnByb3RvYnVmLlN0cnVjdBInCgZvdXRwdXQYAiABKAsyFy5nb29nbGUucHJvdG9idWYuU3RydWN0IjwKDUFycm93Q29udHJhY3QSFAoMaW5wdXRfc2NoZW1hGAEgASgMEhUKDW91dHB1dF9zY2hlbWEYAiABKAwiLgoJUmVzb3VyY2VzEg0KBXZjcHVzGAEgASgNEhIKCm1lbW9yeV9taWIYAiABKA0iUAoRQ29udHJhY3RWaW9sYXRpb24SFQoNaW5zdGFuY2VfcGF0aBgBIAEoCRITCgtzY2hlbWFfcGF0aBgCIAEoCRIPCgdtZXNzYWdlGAMgASgJKnwKEkludm9jYXRpb25Qcm90b2NvbBIjCh9JTlZPQ0FUSU9OX1BST1RPQ09MX1VOU1BFQ0lGSUVEEAASHAoYSU5WT0NBVElPTl9QUk9UT0NPTF9FWEVDEAESIwofSU5WT0NBVElPTl9QUk9UT0NPTF9SVU5USU1FX0FQSRACYgZwcm90bzM", [file_google_protobuf_struct]);
+  fileDesc("ChlmdW5jdGlvbnMvdjEvY29tbW9uLnByb3RvEgxmdW5jdGlvbnMudjEieQoIQ29udHJhY3QSNwoLanNvbl9zY2hlbWEYASABKAsyIC5mdW5jdGlvbnMudjEuSnNvblNjaGVtYUNvbnRyYWN0SAASLAoFYXJyb3cYAiABKAsyGy5mdW5jdGlvbnMudjEuQXJyb3dDb250cmFjdEgAQgYKBGtpbmQiZQoSSnNvblNjaGVtYUNvbnRyYWN0EiYKBWlucHV0GAEgASgLMhcuZ29vZ2xlLnByb3RvYnVmLlN0cnVjdBInCgZvdXRwdXQYAiABKAsyFy5nb29nbGUucHJvdG9idWYuU3RydWN0IjwKDUFycm93Q29udHJhY3QSFAoMaW5wdXRfc2NoZW1hGAEgASgMEhUKDW91dHB1dF9zY2hlbWEYAiABKAwiLgoJUmVzb3VyY2VzEg0KBXZjcHVzGAEgASgNEhIKCm1lbW9yeV9taWIYAiABKA0iUAoRQ29udHJhY3RWaW9sYXRpb24SFQoNaW5zdGFuY2VfcGF0aBgBIAEoCRITCgtzY2hlbWFfcGF0aBgCIAEoCRIPCgdtZXNzYWdlGAMgASgJKnwKEkludm9jYXRpb25Qcm90b2NvbBIjCh9JTlZPQ0FUSU9OX1BST1RPQ09MX1VOU1BFQ0lGSUVEEAASHAoYSU5WT0NBVElPTl9QUk9UT0NPTF9FWEVDEAESIwofSU5WT0NBVElPTl9QUk9UT0NPTF9SVU5USU1FX0FQSRACKkgKB05ldHdvcmsSFwoTTkVUV09SS19VTlNQRUNJRklFRBAAEhAKDE5FVFdPUktfTk9ORRABEhIKDk5FVFdPUktfRUdSRVNTEAJiBnByb3RvMw", [file_google_protobuf_struct]);
 
 /**
  * Contract is the typed I/O boundary of a function version. The platform
@@ -200,4 +200,39 @@ export enum InvocationProtocol {
  */
 export const InvocationProtocolSchema: GenEnum<InvocationProtocol> = /*@__PURE__*/
   enumDesc(file_functions_v1_common, 0);
+
+/**
+ * Network is what a function's microVM can reach.
+ *
+ * @generated from enum functions.v1.Network
+ */
+export enum Network {
+  /**
+   * UNSPECIFIED is NONE.
+   *
+   * @generated from enum value: NETWORK_UNSPECIFIED = 0;
+   */
+  UNSPECIFIED = 0,
+
+  /**
+   * NONE gives the microVM no network device.
+   *
+   * @generated from enum value: NETWORK_NONE = 1;
+   */
+  NONE = 1,
+
+  /**
+   * EGRESS reaches the internet. Private, link-local and the cluster's own
+   * addresses stay unreachable.
+   *
+   * @generated from enum value: NETWORK_EGRESS = 2;
+   */
+  EGRESS = 2,
+}
+
+/**
+ * Describes the enum functions.v1.Network.
+ */
+export const NetworkSchema: GenEnum<Network> = /*@__PURE__*/
+  enumDesc(file_functions_v1_common, 1);
 

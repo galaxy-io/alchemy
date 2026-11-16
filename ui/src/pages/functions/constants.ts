@@ -9,6 +9,7 @@ import {
   type ArrowContract,
   InvocationProtocol,
   type JsonSchemaContract,
+  Network,
 } from "@/gen/functions/v1/common_pb";
 import { FunctionVersionStatus, type Runtime } from "@/gen/functions/v1/functions_pb";
 
@@ -21,6 +22,13 @@ import {
 export const FUNCTION_NAME_PATTERN = /^[a-z][a-z0-9-]{1,62}$/;
 export const FUNCTION_NAME_MAX_LENGTH = 63;
 export const FUNCTION_DESCRIPTION_MAX_LENGTH = 160;
+
+export const FUNCTION_NETWORK_TO_LABEL_MAP: Record<Network, string> = {
+  [Network.UNSPECIFIED]: "None",
+  [Network.NONE]: "None",
+  [Network.EGRESS]: "Internet",
+};
+export const FUNCTION_NETWORKS = [Network.NONE, Network.EGRESS];
 
 export const FUNCTION_VERSION_STATUS_TO_LABEL_MAP: Record<FunctionVersionStatus, string> = {
   [FunctionVersionStatus.UNSPECIFIED]: "Unknown",

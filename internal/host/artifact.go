@@ -28,6 +28,7 @@ func toProto(req *hostv1.BuildRequest, a *driver.Artifact) *hostv1.Artifact {
 		Layers:      req.GetLayers(),
 		Contract:    req.GetSpec().GetContract(),
 		Secrets:     req.GetSpec().GetSecrets(),
+		Network:     req.GetNetwork(),
 	}
 	p.Id = artifact.ID(p)
 	return p
@@ -47,6 +48,7 @@ func fromProto(p *hostv1.Artifact) *driver.Artifact {
 		Protocol:    driver.SupervisorProtocol(p.GetProtocol()),
 		VCPUs:       p.GetVcpus(),
 		MemoryMiB:   p.GetMemoryMib(),
+		Egress:      p.GetNetwork() == functionsv1.Network_NETWORK_EGRESS,
 	}
 }
 

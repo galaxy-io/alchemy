@@ -12,6 +12,7 @@ import (
 	"os/signal"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"syscall"
 	"time"
 
@@ -56,6 +57,12 @@ func run(log *slog.Logger) error {
 		Console:        true,
 		Keychain:       registry.Keychain(registry.AWS(), registry.GCP()),
 		Snapshots:      true,
+		EgressSubnet:   envOr("EGRESS_SUBNET", "169.254.200.0/21"),
+		EgressDeny:     envList("EGRESS_DENY"),
+		EgressDNS:      envList("EGRESS_DNS"),
+	}
+	if len(fcCfg.EgressDNS) == 0 {
+		fcCfg.EgressDNS = []string{"1.1.1.1", "8.8.8.8"}
 	}
 	if err := errors.Join(
 		envParse("MAX_INSTANCES", &cfg.MaxConcurrency, strconv.Atoi),
@@ -109,6 +116,17 @@ func run(log *slog.Logger) error {
 	}
 
 	return host.New(cfg, drv, b, bucket, artifacts, log).Run(ctx)
+}
+
+// envList splits a comma-separated variable, dropping empty entries.
+func envList(key string) []string {
+	var out []string
+	for v := range strings.SplitSeq(os.Getenv(key), ",") {
+		if v = strings.TrimSpace(v); v != "" {
+			out = append(out, v)
+		}
+	}
+	return out
 }
 
 func envOr(key, fallback string) string {

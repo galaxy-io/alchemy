@@ -33,6 +33,7 @@ export enum CreateFunctionModalActionType {
   SET_TIMEOUT_MS = "SET_TIMEOUT_MS",
   SET_MAX_CONCURRENCY = "SET_MAX_CONCURRENCY",
   SET_RETRIES = "SET_RETRIES",
+  SET_NETWORK = "SET_NETWORK",
   GO_TO_STEP = "GO_TO_STEP",
   GO_BACK = "GO_BACK",
   GO_NEXT = "GO_NEXT",
@@ -143,6 +144,11 @@ export interface SetRetriesAction {
   payload: CreateFunctionModalState["retries"];
 }
 
+export interface SetNetworkAction {
+  type: CreateFunctionModalActionType.SET_NETWORK;
+  payload: CreateFunctionModalState["network"];
+}
+
 export interface GoToStepAction {
   type: CreateFunctionModalActionType.GO_TO_STEP;
   payload: CreateFunctionModalStep;
@@ -182,6 +188,7 @@ export type CreateFunctionModalAction =
   | SetTimeoutMsAction
   | SetMaxConcurrencyAction
   | SetRetriesAction
+  | SetNetworkAction
   | GoToStepAction
   | GoBackAction
   | GoNextAction

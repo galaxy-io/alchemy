@@ -1,6 +1,8 @@
 import type { JsonObject } from "@bufbuild/protobuf";
 import { CodeIcon, CubeIcon, HammerIcon, type Icon, PlusIcon } from "@phosphor-icons/react";
 
+import { Network } from "@/gen/functions/v1/common_pb";
+
 import {
   type CreateFunctionModalArrowField,
   CreateFunctionModalMode,
@@ -210,6 +212,7 @@ export const CREATE_FUNCTION_MODAL_DEFAULT_STATE: CreateFunctionModalState = {
   timeoutMs: 30_000,
   maxConcurrency: null,
   retries: 2,
+  network: Network.NONE,
   isSubmitting: false,
 };
 

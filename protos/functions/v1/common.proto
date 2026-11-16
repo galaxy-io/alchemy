@@ -17,6 +17,17 @@ enum InvocationProtocol {
   INVOCATION_PROTOCOL_RUNTIME_API = 2;
 }
 
+// Network is what a function's microVM can reach.
+enum Network {
+  // UNSPECIFIED is NONE.
+  NETWORK_UNSPECIFIED = 0;
+  // NONE gives the microVM no network device.
+  NETWORK_NONE = 1;
+  // EGRESS reaches the internet. Private, link-local and the cluster's own
+  // addresses stay unreachable.
+  NETWORK_EGRESS = 2;
+}
+
 // Contract is the typed I/O boundary of a function version. The platform
 // enforces it on both sides: input before any compute is acquired, output
 // before it is returned to the caller. It is a oneof so that other schema

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
 	"net"
@@ -42,7 +43,19 @@ func initGuest() error {
 			return fmt.Errorf("mount %s: %w", m.target, err)
 		}
 	}
+	useKernelDNS()
 	return nil
+}
+
+// useKernelDNS makes the dns servers the host gave the kernel, listed in
+// /proc/net/pnp in resolv.conf format, the guest's resolv.conf. A guest
+// without network, or an image without /etc/resolv.conf, keeps its own.
+func useKernelDNS() {
+	pnp, err := os.ReadFile("/proc/net/pnp")
+	if err != nil || !bytes.Contains(pnp, []byte("nameserver")) {
+		return
+	}
+	_ = unix.Mount("/proc/net/pnp", "/etc/resolv.conf", "", unix.MS_BIND, "")
 }
 
 // overlayLayers makes the layer drive the top of the root filesystem: the

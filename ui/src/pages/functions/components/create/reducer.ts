@@ -11,6 +11,7 @@ import {
   type SetMaxConcurrencyAction,
   type SetMemoryMibAction,
   type SetNameAction,
+  type SetNetworkAction,
   type SetRetriesAction,
   type SetRuntimeAction,
   type SetSchemaTextAction,
@@ -161,6 +162,13 @@ function setRetries(
   return { ...state, retries: action.payload };
 }
 
+function setNetwork(
+  state: CreateFunctionModalState,
+  action: SetNetworkAction,
+): CreateFunctionModalState {
+  return { ...state, network: action.payload };
+}
+
 function setSubmitting(
   state: CreateFunctionModalState,
   action: SetSubmittingAction,
@@ -285,6 +293,8 @@ const createFunctionModalReducer = (
       return setMaxConcurrency(state, action);
     case CreateFunctionModalActionType.SET_RETRIES:
       return setRetries(state, action);
+    case CreateFunctionModalActionType.SET_NETWORK:
+      return setNetwork(state, action);
     case CreateFunctionModalActionType.GO_TO_STEP:
       return goToStep(state, action);
     case CreateFunctionModalActionType.GO_BACK:

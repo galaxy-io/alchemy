@@ -411,20 +411,17 @@ func (h *Host) functionConfig(ctx context.Context, q *bus.InvokeQueue, inv *func
 	return cfg
 }
 
-// resize has req run at its function's current resources. The server named
-// the artifact when it queued req; a change since makes it the artifact
-// those resources build, named as hosts name what they build.
+// resize has req run at its function's current resources and network. The
+// server named the artifact when it queued req; a change since makes it the
+// artifact those build, named as hosts name what they build.
 func resize(req *hostv1.InvokeRequest, cfg *hostv1.FunctionConfig) {
-	r := cfg.GetResources()
-	a := req.GetArtifact()
-	if r == nil || (r.GetVcpus() == a.GetVcpus() && r.GetMemoryMib() == a.GetMemoryMib()) {
+	a := artifact.Configure(req.GetArtifact(), cfg.GetResources(), cfg.GetNetwork())
+	if a == req.GetArtifact() {
 		return
 	}
-	a = proto.CloneOf(a)
-	a.Vcpus, a.MemoryMib = r.GetVcpus(), r.GetMemoryMib()
-	a.Id = artifact.ID(a)
 	req.Artifact = a
-	if req.GetBuild() != nil {
-		req.Build.Resources = r
+	if b := req.GetBuild(); b != nil {
+		b.Resources = &functionsv1.Resources{Vcpus: a.GetVcpus(), MemoryMib: a.GetMemoryMib()}
+		b.Network = a.GetNetwork()
 	}
 }

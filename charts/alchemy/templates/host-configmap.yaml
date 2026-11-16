@@ -16,6 +16,10 @@ data:
   # Eviction
   KEPT_VERSIONS: {{ .Values.host.eviction.keptVersions | quote }}
   VERSION_IDLE_TTL: {{ .Values.host.eviction.versionIdleTTL | quote }}
+  # Egress
+  EGRESS_SUBNET: {{ .Values.host.egress.subnet | quote }}
+  EGRESS_DENY: {{ join "," .Values.host.egress.deny | quote }}
+  EGRESS_DNS: {{ join "," .Values.host.egress.dns | quote }}
   # Secrets
   SECRETS_REFRESH_INTERVAL: {{ .Values.host.secretsRefreshInterval | quote }}
   # Observability

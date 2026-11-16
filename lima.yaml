@@ -18,7 +18,7 @@ provision:
       set -euo pipefail
       export DEBIAN_FRONTEND=noninteractive
       apt-get update -q
-      apt-get install -y -q e2fsprogs curl
+      apt-get install -y -q e2fsprogs curl iproute2 nftables
 
       FC_VERSION=v1.17.0
       ARCH=$(uname -m)

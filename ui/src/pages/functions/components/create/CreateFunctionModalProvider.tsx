@@ -127,6 +127,8 @@ export const useCreateFunctionModalActions = () => {
         dispatch({ type: CreateFunctionModalActionType.SET_MAX_CONCURRENCY, payload }),
       setRetries: (payload: CreateFunctionModalState["retries"]) =>
         dispatch({ type: CreateFunctionModalActionType.SET_RETRIES, payload }),
+      setNetwork: (payload: CreateFunctionModalState["network"]) =>
+        dispatch({ type: CreateFunctionModalActionType.SET_NETWORK, payload }),
       goToStep: (payload: CreateFunctionModalStep) =>
         dispatch({ type: CreateFunctionModalActionType.GO_TO_STEP, payload }),
       goBack: () => dispatch({ type: CreateFunctionModalActionType.GO_BACK }),
