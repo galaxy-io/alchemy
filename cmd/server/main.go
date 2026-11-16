@@ -154,7 +154,7 @@ func run(log *slog.Logger) error {
 // routes serves the API, and Invoke and GetInvocation over plain HTTP, behind one interceptor
 // that authenticates both, and the UI.
 func routes(svc *server.Service, auth authv1connect.AuthServiceHandler, interceptor *server.AuthInterceptor) *http.ServeMux {
-	opts := connect.WithInterceptors(interceptor)
+	opts := connect.WithInterceptors(interceptor, server.ErrorInterceptor{})
 	mux := http.NewServeMux()
 	mux.Handle(functionsv1connect.NewFunctionsServiceHandler(svc, opts))
 	mux.Handle(metricsv1connect.NewMetricsServiceHandler(svc.NewMetricsService(), opts))

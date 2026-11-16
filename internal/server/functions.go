@@ -55,7 +55,7 @@ func (s *Service) CreateFunction(ctx context.Context, req *connect.Request[funct
 	if err != nil {
 		return nil, err
 	}
-	spec, err := s.prepareSpec(ctx, req.Msg.GetSpec())
+	spec, err := s.prepareSpec(ctx, "", req.Msg.GetSpec())
 	if err != nil {
 		return nil, err
 	}
@@ -228,7 +228,7 @@ func (s *Service) CreateFunctionVersion(ctx context.Context, req *connect.Reques
 	if err != nil {
 		return nil, err
 	}
-	spec, err := s.prepareSpec(ctx, req.Msg.GetSpec())
+	spec, err := s.prepareSpec(ctx, req.Msg.GetFunctionId(), req.Msg.GetSpec())
 	if err != nil {
 		return nil, err
 	}
@@ -553,8 +553,8 @@ func validRetries(n int32) (int32, error) {
 
 // prepareSpec validates a spec, fills in server defaults, checks that its
 // contract compiles and puts its source, if any, in the artifacts bucket.
-// The returned spec is a copy.
-func (s *Service) prepareSpec(ctx context.Context, in *functionsv1.FunctionSpec) (*functionsv1.FunctionSpec, error) {
+// The returned spec is a copy. functionID is empty for a new function.
+func (s *Service) prepareSpec(ctx context.Context, functionID string, in *functionsv1.FunctionSpec) (*functionsv1.FunctionSpec, error) {
 	invalid := func(format string, args ...any) error {
 		return connect.NewError(connect.CodeInvalidArgument, fmt.Errorf(format, args...))
 	}
@@ -576,7 +576,7 @@ func (s *Service) prepareSpec(ctx context.Context, in *functionsv1.FunctionSpec)
 	if _, err := contract.Compile(spec.GetContract()); err != nil {
 		return nil, invalid("spec.%w", err)
 	}
-	if err := s.checkSecrets(ctx, spec); err != nil {
+	if err := s.checkSecrets(ctx, functionID, spec); err != nil {
 		return nil, err
 	}
 
@@ -601,7 +601,7 @@ func validName(name string) (string, error) {
 // onto NOT_FOUND, and the rest onto an internal error.
 func storeError(err error, conflictFormat string, args ...any) error {
 	var pgErr *pgconn.PgError
-	if errors.As(err, &pgErr) && pgErr.Code == "23505" {
+	if errors.As(err, &pgErr) && pgErr.Code == pgUniqueViolation {
 		return connect.NewError(connect.CodeAlreadyExists, fmt.Errorf(conflictFormat, args...))
 	}
 	return notFound(err, "not found")

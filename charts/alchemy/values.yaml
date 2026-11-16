@@ -362,6 +362,12 @@ host:
   # within this.
   secretsRefreshInterval: 5m
 
+  # -- Registries function images may come from (`REGISTRY_ALLOW`), as
+  # hosts with optional `*` wildcards, such as `ghcr.io` or
+  # `*.dkr.ecr.*.amazonaws.com`. Docker Hub is `index.docker.io`. Empty
+  # allows any, which lets an image reference make a host fetch from any
+  # address it reaches.
+  registryAllow: []
   egress:
     # -- Host-local range each microVM with `network: EGRESS` takes a /30 of
     # (`EGRESS_SUBNET`). It must not overlap anything the host reaches.

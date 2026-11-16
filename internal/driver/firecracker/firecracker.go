@@ -77,6 +77,9 @@ type Config struct {
 	EgressDeny []string
 	// EgressDNS are the one or two resolvers guests with egress use.
 	EgressDNS []string
+	// RegistryAllow lists the registries images may come from, as hosts
+	// with optional * wildcards. Empty allows any.
+	RegistryAllow []string
 }
 
 // Driver implements driver.Driver with Firecracker microVMs.
@@ -155,6 +158,12 @@ func New(cfg Config, log *slog.Logger) (*Driver, error) {
 	}
 	if d.parentCgroup, err = setupCgroups(); err != nil {
 		return nil, fmt.Errorf("cgroups: %w", err)
+	}
+	if err := checkRegistryAllow(cfg.RegistryAllow); err != nil {
+		return nil, err
+	}
+	if len(cfg.RegistryAllow) == 0 {
+		log.Warn("REGISTRY_ALLOW is empty: an image reference can make this host fetch from any address")
 	}
 	if d.egress, d.egressErr = setupEgress(context.Background(), cfg); d.egressErr != nil {
 		log.Warn("egress is unavailable: functions with network EGRESS fail on this host", "err", d.egressErr)

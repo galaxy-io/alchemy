@@ -60,6 +60,7 @@ func run(log *slog.Logger) error {
 		EgressSubnet:   envOr("EGRESS_SUBNET", "169.254.200.0/21"),
 		EgressDeny:     envList("EGRESS_DENY"),
 		EgressDNS:      envList("EGRESS_DNS"),
+		RegistryAllow:  envList("REGISTRY_ALLOW"),
 	}
 	if len(fcCfg.EgressDNS) == 0 {
 		fcCfg.EgressDNS = []string{"1.1.1.1", "8.8.8.8"}
