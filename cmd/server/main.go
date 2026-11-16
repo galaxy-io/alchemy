@@ -48,7 +48,7 @@ func main() {
 	}
 }
 
-func run(log *slog.Logger) error {
+func run(log *slog.Logger) error { //nolint:funlen // reads every server setting in one place before wiring
 	cfg := server.DefaultConfig()
 
 	addr := envOr("ADDR", ":8780")
