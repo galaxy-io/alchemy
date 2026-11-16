@@ -98,7 +98,9 @@ const mapCreateFunctionModalFlowContract = (
         : undefined;
     })
     .with({ kind: "arrow" }, ({ kind, input, output }) =>
-      [...input, ...output].every(({ type }) => parseArrowType(type))
+      input.length > 0 &&
+      output.length > 0 &&
+      [...input, ...output].every(({ name, type }) => name.trim() && parseArrowType(type))
         ? { contractKind: kind, arrowFields: mapCreateFunctionModalArrowFields(input, output) }
         : undefined,
     )
@@ -130,6 +132,7 @@ export const createInitialCreateFunctionModalState = ({
     sourceFiles,
     sourceFile: sourceFiles[0]?.path ?? "",
     name: seed.functionName ?? "",
+    isNameTouched: !!seed.functionName,
     description: seed.functionDescription ?? "",
     ...seededContract,
     contractCaller: seededContract

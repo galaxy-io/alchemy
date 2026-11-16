@@ -15,7 +15,7 @@ export const createAlchemyFunctionHref = (
   returnTo: string,
   seed: AlchemyFunctionLinkSeed = {},
 ) =>
-  `${alchemyUrl}${AlchemyPath.FUNCTIONS.slice(1)}${defaultStringifySearch(
+  `${alchemyUrl.replace(/\/+$/, "")}${AlchemyPath.FUNCTIONS.slice(1)}${defaultStringifySearch(
     createAlchemyFlowSearch(Flow.CREATE_FUNCTION, { ...seed, returnTo }),
   )}`;
 

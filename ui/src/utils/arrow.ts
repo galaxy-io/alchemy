@@ -101,7 +101,7 @@ export const parseArrowType = (token: string): DataType | undefined => {
   const time = /^time(?:32\[(s|ms)\]|64\[(us|ns)\])$/.exec(token);
   if (time?.[1]) return new Time(TOKEN_TO_TIME_UNIT_MAP[time[1]], 32);
   if (time?.[2]) return new Time(TOKEN_TO_TIME_UNIT_MAP[time[2]], 64);
-  const decimal = /^decimal(128|256)\((\d+), ?(\d+)\)$/.exec(token);
+  const decimal = /^decimal(128|256)\((\d+), ?(-?\d+)\)$/.exec(token);
   if (decimal?.[1] && decimal[2] && decimal[3]) {
     return new Decimal(Number(decimal[3]), Number(decimal[2]), Number(decimal[1]));
   }

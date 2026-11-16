@@ -88,17 +88,16 @@ export const useAlchemyFlowOpen = () => {
 export const useAlchemyReturn = () => {
   const router = useRouter();
   return useCallback(
-    (url: URL, result?: AlchemyReturnSearch) => {
-      const search = router.options.stringifySearch({
-        ...router.options.parseSearch(url.search),
-        ...result,
-      });
-      const path = `${url.pathname}${search}${url.hash}`;
+    (returnUrl: URL, result?: AlchemyReturnSearch) => {
+      const url = new URL(returnUrl);
+      for (const [key, value] of Object.entries(result ?? {})) {
+        url.searchParams.set(key, String(value));
+      }
       if (url.origin === window.location.origin) {
-        router.history.replace(path);
+        router.history.replace(`${url.pathname}${url.search}${url.hash}`);
         return;
       }
-      window.location.replace(`${url.origin}${path}`);
+      window.location.replace(url.href);
     },
     [router],
   );
