@@ -6,10 +6,9 @@ import {
   useMatchRoute,
   useNavigate,
   useParams,
+  useRouter,
   useSearch,
 } from "@tanstack/react-router";
-
-import type { Function as AlchemyFunction } from "@/gen/functions/v1/functions_pb";
 
 import { INVOCATIONS_DEFAULT_TIMEFRAME } from "@/components/invocations/constants";
 
@@ -19,8 +18,13 @@ import {
   OBSERVABILITY_DEFAULT_TRAFFIC_FILL,
 } from "@/pages/observability/constants";
 
-import type { AlchemyPath } from "@/module/paths";
 import {
+  type AlchemyPath,
+  type AlchemyReturnSearch,
+  createAlchemyFlowSearch,
+} from "@/module/paths";
+import {
+  type AlchemyFlowSeed,
   type AlchemyLayoutSearch,
   alchemyLayoutSearchSchema,
   functionParamsSchema,
@@ -70,15 +74,32 @@ export const useAlchemySearchUpdate = <TSearch extends object>() => {
 export const useAlchemyFlowOpen = () => {
   const updateSearch = useAlchemySearchUpdate<AlchemyLayoutSearch>();
   return useCallback(
-    (flow: Flow, functionId?: AlchemyFunction["id"]) =>
+    (flow: Flow, seed?: AlchemyFlowSeed) =>
       void updateSearch((prev) => ({
         ...prev,
+        ...createAlchemyFlowSearch(flow, seed),
         invocationId: undefined,
         invocationAttempt: undefined,
-        flow,
-        functionId,
       })),
     [updateSearch],
+  );
+};
+
+export const useAlchemyReturn = () => {
+  const router = useRouter();
+  return useCallback(
+    (returnUrl: URL, result?: AlchemyReturnSearch) => {
+      const url = new URL(returnUrl);
+      for (const [key, value] of Object.entries(result ?? {})) {
+        url.searchParams.set(key, String(value));
+      }
+      if (url.origin === window.location.origin) {
+        router.history.replace(`${url.pathname}${url.search}${url.hash}`);
+        return;
+      }
+      window.location.replace(url.href);
+    },
+    [router],
   );
 };
 

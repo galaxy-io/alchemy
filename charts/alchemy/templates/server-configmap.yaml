@@ -8,6 +8,12 @@ metadata:
 data:
   # API
   ADDR: ":{{ .Values.server.service.port }}"
+  # Galaxy products
+  {{- range $product, $url := .Values.galaxy.productUrls }}
+  {{- with $url }}
+  GALAXY_{{ upper $product }}_URL: {{ . | quote }}
+  {{- end }}
+  {{- end }}
   # Invocations
   IDEMPOTENCY_WINDOW: {{ .Values.server.idempotencyWindow | quote }}
   INVOKE_DEADLINE: {{ .Values.server.invoke.deadline | quote }}

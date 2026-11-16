@@ -25,6 +25,10 @@
       "types": "./dist/module/paths.d.ts",
       "import": "./dist/module/paths.js"
     },
+    "./links": {
+      "types": "./dist/module/links.d.ts",
+      "import": "./dist/module/links.js"
+    },
     "./routes": {
       "types": "./dist/module/routes.d.ts",
       "import": "./dist/module/routes.js"

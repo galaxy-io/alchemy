@@ -48,7 +48,7 @@ func main() {
 	}
 }
 
-func run(log *slog.Logger) error {
+func run(log *slog.Logger) error { //nolint:funlen // reads every server setting in one place before wiring
 	cfg := server.DefaultConfig()
 
 	addr := envOr("ADDR", ":8780")
@@ -59,6 +59,10 @@ func run(log *slog.Logger) error {
 	// Empty means functions are built from images only.
 	artifactsBucket := os.Getenv("ARTIFACTS_BUCKET")
 	if err := configure(&cfg); err != nil {
+		return err
+	}
+	productURLs, err := ui.ProductURLsFromEnv(os.Getenv)
+	if err != nil {
 		return err
 	}
 
@@ -128,7 +132,7 @@ func run(log *slog.Logger) error {
 	protocols.SetUnencryptedHTTP2(true)
 	srv := &http.Server{
 		Addr:              addr,
-		Handler:           routes(svc, server.AuthHandler(auth), server.NewAuthInterceptor(auth, store)),
+		Handler:           routes(svc, server.AuthHandler(auth), server.NewAuthInterceptor(auth, store), ui.Config{ProductURLs: productURLs}),
 		Protocols:         protocols,
 		ReadHeaderTimeout: 10 * time.Second,
 	}
@@ -152,8 +156,8 @@ func run(log *slog.Logger) error {
 }
 
 // routes serves the API, and Invoke and GetInvocation over plain HTTP, behind one interceptor
-// that authenticates both, and the UI.
-func routes(svc *server.Service, auth authv1connect.AuthServiceHandler, interceptor *server.AuthInterceptor) *http.ServeMux {
+// that authenticates both, and the UI rendered with uiConfig.
+func routes(svc *server.Service, auth authv1connect.AuthServiceHandler, interceptor *server.AuthInterceptor, uiConfig ui.Config) *http.ServeMux {
 	opts := connect.WithInterceptors(interceptor, server.ErrorInterceptor{})
 	mux := http.NewServeMux()
 	mux.Handle(functionsv1connect.NewFunctionsServiceHandler(svc, opts))
@@ -174,7 +178,7 @@ func routes(svc *server.Service, auth authv1connect.AuthServiceHandler, intercep
 		w.Header().Set("Content-Type", "application/json")
 		_ = json.NewEncoder(w).Encode(scaling)
 	})
-	mux.Handle("/", ui.Handler())
+	mux.Handle("/", ui.Handler(uiConfig))
 	return mux
 }
 

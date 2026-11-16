@@ -11,11 +11,19 @@ import {
   linkOptions,
   Outlet,
   redirect,
+  useSearch,
 } from "@tanstack/react-router";
 
 import AlchemyLayout from "@galaxy-io/alchemy-ui/AlchemyLayout";
 import { useAlchemyCommandItems } from "@galaxy-io/alchemy-ui/commands";
-import { AlchemyPath } from "@galaxy-io/alchemy-ui/paths";
+import { createAlchemyFunctionHref, parseAlchemyReturnSearch } from "@galaxy-io/alchemy-ui/links";
+import {
+  AlchemyPath,
+  createAlchemyFlowSearch,
+  Flow,
+  GalaxyProduct,
+  type GalaxyProductUrls,
+} from "@galaxy-io/alchemy-ui/paths";
 import {
   alchemyLayoutRouteOptions,
   alchemyNotFoundRouteOptions,
@@ -32,16 +40,34 @@ import {
   observabilityRouteOptions,
 } from "@galaxy-io/alchemy-ui/routes";
 import CommandPalette from "@galaxy-io/dls/navigation/CommandPalette";
+import Text from "@galaxy-io/dls/text/Text";
 
 const MOUNT_PATH = "alchemy";
 
 const alchemyTransport = createConnectTransport({ baseUrl: "" });
+
+const FIXTURE_PRODUCT_URLS: GalaxyProductUrls = {
+  [GalaxyProduct.ALCHEMY]: `/${MOUNT_PATH}`,
+  [GalaxyProduct.FILAMENT]: "https://filament.example.com",
+};
+
+const hostFunctionSearch = createAlchemyFlowSearch(Flow.CREATE_FUNCTION, {
+  functionName: "orders-enrich",
+  contract: {
+    kind: "arrow",
+    input: [{ name: "email", type: "utf8", nullable: true }],
+    output: [{ name: "domain", type: "utf8", nullable: true }],
+  },
+  returnTo: "/",
+  returnLabel: "the fixture host",
+});
 
 const HomePage: FC = () => {
   const commandItems = useAlchemyCommandItems({
     base: `/${MOUNT_PATH}`,
     transport: alchemyTransport,
   });
+  const createdFunction = parseAlchemyReturnSearch(useSearch({ strict: false }));
 
   return (
     <>
@@ -49,6 +75,15 @@ const HomePage: FC = () => {
       <Link from={`/${MOUNT_PATH}`} to={AlchemyPath.FUNCTION_WORKBENCH} params={{ id: "f" }}>
         Open a function workbench
       </Link>
+      <Link to={`/${MOUNT_PATH}/functions`} search={hostFunctionSearch}>
+        Write a function for the host
+      </Link>
+      {createdFunction ? (
+        <Text as="p">
+          Created {createdFunction.alchemyFunctionId} version{" "}
+          {String(createdFunction.alchemyFunctionVersion)}
+        </Text>
+      ) : null}
       <CommandPalette items={commandItems} shouldBindHotKey />
     </>
   );
@@ -56,7 +91,7 @@ const HomePage: FC = () => {
 
 const MountLayout: FC = () => (
   <TransportProvider transport={alchemyTransport}>
-    <AlchemyLayout />
+    <AlchemyLayout productUrls={FIXTURE_PRODUCT_URLS} />
   </TransportProvider>
 );
 
@@ -196,6 +231,21 @@ export const unknownSearchKeyLink = linkOptions({
   // @ts-expect-error a module route rejects search keys its schema does not declare
   search: { nope: 1 },
 });
+
+export const unknownContractKindSearch = createAlchemyFlowSearch(Flow.CREATE_FUNCTION, {
+  // @ts-expect-error a flow seed only takes the contract kinds Alchemy declares
+  contract: { kind: "protobuf", input: "", output: "" },
+});
+
+export const otherProductFunctionHref = createAlchemyFunctionHref(
+  "https://alchemy.example.com",
+  "https://filament.example.com/pipelines/p/canvas",
+  {
+    functionName: "orders-enrich",
+    // @ts-expect-error a link seed carries only the contract kinds Alchemy declares
+    contract: { kind: "protobuf", input: "", output: "" },
+  },
+);
 
 declare module "@tanstack/react-router" {
   interface Register {

@@ -22,7 +22,7 @@ import {
   ALCHEMY_NAV_ITEM_TO_PATH_MAP,
   ALCHEMY_NAV_ITEMS,
 } from "@/module/nav";
-import { AlchemyPath } from "@/module/paths";
+import { AlchemyPath, createAlchemyFlowSearch } from "@/module/paths";
 import type { AlchemyLayoutSearch } from "@/module/schemas";
 import { AlchemyNavItem, Flow } from "@/module/types";
 
@@ -58,7 +58,9 @@ export const useAlchemyCommandItems = ({
         openFlow(Flow.CREATE_FUNCTION);
         return;
       }
-      navigateFromBase(AlchemyPath.FUNCTIONS, { search: { flow: Flow.CREATE_FUNCTION } });
+      navigateFromBase(AlchemyPath.FUNCTIONS, {
+        search: createAlchemyFlowSearch(Flow.CREATE_FUNCTION),
+      });
     };
 
     return [

@@ -32,6 +32,15 @@ The default URLs point at the local development stack. Set them in every real de
 | `PERSISTENCE_DSN` | local development DSN | `persistence.postgresql.dsn` (Secret) | PostgreSQL connection string. Migrations run on start |
 | `SERVER_NAME` | the hostname | | Name the server is known by on the bus. Must be unique per server |
 
+### Galaxy products
+
+Galaxy products link to each other, such as Filament opening Alchemy to write a function. Set the same variables on every product. A product links only to the products that are set, and it sends people back only to their origins. Each value is an absolute http or https URL without query or fragment, and an invalid one stops the server at start.
+
+| Variable | Default | Chart value | Description |
+|---|---|---|---|
+| `GALAXY_ALCHEMY_URL` | unset | `galaxy.productUrls.alchemy` | Where Alchemy's UI is served, such as `https://alchemy.example.com` |
+| `GALAXY_FILAMENT_URL` | unset | `galaxy.productUrls.filament` | Where Filament's UI is served, such as `https://filament.example.com` |
+
 ### Invocations
 
 | Variable | Default | Chart value | Description |
