@@ -1925,8 +1925,11 @@ type FunctionConfig struct {
 	Resources      *v1.Resources `protobuf:"bytes,2,opt,name=resources,proto3" json:"resources,omitempty"`
 	// retries is how many more times an invocation runs after a failed
 	// attempt, unless the call set its own.
-	Retries       int32      `protobuf:"varint,3,opt,name=retries,proto3" json:"retries,omitempty"`
-	Network       v1.Network `protobuf:"varint,4,opt,name=network,proto3,enum=functions.v1.Network" json:"network,omitempty"`
+	Retries int32      `protobuf:"varint,3,opt,name=retries,proto3" json:"retries,omitempty"`
+	Network v1.Network `protobuf:"varint,4,opt,name=network,proto3,enum=functions.v1.Network" json:"network,omitempty"`
+	// updated_at is when the function's row last changed, in unix
+	// microseconds. An older config never replaces a newer one.
+	UpdatedAt     int64 `protobuf:"varint,5,opt,name=updated_at,json=updatedAt,proto3" json:"updated_at,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1987,6 +1990,13 @@ func (x *FunctionConfig) GetNetwork() v1.Network {
 		return x.Network
 	}
 	return v1.Network(0)
+}
+
+func (x *FunctionConfig) GetUpdatedAt() int64 {
+	if x != nil {
+		return x.UpdatedAt
+	}
+	return 0
 }
 
 var File_host_v1_host_proto protoreflect.FileDescriptor
@@ -2152,12 +2162,14 @@ const file_host_v1_host_proto_rawDesc = "" +
 	"\x19ActiveInvocationsResponse\x12:\n" +
 	"\vinvocations\x18\x01 \x03(\v2\x18.functions.v1.InvocationR\vinvocations\"O\n" +
 	"\x11InvocationRecords\x12:\n" +
-	"\vinvocations\x18\x01 \x03(\v2\x18.functions.v1.InvocationR\vinvocations\"\xbb\x01\n" +
+	"\vinvocations\x18\x01 \x03(\v2\x18.functions.v1.InvocationR\vinvocations\"\xda\x01\n" +
 	"\x0eFunctionConfig\x12'\n" +
 	"\x0fmax_concurrency\x18\x01 \x01(\x05R\x0emaxConcurrency\x125\n" +
 	"\tresources\x18\x02 \x01(\v2\x17.functions.v1.ResourcesR\tresources\x12\x18\n" +
 	"\aretries\x18\x03 \x01(\x05R\aretries\x12/\n" +
-	"\anetwork\x18\x04 \x01(\x0e2\x15.functions.v1.NetworkR\anetworkB\x86\x01\n" +
+	"\anetwork\x18\x04 \x01(\x0e2\x15.functions.v1.NetworkR\anetwork\x12\x1d\n" +
+	"\n" +
+	"updated_at\x18\x05 \x01(\x03R\tupdatedAtB\x86\x01\n" +
 	"\vcom.host.v1B\tHostProtoP\x01Z/github.com/galaxy-io/alchemy/api/host/v1;hostv1\xa2\x02\x03HXX\xaa\x02\aHost.V1\xca\x02\aHost\\V1\xe2\x02\x13Host\\V1\\GPBMetadata\xea\x02\bHost::V1b\x06proto3"
 
 var (

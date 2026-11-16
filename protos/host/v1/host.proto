@@ -344,4 +344,7 @@ message FunctionConfig {
   // attempt, unless the call set its own.
   int32 retries = 3;
   functions.v1.Network network = 4;
+  // updated_at is when the function's row last changed, in unix
+  // microseconds. An older config never replaces a newer one.
+  int64 updated_at = 5;
 }

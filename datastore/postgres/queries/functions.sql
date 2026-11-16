@@ -41,5 +41,5 @@ WHERE tenant_id = $1 AND NOT is_deleted AND (sqlc.arg('search')::text = '' OR na
 
 -- name: ListFunctionConfigs :many
 -- What hosts read about every live function.
-SELECT tenant_id, id, max_concurrency, retries, vcpus, memory_mib, network FROM functions
+SELECT tenant_id, id, max_concurrency, retries, vcpus, memory_mib, network, updated_at FROM functions
 WHERE NOT is_deleted;

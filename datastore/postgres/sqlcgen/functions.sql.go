@@ -141,7 +141,7 @@ func (q *Queries) GetFunction(ctx context.Context, arg GetFunctionParams) (*Func
 }
 
 const listFunctionConfigs = `-- name: ListFunctionConfigs :many
-SELECT tenant_id, id, max_concurrency, retries, vcpus, memory_mib, network FROM functions
+SELECT tenant_id, id, max_concurrency, retries, vcpus, memory_mib, network, updated_at FROM functions
 WHERE NOT is_deleted
 `
 
@@ -153,6 +153,7 @@ type ListFunctionConfigsRow struct {
 	Vcpus          int32
 	MemoryMib      int32
 	Network        int32
+	UpdatedAt      pgtype.Timestamptz
 }
 
 // What hosts read about every live function.
@@ -173,6 +174,7 @@ func (q *Queries) ListFunctionConfigs(ctx context.Context) ([]*ListFunctionConfi
 			&i.Vcpus,
 			&i.MemoryMib,
 			&i.Network,
+			&i.UpdatedAt,
 		); err != nil {
 			return nil, err
 		}

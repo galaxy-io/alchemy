@@ -23,7 +23,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates
 # mke2fs and tar build each rootfs; ca-certificates is for registry TLS;
 # ip and nft give microVMs egress.
 FROM debian:13-slim
-RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates e2fsprogs iproute2 nftables && \
+RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates conntrack e2fsprogs iproute2 nftables && \
     rm -rf /var/lib/apt/lists/*
 
 COPY --from=firecracker /firecracker /jailer /usr/local/bin/

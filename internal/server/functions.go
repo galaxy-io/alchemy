@@ -442,7 +442,13 @@ func (s *Service) requestBuild(ctx context.Context, v *sqlcgen.FunctionVersion, 
 // hosts, which read them each time they take one of its invocations, so a
 // change applies to the ones already queued.
 func (s *Service) syncFunctionConfig(ctx context.Context, fn *sqlcgen.Function) error {
-	cfg := &hostv1.FunctionConfig{MaxConcurrency: fn.MaxConcurrency, Resources: functionResources(fn), Retries: fn.Retries, Network: functionsv1.Network(fn.Network)}
+	cfg := &hostv1.FunctionConfig{
+		MaxConcurrency: fn.MaxConcurrency,
+		Resources:      functionResources(fn),
+		Retries:        fn.Retries,
+		Network:        functionsv1.Network(fn.Network),
+		UpdatedAt:      fn.UpdatedAt.Time.UnixMicro(),
+	}
 	if err := s.queue.SetFunctionConfig(ctx, fn.TenantID, fn.ID, cfg); err != nil {
 		return connect.NewError(connect.CodeUnavailable, fmt.Errorf("the function is saved but hosts did not get its settings, save again: %w", err))
 	}
@@ -462,6 +468,7 @@ func (s *Service) syncFunctionConfigs(ctx context.Context) error {
 			MaxConcurrency: r.MaxConcurrency,
 			Retries:        r.Retries,
 			Network:        functionsv1.Network(r.Network),
+			UpdatedAt:      r.UpdatedAt.Time.UnixMicro(),
 			Resources:      &functionsv1.Resources{Vcpus: uint32(r.Vcpus), MemoryMib: uint32(r.MemoryMib)}, //nolint:gosec // bounded by validResources
 		}
 		if err := s.queue.SetFunctionConfig(ctx, r.TenantID, r.ID, cfg); err != nil {

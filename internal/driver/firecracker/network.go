@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/binary"
+	"errors"
 	"fmt"
 	"net"
 	"net/netip"
@@ -33,6 +34,9 @@ const (
 	guestIfName = "eth0"
 	ipForward   = "/proc/sys/net/ipv4/ip_forward"
 	ipv4Bits    = 32
+	// conntrackBin flushes a freed /30's flows; it fails when none matched.
+	conntrackBin         = "conntrack"
+	conntrackNoneDeleted = "0 flow entries have been deleted"
 	// macPrefix makes a locally administered unicast MAC.
 	macPrefix = "06:00"
 	// slotBits sizes each veth pair's slice of the subnet, one address per end.
@@ -102,6 +106,11 @@ func setupEgress(ctx context.Context, cfg Config) (*egress, error) {
 	}
 	if len(cfg.EgressDNS) == 0 || len(cfg.EgressDNS) > maxDNS {
 		return nil, fmt.Errorf("egress needs one to %d dns servers", maxDNS)
+	}
+	for _, bin := range []string{"ip", "nft", conntrackBin} {
+		if _, err := exec.LookPath(bin); err != nil {
+			return nil, fmt.Errorf("egress needs %s: %w", bin, err)
+		}
 	}
 	if err := os.WriteFile(ipForward, []byte("1"), 0); err != nil {
 		return nil, fmt.Errorf("enable forwarding: %w", err)
@@ -222,7 +231,9 @@ func (e *egress) add(ctx context.Context, id string, uid int) (*vmNet, error) {
 		err = run(ctx, nil, "ip", "netns", "exec", n.ns, "sh", "-c", "echo 1 > "+ipForward)
 	}
 	if err != nil {
-		e.del(context.WithoutCancel(ctx), n)
+		if derr := e.del(context.WithoutCancel(ctx), n); derr != nil {
+			err = errors.Join(err, derr)
+		}
 		return nil, err
 	}
 	return n, nil
@@ -237,12 +248,21 @@ const nsRules = `table ip alchemy {
 `
 
 // del removes n's namespace, which takes the tap and both veth ends with
-// it, and frees its /30.
-func (e *egress) del(ctx context.Context, n *vmNet) {
-	if _, err := os.Stat(filepath.Join(netnsDir, n.ns)); err == nil {
-		_ = run(ctx, nil, "ip", "netns", "del", n.ns)
+// it, and the host's conntrack entries from its address, then frees its
+// /30. On failure the /30 stays taken, so no later microVM shares the old
+// one's address or its flows.
+func (e *egress) del(ctx context.Context, n *vmNet) error {
+	if _, err := os.Stat(n.path()); err == nil {
+		if err := run(ctx, nil, "ip", "netns", "del", n.ns); err != nil {
+			return err
+		}
+	}
+	_, nsAddr := e.slotAddrs(n.slot)
+	if err := run(ctx, nil, conntrackBin, "-D", "-s", nsAddr.String()); err != nil && !strings.Contains(err.Error(), conntrackNoneDeleted) {
+		return err
 	}
 	e.give(n.slot)
+	return nil
 }
 
 // mac is a locally administered unicast MAC holding addr, so it is the same

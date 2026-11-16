@@ -483,7 +483,9 @@ func (s *instance) Release(context.Context) {
 		}
 	}
 	if s.net != nil {
-		s.driver.egress.del(context.Background(), s.net)
+		if err := s.driver.egress.del(context.Background(), s.net); err != nil {
+			log.Warn("remove network namespace, its address stays taken", "err", err)
+		}
 	}
 	s.driver.uids.give(s.uid)
 	// A failed microVM keeps its log, beside the chroot. The chroot goes
