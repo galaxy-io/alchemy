@@ -50,6 +50,7 @@ export interface CreateFunctionModalState {
   isSourceTouched: boolean;
   command: FunctionSpec["command"];
   variables: KeyValueInputPair[];
+  stored: KeyValueInputPair[];
   secrets: KeyValueInputPair[];
   secretNames: NonNullable<FunctionSpec["secrets"]>;
   contractKind: FunctionContractKind;

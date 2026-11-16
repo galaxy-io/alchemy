@@ -109,7 +109,7 @@ const FunctionSettingsPageLimits: FC<FunctionSettingsPageLimitsProps> = ({ alche
   };
 
   return (
-    <Widget header="Resources" isCollapsible defaultIsOpen>
+    <Widget header="Resources" isCollapsible>
       <Flex direction={FlexDirection.COLUMN} gap={12}>
         <Flex hasBorder radius={Radius.LG} padding={12}>
           <SliderInput

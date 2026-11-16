@@ -199,6 +199,7 @@ export const CREATE_FUNCTION_MODAL_DEFAULT_STATE: CreateFunctionModalState = {
   isSourceTouched: false,
   command: [],
   variables: [],
+  stored: [],
   secrets: [],
   secretNames: {},
   contractKind: "jsonSchema",
@@ -215,12 +216,6 @@ export const CREATE_FUNCTION_MODAL_DEFAULT_STATE: CreateFunctionModalState = {
   network: Network.NONE,
   isSubmitting: false,
 };
-
-export const CREATE_FUNCTION_MODAL_ENV_NAME_PATTERN = /^[A-Za-z_][A-Za-z0-9_]*$/;
-export const CREATE_FUNCTION_MODAL_SECRETS_KEPT_DESCRIPTION =
-  "Leave a stored secret blank to keep its current value";
-export const CREATE_FUNCTION_MODAL_VARIABLE_DESCRIPTION = "Plain text, stored with the version";
-export const CREATE_FUNCTION_MODAL_SECRET_DESCRIPTION = "Encrypted at rest, hidden once saved";
 
 export const CREATE_FUNCTION_MODAL_SOURCE_KIND_NAME = "create-function-source-kind";
 export const CREATE_FUNCTION_MODAL_COMMAND_SEPARATORS = [" ", ","];

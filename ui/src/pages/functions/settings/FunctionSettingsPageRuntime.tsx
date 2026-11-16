@@ -12,7 +12,7 @@ const FunctionSettingsPageRuntime: FC = () => {
   if (!spec) return null;
 
   return (
-    <Widget header="Runtime" isCollapsible defaultIsOpen>
+    <Widget header="Runtime" isCollapsible>
       <JsonViewer
         ariaLabel="Runtime"
         data={createFunctionSpecJson(spec)}

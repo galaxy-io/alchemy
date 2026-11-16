@@ -23,6 +23,7 @@ export enum CreateFunctionModalActionType {
   SET_COMMAND = "SET_COMMAND",
   SET_VARIABLES = "SET_VARIABLES",
   SET_SECRETS = "SET_SECRETS",
+  SET_STORED_SECRETS = "SET_STORED_SECRETS",
   SET_CONTRACT_KIND = "SET_CONTRACT_KIND",
   SET_SCHEMA_TEXT = "SET_SCHEMA_TEXT",
   ADD_ARROW_FIELD = "ADD_ARROW_FIELD",
@@ -83,6 +84,11 @@ export interface SetCommandAction {
 export interface SetVariablesAction {
   type: CreateFunctionModalActionType.SET_VARIABLES;
   payload: CreateFunctionModalState["variables"];
+}
+
+export interface SetStoredSecretsAction {
+  type: CreateFunctionModalActionType.SET_STORED_SECRETS;
+  payload: CreateFunctionModalState["stored"];
 }
 
 export interface SetSecretsAction {
@@ -178,6 +184,7 @@ export type CreateFunctionModalAction =
   | SetCommandAction
   | SetVariablesAction
   | SetSecretsAction
+  | SetStoredSecretsAction
   | SetContractKindAction
   | SetSchemaTextAction
   | AddArrowFieldAction

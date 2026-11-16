@@ -5,8 +5,10 @@ import { notFound } from "@tanstack/react-router";
 import Flex, { FlexDirection } from "@galaxy-io/dls/layout/Flex";
 import ScrollArea from "@galaxy-io/dls/layout/ScrollArea";
 
+import { useFunctionVersion } from "@/pages/functions/hooks/useFunctionVersion";
 import { FUNCTION_SETTINGS_PAGE_MAX_WIDTH } from "@/pages/functions/settings/constants";
 import FunctionSettingsPageDanger from "@/pages/functions/settings/FunctionSettingsPageDanger";
+import FunctionSettingsPageEnvironment from "@/pages/functions/settings/FunctionSettingsPageEnvironment";
 import FunctionSettingsPageGeneral from "@/pages/functions/settings/FunctionSettingsPageGeneral";
 import FunctionSettingsPageLimits from "@/pages/functions/settings/FunctionSettingsPageLimits";
 import FunctionSettingsPageRuntime from "@/pages/functions/settings/FunctionSettingsPageRuntime";
@@ -20,6 +22,7 @@ const FunctionSettingsPage: FC = () => {
 
   const { data } = useSuspenseGetFunctionQuery({ input: createGetFunctionInput(id) });
   const alchemyFunction = data.function;
+  const version = useFunctionVersion();
 
   if (!alchemyFunction) {
     throw notFound();
@@ -41,6 +44,13 @@ const FunctionSettingsPage: FC = () => {
           key={`${alchemyFunction.timeoutMs}:${alchemyFunction.maxConcurrency}:${alchemyFunction.retries}:${alchemyFunction.resources?.vcpus}:${alchemyFunction.resources?.memoryMib}:${alchemyFunction.network}`}
           alchemyFunction={alchemyFunction}
         />
+        {version && (
+          <FunctionSettingsPageEnvironment
+            key={version.id}
+            alchemyFunction={alchemyFunction}
+            version={version}
+          />
+        )}
         <FunctionSettingsPageRuntime />
         <FunctionSettingsPageDanger alchemyFunction={alchemyFunction} />
       </Flex>

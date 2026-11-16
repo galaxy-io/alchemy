@@ -87,6 +87,8 @@ export const useCreateFunctionModalActions = () => {
         dispatch({ type: CreateFunctionModalActionType.SET_COMMAND, payload }),
       setVariables: (payload: CreateFunctionModalState["variables"]) =>
         dispatch({ type: CreateFunctionModalActionType.SET_VARIABLES, payload }),
+      setStoredSecrets: (payload: CreateFunctionModalState["stored"]) =>
+        dispatch({ type: CreateFunctionModalActionType.SET_STORED_SECRETS, payload }),
       setSecrets: (payload: CreateFunctionModalState["secrets"]) =>
         dispatch({ type: CreateFunctionModalActionType.SET_SECRETS, payload }),
       setContractKind: (payload: FunctionContractKind) =>

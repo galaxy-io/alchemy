@@ -19,6 +19,7 @@ import {
   type SetSourceFileAction,
   type SetSourceFileContentAction,
   type SetSourceKindAction,
+  type SetStoredSecretsAction,
   type SetSubmittingAction,
   type SetTimeoutMsAction,
   type SetVariablesAction,
@@ -111,6 +112,13 @@ function setVariables(
   action: SetVariablesAction,
 ): CreateFunctionModalState {
   return { ...state, variables: action.payload };
+}
+
+function setStoredSecrets(
+  state: CreateFunctionModalState,
+  action: SetStoredSecretsAction,
+): CreateFunctionModalState {
+  return { ...state, stored: action.payload };
 }
 
 function setSecrets(
@@ -273,6 +281,8 @@ const createFunctionModalReducer = (
       return setVariables(state, action);
     case CreateFunctionModalActionType.SET_SECRETS:
       return setSecrets(state, action);
+    case CreateFunctionModalActionType.SET_STORED_SECRETS:
+      return setStoredSecrets(state, action);
     case CreateFunctionModalActionType.SET_CONTRACT_KIND:
       return setContractKind(state, action);
     case CreateFunctionModalActionType.SET_SCHEMA_TEXT:
