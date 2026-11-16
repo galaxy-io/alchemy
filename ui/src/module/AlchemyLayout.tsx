@@ -7,7 +7,7 @@ import MainLayout from "@/layouts/main/MainLayout";
 import CreateFunctionModal from "@/pages/functions/components/create/CreateFunctionModal";
 import InvocationDrawer from "@/pages/invocations/components/drawer/InvocationDrawer";
 
-import { ALCHEMY_LAYOUT_DEFAULT_PRODUCT_URLS } from "@/module/constants";
+import { GALAXY_DEFAULT_PRODUCT_URLS } from "@/module/constants";
 import {
   useAlchemyLayoutSearch,
   useAlchemyNavigate,
@@ -26,7 +26,7 @@ export interface AlchemyLayoutProps {
 
 const AlchemyLayout: FC<AlchemyLayoutProps> = ({
   sidebarFooter,
-  productUrls = ALCHEMY_LAYOUT_DEFAULT_PRODUCT_URLS,
+  productUrls = GALAXY_DEFAULT_PRODUCT_URLS,
 }) => {
   const updateSearch = useAlchemySearchUpdate<AlchemyLayoutSearch>();
   const navigate = useAlchemyNavigate();
