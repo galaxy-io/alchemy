@@ -29,6 +29,8 @@ type Artifact struct {
 	Protocol    supervisorv1.Protocol
 	VCPUs       uint32
 	MemoryMiB   uint32
+	// Egress gives the instance outbound network access.
+	Egress bool
 }
 
 // Driver turns function versions into runnable instances on one host.

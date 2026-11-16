@@ -73,6 +73,7 @@ host count="1" memory="512" warm="5m" prewarm="0": build-linux
           LOGS_BUCKET="s3://alchemy-logs?$bucket" \
           ARTIFACTS_BUCKET="s3://alchemy-artifacts?$bucket" \
           LOG_FORMAT=text LOG_LEVEL="${LOG_LEVEL:-info}" \
+          REGISTRY_ALLOW=192.168.5.2:5001 \
           HOST_NAME="host-$i" DATA_DIR="/var/lib/alchemy/host-$i" UID_BASE=$((10000000 * i)) \
           MEMORY_BUDGET_MIB={{ memory }} WARM_INSTANCE_TTL={{ warm }} PREWARM_COUNT={{ prewarm }} \
           bin/linux-arm64/host 2>&1 | sed -u "s/^/[host-$i] /" &

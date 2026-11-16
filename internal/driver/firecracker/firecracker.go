@@ -69,6 +69,17 @@ type Config struct {
 	// Snapshots takes a snapshot of every artifact after its build and
 	// restores it on Acquire, instead of booting a kernel each time.
 	Snapshots bool
+	// EgressSubnet is the host-local range each microVM with egress takes a
+	// /30 of. It must not overlap anything the host itself reaches.
+	EgressSubnet string
+	// EgressDeny is added to DefaultEgressDeny, such as cluster ranges
+	// outside the private ones.
+	EgressDeny []string
+	// EgressDNS are the one or two resolvers guests with egress use.
+	EgressDNS []string
+	// RegistryAllow lists the registries images may come from, as hosts
+	// with optional * wildcards. Empty allows any.
+	RegistryAllow []string
 }
 
 // Driver implements driver.Driver with Firecracker microVMs.
@@ -85,6 +96,10 @@ type Driver struct {
 	// supervisorID names the supervisor build inside every root filesystem
 	// this driver makes, so a new supervisor means new drives.
 	supervisorID string
+	// egress is nil when it could not be set up, with the reason in
+	// egressErr.
+	egress    *egress
+	egressErr error
 }
 
 // New checks that the host runs as root with KVM usable and the configured
@@ -143,6 +158,15 @@ func New(cfg Config, log *slog.Logger) (*Driver, error) {
 	}
 	if d.parentCgroup, err = setupCgroups(); err != nil {
 		return nil, fmt.Errorf("cgroups: %w", err)
+	}
+	if err := checkRegistryAllow(cfg.RegistryAllow); err != nil {
+		return nil, err
+	}
+	if len(cfg.RegistryAllow) == 0 {
+		log.Warn("REGISTRY_ALLOW is empty: an image reference can make this host fetch from any address")
+	}
+	if d.egress, d.egressErr = setupEgress(context.Background(), cfg); d.egressErr != nil {
+		log.Warn("egress is unavailable: functions with network EGRESS fail on this host", "err", d.egressErr)
 	}
 	return d, nil
 }
@@ -217,6 +241,16 @@ func (d *Driver) start(ctx context.Context, a *driver.Artifact, extra map[string
 		sb.Release(context.WithoutCancel(ctx))
 		return nil, err
 	}
+	if a.Egress {
+		if d.egress == nil {
+			sb.Release(context.WithoutCancel(ctx))
+			return nil, fmt.Errorf("egress is unavailable on this host: %w", d.egressErr)
+		}
+		if sb.net, err = d.egress.add(ctx, sb.id, uid); err != nil {
+			sb.Release(context.WithoutCancel(ctx))
+			return nil, fmt.Errorf("egress: %w", err)
+		}
+	}
 	// Launching, configuring and starting the microVM share one deadline:
 	// callers such as an invocation's Acquire may pass a context with none.
 	bringCtx, cancel := context.WithTimeout(ctx, bootTimeout)
@@ -233,6 +267,7 @@ type instance struct {
 	id        string
 	uid       int
 	jail      *jail
+	net       *vmNet
 	process   *exec.Cmd
 	transport *http.Transport
 	client    supervisorv1connect.SupervisorServiceClient
@@ -253,7 +288,7 @@ func (s *instance) launch(ctx context.Context, a *driver.Artifact) (*api, error)
 	defer func() { _ = logFile.Close() }()
 	// Without --daemonize the jailer execs into Firecracker, so this process
 	// is the microVM's for the rest of its life.
-	s.process = exec.Command(s.driver.cfg.JailerBin, s.driver.jailerArgs(s.id, s.uid, a.VCPUs)...) //nolint:gosec // the binary path is operator configuration
+	s.process = exec.Command(s.driver.cfg.JailerBin, s.driver.jailerArgs(s.id, s.uid, a.VCPUs, s.net)...) //nolint:gosec // the binary path is operator configuration
 	s.process.Stdout = logFile
 	s.process.Stderr = logFile
 	if err := s.process.Start(); err != nil {
@@ -289,6 +324,9 @@ func (s *instance) boot(ctx context.Context, a *driver.Artifact) error {
 		// it also shaves the UART probe off the boot.
 		bootArgs = "8250.nr_uarts=0 " + bootArgs
 	}
+	if s.net != nil {
+		bootArgs += s.driver.egress.bootArgs()
+	}
 	steps := []struct {
 		path string
 		body any
@@ -303,6 +341,12 @@ func (s *instance) boot(ctx context.Context, a *driver.Artifact) error {
 			path string
 			body any
 		}{"/drives/layers", map[string]any{"drive_id": "layers", "path_on_host": jailLayers, "is_root_device": false, "is_read_only": true}})
+	}
+	if s.net != nil {
+		steps = append(steps, struct {
+			path string
+			body any
+		}{"/network-interfaces/" + guestIfName, map[string]any{"iface_id": guestIfName, "guest_mac": mac(guestIP), "host_dev_name": tapName}})
 	}
 	steps = append(steps, []struct {
 		path string
@@ -436,6 +480,11 @@ func (s *instance) Release(context.Context) {
 		<-s.exited
 		if err := os.Remove(s.driver.cgroup(s.id)); err != nil && !errors.Is(err, os.ErrNotExist) {
 			log.Warn("remove cgroup", "err", err)
+		}
+	}
+	if s.net != nil {
+		if err := s.driver.egress.del(context.Background(), s.net); err != nil {
+			log.Warn("remove network namespace, its address stays taken", "err", err)
 		}
 	}
 	s.driver.uids.give(s.uid)

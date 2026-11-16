@@ -51,7 +51,11 @@ func (s *Service) CreateFunction(ctx context.Context, req *connect.Request[funct
 	if err != nil {
 		return nil, err
 	}
-	spec, err := s.prepareSpec(ctx, req.Msg.GetSpec())
+	network, err := validNetwork(req.Msg.GetNetwork())
+	if err != nil {
+		return nil, err
+	}
+	spec, err := s.prepareSpec(ctx, "", req.Msg.GetSpec())
 	if err != nil {
 		return nil, err
 	}
@@ -64,6 +68,7 @@ func (s *Service) CreateFunction(ctx context.Context, req *connect.Request[funct
 		Retries:        retries,
 		Vcpus:          int32(resources.GetVcpus()),     //nolint:gosec // bounded by validResources
 		MemoryMib:      int32(resources.GetMemoryMib()), //nolint:gosec // bounded by validResources
+		Network:        int32(network),
 	})
 	if err != nil {
 		return nil, storeError(err, "a function named %q already exists", name)
@@ -131,6 +136,13 @@ func (s *Service) UpdateFunction(ctx context.Context, req *connect.Request[funct
 		}
 		params.Vcpus = pgtype.Int4{Int32: int32(resources.GetVcpus()), Valid: true}         //nolint:gosec // bounded by validResources
 		params.MemoryMib = pgtype.Int4{Int32: int32(resources.GetMemoryMib()), Valid: true} //nolint:gosec // bounded by validResources
+	}
+	if req.Msg.Network != nil {
+		network, err := validNetwork(req.Msg.GetNetwork())
+		if err != nil {
+			return nil, err
+		}
+		params.Network = pgtype.Int4{Int32: int32(network), Valid: true}
 	}
 	fn, err := s.store.UpdateFunction(ctx, params)
 	if err != nil {
@@ -216,7 +228,7 @@ func (s *Service) CreateFunctionVersion(ctx context.Context, req *connect.Reques
 	if err != nil {
 		return nil, err
 	}
-	spec, err := s.prepareSpec(ctx, req.Msg.GetSpec())
+	spec, err := s.prepareSpec(ctx, req.Msg.GetFunctionId(), req.Msg.GetSpec())
 	if err != nil {
 		return nil, err
 	}
@@ -351,7 +363,7 @@ func (s *Service) build(v *sqlcgen.FunctionVersion) {
 		fn, err = s.store.GetFunction(ctx, sqlcgen.GetFunctionParams{TenantID: v.TenantID, ID: v.FunctionID})
 	}
 	if err == nil {
-		artifact, buildLog, err = s.requestBuild(ctx, v, spec, functionResources(fn), layers)
+		artifact, buildLog, err = s.requestBuild(ctx, v, spec, functionResources(fn), functionsv1.Network(fn.Network), layers)
 	}
 	buildLog = compileLog + buildLog
 
@@ -402,10 +414,10 @@ func (s *Service) build(v *sqlcgen.FunctionVersion) {
 // hosts build the artifact themselves when they first take one of the
 // version's invocations. Hosts cache by image and layer digests, so a
 // rebuild of a known image is a cache hit.
-func (s *Service) requestBuild(ctx context.Context, v *sqlcgen.FunctionVersion, spec *functionsv1.FunctionSpec, resources *functionsv1.Resources, layers []*hostv1.Layer) (*hostv1.Artifact, string, error) {
+func (s *Service) requestBuild(ctx context.Context, v *sqlcgen.FunctionVersion, spec *functionsv1.FunctionSpec, resources *functionsv1.Resources, network functionsv1.Network, layers []*hostv1.Layer) (*hostv1.Artifact, string, error) {
 	ctx, cancel := context.WithTimeout(ctx, s.cfg.BuildTimeout)
 	defer cancel()
-	req := &hostv1.BuildRequest{TenantId: v.TenantID, FunctionId: v.FunctionID, Version: v.Version, Spec: spec, Resources: resources, Layers: layers}
+	req := &hostv1.BuildRequest{TenantId: v.TenantID, FunctionId: v.FunctionID, Version: v.Version, Spec: spec, Resources: resources, Network: network, Layers: layers}
 	err := errNoHosts
 	for _, name := range s.hostsByLoad() {
 		resp := &hostv1.BuildResponse{}
@@ -430,7 +442,13 @@ func (s *Service) requestBuild(ctx context.Context, v *sqlcgen.FunctionVersion, 
 // hosts, which read them each time they take one of its invocations, so a
 // change applies to the ones already queued.
 func (s *Service) syncFunctionConfig(ctx context.Context, fn *sqlcgen.Function) error {
-	cfg := &hostv1.FunctionConfig{MaxConcurrency: fn.MaxConcurrency, Resources: functionResources(fn), Retries: fn.Retries}
+	cfg := &hostv1.FunctionConfig{
+		MaxConcurrency: fn.MaxConcurrency,
+		Resources:      functionResources(fn),
+		Retries:        fn.Retries,
+		Network:        functionsv1.Network(fn.Network),
+		UpdatedAt:      fn.UpdatedAt.Time.UnixMicro(),
+	}
 	if err := s.queue.SetFunctionConfig(ctx, fn.TenantID, fn.ID, cfg); err != nil {
 		return connect.NewError(connect.CodeUnavailable, fmt.Errorf("the function is saved but hosts did not get its settings, save again: %w", err))
 	}
@@ -449,6 +467,8 @@ func (s *Service) syncFunctionConfigs(ctx context.Context) error {
 		cfg := &hostv1.FunctionConfig{
 			MaxConcurrency: r.MaxConcurrency,
 			Retries:        r.Retries,
+			Network:        functionsv1.Network(r.Network),
+			UpdatedAt:      r.UpdatedAt.Time.UnixMicro(),
 			Resources:      &functionsv1.Resources{Vcpus: uint32(r.Vcpus), MemoryMib: uint32(r.MemoryMib)}, //nolint:gosec // bounded by validResources
 		}
 		if err := s.queue.SetFunctionConfig(ctx, r.TenantID, r.ID, cfg); err != nil {
@@ -519,6 +539,17 @@ const (
 	maxRetries = 10
 )
 
+// validNetwork is a function's network, NONE when unset.
+func validNetwork(n functionsv1.Network) (functionsv1.Network, error) {
+	if n == functionsv1.Network_NETWORK_UNSPECIFIED {
+		return functionsv1.Network_NETWORK_NONE, nil
+	}
+	if _, ok := functionsv1.Network_name[int32(n)]; !ok {
+		return 0, connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("network %d is not a network", n))
+	}
+	return n, nil
+}
+
 // validRetries is a function's or a call's retries.
 func validRetries(n int32) (int32, error) {
 	if n < 0 || n > maxRetries {
@@ -529,8 +560,8 @@ func validRetries(n int32) (int32, error) {
 
 // prepareSpec validates a spec, fills in server defaults, checks that its
 // contract compiles and puts its source, if any, in the artifacts bucket.
-// The returned spec is a copy.
-func (s *Service) prepareSpec(ctx context.Context, in *functionsv1.FunctionSpec) (*functionsv1.FunctionSpec, error) {
+// The returned spec is a copy. functionID is empty for a new function.
+func (s *Service) prepareSpec(ctx context.Context, functionID string, in *functionsv1.FunctionSpec) (*functionsv1.FunctionSpec, error) {
 	invalid := func(format string, args ...any) error {
 		return connect.NewError(connect.CodeInvalidArgument, fmt.Errorf(format, args...))
 	}
@@ -552,7 +583,7 @@ func (s *Service) prepareSpec(ctx context.Context, in *functionsv1.FunctionSpec)
 	if _, err := contract.Compile(spec.GetContract()); err != nil {
 		return nil, invalid("spec.%w", err)
 	}
-	if err := s.checkSecrets(ctx, spec); err != nil {
+	if err := s.checkSecrets(ctx, functionID, spec); err != nil {
 		return nil, err
 	}
 
@@ -577,7 +608,7 @@ func validName(name string) (string, error) {
 // onto NOT_FOUND, and the rest onto an internal error.
 func storeError(err error, conflictFormat string, args ...any) error {
 	var pgErr *pgconn.PgError
-	if errors.As(err, &pgErr) && pgErr.Code == "23505" {
+	if errors.As(err, &pgErr) && pgErr.Code == pgUniqueViolation {
 		return connect.NewError(connect.CodeAlreadyExists, fmt.Errorf(conflictFormat, args...))
 	}
 	return notFound(err, "not found")

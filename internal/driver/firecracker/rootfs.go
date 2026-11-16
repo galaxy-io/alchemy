@@ -48,6 +48,9 @@ func (d *Driver) Build(ctx context.Context, spec *functionsv1.FunctionSpec, reso
 	if err != nil {
 		return nil, fmt.Errorf("image %q: %w", spec.GetImage(), err)
 	}
+	if reg := ref.Context().RegistryStr(); !registryAllowed(d.cfg.RegistryAllow, reg) {
+		return nil, fmt.Errorf("image %q: registry %s is not in REGISTRY_ALLOW", spec.GetImage(), reg)
+	}
 	// The guest runs on this host's CPU, so a multi-arch image resolves to
 	// this host's architecture.
 	desc, err := remote.Get(ref,

@@ -216,9 +216,10 @@ func (d *Driver) cgroup(id string) string {
 	return filepath.Join(cgroupRoot, d.parentCgroup, id)
 }
 
-// jailerArgs runs Firecracker for id inside its jail, limited to vcpus CPUs.
-func (d *Driver) jailerArgs(id string, uid int, vcpus uint32) []string {
-	return []string{
+// jailerArgs runs Firecracker for id inside its jail, limited to vcpus CPUs,
+// and in net's namespace when it has one.
+func (d *Driver) jailerArgs(id string, uid int, vcpus uint32, net *vmNet) []string {
+	args := []string{
 		"--id", id,
 		"--exec-file", d.firecracker(),
 		"--uid", strconv.Itoa(uid),
@@ -230,6 +231,10 @@ func (d *Driver) jailerArgs(id string, uid int, vcpus uint32) []string {
 		"--",
 		"--api-sock", jailAPISocket,
 	}
+	if net != nil {
+		args = append([]string{"--netns", net.path()}, args...)
+	}
+	return args
 }
 
 // jailExec names the Firecracker binary the jailer runs, and so the

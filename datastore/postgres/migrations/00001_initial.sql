@@ -46,6 +46,8 @@ CREATE TABLE functions (
   -- vcpus and memory_mib size the microVM of every version.
   vcpus              INTEGER     NOT NULL,
   memory_mib         INTEGER     NOT NULL,
+  -- network is a functions.v1.Network.
+  network            INTEGER     NOT NULL DEFAULT 1,
   -- A deleted function stays, flagged and renamed out of the way, so its
   -- versions and invocations keep their history.
   is_deleted         BOOLEAN     NOT NULL DEFAULT false,

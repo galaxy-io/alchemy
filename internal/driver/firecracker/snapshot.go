@@ -35,6 +35,8 @@ func snapshotGeneration(cfg Config) (string, error) {
 	// line on exit, which would make every start a new generation.
 	version, _, _ := strings.Cut(string(out), "\n")
 	h.Write([]byte(strings.TrimSpace(version)))
+	// A snapshot keeps the dns servers its guest booted with.
+	h.Write([]byte(strings.Join(cfg.EgressDNS, ",")))
 	for _, path := range []string{cfg.Kernel, cfg.SupervisorBin} {
 		if err := hashFile(h, path); err != nil {
 			return "", err

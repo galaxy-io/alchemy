@@ -16,10 +16,34 @@ A microVM gets exactly what its function's `resources` ask for: `vcpus` and
 - a read-only root drive, the function's image flattened into ext4,
 - a read-only layer drive, when the version has source files or a compiled
   layer,
-- a vsock to its host, and a virtio-rng device for entropy.
+- a vsock to its host, and a virtio-rng device for entropy,
+- a network interface, only when the function sets `network: EGRESS`.
 
-The driver configures no network interface, so a guest has no network. Its one
-channel out is the vsock, where the supervisor serves the host.
+Without `EGRESS` a guest has no network. Its one channel out is the vsock,
+where the supervisor serves the host.
+
+## Egress
+
+A function with `network: EGRESS` reaches the internet and nothing else:
+
+- **Namespace**: each microVM runs in a network namespace of its own. The
+  guest sits at `172.16.0.2` behind a tap device, the same in every namespace,
+  so snapshots restore unchanged. A veth pair with an address from
+  `EGRESS_SUBNET` links the namespace to the host.
+- **Deny list**: the host drops traffic from guests to private, shared,
+  loopback, link-local and reserved ranges, so cloud metadata at
+  `169.254.169.254`, other pods, NATS and PostgreSQL stay unreachable.
+  `EGRESS_DENY` adds ranges, such as cluster ranges outside the private ones.
+- **Host and peers**: a guest cannot reach the host itself or another
+  microVM.
+- **NAT**: the rest leaves masqueraded as the host pod.
+- **DNS**: the guest uses the resolvers in `EGRESS_DNS`, 1.1.1.1 and 8.8.8.8
+  by default. They must be outside the denied ranges, so cluster DNS is not
+  one of them.
+- **IPv6**: dropped.
+
+A host that cannot set egress up, for lack of `ip` or `nft`, starts anyway and
+fails `EGRESS` invocations with the reason.
 
 Inside, the supervisor is PID 1. It overlays the layer drive on the root
 filesystem read-only, mounts `/proc`, `/sys`, and a tmpfs on `/tmp` and `/run`,

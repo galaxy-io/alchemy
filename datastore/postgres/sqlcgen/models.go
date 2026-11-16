@@ -155,6 +155,7 @@ type Function struct {
 	Retries         int32
 	Vcpus           int32
 	MemoryMib       int32
+	Network         int32
 	IsDeleted       bool
 	DeletedAt       pgtype.Timestamptz
 	DeletedByUserID pgtype.Text

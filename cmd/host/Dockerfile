@@ -20,9 +20,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates
     KERNEL=$(curl -fsSL "$S3?list-type=2&prefix=${PREFIX}${ARCH}/vmlinux-" | grep -oP "(?<=<Key>)${PREFIX}${ARCH}/vmlinux-6\.1\.[0-9]+(?=</Key>)" | sort -V | tail -1) && \
     mkdir /kernel && curl -fsSL -o "/kernel/$(basename "$KERNEL")" "$S3/$KERNEL"
 
-# mke2fs and tar build each rootfs; ca-certificates is for registry TLS.
+# mke2fs and tar build each rootfs; ca-certificates is for registry TLS;
+# ip and nft give microVMs egress.
 FROM debian:13-slim
-RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates e2fsprogs && \
+RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates conntrack e2fsprogs iproute2 nftables && \
     rm -rf /var/lib/apt/lists/*
 
 COPY --from=firecracker /firecracker /jailer /usr/local/bin/

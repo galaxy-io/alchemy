@@ -305,7 +305,9 @@ func functionKey(tenantID, functionID string) string {
 }
 
 // SetFunctionConfig records what hosts read about a function; nil removes
-// it.
+// it. It is a compare and swap that keeps a stored config with a later
+// updated_at, so a server writing what it read earlier never undoes a newer
+// change.
 func (q *InvokeQueue) SetFunctionConfig(ctx context.Context, tenantID, functionID string, cfg *hostv1.FunctionConfig) error {
 	key := functionKey(tenantID, functionID)
 	if cfg == nil {
@@ -318,10 +320,32 @@ func (q *InvokeQueue) SetFunctionConfig(ctx context.Context, tenantID, functionI
 	if err != nil {
 		return err
 	}
-	if _, err := q.leases.Put(ctx, key, data); err != nil {
-		return fmt.Errorf("bus: set function config: %w", err)
+	for {
+		entry, err := q.leases.Get(ctx, key)
+		if errors.Is(err, jetstream.ErrKeyNotFound) {
+			if _, err := q.leases.Create(ctx, key, data); err == nil {
+				return nil
+			} else if !errors.Is(err, jetstream.ErrKeyExists) {
+				return fmt.Errorf("bus: set function config: %w", err)
+			}
+			continue
+		}
+		if err != nil {
+			return fmt.Errorf("bus: set function config: %w", err)
+		}
+		stored := &hostv1.FunctionConfig{}
+		if err := proto.Unmarshal(entry.Value(), stored); err != nil {
+			return fmt.Errorf("bus: set function config: %w", err)
+		}
+		if stored.GetUpdatedAt() > cfg.GetUpdatedAt() {
+			return nil
+		}
+		if _, err := q.leases.Update(ctx, key, data, entry.Revision()); err == nil {
+			return nil
+		} else if !errors.Is(err, jetstream.ErrKeyExists) {
+			return fmt.Errorf("bus: set function config: %w", err)
+		}
 	}
-	return nil
 }
 
 // FunctionConfig is what hosts read about a function, or nil when nothing

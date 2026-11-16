@@ -87,6 +87,8 @@ export const useCreateFunctionModalActions = () => {
         dispatch({ type: CreateFunctionModalActionType.SET_COMMAND, payload }),
       setVariables: (payload: CreateFunctionModalState["variables"]) =>
         dispatch({ type: CreateFunctionModalActionType.SET_VARIABLES, payload }),
+      setStoredSecrets: (payload: CreateFunctionModalState["stored"]) =>
+        dispatch({ type: CreateFunctionModalActionType.SET_STORED_SECRETS, payload }),
       setSecrets: (payload: CreateFunctionModalState["secrets"]) =>
         dispatch({ type: CreateFunctionModalActionType.SET_SECRETS, payload }),
       setContractKind: (payload: FunctionContractKind) =>
@@ -127,6 +129,8 @@ export const useCreateFunctionModalActions = () => {
         dispatch({ type: CreateFunctionModalActionType.SET_MAX_CONCURRENCY, payload }),
       setRetries: (payload: CreateFunctionModalState["retries"]) =>
         dispatch({ type: CreateFunctionModalActionType.SET_RETRIES, payload }),
+      setNetwork: (payload: CreateFunctionModalState["network"]) =>
+        dispatch({ type: CreateFunctionModalActionType.SET_NETWORK, payload }),
       goToStep: (payload: CreateFunctionModalStep) =>
         dispatch({ type: CreateFunctionModalActionType.GO_TO_STEP, payload }),
       goBack: () => dispatch({ type: CreateFunctionModalActionType.GO_BACK }),

@@ -155,6 +155,9 @@ message Function {
   // raised, crashed or timed out, or the platform could not run it, with
   // exponential backoff between attempts. A call may set its own.
   int32 retries = 14;
+  // network is what the microVM can reach. A change applies to the next
+  // invocation, as resources do.
+  Network network = 15;
 }
 
 // CreateFunction creates the function and version 1 from spec. It returns as
@@ -175,6 +178,7 @@ message CreateFunctionRequest {
   Resources resources = 7;
   // retries is as on Function. Unset takes the default of 2.
   optional int32 retries = 8;
+  Network network = 9;
 }
 
 message CreateFunctionResponse {
@@ -183,8 +187,8 @@ message CreateFunctionResponse {
 }
 
 // UpdateFunction changes a function's settings. They apply to the next
-// invocation of any version. timeout_ms, max_concurrency, resources and
-// retries change only when set.
+// invocation of any version. timeout_ms, max_concurrency, resources,
+// retries and network change only when set.
 message UpdateFunctionRequest {
   string function_id = 1;
   string name = 2;
@@ -193,6 +197,7 @@ message UpdateFunctionRequest {
   optional int32 max_concurrency = 5;
   Resources resources = 6;
   optional int32 retries = 7;
+  optional Network network = 8;
 }
 
 message UpdateFunctionResponse {

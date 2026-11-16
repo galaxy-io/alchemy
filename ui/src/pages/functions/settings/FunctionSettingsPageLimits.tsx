@@ -13,6 +13,7 @@ import { ToastVariant } from "@galaxy-io/dls/toast/Toast";
 import { useToast } from "@galaxy-io/dls/toast/useToast";
 import Widget from "@galaxy-io/dls/widget/Widget";
 
+import { Network } from "@/gen/functions/v1/common_pb";
 import {
   type Function as AlchemyFunction,
   UpdateFunctionRequestSchema,
@@ -31,6 +32,7 @@ import {
   CREATE_FUNCTION_MODAL_VCPUS_MIN,
   CREATE_FUNCTION_MODAL_VCPUS_SLIDER_MARKS,
 } from "@/pages/functions/components/create/constants";
+import FunctionNetworkToggle from "@/pages/functions/components/network/FunctionNetworkToggle";
 import { FUNCTION_LIMITS_COLUMNS } from "@/pages/functions/constants";
 
 import { useUpdateFunctionMutation } from "@/api/queries/functions";
@@ -44,6 +46,7 @@ interface FunctionSettingsPageLimitsState {
   timeoutMs: number;
   maxConcurrency: number | null;
   retries: number;
+  network: Network;
 }
 
 interface FunctionSettingsPageLimitsProps {
@@ -60,6 +63,7 @@ const FunctionSettingsPageLimits: FC<FunctionSettingsPageLimitsProps> = ({ alche
     timeoutMs: Number(alchemyFunction.timeoutMs),
     maxConcurrency: alchemyFunction.maxConcurrency || null,
     retries: alchemyFunction.retries,
+    network: alchemyFunction.network || Network.NONE,
   });
 
   const [state, setState] = useState<FunctionSettingsPageLimitsState>(createInitialState);
@@ -70,7 +74,8 @@ const FunctionSettingsPageLimits: FC<FunctionSettingsPageLimitsProps> = ({ alche
     state.memoryMib !== alchemyFunction.resources?.memoryMib ||
     state.timeoutMs !== Number(alchemyFunction.timeoutMs) ||
     maxConcurrency !== alchemyFunction.maxConcurrency ||
-    state.retries !== alchemyFunction.retries;
+    state.retries !== alchemyFunction.retries ||
+    state.network !== (alchemyFunction.network || Network.NONE);
 
   const handleChange = (patch: Partial<FunctionSettingsPageLimitsState>) => {
     setState((prev) => ({ ...prev, ...patch }));
@@ -85,6 +90,7 @@ const FunctionSettingsPageLimits: FC<FunctionSettingsPageLimitsProps> = ({ alche
         timeoutMs: BigInt(Math.round(state.timeoutMs)),
         maxConcurrency,
         retries: state.retries,
+        network: state.network,
         resources: { vcpus: state.vcpus, memoryMib: state.memoryMib },
       }),
       {
@@ -103,7 +109,7 @@ const FunctionSettingsPageLimits: FC<FunctionSettingsPageLimitsProps> = ({ alche
   };
 
   return (
-    <Widget header="Resources" isCollapsible defaultIsOpen>
+    <Widget header="Resources" isCollapsible>
       <Flex direction={FlexDirection.COLUMN} gap={12}>
         <Flex hasBorder radius={Radius.LG} padding={12}>
           <SliderInput
@@ -169,6 +175,10 @@ const FunctionSettingsPageLimits: FC<FunctionSettingsPageLimitsProps> = ({ alche
             fillWidth
           />
         </Grid>
+        <FunctionNetworkToggle
+          network={state.network}
+          onChange={(network) => handleChange({ network })}
+        />
         <Flex justifyContent={JustifyContent.END} gap={8}>
           <Button
             label="Cancel"

@@ -25,7 +25,8 @@ supervisor, the runtime images, the web UI, the Helm chart, and the published
 container images.
 
 Escaping a function's microVM, reaching another invocation's input, output,
-logs or secrets, and crossing from one tenant to another are in scope and are
+logs or secrets, crossing from one tenant to another, and reaching the host,
+the cluster or a private address from a guest with egress are in scope and are
 the reports we most want.
 
 The following are out of scope:

@@ -17,7 +17,7 @@ the model.
 | RPC | Description |
 |---|---|
 | `CreateFunction` | Create a function and start building version 1 |
-| `UpdateFunction` | Change a function's name, description, timeout, concurrency, resources and retries |
+| `UpdateFunction` | Change a function's name, description, timeout, concurrency, resources, retries and network |
 | `GetFunction` | Read one function, optionally with every version |
 | `ListFunctions` | Page through the tenant's functions, oldest first |
 | `DeleteFunction` | Remove a function, its versions and its invocations |
@@ -71,13 +71,14 @@ of any version.
 | `resources.vcpus` | 1 when zero | At most 8 |
 | `resources.memory_mib` | 128 when zero | 64 to 8192 |
 | `retries` | 2 when unset | 0 to 10 |
+| `network` | `NETWORK_NONE` when unset | `NETWORK_EGRESS` reaches the internet but not private addresses or the cluster. See [Isolation](/pages/concepts/isolation#egress) |
 
 `name` is required, trimmed, at most 128 bytes and unique within the tenant.
 
 ## CreateFunction
 
 Request fields: `name`, `description`, `spec`, `secret_values`, `timeout_ms`,
-`max_concurrency`, `resources` and `retries`. The response carries the new
+`max_concurrency`, `resources`, `retries` and `network`. The response carries the new
 `function` and its first `version`, which returns in
 `FUNCTION_VERSION_STATUS_BUILDING`. The build runs in the background on the
 least busy live host.
@@ -112,10 +113,10 @@ curl -X POST http://localhost:8780/functions.v1.FunctionsService/CreateFunction 
 ## UpdateFunction
 
 Send `function_id` and the full `name` and `description`, which are always
-written. `timeout_ms`, `max_concurrency`, `resources` and `retries` change
-only when set, with the same defaults and bounds as on create. A resources
-change takes effect on the next invocation, and each host snapshots the
-function again at the new size the first time it runs it. An unknown
+written. `timeout_ms`, `max_concurrency`, `resources`, `retries` and
+`network` change only when set, with the same defaults and bounds as on
+create. A resources or network change takes effect on the next invocation,
+and each host snapshots the function again the first time it runs it. An unknown
 `function_id` is `not_found`, and a name in use is `already_exists`.
 
 ## GetFunction

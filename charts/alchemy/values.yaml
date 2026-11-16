@@ -362,6 +362,25 @@ host:
   # within this.
   secretsRefreshInterval: 5m
 
+  # -- Registries function images may come from (`REGISTRY_ALLOW`), as
+  # hosts with optional `*` wildcards, such as `ghcr.io` or
+  # `*.dkr.ecr.*.amazonaws.com`. Docker Hub is `index.docker.io`. Empty
+  # allows any, which lets an image reference make a host fetch from any
+  # address it reaches.
+  registryAllow: []
+  egress:
+    # -- Host-local range each microVM with `network: EGRESS` takes a /30 of
+    # (`EGRESS_SUBNET`). It must not overlap anything the host reaches.
+    subnet: 169.254.200.0/21
+    # -- Ranges guests can never reach, on top of the private, link-local
+    # and reserved ones (`EGRESS_DENY`). Add cluster ranges outside those.
+    deny: []
+    # -- One or two resolvers guests use (`EGRESS_DNS`). Must be outside the
+    # denied ranges.
+    dns:
+      - 1.1.1.1
+      - 8.8.8.8
+
   # -- Host log level: `debug`, `info`, `warn` or `error`.
   logLevel: info
   # -- Host log format: `json` or `text`.

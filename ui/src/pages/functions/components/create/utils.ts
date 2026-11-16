@@ -13,7 +13,6 @@ import {
   CREATE_FUNCTION_MODAL_CONTRACT_SIDE_TO_LABEL_MAP,
   CREATE_FUNCTION_MODAL_CONTRACT_SIDES,
   CREATE_FUNCTION_MODAL_DEFAULT_STATE,
-  CREATE_FUNCTION_MODAL_ENV_NAME_PATTERN,
   CREATE_FUNCTION_MODAL_IMAGE_PATTERN,
   CREATE_FUNCTION_MODAL_MEMORY_MIB_MAX,
   CREATE_FUNCTION_MODAL_MEMORY_MIB_MIN,
@@ -37,10 +36,12 @@ import {
 } from "@/pages/functions/constants";
 import { FunctionContractSide, FunctionSourceKind } from "@/pages/functions/types";
 import {
+  createFunctionEnv,
   createFunctionSourceStarter,
   decodeFunctionArrowFields,
   decodeFunctionSourceFiles,
   encodeFunctionSourceFile,
+  getFunctionEnvHints,
   getFunctionRuntime,
 } from "@/pages/functions/utils";
 
@@ -87,9 +88,7 @@ export const createInitialCreateFunctionModalState = ({
     image: spec?.source ? "" : (spec?.image ?? ""),
     isSourceTouched: !!spec?.source,
     command: spec?.command ?? [],
-    variables: Object.entries(spec?.env ?? {}).map(([key, value]) => ({ key, value })),
-    secrets: Object.keys(spec?.secrets ?? {}).map((key) => ({ key, value: "" })),
-    secretNames: spec?.secrets ?? {},
+    ...createFunctionEnv(spec),
     contractKind,
     schemaTexts:
       contract?.case === "jsonSchema"
@@ -128,21 +127,6 @@ export const getCreateFunctionModalSteps = (
       !CREATE_FUNCTION_MODAL_SOURCE_KIND_TO_SKIPPED_STEPS_MAP[sourceKind].includes(step),
   );
 
-const getEnvHints = (state: CreateFunctionModalState) => {
-  const names = [...state.variables, ...state.secrets].map((pair) => pair.key.trim());
-  return [
-    state.variables.some((pair) => !pair.key.trim()) ? "Every variable needs a name" : undefined,
-    state.secrets.some((pair) => !pair.key.trim()) ? "Every secret needs a name" : undefined,
-    names.some((name) => name && !CREATE_FUNCTION_MODAL_ENV_NAME_PATTERN.test(name))
-      ? "A name is letters, digits and underscores, not starting with a digit"
-      : undefined,
-    new Set(names).size !== names.length ? "Variable and secret names must be unique" : undefined,
-    state.secrets.some((pair) => !pair.value && !state.secretNames[pair.key.trim()])
-      ? "Every secret needs a value"
-      : undefined,
-  ].filter((hint) => hint !== undefined);
-};
-
 const getSourceHints = (state: CreateFunctionModalState) => [
   ...match(state.sourceKind)
     .with(FunctionSourceKind.IMAGE, () =>
@@ -152,7 +136,7 @@ const getSourceHints = (state: CreateFunctionModalState) => [
     )
     .with(FunctionSourceKind.SOURCE, () => [])
     .exhaustive(),
-  ...getEnvHints(state),
+  ...getFunctionEnvHints(state),
 ];
 
 const getCodeHints = (state: CreateFunctionModalState) => {

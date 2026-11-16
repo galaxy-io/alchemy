@@ -225,15 +225,10 @@ func (s *Service) resolve(ctx context.Context, functionID string, n int64) (*com
 	cv := *cached
 	cv.timeout = time.Duration(fn.TimeoutMs) * time.Millisecond
 	cv.retries = fn.Retries
-	// The version was built at the function's resources then. When they
-	// changed since, the invocation runs as the artifact those built at the
-	// new size would be, which a host builds the first time it takes one.
-	if r := functionResources(fn); r.GetVcpus() != cv.artifact.GetVcpus() || r.GetMemoryMib() != cv.artifact.GetMemoryMib() {
-		a := proto.CloneOf(cv.artifact)
-		a.Vcpus, a.MemoryMib = r.GetVcpus(), r.GetMemoryMib()
-		a.Id = artifact.ID(a)
-		cv.artifact = a
-	}
+	// The version was built at the function's resources and network then.
+	// When they changed since, the invocation runs as the artifact built at
+	// the new ones would be, which a host builds the first time it takes one.
+	cv.artifact = artifact.Configure(cv.artifact, functionResources(fn), functionsv1.Network(fn.Network))
 	return &cv, nil
 }
 
