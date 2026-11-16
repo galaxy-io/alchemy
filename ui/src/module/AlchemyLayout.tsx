@@ -7,7 +7,7 @@ import MainLayout from "@/layouts/main/MainLayout";
 import CreateFunctionModal from "@/pages/functions/components/create/CreateFunctionModal";
 import InvocationDrawer from "@/pages/invocations/components/drawer/InvocationDrawer";
 
-import { ALCHEMY_LAYOUT_DEFAULT_RETURN_ORIGINS } from "@/module/constants";
+import { ALCHEMY_LAYOUT_DEFAULT_PRODUCT_URLS } from "@/module/constants";
 import {
   useAlchemyLayoutSearch,
   useAlchemyNavigate,
@@ -16,17 +16,17 @@ import {
 } from "@/module/hooks";
 import { AlchemyPath, type AlchemyReturnSearch, createAlchemyFlowSearch } from "@/module/paths";
 import type { AlchemyLayoutSearch } from "@/module/schemas";
-import { Flow } from "@/module/types";
-import { resolveAlchemyReturnUrl } from "@/module/utils";
+import { Flow, type GalaxyProductUrls } from "@/module/types";
+import { getGalaxyProductOrigins, resolveAlchemyReturnUrl } from "@/module/utils";
 
 export interface AlchemyLayoutProps {
   sidebarFooter?: ReactNode;
-  returnOrigins?: readonly string[];
+  productUrls?: GalaxyProductUrls;
 }
 
 const AlchemyLayout: FC<AlchemyLayoutProps> = ({
   sidebarFooter,
-  returnOrigins = ALCHEMY_LAYOUT_DEFAULT_RETURN_ORIGINS,
+  productUrls = ALCHEMY_LAYOUT_DEFAULT_PRODUCT_URLS,
 }) => {
   const updateSearch = useAlchemySearchUpdate<AlchemyLayoutSearch>();
   const navigate = useAlchemyNavigate();
@@ -44,13 +44,11 @@ const AlchemyLayout: FC<AlchemyLayoutProps> = ({
     invocationAttempt,
   } = useAlchemyLayoutSearch();
 
-  const returnUrl = useMemo(
-    () =>
-      returnTo
-        ? resolveAlchemyReturnUrl(returnTo, window.location.origin, returnOrigins)
-        : undefined,
-    [returnTo, returnOrigins],
-  );
+  const returnUrl = useMemo(() => {
+    if (!returnTo) return undefined;
+    const { origin } = window.location;
+    return resolveAlchemyReturnUrl(returnTo, origin, getGalaxyProductOrigins(productUrls, origin));
+  }, [returnTo, productUrls]);
 
   const handleCloseDrawer = useCallback(() => {
     void updateSearch(

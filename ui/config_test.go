@@ -1,53 +1,52 @@
 package ui
 
 import (
-	"slices"
+	"maps"
 	"strings"
 	"testing"
 )
 
-func TestParseReturnOrigins(t *testing.T) {
-	tests := []struct {
-		name  string
-		input string
-		want  []string
-	}{
-		{name: "unset", input: "", want: nil},
-		{name: "one origin", input: "https://filament.example.com", want: []string{"https://filament.example.com"}},
-		{name: "list with spaces", input: " https://a.example.com , http://localhost:5173 ", want: []string{"https://a.example.com", "http://localhost:5173"}},
-		{name: "trailing slash and case", input: "https://Filament.Example.com/", want: []string{"https://filament.example.com"}},
-		{name: "default ports", input: "https://a.example.com:443,http://b.example.com:80", want: []string{"https://a.example.com", "http://b.example.com"}},
-		{name: "other port kept", input: "https://a.example.com:8443", want: []string{"https://a.example.com:8443"}},
-		{name: "empty entries skipped", input: "https://a.example.com,,", want: []string{"https://a.example.com"}},
+func TestProductURLsFromEnv(t *testing.T) {
+	env := map[string]string{
+		"GALAXY_ALCHEMY_URL":  "https://alchemy.example.com/",
+		"GALAXY_FILAMENT_URL": "https://galaxy.example.com/ingest",
+		"GALAXY_OTHER_URL":    "https://other.example.com",
 	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			got, err := ParseReturnOrigins(tt.input)
-			if err != nil {
-				t.Fatal(err)
-			}
-			if !slices.Equal(got, tt.want) {
-				t.Errorf("got %q, want %q", got, tt.want)
-			}
-		})
+	got, err := ProductURLsFromEnv(func(name string) string { return env[name] })
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := map[string]string{"alchemy": "https://alchemy.example.com", "filament": "https://galaxy.example.com/ingest"}
+	if !maps.Equal(got, want) {
+		t.Errorf("got %v, want %v", got, want)
+	}
+	if got, err := ProductURLsFromEnv(func(string) string { return "" }); err != nil || len(got) != 0 {
+		t.Errorf("unset: got %v, %v, want no products", got, err)
 	}
 }
 
-func TestParseReturnOriginsRejects(t *testing.T) {
+func TestProductURLsFromEnvRejects(t *testing.T) {
 	for _, input := range []string{
-		"filament.example.com",
-		"ftp://filament.example.com",
+		"alchemy.example.com",
+		"/functions",
+		"ftp://alchemy.example.com",
 		"javascript:alert(1)",
-		"https://filament.example.com/pipelines",
-		"https://filament.example.com?x=1",
-		"https://filament.example.com#x",
-		"https://user@filament.example.com",
+		"https://alchemy.example.com?x=1",
+		"https://alchemy.example.com#x",
+		"https://user@alchemy.example.com",
 		"https://",
-		"https://a.example.com,nope",
 	} {
 		t.Run(input, func(t *testing.T) {
-			if got, err := ParseReturnOrigins(input); err == nil {
-				t.Errorf("got %q, want an error", got)
+			got, err := ProductURLsFromEnv(func(name string) string {
+				if name == "GALAXY_ALCHEMY_URL" {
+					return input
+				}
+				return ""
+			})
+			if err == nil {
+				t.Errorf("got %v, want an error", got)
+			} else if !strings.HasPrefix(err.Error(), "GALAXY_ALCHEMY_URL: ") {
+				t.Errorf("error %q does not name the variable", err)
 			}
 		})
 	}
@@ -61,7 +60,7 @@ func TestRenderIndex(t *testing.T) {
 	if want := `<head><script type="application/json" id="alchemy-runtime-config">{}</script></head>`; string(got) != want {
 		t.Errorf("got %s, want %s", got, want)
 	}
-	got, err = renderIndex([]byte("<head></head>"), Config{ReturnOrigins: []string{"https://a.example.com/</script>"}})
+	got, err = renderIndex([]byte("<head></head>"), Config{ProductURLs: map[string]string{"alchemy": "https://a.example.com/</script>"}})
 	if err != nil {
 		t.Fatal(err)
 	}

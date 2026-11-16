@@ -168,6 +168,14 @@ runtimes:
   # `<iconBaseUrl>/source-icon-<runtime>-<dark|light>.svg`.
   iconBaseUrl: https://cdn.getgalaxy.io/sources
 
+galaxy:
+  # -- Where each Galaxy product's UI is served, e.g. `alchemy: https://alchemy.example.com`
+  # (`GALAXY_<PRODUCT>_URL`). Products link to each other through these and send people back
+  # only to them. Set the same block on every product.
+  productUrls:
+    alchemy: ""
+    filament: ""
+
 server:
   image:
     # -- Server image repository.
@@ -242,12 +250,6 @@ server:
   logLevel: info
   # -- Server log format: `json` or `text`.
   logFormat: json
-
-  ui:
-    # -- Origins of other apps, such as a standalone Filament, that may open
-    # an Alchemy flow and get the user back when it ends
-    # (`UI_RETURN_ORIGINS`). The UI's own origin is always allowed.
-    returnOrigins: []
 
   service:
     # -- Service type.

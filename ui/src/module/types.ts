@@ -15,3 +15,10 @@ export enum AlchemyNavItem {
   HOSTS = "HOSTS",
   INVOCATIONS = "INVOCATIONS",
 }
+
+export enum GalaxyProduct {
+  ALCHEMY = "alchemy",
+  FILAMENT = "filament",
+}
+
+export type GalaxyProductUrls = Partial<Record<GalaxyProduct, string>>;

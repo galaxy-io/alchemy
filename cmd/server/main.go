@@ -61,9 +61,9 @@ func run(log *slog.Logger) error {
 	if err := configure(&cfg); err != nil {
 		return err
 	}
-	returnOrigins, err := ui.ParseReturnOrigins(os.Getenv("UI_RETURN_ORIGINS"))
+	productURLs, err := ui.ProductURLsFromEnv(os.Getenv)
 	if err != nil {
-		return fmt.Errorf("UI_RETURN_ORIGINS: %w", err)
+		return err
 	}
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
@@ -132,7 +132,7 @@ func run(log *slog.Logger) error {
 	protocols.SetUnencryptedHTTP2(true)
 	srv := &http.Server{
 		Addr:              addr,
-		Handler:           routes(svc, server.AuthHandler(auth), server.NewAuthInterceptor(auth, store), ui.Config{ReturnOrigins: returnOrigins}),
+		Handler:           routes(svc, server.AuthHandler(auth), server.NewAuthInterceptor(auth, store), ui.Config{ProductURLs: productURLs}),
 		Protocols:         protocols,
 		ReadHeaderTimeout: 10 * time.Second,
 	}

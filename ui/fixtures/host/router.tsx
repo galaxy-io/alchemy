@@ -17,7 +17,13 @@ import {
 import AlchemyLayout from "@galaxy-io/alchemy-ui/AlchemyLayout";
 import { useAlchemyCommandItems } from "@galaxy-io/alchemy-ui/commands";
 import { createAlchemyFunctionHref, parseAlchemyReturnSearch } from "@galaxy-io/alchemy-ui/links";
-import { AlchemyPath, createAlchemyFlowSearch, Flow } from "@galaxy-io/alchemy-ui/paths";
+import {
+  AlchemyPath,
+  createAlchemyFlowSearch,
+  Flow,
+  GalaxyProduct,
+  type GalaxyProductUrls,
+} from "@galaxy-io/alchemy-ui/paths";
 import {
   alchemyLayoutRouteOptions,
   alchemyNotFoundRouteOptions,
@@ -40,7 +46,10 @@ const MOUNT_PATH = "alchemy";
 
 const alchemyTransport = createConnectTransport({ baseUrl: "" });
 
-const FIXTURE_RETURN_ORIGINS = ["https://filament.example.com"];
+const FIXTURE_PRODUCT_URLS: GalaxyProductUrls = {
+  [GalaxyProduct.ALCHEMY]: `/${MOUNT_PATH}`,
+  [GalaxyProduct.FILAMENT]: "https://filament.example.com",
+};
 
 const hostFunctionSearch = createAlchemyFlowSearch(Flow.CREATE_FUNCTION, {
   functionName: "orders-enrich",
@@ -82,7 +91,7 @@ const HomePage: FC = () => {
 
 const MountLayout: FC = () => (
   <TransportProvider transport={alchemyTransport}>
-    <AlchemyLayout returnOrigins={FIXTURE_RETURN_ORIGINS} />
+    <AlchemyLayout productUrls={FIXTURE_PRODUCT_URLS} />
   </TransportProvider>
 );
 

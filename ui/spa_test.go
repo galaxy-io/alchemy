@@ -14,11 +14,11 @@ func TestSPAHandler(t *testing.T) {
 		"assets/index-abc.js":  {Data: []byte("console.log(1)")},
 		"assets/index-abc.css": {Data: []byte("body{}")},
 	}
-	handler, err := spaHandler(build, Config{ReturnOrigins: []string{"https://filament.example.com", "http://localhost:5173"}})
+	handler, err := spaHandler(build, Config{ProductURLs: map[string]string{"alchemy": "https://alchemy.example.com", "filament": "https://filament.example.com"}})
 	if err != nil {
 		t.Fatal(err)
 	}
-	index := `<!doctype html><head><script type="application/json" id="alchemy-runtime-config">{"returnOrigins":["https://filament.example.com","http://localhost:5173"]}</script></head>app`
+	index := `<!doctype html><head><script type="application/json" id="alchemy-runtime-config">{"products":{"alchemy":"https://alchemy.example.com","filament":"https://filament.example.com"}}</script></head>app`
 
 	tests := []struct {
 		name         string

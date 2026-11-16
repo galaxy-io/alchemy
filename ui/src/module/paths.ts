@@ -1,9 +1,10 @@
 import type { AlchemyFlowSeed, AlchemyLayoutSearch } from "@/module/schemas";
-import { Flow } from "@/module/types";
+import { Flow, GalaxyProduct } from "@/module/types";
 
 export type { AlchemyFlowContract, AlchemyFlowSeed, AlchemyReturnSearch } from "@/module/schemas";
+export type { GalaxyProductUrls } from "@/module/types";
 
-export { Flow };
+export { Flow, GalaxyProduct };
 
 export enum AlchemyPath {
   OBSERVABILITY = "./observability",

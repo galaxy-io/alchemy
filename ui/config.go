@@ -13,51 +13,51 @@ import (
 // Config, read by the standalone host.
 const runtimeConfigElementID = "alchemy-runtime-config"
 
+// Products are the Galaxy products a deployment can point at each other,
+// each configured by GALAXY_<PRODUCT>_URL.
+var Products = []string{"alchemy", "filament"}
+
 // Config is what the server tells the UI at runtime. It is written into
 // index.html as JSON, so one UI build serves every deployment.
 type Config struct {
-	// ReturnOrigins are other apps, such as a standalone Filament, that may
-	// open an Alchemy flow and get the user back when it ends. The UI's own
-	// origin is always allowed.
-	ReturnOrigins []string `json:"returnOrigins,omitempty"`
+	// ProductURLs maps a Galaxy product to where its UI is served. Products
+	// link to each other through it and send people back only to these.
+	ProductURLs map[string]string `json:"products,omitempty"`
 }
 
-// ParseReturnOrigins reads a comma-separated list of origins such as
-// https://filament.example.com and returns each the way a browser reports
-// it, so the UI can compare them with URL.origin.
-func ParseReturnOrigins(s string) ([]string, error) {
-	var origins []string
-	for raw := range strings.SplitSeq(s, ",") {
-		raw = strings.TrimSpace(raw)
+// ProductURLsFromEnv reads GALAXY_<PRODUCT>_URL for every product and leaves
+// out the unset ones.
+func ProductURLsFromEnv(getenv func(string) string) (map[string]string, error) {
+	urls := map[string]string{}
+	for _, product := range Products {
+		name := "GALAXY_" + strings.ToUpper(product) + "_URL"
+		raw := getenv(name)
 		if raw == "" {
 			continue
 		}
-		origin, err := parseOrigin(raw)
+		u, err := parseProductURL(raw)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("%s: %w", name, err)
 		}
-		origins = append(origins, origin)
+		urls[product] = u
 	}
-	return origins, nil
+	return urls, nil
 }
 
-func parseOrigin(raw string) (string, error) {
-	u, err := url.Parse(raw)
+// parseProductURL checks that s is an absolute http or https URL without
+// credentials, query or fragment and returns it without a trailing slash.
+func parseProductURL(s string) (string, error) {
+	u, err := url.Parse(s)
 	if err != nil {
 		return "", err
 	}
-	isOrigin := (u.Scheme == "http" || u.Scheme == "https") &&
+	isBase := (u.Scheme == "http" || u.Scheme == "https") &&
 		u.Host != "" && u.User == nil && u.Opaque == "" &&
-		(u.Path == "" || u.Path == "/") &&
 		u.RawQuery == "" && !u.ForceQuery && u.Fragment == ""
-	if !isOrigin {
-		return "", fmt.Errorf("%q is not an origin such as https://filament.example.com", raw)
+	if !isBase {
+		return "", fmt.Errorf("%q is not an absolute http or https URL without query or fragment", s)
 	}
-	host := strings.ToLower(u.Host)
-	if port := u.Port(); (u.Scheme == "http" && port == "80") || (u.Scheme == "https" && port == "443") {
-		host = strings.TrimSuffix(host, ":"+port)
-	}
-	return u.Scheme + "://" + host, nil
+	return strings.TrimRight(u.String(), "/"), nil
 }
 
 // renderIndex writes cfg into index.html as a JSON script before </head>.

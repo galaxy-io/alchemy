@@ -9,9 +9,7 @@ import { getHostRuntimeConfig } from "@/host/utils";
 
 const HOST_RUNTIME_CONFIG = getHostRuntimeConfig();
 
-const HostAlchemyLayout: FC = () => (
-  <AlchemyLayout returnOrigins={HOST_RUNTIME_CONFIG.returnOrigins} />
-);
+const HostAlchemyLayout: FC = () => <AlchemyLayout productUrls={HOST_RUNTIME_CONFIG.products} />;
 
 export const Route = createFileRoute("/_app/_alchemy")({
   ...alchemyLayoutRouteOptions,
