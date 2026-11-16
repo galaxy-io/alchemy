@@ -117,6 +117,10 @@ See [Authentication](/pages/deployment/authentication) for how the modes work.
 | `CONSOLE_ENABLED` | `true` | `host.console.enabled` (`false`) | Keep the guest serial console on. Observable, slower boot |
 | `KEPT_VERSIONS` | `2` | `host.eviction.keptVersions` | Newest versions of each function a host keeps built whatever their use |
 | `VERSION_IDLE_TTL` | `24h` | `host.eviction.versionIdleTTL` | How long an older version goes without an invocation before the host drops its snapshot and drives. `0s` keeps every version |
+| `EGRESS_SUBNET` | `169.254.200.0/21` | `host.egress.subnet` | Host-local range each microVM with egress takes a /30 of |
+| `EGRESS_DENY` | empty | `host.egress.deny` | Comma-separated ranges guests can never reach, on top of the private, link-local and reserved ones |
+| `EGRESS_DNS` | `1.1.1.1,8.8.8.8` | `host.egress.dns` | One or two resolvers guests with egress use, outside the denied ranges |
+| `REGISTRY_ALLOW` | empty, any registry | `host.registryAllow` | Registries function images may come from, comma-separated hosts with optional `*` wildcards such as `ghcr.io` or `*.dkr.ecr.*.amazonaws.com`. Docker Hub is `index.docker.io`. Set it in production: an image from anywhere else fails its build |
 | `SECRETS_REFRESH_INTERVAL` | `5m` | `host.secretsRefreshInterval` | How long a host uses a fetched secret value before asking a server again |
 | `DATA_DIR` | `/var/lib/alchemy` | | Kernel, root filesystem cache and microVM jails. Must be one filesystem |
 | `KERNEL_IMAGE` | newest `/var/lib/firecracker/vmlinux-*` | | Guest kernel. The host image ships one |

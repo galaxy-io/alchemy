@@ -9,6 +9,7 @@ import (
 	"maps"
 	"regexp"
 	"slices"
+	"strings"
 
 	"connectrpc.com/connect"
 	"google.golang.org/protobuf/proto"
@@ -26,14 +27,18 @@ import (
 // alchemy/<tenant>/<name>.
 var SecretScope = secret.Scope{Prefix: "alchemy/"}
 
+// secretNameSep joins a secret name's function, suffix and variable.
+const secretNameSep = "."
+
 var (
 	envName    = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_]*$`)
 	secretName = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$`)
 )
 
 // checkSecrets validates spec.secrets: every variable is a valid name and
-// every secret exists in the tenant's secret provider.
-func (s *Service) checkSecrets(ctx context.Context, spec *functionsv1.FunctionSpec) error {
+// every secret is one of functionID's and exists in the tenant's provider.
+// A new function, with functionID empty, has none yet.
+func (s *Service) checkSecrets(ctx context.Context, functionID string, spec *functionsv1.FunctionSpec) error {
 	tenant, err := tenantFromContext(ctx)
 	if err != nil {
 		return err
@@ -51,6 +56,9 @@ func (s *Service) checkSecrets(ctx context.Context, spec *functionsv1.FunctionSp
 		if !secretName.MatchString(name) {
 			return invalid("spec.secrets[%s]: %q is not a secret name", variable, name)
 		}
+		if !ownsSecret(functionID, name) {
+			return connect.NewError(connect.CodePermissionDenied, fmt.Errorf("spec.secrets[%s]: %q is not this function's secret, send its value in secret_values", variable, name))
+		}
 		if _, err := s.secrets.Read(ctx, SecretScope.Ref(tenant, name)); err != nil {
 			if errors.Is(err, secret.ErrNotFound) {
 				return connect.NewError(connect.CodeNotFound, fmt.Errorf("spec.secrets[%s]: secret %q not found", variable, name))
@@ -59,6 +67,12 @@ func (s *Service) checkSecrets(ctx context.Context, spec *functionsv1.FunctionSp
 		}
 	}
 	return nil
+}
+
+// ownsSecret reports whether name is one storeSecretValues made for
+// functionID.
+func ownsSecret(functionID, name string) bool {
+	return functionID != "" && strings.HasPrefix(name, functionID+secretNameSep)
 }
 
 // storeSecretValues creates a secret per value and names each in
@@ -81,7 +95,7 @@ func (s *Service) storeSecretValues(ctx context.Context, functionID string, spec
 	if _, err := rand.Read(raw); err != nil {
 		return connect.NewError(connect.CodeInternal, err)
 	}
-	prefix := functionID + "." + hex.EncodeToString(raw) + "."
+	prefix := functionID + secretNameSep + hex.EncodeToString(raw) + secretNameSep
 	var written []string
 	for _, variable := range slices.Sorted(maps.Keys(values)) {
 		if !envName.MatchString(variable) {

@@ -26,13 +26,15 @@ import {
   CREATE_FUNCTION_MODAL_VCPUS_MIN,
   CREATE_FUNCTION_MODAL_VCPUS_SLIDER_MARKS,
 } from "@/pages/functions/components/create/constants";
+import FunctionNetworkToggle from "@/pages/functions/components/network/FunctionNetworkToggle";
 import { FUNCTION_LIMITS_COLUMNS } from "@/pages/functions/constants";
 
 import { formatMemory } from "@/utils/format";
 
 const CreateFunctionModalResources: FC = () => {
-  const { vcpus, memoryMib, timeoutMs, maxConcurrency, retries } = useCreateFunctionModalState();
-  const { setVcpus, setMemoryMib, setTimeoutMs, setMaxConcurrency, setRetries } =
+  const { vcpus, memoryMib, timeoutMs, maxConcurrency, retries, network } =
+    useCreateFunctionModalState();
+  const { setVcpus, setMemoryMib, setTimeoutMs, setMaxConcurrency, setRetries, setNetwork } =
     useCreateFunctionModalActions();
 
   return (
@@ -105,6 +107,9 @@ const CreateFunctionModalResources: FC = () => {
             fillWidth
           />
         </Grid>
+      </Widget>
+      <Widget header="Network">
+        <FunctionNetworkToggle network={network} onChange={setNetwork} />
       </Widget>
     </Flex>
   );

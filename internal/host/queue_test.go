@@ -29,6 +29,7 @@ func TestResize(t *testing.T) {
 		cfg         *hostv1.FunctionConfig
 		wantVcpus   uint32
 		wantMemory  uint32
+		wantNetwork functionsv1.Network
 		wantReplace bool
 	}{
 		{name: "no config", cfg: nil, wantVcpus: 1, wantMemory: 128},
@@ -36,6 +37,7 @@ func TestResize(t *testing.T) {
 		{name: "same size", cfg: &hostv1.FunctionConfig{Resources: &functionsv1.Resources{Vcpus: 1, MemoryMib: 128}}, wantVcpus: 1, wantMemory: 128},
 		{name: "more memory", cfg: &hostv1.FunctionConfig{Resources: &functionsv1.Resources{Vcpus: 1, MemoryMib: 512}}, wantVcpus: 1, wantMemory: 512, wantReplace: true},
 		{name: "more vcpus", cfg: &hostv1.FunctionConfig{Resources: &functionsv1.Resources{Vcpus: 4, MemoryMib: 128}}, wantVcpus: 4, wantMemory: 128, wantReplace: true},
+		{name: "egress", cfg: &hostv1.FunctionConfig{Network: functionsv1.Network_NETWORK_EGRESS}, wantVcpus: 1, wantMemory: 128, wantNetwork: functionsv1.Network_NETWORK_EGRESS, wantReplace: true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -48,6 +50,9 @@ func TestResize(t *testing.T) {
 			got := req.GetArtifact()
 			if got.GetVcpus() != tt.wantVcpus || got.GetMemoryMib() != tt.wantMemory {
 				t.Errorf("artifact = %d vCPU %d MiB, want %d and %d", got.GetVcpus(), got.GetMemoryMib(), tt.wantVcpus, tt.wantMemory)
+			}
+			if got.GetNetwork() != tt.wantNetwork || req.GetBuild().GetNetwork() != tt.wantNetwork && tt.wantReplace {
+				t.Errorf("network = %v, build %v, want %v", got.GetNetwork(), req.GetBuild().GetNetwork(), tt.wantNetwork)
 			}
 			if r := req.GetBuild().GetResources(); r.GetVcpus() != tt.wantVcpus || r.GetMemoryMib() != tt.wantMemory {
 				t.Errorf("build resources = %v, want %d vCPU %d MiB", r, tt.wantVcpus, tt.wantMemory)

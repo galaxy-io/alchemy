@@ -820,7 +820,10 @@ type Function struct {
 	// retries is how many more times an invocation runs after its function
 	// raised, crashed or timed out, or the platform could not run it, with
 	// exponential backoff between attempts. A call may set its own.
-	Retries       int32 `protobuf:"varint,14,opt,name=retries,proto3" json:"retries,omitempty"`
+	Retries int32 `protobuf:"varint,14,opt,name=retries,proto3" json:"retries,omitempty"`
+	// network is what the microVM can reach. A change applies to the next
+	// invocation, as resources do.
+	Network       Network `protobuf:"varint,15,opt,name=network,proto3,enum=functions.v1.Network" json:"network,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -953,6 +956,13 @@ func (x *Function) GetRetries() int32 {
 	return 0
 }
 
+func (x *Function) GetNetwork() Network {
+	if x != nil {
+		return x.Network
+	}
+	return Network_NETWORK_UNSPECIFIED
+}
+
 // CreateFunction creates the function and version 1 from spec. It returns as
 // soon as the version is accepted, in BUILDING.
 type CreateFunctionRequest struct {
@@ -971,7 +981,8 @@ type CreateFunctionRequest struct {
 	MaxConcurrency int32      `protobuf:"varint,6,opt,name=max_concurrency,json=maxConcurrency,proto3" json:"max_concurrency,omitempty"`
 	Resources      *Resources `protobuf:"bytes,7,opt,name=resources,proto3" json:"resources,omitempty"`
 	// retries is as on Function. Unset takes the default of 2.
-	Retries       *int32 `protobuf:"varint,8,opt,name=retries,proto3,oneof" json:"retries,omitempty"`
+	Retries       *int32  `protobuf:"varint,8,opt,name=retries,proto3,oneof" json:"retries,omitempty"`
+	Network       Network `protobuf:"varint,9,opt,name=network,proto3,enum=functions.v1.Network" json:"network,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1062,6 +1073,13 @@ func (x *CreateFunctionRequest) GetRetries() int32 {
 	return 0
 }
 
+func (x *CreateFunctionRequest) GetNetwork() Network {
+	if x != nil {
+		return x.Network
+	}
+	return Network_NETWORK_UNSPECIFIED
+}
+
 type CreateFunctionResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Function      *Function              `protobuf:"bytes,1,opt,name=function,proto3" json:"function,omitempty"`
@@ -1115,8 +1133,8 @@ func (x *CreateFunctionResponse) GetVersion() *FunctionVersion {
 }
 
 // UpdateFunction changes a function's settings. They apply to the next
-// invocation of any version. timeout_ms, max_concurrency, resources and
-// retries change only when set.
+// invocation of any version. timeout_ms, max_concurrency, resources,
+// retries and network change only when set.
 type UpdateFunctionRequest struct {
 	state          protoimpl.MessageState `protogen:"open.v1"`
 	FunctionId     string                 `protobuf:"bytes,1,opt,name=function_id,json=functionId,proto3" json:"function_id,omitempty"`
@@ -1126,6 +1144,7 @@ type UpdateFunctionRequest struct {
 	MaxConcurrency *int32                 `protobuf:"varint,5,opt,name=max_concurrency,json=maxConcurrency,proto3,oneof" json:"max_concurrency,omitempty"`
 	Resources      *Resources             `protobuf:"bytes,6,opt,name=resources,proto3" json:"resources,omitempty"`
 	Retries        *int32                 `protobuf:"varint,7,opt,name=retries,proto3,oneof" json:"retries,omitempty"`
+	Network        *Network               `protobuf:"varint,8,opt,name=network,proto3,enum=functions.v1.Network,oneof" json:"network,omitempty"`
 	unknownFields  protoimpl.UnknownFields
 	sizeCache      protoimpl.SizeCache
 }
@@ -1207,6 +1226,13 @@ func (x *UpdateFunctionRequest) GetRetries() int32 {
 		return *x.Retries
 	}
 	return 0
+}
+
+func (x *UpdateFunctionRequest) GetNetwork() Network {
+	if x != nil && x.Network != nil {
+		return *x.Network
+	}
+	return Network_NETWORK_UNSPECIFIED
 }
 
 type UpdateFunctionResponse struct {
@@ -1903,7 +1929,7 @@ const file_functions_v1_functions_proto_rawDesc = "" +
 	"\frootfs_bytes\x18\n" +
 	" \x01(\x03R\vrootfsBytes\x12\x1b\n" +
 	"\tbuild_log\x18\v \x01(\tR\bbuildLog\x12+\n" +
-	"\x12created_by_user_id\x18\f \x01(\tR\x0fcreatedByUserId\"\xa1\x04\n" +
+	"\x12created_by_user_id\x18\f \x01(\tR\x0fcreatedByUserId\"\xd2\x04\n" +
 	"\bFunction\x12\x1b\n" +
 	"\ttenant_id\x18\x01 \x01(\tR\btenantId\x12\x0e\n" +
 	"\x02id\x18\x02 \x01(\tR\x02id\x12\x12\n" +
@@ -1922,7 +1948,8 @@ const file_functions_v1_functions_proto_rawDesc = "" +
 	"timeout_ms\x18\v \x01(\x03R\ttimeoutMs\x12'\n" +
 	"\x0fmax_concurrency\x18\f \x01(\x05R\x0emaxConcurrency\x125\n" +
 	"\tresources\x18\r \x01(\v2\x17.functions.v1.ResourcesR\tresources\x12\x18\n" +
-	"\aretries\x18\x0e \x01(\x05R\aretries\"\xc4\x03\n" +
+	"\aretries\x18\x0e \x01(\x05R\aretries\x12/\n" +
+	"\anetwork\x18\x0f \x01(\x0e2\x15.functions.v1.NetworkR\anetwork\"\xf5\x03\n" +
 	"\x15CreateFunctionRequest\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12 \n" +
 	"\vdescription\x18\x02 \x01(\tR\vdescription\x12.\n" +
@@ -1932,7 +1959,8 @@ const file_functions_v1_functions_proto_rawDesc = "" +
 	"timeout_ms\x18\x05 \x01(\x03R\ttimeoutMs\x12'\n" +
 	"\x0fmax_concurrency\x18\x06 \x01(\x05R\x0emaxConcurrency\x125\n" +
 	"\tresources\x18\a \x01(\v2\x17.functions.v1.ResourcesR\tresources\x12\x1d\n" +
-	"\aretries\x18\b \x01(\x05H\x00R\aretries\x88\x01\x01\x1a?\n" +
+	"\aretries\x18\b \x01(\x05H\x00R\aretries\x88\x01\x01\x12/\n" +
+	"\anetwork\x18\t \x01(\x0e2\x15.functions.v1.NetworkR\anetwork\x1a?\n" +
 	"\x11SecretValuesEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
 	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01B\n" +
@@ -1940,7 +1968,7 @@ const file_functions_v1_functions_proto_rawDesc = "" +
 	"\b_retries\"\x85\x01\n" +
 	"\x16CreateFunctionResponse\x122\n" +
 	"\bfunction\x18\x01 \x01(\v2\x16.functions.v1.FunctionR\bfunction\x127\n" +
-	"\aversion\x18\x02 \x01(\v2\x1d.functions.v1.FunctionVersionR\aversion\"\xc5\x02\n" +
+	"\aversion\x18\x02 \x01(\v2\x1d.functions.v1.FunctionVersionR\aversion\"\x87\x03\n" +
 	"\x15UpdateFunctionRequest\x12\x1f\n" +
 	"\vfunction_id\x18\x01 \x01(\tR\n" +
 	"functionId\x12\x12\n" +
@@ -1950,11 +1978,14 @@ const file_functions_v1_functions_proto_rawDesc = "" +
 	"timeout_ms\x18\x04 \x01(\x03H\x00R\ttimeoutMs\x88\x01\x01\x12,\n" +
 	"\x0fmax_concurrency\x18\x05 \x01(\x05H\x01R\x0emaxConcurrency\x88\x01\x01\x125\n" +
 	"\tresources\x18\x06 \x01(\v2\x17.functions.v1.ResourcesR\tresources\x12\x1d\n" +
-	"\aretries\x18\a \x01(\x05H\x02R\aretries\x88\x01\x01B\r\n" +
+	"\aretries\x18\a \x01(\x05H\x02R\aretries\x88\x01\x01\x124\n" +
+	"\anetwork\x18\b \x01(\x0e2\x15.functions.v1.NetworkH\x03R\anetwork\x88\x01\x01B\r\n" +
 	"\v_timeout_msB\x12\n" +
 	"\x10_max_concurrencyB\n" +
 	"\n" +
-	"\b_retries\"L\n" +
+	"\b_retriesB\n" +
+	"\n" +
+	"\b_network\"L\n" +
 	"\x16UpdateFunctionResponse\x122\n" +
 	"\bfunction\x18\x01 \x01(\v2\x16.functions.v1.FunctionR\bfunction\"O\n" +
 	"\x12GetFunctionRequest\x12\x0e\n" +
@@ -2059,8 +2090,9 @@ var file_functions_v1_functions_proto_goTypes = []any{
 	(InvocationProtocol)(0),               // 32: functions.v1.InvocationProtocol
 	(*Contract)(nil),                      // 33: functions.v1.Contract
 	(*Resources)(nil),                     // 34: functions.v1.Resources
-	(*PaginationRequest)(nil),             // 35: functions.v1.PaginationRequest
-	(*PaginationResponse)(nil),            // 36: functions.v1.PaginationResponse
+	(Network)(0),                          // 35: functions.v1.Network
+	(*PaginationRequest)(nil),             // 36: functions.v1.PaginationRequest
+	(*PaginationResponse)(nil),            // 37: functions.v1.PaginationResponse
 }
 var file_functions_v1_functions_proto_depIdxs = []int32{
 	28, // 0: functions.v1.FunctionSpec.env:type_name -> functions.v1.FunctionSpec.EnvEntry
@@ -2078,29 +2110,32 @@ var file_functions_v1_functions_proto_depIdxs = []int32{
 	10, // 12: functions.v1.Function.current_version:type_name -> functions.v1.FunctionVersion
 	10, // 13: functions.v1.Function.versions:type_name -> functions.v1.FunctionVersion
 	34, // 14: functions.v1.Function.resources:type_name -> functions.v1.Resources
-	1,  // 15: functions.v1.CreateFunctionRequest.spec:type_name -> functions.v1.FunctionSpec
-	30, // 16: functions.v1.CreateFunctionRequest.secret_values:type_name -> functions.v1.CreateFunctionRequest.SecretValuesEntry
-	34, // 17: functions.v1.CreateFunctionRequest.resources:type_name -> functions.v1.Resources
-	11, // 18: functions.v1.CreateFunctionResponse.function:type_name -> functions.v1.Function
-	10, // 19: functions.v1.CreateFunctionResponse.version:type_name -> functions.v1.FunctionVersion
-	34, // 20: functions.v1.UpdateFunctionRequest.resources:type_name -> functions.v1.Resources
-	11, // 21: functions.v1.UpdateFunctionResponse.function:type_name -> functions.v1.Function
-	11, // 22: functions.v1.GetFunctionResponse.function:type_name -> functions.v1.Function
-	35, // 23: functions.v1.ListFunctionsRequest.pagination:type_name -> functions.v1.PaginationRequest
-	11, // 24: functions.v1.ListFunctionsResponse.functions:type_name -> functions.v1.Function
-	36, // 25: functions.v1.ListFunctionsResponse.pagination:type_name -> functions.v1.PaginationResponse
-	1,  // 26: functions.v1.CreateFunctionVersionRequest.spec:type_name -> functions.v1.FunctionSpec
-	31, // 27: functions.v1.CreateFunctionVersionRequest.secret_values:type_name -> functions.v1.CreateFunctionVersionRequest.SecretValuesEntry
-	10, // 28: functions.v1.CreateFunctionVersionResponse.version:type_name -> functions.v1.FunctionVersion
-	10, // 29: functions.v1.GetFunctionVersionResponse.version:type_name -> functions.v1.FunctionVersion
-	35, // 30: functions.v1.ListFunctionVersionsRequest.pagination:type_name -> functions.v1.PaginationRequest
-	10, // 31: functions.v1.ListFunctionVersionsResponse.versions:type_name -> functions.v1.FunctionVersion
-	36, // 32: functions.v1.ListFunctionVersionsResponse.pagination:type_name -> functions.v1.PaginationResponse
-	33, // [33:33] is the sub-list for method output_type
-	33, // [33:33] is the sub-list for method input_type
-	33, // [33:33] is the sub-list for extension type_name
-	33, // [33:33] is the sub-list for extension extendee
-	0,  // [0:33] is the sub-list for field type_name
+	35, // 15: functions.v1.Function.network:type_name -> functions.v1.Network
+	1,  // 16: functions.v1.CreateFunctionRequest.spec:type_name -> functions.v1.FunctionSpec
+	30, // 17: functions.v1.CreateFunctionRequest.secret_values:type_name -> functions.v1.CreateFunctionRequest.SecretValuesEntry
+	34, // 18: functions.v1.CreateFunctionRequest.resources:type_name -> functions.v1.Resources
+	35, // 19: functions.v1.CreateFunctionRequest.network:type_name -> functions.v1.Network
+	11, // 20: functions.v1.CreateFunctionResponse.function:type_name -> functions.v1.Function
+	10, // 21: functions.v1.CreateFunctionResponse.version:type_name -> functions.v1.FunctionVersion
+	34, // 22: functions.v1.UpdateFunctionRequest.resources:type_name -> functions.v1.Resources
+	35, // 23: functions.v1.UpdateFunctionRequest.network:type_name -> functions.v1.Network
+	11, // 24: functions.v1.UpdateFunctionResponse.function:type_name -> functions.v1.Function
+	11, // 25: functions.v1.GetFunctionResponse.function:type_name -> functions.v1.Function
+	36, // 26: functions.v1.ListFunctionsRequest.pagination:type_name -> functions.v1.PaginationRequest
+	11, // 27: functions.v1.ListFunctionsResponse.functions:type_name -> functions.v1.Function
+	37, // 28: functions.v1.ListFunctionsResponse.pagination:type_name -> functions.v1.PaginationResponse
+	1,  // 29: functions.v1.CreateFunctionVersionRequest.spec:type_name -> functions.v1.FunctionSpec
+	31, // 30: functions.v1.CreateFunctionVersionRequest.secret_values:type_name -> functions.v1.CreateFunctionVersionRequest.SecretValuesEntry
+	10, // 31: functions.v1.CreateFunctionVersionResponse.version:type_name -> functions.v1.FunctionVersion
+	10, // 32: functions.v1.GetFunctionVersionResponse.version:type_name -> functions.v1.FunctionVersion
+	36, // 33: functions.v1.ListFunctionVersionsRequest.pagination:type_name -> functions.v1.PaginationRequest
+	10, // 34: functions.v1.ListFunctionVersionsResponse.versions:type_name -> functions.v1.FunctionVersion
+	37, // 35: functions.v1.ListFunctionVersionsResponse.pagination:type_name -> functions.v1.PaginationResponse
+	36, // [36:36] is the sub-list for method output_type
+	36, // [36:36] is the sub-list for method input_type
+	36, // [36:36] is the sub-list for extension type_name
+	36, // [36:36] is the sub-list for extension extendee
+	0,  // [0:36] is the sub-list for field type_name
 }
 
 func init() { file_functions_v1_functions_proto_init() }

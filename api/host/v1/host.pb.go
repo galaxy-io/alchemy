@@ -58,6 +58,7 @@ type Artifact struct {
 	// secrets names the tenant's secrets the function receives, variable
 	// name to secret name. The host fetches the values from a server.
 	Secrets       map[string]string `protobuf:"bytes,16,rep,name=secrets,proto3" json:"secrets,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
+	Network       v1.Network        `protobuf:"varint,17,opt,name=network,proto3,enum=functions.v1.Network" json:"network,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -202,6 +203,13 @@ func (x *Artifact) GetSecrets() map[string]string {
 		return x.Secrets
 	}
 	return nil
+}
+
+func (x *Artifact) GetNetwork() v1.Network {
+	if x != nil {
+		return x.Network
+	}
+	return v1.Network(0)
 }
 
 // SecretsRequest asks a server for the values of a function's secrets, for
@@ -514,6 +522,7 @@ type BuildRequest struct {
 	Version    int64    `protobuf:"varint,5,opt,name=version,proto3" json:"version,omitempty"`
 	// resources size the microVM the artifact is snapshotted at, and runs in.
 	Resources     *v1.Resources `protobuf:"bytes,6,opt,name=resources,proto3" json:"resources,omitempty"`
+	Network       v1.Network    `protobuf:"varint,7,opt,name=network,proto3,enum=functions.v1.Network" json:"network,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -588,6 +597,13 @@ func (x *BuildRequest) GetResources() *v1.Resources {
 		return x.Resources
 	}
 	return nil
+}
+
+func (x *BuildRequest) GetNetwork() v1.Network {
+	if x != nil {
+		return x.Network
+	}
+	return v1.Network(0)
 }
 
 type BuildResponse struct {
@@ -1909,7 +1925,11 @@ type FunctionConfig struct {
 	Resources      *v1.Resources `protobuf:"bytes,2,opt,name=resources,proto3" json:"resources,omitempty"`
 	// retries is how many more times an invocation runs after a failed
 	// attempt, unless the call set its own.
-	Retries       int32 `protobuf:"varint,3,opt,name=retries,proto3" json:"retries,omitempty"`
+	Retries int32      `protobuf:"varint,3,opt,name=retries,proto3" json:"retries,omitempty"`
+	Network v1.Network `protobuf:"varint,4,opt,name=network,proto3,enum=functions.v1.Network" json:"network,omitempty"`
+	// updated_at is when the function's row last changed, in unix
+	// microseconds. An older config never replaces a newer one.
+	UpdatedAt     int64 `protobuf:"varint,5,opt,name=updated_at,json=updatedAt,proto3" json:"updated_at,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1965,11 +1985,25 @@ func (x *FunctionConfig) GetRetries() int32 {
 	return 0
 }
 
+func (x *FunctionConfig) GetNetwork() v1.Network {
+	if x != nil {
+		return x.Network
+	}
+	return v1.Network(0)
+}
+
+func (x *FunctionConfig) GetUpdatedAt() int64 {
+	if x != nil {
+		return x.UpdatedAt
+	}
+	return 0
+}
+
 var File_host_v1_host_proto protoreflect.FileDescriptor
 
 const file_host_v1_host_proto_rawDesc = "" +
 	"\n" +
-	"\x12host/v1/host.proto\x12\ahost.v1\x1a\x19functions/v1/common.proto\x1a\x1cfunctions/v1/functions.proto\x1a\x17functions/v1/host.proto\x1a\x1efunctions/v1/invocations.proto\"\xa3\x05\n" +
+	"\x12host/v1/host.proto\x12\ahost.v1\x1a\x19functions/v1/common.proto\x1a\x1cfunctions/v1/functions.proto\x1a\x17functions/v1/host.proto\x1a\x1efunctions/v1/invocations.proto\"\xd4\x05\n" +
 	"\bArtifact\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x1b\n" +
 	"\ttenant_id\x18\x02 \x01(\tR\btenantId\x12\x14\n" +
@@ -1990,7 +2024,8 @@ const file_host_v1_host_proto_rawDesc = "" +
 	"\vfunction_id\x18\x0e \x01(\tR\n" +
 	"functionId\x12\x18\n" +
 	"\aversion\x18\x0f \x01(\x03R\aversion\x128\n" +
-	"\asecrets\x18\x10 \x03(\v2\x1e.host.v1.Artifact.SecretsEntryR\asecrets\x1a6\n" +
+	"\asecrets\x18\x10 \x03(\v2\x1e.host.v1.Artifact.SecretsEntryR\asecrets\x12/\n" +
+	"\anetwork\x18\x11 \x01(\x0e2\x15.functions.v1.NetworkR\anetwork\x1a6\n" +
 	"\bEnvEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
 	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\x1a:\n" +
@@ -2018,7 +2053,7 @@ const file_host_v1_host_proto_rawDesc = "" +
 	"\x06sha256\x18\x02 \x01(\tR\x06sha256\"5\n" +
 	"\x05Error\x12\x12\n" +
 	"\x04code\x18\x01 \x01(\tR\x04code\x12\x18\n" +
-	"\amessage\x18\x02 \x01(\tR\amessage\"\xf5\x01\n" +
+	"\amessage\x18\x02 \x01(\tR\amessage\"\xa6\x02\n" +
 	"\fBuildRequest\x12\x1b\n" +
 	"\ttenant_id\x18\x01 \x01(\tR\btenantId\x12.\n" +
 	"\x04spec\x18\x02 \x01(\v2\x1a.functions.v1.FunctionSpecR\x04spec\x12&\n" +
@@ -2026,7 +2061,8 @@ const file_host_v1_host_proto_rawDesc = "" +
 	"\vfunction_id\x18\x04 \x01(\tR\n" +
 	"functionId\x12\x18\n" +
 	"\aversion\x18\x05 \x01(\x03R\aversion\x125\n" +
-	"\tresources\x18\x06 \x01(\v2\x17.functions.v1.ResourcesR\tresources\"\x8f\x01\n" +
+	"\tresources\x18\x06 \x01(\v2\x17.functions.v1.ResourcesR\tresources\x12/\n" +
+	"\anetwork\x18\a \x01(\x0e2\x15.functions.v1.NetworkR\anetwork\"\x8f\x01\n" +
 	"\rBuildResponse\x12/\n" +
 	"\bartifact\x18\x01 \x01(\v2\x11.host.v1.ArtifactH\x00R\bartifact\x12&\n" +
 	"\x05error\x18\x02 \x01(\v2\x0e.host.v1.ErrorH\x00R\x05error\x12\x1b\n" +
@@ -2126,11 +2162,14 @@ const file_host_v1_host_proto_rawDesc = "" +
 	"\x19ActiveInvocationsResponse\x12:\n" +
 	"\vinvocations\x18\x01 \x03(\v2\x18.functions.v1.InvocationR\vinvocations\"O\n" +
 	"\x11InvocationRecords\x12:\n" +
-	"\vinvocations\x18\x01 \x03(\v2\x18.functions.v1.InvocationR\vinvocations\"\x8a\x01\n" +
+	"\vinvocations\x18\x01 \x03(\v2\x18.functions.v1.InvocationR\vinvocations\"\xda\x01\n" +
 	"\x0eFunctionConfig\x12'\n" +
 	"\x0fmax_concurrency\x18\x01 \x01(\x05R\x0emaxConcurrency\x125\n" +
 	"\tresources\x18\x02 \x01(\v2\x17.functions.v1.ResourcesR\tresources\x12\x18\n" +
-	"\aretries\x18\x03 \x01(\x05R\aretriesB\x86\x01\n" +
+	"\aretries\x18\x03 \x01(\x05R\aretries\x12/\n" +
+	"\anetwork\x18\x04 \x01(\x0e2\x15.functions.v1.NetworkR\anetwork\x12\x1d\n" +
+	"\n" +
+	"updated_at\x18\x05 \x01(\x03R\tupdatedAtB\x86\x01\n" +
 	"\vcom.host.v1B\tHostProtoP\x01Z/github.com/galaxy-io/alchemy/api/host/v1;hostv1\xa2\x02\x03HXX\xaa\x02\aHost.V1\xca\x02\aHost\\V1\xe2\x02\x13Host\\V1\\GPBMetadata\xea\x02\bHost::V1b\x06proto3"
 
 var (
@@ -2178,14 +2217,15 @@ var file_host_v1_host_proto_goTypes = []any{
 	nil,                               // 28: host.v1.SecretsResponse.ValuesEntry
 	(v1.InvocationProtocol)(0),        // 29: functions.v1.InvocationProtocol
 	(*v1.Contract)(nil),               // 30: functions.v1.Contract
-	(*v1.FunctionSpec)(nil),           // 31: functions.v1.FunctionSpec
-	(*v1.Resources)(nil),              // 32: functions.v1.Resources
-	(*v1.Invocation)(nil),             // 33: functions.v1.Invocation
-	(*v1.FunctionError)(nil),          // 34: functions.v1.FunctionError
-	(v1.StartKind)(0),                 // 35: functions.v1.StartKind
-	(v1.InvocationStatus)(0),          // 36: functions.v1.InvocationStatus
-	(*v1.Host)(nil),                   // 37: functions.v1.Host
-	(*v1.Instance)(nil),               // 38: functions.v1.Instance
+	(v1.Network)(0),                   // 31: functions.v1.Network
+	(*v1.FunctionSpec)(nil),           // 32: functions.v1.FunctionSpec
+	(*v1.Resources)(nil),              // 33: functions.v1.Resources
+	(*v1.Invocation)(nil),             // 34: functions.v1.Invocation
+	(*v1.FunctionError)(nil),          // 35: functions.v1.FunctionError
+	(v1.StartKind)(0),                 // 36: functions.v1.StartKind
+	(v1.InvocationStatus)(0),          // 37: functions.v1.InvocationStatus
+	(*v1.Host)(nil),                   // 38: functions.v1.Host
+	(*v1.Instance)(nil),               // 39: functions.v1.Instance
 }
 var file_host_v1_host_proto_depIdxs = []int32{
 	26, // 0: host.v1.Artifact.env:type_name -> host.v1.Artifact.EnvEntry
@@ -2193,39 +2233,42 @@ var file_host_v1_host_proto_depIdxs = []int32{
 	4,  // 2: host.v1.Artifact.layers:type_name -> host.v1.Layer
 	30, // 3: host.v1.Artifact.contract:type_name -> functions.v1.Contract
 	27, // 4: host.v1.Artifact.secrets:type_name -> host.v1.Artifact.SecretsEntry
-	28, // 5: host.v1.SecretsResponse.values:type_name -> host.v1.SecretsResponse.ValuesEntry
-	5,  // 6: host.v1.SecretsResponse.error:type_name -> host.v1.Error
-	31, // 7: host.v1.BuildRequest.spec:type_name -> functions.v1.FunctionSpec
-	4,  // 8: host.v1.BuildRequest.layers:type_name -> host.v1.Layer
-	32, // 9: host.v1.BuildRequest.resources:type_name -> functions.v1.Resources
-	0,  // 10: host.v1.BuildResponse.artifact:type_name -> host.v1.Artifact
-	5,  // 11: host.v1.BuildResponse.error:type_name -> host.v1.Error
-	4,  // 12: host.v1.CompileRequest.source:type_name -> host.v1.Layer
-	4,  // 13: host.v1.CompileResponse.layer:type_name -> host.v1.Layer
-	5,  // 14: host.v1.CompileResponse.error:type_name -> host.v1.Error
-	33, // 15: host.v1.InvokeRequest.invocation:type_name -> functions.v1.Invocation
-	0,  // 16: host.v1.InvokeRequest.artifact:type_name -> host.v1.Artifact
-	6,  // 17: host.v1.InvokeRequest.build:type_name -> host.v1.BuildRequest
-	12, // 18: host.v1.InvokeResult.response:type_name -> host.v1.InvokeResponse
-	34, // 19: host.v1.InvokeResponse.function_error:type_name -> functions.v1.FunctionError
-	5,  // 20: host.v1.InvokeResponse.error:type_name -> host.v1.Error
-	35, // 21: host.v1.InvokeResponse.start_kind:type_name -> functions.v1.StartKind
-	36, // 22: host.v1.InvocationEvent.status:type_name -> functions.v1.InvocationStatus
-	35, // 23: host.v1.InvocationEvent.start_kind:type_name -> functions.v1.StartKind
-	34, // 24: host.v1.InvocationEvent.error:type_name -> functions.v1.FunctionError
-	37, // 25: host.v1.DescribeResponse.host:type_name -> functions.v1.Host
-	38, // 26: host.v1.ListInstancesResponse.instances:type_name -> functions.v1.Instance
-	37, // 27: host.v1.Heartbeat.host:type_name -> functions.v1.Host
-	20, // 28: host.v1.Heartbeat.artifacts:type_name -> host.v1.ArtifactState
-	19, // 29: host.v1.Heartbeat.running:type_name -> host.v1.FunctionRunning
-	33, // 30: host.v1.ActiveInvocationsResponse.invocations:type_name -> functions.v1.Invocation
-	33, // 31: host.v1.InvocationRecords.invocations:type_name -> functions.v1.Invocation
-	32, // 32: host.v1.FunctionConfig.resources:type_name -> functions.v1.Resources
-	33, // [33:33] is the sub-list for method output_type
-	33, // [33:33] is the sub-list for method input_type
-	33, // [33:33] is the sub-list for extension type_name
-	33, // [33:33] is the sub-list for extension extendee
-	0,  // [0:33] is the sub-list for field type_name
+	31, // 5: host.v1.Artifact.network:type_name -> functions.v1.Network
+	28, // 6: host.v1.SecretsResponse.values:type_name -> host.v1.SecretsResponse.ValuesEntry
+	5,  // 7: host.v1.SecretsResponse.error:type_name -> host.v1.Error
+	32, // 8: host.v1.BuildRequest.spec:type_name -> functions.v1.FunctionSpec
+	4,  // 9: host.v1.BuildRequest.layers:type_name -> host.v1.Layer
+	33, // 10: host.v1.BuildRequest.resources:type_name -> functions.v1.Resources
+	31, // 11: host.v1.BuildRequest.network:type_name -> functions.v1.Network
+	0,  // 12: host.v1.BuildResponse.artifact:type_name -> host.v1.Artifact
+	5,  // 13: host.v1.BuildResponse.error:type_name -> host.v1.Error
+	4,  // 14: host.v1.CompileRequest.source:type_name -> host.v1.Layer
+	4,  // 15: host.v1.CompileResponse.layer:type_name -> host.v1.Layer
+	5,  // 16: host.v1.CompileResponse.error:type_name -> host.v1.Error
+	34, // 17: host.v1.InvokeRequest.invocation:type_name -> functions.v1.Invocation
+	0,  // 18: host.v1.InvokeRequest.artifact:type_name -> host.v1.Artifact
+	6,  // 19: host.v1.InvokeRequest.build:type_name -> host.v1.BuildRequest
+	12, // 20: host.v1.InvokeResult.response:type_name -> host.v1.InvokeResponse
+	35, // 21: host.v1.InvokeResponse.function_error:type_name -> functions.v1.FunctionError
+	5,  // 22: host.v1.InvokeResponse.error:type_name -> host.v1.Error
+	36, // 23: host.v1.InvokeResponse.start_kind:type_name -> functions.v1.StartKind
+	37, // 24: host.v1.InvocationEvent.status:type_name -> functions.v1.InvocationStatus
+	36, // 25: host.v1.InvocationEvent.start_kind:type_name -> functions.v1.StartKind
+	35, // 26: host.v1.InvocationEvent.error:type_name -> functions.v1.FunctionError
+	38, // 27: host.v1.DescribeResponse.host:type_name -> functions.v1.Host
+	39, // 28: host.v1.ListInstancesResponse.instances:type_name -> functions.v1.Instance
+	38, // 29: host.v1.Heartbeat.host:type_name -> functions.v1.Host
+	20, // 30: host.v1.Heartbeat.artifacts:type_name -> host.v1.ArtifactState
+	19, // 31: host.v1.Heartbeat.running:type_name -> host.v1.FunctionRunning
+	34, // 32: host.v1.ActiveInvocationsResponse.invocations:type_name -> functions.v1.Invocation
+	34, // 33: host.v1.InvocationRecords.invocations:type_name -> functions.v1.Invocation
+	33, // 34: host.v1.FunctionConfig.resources:type_name -> functions.v1.Resources
+	31, // 35: host.v1.FunctionConfig.network:type_name -> functions.v1.Network
+	36, // [36:36] is the sub-list for method output_type
+	36, // [36:36] is the sub-list for method input_type
+	36, // [36:36] is the sub-list for extension type_name
+	36, // [36:36] is the sub-list for extension extendee
+	0,  // [0:36] is the sub-list for field type_name
 }
 
 func init() { file_host_v1_host_proto_init() }

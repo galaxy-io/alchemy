@@ -87,6 +87,7 @@ func buildFor(cv *compiledVersion) *hostv1.BuildRequest {
 		TenantId: cv.row.TenantID, FunctionId: cv.row.FunctionID, Version: cv.row.Version,
 		Spec: cv.pinnedSpec(), Layers: cv.artifact.GetLayers(),
 		Resources: &functionsv1.Resources{Vcpus: cv.artifact.GetVcpus(), MemoryMib: cv.artifact.GetMemoryMib()},
+		Network:   cv.artifact.GetNetwork(),
 	}
 }
 

@@ -17,6 +17,7 @@ import {
 } from "@/gen/functions/v1/functions_pb";
 
 import {
+  FUNCTION_ENV_NAME_PATTERN,
   FUNCTION_NAME_PATTERN,
   FUNCTION_PROTOCOL_TO_TOKEN_MAP,
   FUNCTION_SOURCE_EXTENSION_TO_LANGUAGE_MAP,
@@ -26,6 +27,7 @@ import {
 import type {
   FunctionArrowField,
   FunctionContractKind,
+  FunctionEnv,
   FunctionSourceFile,
 } from "@/pages/functions/types";
 
@@ -153,3 +155,37 @@ export const createFunctionSourceSpec = (spec: FunctionSpec, files: FunctionSour
   next.source = createFunctionSource(files);
   return next;
 };
+
+export const createFunctionEnv = (spec: FunctionSpec | undefined): FunctionEnv => ({
+  variables: Object.entries(spec?.env ?? {}).map(([key, value]) => ({ key, value })),
+  stored: Object.keys(spec?.secrets ?? {}).map((key) => ({ key, value: "" })),
+  secrets: [],
+  secretNames: spec?.secrets ?? {},
+});
+
+export const getFunctionEnvHints = ({ variables, stored, secrets }: FunctionEnv) => {
+  const names = [...variables, ...stored, ...secrets].map((pair) => pair.key.trim());
+  return [
+    variables.some((pair) => !pair.key.trim()) ? "Every variable needs a name" : undefined,
+    secrets.some((pair) => !pair.key.trim()) ? "Every secret needs a name" : undefined,
+    names.some((name) => name && !FUNCTION_ENV_NAME_PATTERN.test(name))
+      ? "A name is letters, digits and underscores, not starting with a digit"
+      : undefined,
+    new Set(names).size !== names.length ? "Variable and secret names must be unique" : undefined,
+    secrets.some((pair) => !pair.value) ? "Every new secret needs a value" : undefined,
+  ].filter((hint) => hint !== undefined);
+};
+
+export const serializeFunctionEnv = ({ variables, stored, secrets, secretNames }: FunctionEnv) => ({
+  env: Object.fromEntries(
+    variables.filter((pair) => pair.key.trim()).map((pair) => [pair.key.trim(), pair.value]),
+  ),
+  secrets: Object.fromEntries(
+    stored.filter((pair) => !pair.value).map((pair) => [pair.key, secretNames[pair.key]]),
+  ),
+  secretValues: Object.fromEntries(
+    [...stored, ...secrets]
+      .filter((pair) => pair.key.trim() && pair.value)
+      .map((pair) => [pair.key.trim(), pair.value]),
+  ),
+});

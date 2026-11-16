@@ -22,6 +22,9 @@ It runs each invocation in a Firecracker microVM, checks every input and output 
 
 Run Alchemy as a service with its API and web UI, or deploy it to your own machines with KVM.
 
+> [!WARNING]
+> Alchemy is in early development. APIs, the Helm chart and the database schema may change between releases before v1.0.0, so pin a version and read the release notes before you upgrade. Keep NATS, the hosts and the API on a private network, and turn on authentication for anything reachable from outside it.
+
 ## Install
 
 Install the Helm chart from GitHub Container Registry:

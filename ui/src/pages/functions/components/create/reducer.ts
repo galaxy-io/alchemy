@@ -11,6 +11,7 @@ import {
   type SetMaxConcurrencyAction,
   type SetMemoryMibAction,
   type SetNameAction,
+  type SetNetworkAction,
   type SetRetriesAction,
   type SetRuntimeAction,
   type SetSchemaTextAction,
@@ -18,6 +19,7 @@ import {
   type SetSourceFileAction,
   type SetSourceFileContentAction,
   type SetSourceKindAction,
+  type SetStoredSecretsAction,
   type SetSubmittingAction,
   type SetTimeoutMsAction,
   type SetVariablesAction,
@@ -112,6 +114,13 @@ function setVariables(
   return { ...state, variables: action.payload };
 }
 
+function setStoredSecrets(
+  state: CreateFunctionModalState,
+  action: SetStoredSecretsAction,
+): CreateFunctionModalState {
+  return { ...state, stored: action.payload };
+}
+
 function setSecrets(
   state: CreateFunctionModalState,
   action: SetSecretsAction,
@@ -159,6 +168,13 @@ function setRetries(
   action: SetRetriesAction,
 ): CreateFunctionModalState {
   return { ...state, retries: action.payload };
+}
+
+function setNetwork(
+  state: CreateFunctionModalState,
+  action: SetNetworkAction,
+): CreateFunctionModalState {
+  return { ...state, network: action.payload };
 }
 
 function setSubmitting(
@@ -265,6 +281,8 @@ const createFunctionModalReducer = (
       return setVariables(state, action);
     case CreateFunctionModalActionType.SET_SECRETS:
       return setSecrets(state, action);
+    case CreateFunctionModalActionType.SET_STORED_SECRETS:
+      return setStoredSecrets(state, action);
     case CreateFunctionModalActionType.SET_CONTRACT_KIND:
       return setContractKind(state, action);
     case CreateFunctionModalActionType.SET_SCHEMA_TEXT:
@@ -285,6 +303,8 @@ const createFunctionModalReducer = (
       return setMaxConcurrency(state, action);
     case CreateFunctionModalActionType.SET_RETRIES:
       return setRetries(state, action);
+    case CreateFunctionModalActionType.SET_NETWORK:
+      return setNetwork(state, action);
     case CreateFunctionModalActionType.GO_TO_STEP:
       return goToStep(state, action);
     case CreateFunctionModalActionType.GO_BACK:

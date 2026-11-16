@@ -88,6 +88,7 @@ message Artifact {
   // secrets names the tenant's secrets the function receives, variable
   // name to secret name. The host fetches the values from a server.
   map<string, string> secrets = 16;
+  functions.v1.Network network = 17;
 }
 
 // SecretsRequest asks a server for the values of a function's secrets, for
@@ -143,6 +144,7 @@ message BuildRequest {
   int64 version = 5;
   // resources size the microVM the artifact is snapshotted at, and runs in.
   functions.v1.Resources resources = 6;
+  functions.v1.Network network = 7;
 }
 
 message BuildResponse {
@@ -341,4 +343,8 @@ message FunctionConfig {
   // retries is how many more times an invocation runs after a failed
   // attempt, unless the call set its own.
   int32 retries = 3;
+  functions.v1.Network network = 4;
+  // updated_at is when the function's row last changed, in unix
+  // microseconds. An older config never replaces a newer one.
+  int64 updated_at = 5;
 }
