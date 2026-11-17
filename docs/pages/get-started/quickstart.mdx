@@ -62,15 +62,6 @@ brew bundle
     just vm
     ```
   </Step>
-  <Step title="Build the images">
-    Builds the server and host images, then builds every runtime (Python,
-    Node, static, Go and Rust) and pushes them to the local registry, where
-    the hosts pull them.
-
-    ```sh
-    just images
-    ```
-  </Step>
   <Step title="Run Alchemy">
     Starts 3 hosts in the VM with 512 MiB each, starts the server on `:8780`,
     waits for its `/healthz`, then starts the UI dev server. The server
@@ -80,7 +71,7 @@ brew bundle
     just dev
     ```
 
-    Open [http://localhost:5173](http://localhost:5173). The UI dev server
+    Open [http://localhost:5174](http://localhost:5174). The UI dev server
     proxies the API to the server on `:8780`.
   </Step>
 </Steps>

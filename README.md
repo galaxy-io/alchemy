@@ -45,16 +45,15 @@ brew bundle
 
 Firecracker needs KVM, so on macOS hosts run in a Lima VM with nested virtualization (Apple M3 or later, macOS 15 or later).
 
-Start the infrastructure and the VM, build the runtime images, then run Alchemy:
+Start the infrastructure and the VM, then run Alchemy:
 
 ```sh
 just infra
 just vm
-just images
 just dev
 ```
 
-Open <http://localhost:5173> to use the web UI. The [quickstart](https://alchemy.getgalaxy.io/pages/get-started/quickstart) creates a function and invokes it.
+Open <http://localhost:5174> to use the web UI. The [quickstart](https://alchemy.getgalaxy.io/pages/get-started/quickstart) creates a function and invokes it.
 
 When you are finished, stop the local infrastructure with:
 

@@ -88,5 +88,5 @@ func uiOrigin() string {
 	if origin := os.Getenv("AUTH_UI_ORIGIN"); origin != "" {
 		return origin
 	}
-	return "http://localhost:5173"
+	return "http://localhost:5174"
 }

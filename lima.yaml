@@ -20,6 +20,9 @@ provision:
       apt-get update -q
       apt-get install -y -q conntrack e2fsprogs curl iproute2 nftables
 
+      # the template's system dockerd sets the forward policy to drop at boot, which blocks guest egress
+      iptables -P FORWARD ACCEPT
+
       FC_VERSION=v1.17.0
       ARCH=$(uname -m)
       if [ ! -x /usr/local/bin/firecracker ]; then

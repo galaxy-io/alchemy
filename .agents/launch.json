@@ -9,12 +9,12 @@
         "ui",
         "dev"
       ],
-      "port": 5173
+      "port": 5174
     },
     {
       "name": "alchemy-ui-attach",
-      "url": "http://localhost:5173",
-      "port": 5173
+      "url": "http://localhost:5174",
+      "port": 5174
     },
     {
       "name": "alchemy-ui-verify",
