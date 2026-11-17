@@ -8,7 +8,8 @@
       "initial-version": "0.0.1",
       "include-component-in-tag": false,
       "exclude-paths": [
-        "examples"
+        "examples",
+        "api"
       ],
       "extra-files": [
         {
@@ -21,12 +22,29 @@
           "path": "charts/alchemy/Chart.yaml",
           "jsonpath": "$.appVersion"
         }
-      ]
+      ],
+      "component": "alchemy"
     },
     "ui": {
       "release-type": "node",
       "component": "alchemy-ui",
       "include-v-in-tag": false
+    },
+    "api": {
+      "release-type": "go",
+      "component": "api",
+      "include-component-in-tag": true,
+      "tag-separator": "/"
     }
-  }
+  },
+  "plugins": [
+    {
+      "type": "linked-versions",
+      "groupName": "alchemy",
+      "components": [
+        "alchemy",
+        "api"
+      ]
+    }
+  ]
 }

@@ -63,6 +63,7 @@ require (
 	github.com/envoyproxy/go-control-plane/envoy v1.39.1-0.20260819172001-e6e3fd93e4be // indirect
 	github.com/envoyproxy/protoc-gen-validate v1.3.3 // indirect
 	github.com/felixge/httpsnoop v1.1.0 // indirect
+	github.com/galaxy-io/alchemy/api v0.0.0
 	github.com/go-chi/chi/v5 v5.5.0 // indirect
 	github.com/go-jose/go-jose/v4 v4.1.6 // indirect
 	github.com/go-logr/logr v1.4.4 // indirect
@@ -127,3 +128,5 @@ require (
 	google.golang.org/grpc v1.85.0 // indirect
 	gotest.tools/v3 v3.5.2 // indirect
 )
+
+replace github.com/galaxy-io/alchemy/api => ./api
