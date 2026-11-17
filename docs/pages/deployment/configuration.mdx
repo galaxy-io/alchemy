@@ -29,7 +29,7 @@ The default URLs point at the local development stack. Set them in every real de
 | Variable | Default | Chart value | Description |
 |---|---|---|---|
 | `ADDR` | `:8780` | `server.service.port` | Address the API, invoke endpoint and UI listen on |
-| `PERSISTENCE_DSN` | local development DSN | `persistence.postgresql.dsn` (Secret) | PostgreSQL connection string. Migrations run on start |
+| `PERSISTENCE_DSN` | local development DSN | `persistence.postgresql.dsn` (Secret) | PostgreSQL connection string. Migrations run with `server -migrate` |
 | `SERVER_NAME` | the hostname | | Name the server is known by on the bus. Must be unique per server |
 
 ### Galaxy products

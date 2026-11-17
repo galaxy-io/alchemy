@@ -138,7 +138,7 @@ Both Deployments carry checksums of their ConfigMap and the chart-created Secret
 kubectl rollout restart deployment/alchemy-server deployment/alchemy-host
 ```
 
-New servers apply any new migrations on start. Read the release notes before you upgrade.
+The chart applies any new migrations in a hook Job, before the new servers start when `existingSecret` is set. Read the release notes before you upgrade.
 
 ## Verify a release
 

@@ -80,9 +80,12 @@ host count="1" memory="512" warm="5m" prewarm="0": build-linux
       done
       wait'
 
-# run server on the Mac on :8780 against compose (env overrides); it applies migrations on start; `just server zitadel|keycloak|proxy` turns auth on
+# run server on the Mac on :8780 against compose (env overrides); it runs `just migrate` first; `just server zitadel|keycloak|proxy` turns auth on
 # hosts pull runtimes from the compose registry by the Mac's private address, which needs no TLS
-server mode="":
+migrate:
+    PERSISTENCE_DSN="${PERSISTENCE_DSN:-postgresql://alchemy:alchemy@localhost:5435/alchemy?sslmode=disable}" go run ./cmd/server -migrate
+
+server mode="": migrate
     #!/usr/bin/env bash
     set -euo pipefail
     # the compose providers, which the server sets up on boot; proxy needs only AUTH_PROXY_TENANT, from the env
