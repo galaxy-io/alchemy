@@ -1,0 +1,12 @@
+syntax = "proto3";
+
+package functions.v1;
+
+message GetVersionRequest {}
+
+// GetVersionResponse is the build the server runs.
+message GetVersionResponse {
+  string version = 1;
+  string commit = 2;
+  string date = 3;
+}

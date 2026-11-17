@@ -40,3 +40,6 @@ export const formatMemory = (mib: bigint | number) =>
   Number(mib) >= MIB_PER_GIB
     ? `${(Number(mib) / MIB_PER_GIB).toFixed(Number(mib) % MIB_PER_GIB ? 1 : 0)} GiB`
     : `${mib} MiB`;
+
+export const formatServerVersion = (version: string) =>
+  /^\d/.test(version) ? `v${version}` : version;
