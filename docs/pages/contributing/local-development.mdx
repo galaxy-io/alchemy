@@ -39,12 +39,12 @@ later. See the [Quickstart](/pages/get-started/quickstart) for why.
 | `datastore/postgres` | Migrations, sqlc queries and the generated `sqlcgen` package |
 | `ui/` | The React web UI and the `@galaxy-io/alchemy-ui` module |
 | `runtimes/` | Dockerfiles for the runtime images |
+| `templates/` | Function templates the web UI and API offer |
 | `charts/alchemy` | The Helm chart |
-| `examples/embed` | One function written in Python, TypeScript, Go and Rust |
 | `docs/` | This site |
 
-The repository has three Go modules: the root, `examples/embed/go` and
-`runtimes/go`. Recipes that run per module set `GOWORK=off`.
+The repository has three Go modules: the root, `api` and `runtimes/go`.
+Recipes that run per module set `GOWORK=off`.
 
 ## How the pieces run in development
 
