@@ -76,6 +76,7 @@ export const FUNCTION_CONTRACT_SIDE_TO_ARROW_SCHEMA_KEY_MAP = {
 
 export const FUNCTION_SOURCE_KIND_TO_LABEL_MAP: Record<FunctionSourceKind, string> = {
   [FunctionSourceKind.SOURCE]: "Code",
+  [FunctionSourceKind.TEMPLATE]: "Template",
   [FunctionSourceKind.IMAGE]: "Image",
 };
 

@@ -7,6 +7,7 @@ import type {
   Runtime,
   SourceLimits,
 } from "@/gen/functions/v1/functions_pb";
+import type { Template } from "@/gen/functions/v1/templates_pb";
 
 import type {
   FunctionArrowField,
@@ -46,6 +47,8 @@ export interface CreateFunctionModalState {
   image: FunctionSpec["image"];
   runtimes: Runtime[];
   limits: SourceLimits | undefined;
+  templates: Template[];
+  template: Template["id"];
   runtime: Runtime["id"];
   sourceFiles: FunctionSourceFile[];
   sourceFile: FunctionSourceFile["path"];

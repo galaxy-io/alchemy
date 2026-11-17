@@ -1,5 +1,12 @@
 import type { JsonObject } from "@bufbuild/protobuf";
-import { CodeIcon, CubeIcon, HammerIcon, type Icon, PlusIcon } from "@phosphor-icons/react";
+import {
+  CodeIcon,
+  CubeIcon,
+  HammerIcon,
+  type Icon,
+  PlusIcon,
+  SquaresFourIcon,
+} from "@phosphor-icons/react";
 
 import { Network } from "@/gen/functions/v1/common_pb";
 
@@ -44,11 +51,13 @@ export const CREATE_FUNCTION_MODAL_SOURCE_KIND_TO_SKIPPED_STEPS_MAP: Record<
   CreateFunctionModalStep[]
 > = {
   [FunctionSourceKind.SOURCE]: [],
+  [FunctionSourceKind.TEMPLATE]: [],
   [FunctionSourceKind.IMAGE]: [CreateFunctionModalStep.CODE],
 };
 
 export const CREATE_FUNCTION_MODAL_SOURCE_KIND_TO_ICON_MAP: Record<FunctionSourceKind, Icon> = {
   [FunctionSourceKind.SOURCE]: CodeIcon,
+  [FunctionSourceKind.TEMPLATE]: SquaresFourIcon,
   [FunctionSourceKind.IMAGE]: CubeIcon,
 };
 
@@ -57,6 +66,7 @@ export const CREATE_FUNCTION_MODAL_SOURCE_KIND_TO_DESCRIPTION_MAP: Record<
   string
 > = {
   [FunctionSourceKind.SOURCE]: "Write it here and Alchemy builds it",
+  [FunctionSourceKind.TEMPLATE]: "Start from one and shape it with a contract",
   [FunctionSourceKind.IMAGE]: "Run an OCI image you build",
 };
 
@@ -64,6 +74,8 @@ export const CREATE_FUNCTION_MODAL_SOURCE_KIND_TO_DETAILS_MAP: Record<FunctionSo
   {
     [FunctionSourceKind.SOURCE]:
       "Write the handler here. It lands on a runtime image with the language and Arrow in it, and Alchemy builds the version from it.",
+    [FunctionSourceKind.TEMPLATE]:
+      "Pick a template, then write the contract. The template's code reads the contract, so the fields you describe decide what it computes. The code stays yours to edit.",
     [FunctionSourceKind.IMAGE]:
       "Point at an OCI image you build and push yourself. Its entrypoint reads input on stdin and writes output on stdout.",
   };
@@ -200,6 +212,8 @@ export const CREATE_FUNCTION_MODAL_DEFAULT_STATE: CreateFunctionModalState = {
   image: "",
   runtimes: [],
   limits: undefined,
+  templates: [],
+  template: "",
   runtime: "",
   sourceFiles: [],
   sourceFile: "",
@@ -226,6 +240,12 @@ export const CREATE_FUNCTION_MODAL_DEFAULT_STATE: CreateFunctionModalState = {
 };
 
 export const CREATE_FUNCTION_MODAL_SOURCE_KIND_NAME = "create-function-source-kind";
+export const CREATE_FUNCTION_MODAL_TEMPLATE_GRID_COLUMNS = "repeat(4, minmax(0, 1fr))";
+export const CREATE_FUNCTION_MODAL_TEMPLATE_CARD_HEIGHT = 120;
+export const CREATE_FUNCTION_MODAL_TEMPLATE_TILE_SIZE = 48;
+export const CREATE_FUNCTION_MODAL_TEMPLATE_LOCKUP_HEIGHT = 13;
+export const CREATE_FUNCTION_MODAL_TEMPLATE_GATEWAY_LABEL = "OpenRouter";
+
 export const CREATE_FUNCTION_MODAL_COMMAND_SEPARATORS = [" ", ","];
 
 export const CREATE_FUNCTION_MODAL_VCPUS_SLIDER_MARKS = CREATE_FUNCTION_MODAL_VCPUS_MARKS.map(

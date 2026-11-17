@@ -1,3 +1,5 @@
+import { match } from "ts-pattern";
+
 import {
   type AddArrowFieldAction,
   type CreateFunctionModalAction,
@@ -21,6 +23,7 @@ import {
   type SetSourceKindAction,
   type SetStoredSecretsAction,
   type SetSubmittingAction,
+  type SetTemplateAction,
   type SetTimeoutMsAction,
   type SetVariablesAction,
   type SetVcpusAction,
@@ -31,16 +34,36 @@ import {
   CreateFunctionModalStep,
 } from "@/pages/functions/components/create/types";
 import {
+  applyCreateFunctionModalTemplate,
+  clearCreateFunctionModalTemplate,
+  createCreateFunctionModalTemplateFiles,
   getCreateFunctionModalRuntime,
   getCreateFunctionModalSteps,
+  getCreateFunctionModalTemplate,
 } from "@/pages/functions/components/create/utils";
+import { FunctionSourceKind } from "@/pages/functions/types";
 import { createFunctionSourceStarter } from "@/pages/functions/utils";
 
-function regenerateStarter(state: CreateFunctionModalState): CreateFunctionModalState {
+function regenerateRuntimeStarter(state: CreateFunctionModalState): CreateFunctionModalState {
   const runtime = getCreateFunctionModalRuntime(state);
   if (state.isSourceTouched || !runtime) return state;
   const sourceFiles = createFunctionSourceStarter(runtime, state.contractKind);
   return { ...state, sourceFiles, sourceFile: sourceFiles[0]?.path ?? state.sourceFile };
+}
+
+function regenerateTemplateFiles(state: CreateFunctionModalState): CreateFunctionModalState {
+  const template = getCreateFunctionModalTemplate(state);
+  if (state.isSourceTouched || !template) return state;
+  const sourceFiles = createCreateFunctionModalTemplateFiles(template, state.contractKind);
+  return { ...state, sourceFiles, sourceFile: sourceFiles[0]?.path ?? state.sourceFile };
+}
+
+function regenerateStarter(state: CreateFunctionModalState): CreateFunctionModalState {
+  return match(state.sourceKind)
+    .with(FunctionSourceKind.SOURCE, () => regenerateRuntimeStarter(state))
+    .with(FunctionSourceKind.TEMPLATE, () => regenerateTemplateFiles(state))
+    .with(FunctionSourceKind.IMAGE, () => state)
+    .exhaustive();
 }
 
 function enterStep(state: CreateFunctionModalState, step: CreateFunctionModalStep) {
@@ -70,7 +93,29 @@ function setSourceKind(
   state: CreateFunctionModalState,
   action: SetSourceKindAction,
 ): CreateFunctionModalState {
-  return { ...state, sourceKind: action.payload };
+  if (action.payload === state.sourceKind) return state;
+  const next = { ...state, sourceKind: action.payload };
+  const template =
+    getCreateFunctionModalTemplate(state) ??
+    state.templates.find((candidate) => !candidate.comingSoon);
+  return match(action.payload)
+    .with(FunctionSourceKind.TEMPLATE, () =>
+      template ? applyCreateFunctionModalTemplate(next, template) : next,
+    )
+    .with(FunctionSourceKind.SOURCE, FunctionSourceKind.IMAGE, () =>
+      regenerateStarter(clearCreateFunctionModalTemplate(next)),
+    )
+    .exhaustive();
+}
+
+function setTemplate(
+  state: CreateFunctionModalState,
+  action: SetTemplateAction,
+): CreateFunctionModalState {
+  const template = state.templates.find((candidate) => candidate.id === action.payload);
+  return template && !template.comingSoon && template.id !== state.template
+    ? applyCreateFunctionModalTemplate(state, template)
+    : state;
 }
 
 function setRuntime(
@@ -271,6 +316,8 @@ const createFunctionModalReducer = (
       return setImage(state, action);
     case CreateFunctionModalActionType.SET_RUNTIME:
       return setRuntime(state, action);
+    case CreateFunctionModalActionType.SET_TEMPLATE:
+      return setTemplate(state, action);
     case CreateFunctionModalActionType.SET_SOURCE_FILE:
       return setSourceFile(state, action);
     case CreateFunctionModalActionType.SET_SOURCE_FILE_CONTENT:
