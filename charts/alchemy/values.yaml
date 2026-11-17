@@ -240,7 +240,9 @@ server:
     # -- Scale servers with a HorizontalPodAutoscaler on CPU. Needs
     # `server.resources.requests.cpu`.
     enabled: false
+    # -- Fewest servers.
     minReplicas: 1
+    # -- Most servers.
     maxReplicas: 5
     # -- Average CPU, as a percent of the request, to hold the servers at.
     targetCPUUtilizationPercentage: 70
@@ -445,8 +447,8 @@ postgresql:
     persistence:
       # -- PVC size for the vendored PostgreSQL primary.
       size: 8Gi
-    # Protect cold starts and crash recovery from liveness restarts for up to
-    # five minutes. Readiness still removes an unhealthy primary promptly.
+    # -- Startup probe for the primary. Protects cold starts and crash
+    # recovery from liveness restarts for up to five minutes.
     startupProbe:
       enabled: true
       initialDelaySeconds: 0
@@ -454,6 +456,7 @@ postgresql:
       timeoutSeconds: 5
       failureThreshold: 30
       successThreshold: 1
+    # -- Readiness probe for the primary. Still removes an unhealthy primary promptly.
     readinessProbe:
       failureThreshold: 2
 
@@ -478,6 +481,7 @@ nats:
         # writes them to PostgreSQL, on disk, so a NATS restart loses none.
         enabled: true
         pvc:
+          # -- PVC size for the JetStream file store.
           size: 10Gi
     merge:
       # -- Largest message NATS accepts. Payloads carry whole function inputs
