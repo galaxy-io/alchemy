@@ -22,8 +22,7 @@
           "path": "charts/alchemy/Chart.yaml",
           "jsonpath": "$.appVersion"
         }
-      ],
-      "component": "alchemy"
+      ]
     },
     "ui": {
       "release-type": "node",
@@ -32,19 +31,10 @@
     },
     "api": {
       "release-type": "go",
+      "initial-version": "0.3.0",
       "component": "api",
       "include-component-in-tag": true,
       "tag-separator": "/"
     }
-  },
-  "plugins": [
-    {
-      "type": "linked-versions",
-      "groupName": "alchemy",
-      "components": [
-        "alchemy",
-        "api"
-      ]
-    }
-  ]
+  }
 }
