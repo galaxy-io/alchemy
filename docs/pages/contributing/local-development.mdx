@@ -35,7 +35,7 @@ later. See the [Quickstart](/pages/get-started/quickstart) for why.
 | `internal/bus` | NATS JetStream streams, consumers and KV between servers and hosts |
 | `internal/contract` | JSON Schema and Arrow contract checks |
 | `internal/runtimes` | The runtime catalog and the starter handlers |
-| `protos/` | Protobuf definitions. `api/` holds the generated Go |
+| `protos/` | Protobuf definitions. `api/` holds the generated Go as its own module, `github.com/galaxy-io/alchemy/api`, so clients import it without the server's dependencies |
 | `datastore/postgres` | Migrations, sqlc queries and the generated `sqlcgen` package |
 | `ui/` | The React web UI and the `@galaxy-io/alchemy-ui` module |
 | `runtimes/` | Dockerfiles for the runtime images |

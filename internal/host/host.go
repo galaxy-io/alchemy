@@ -477,11 +477,8 @@ func (h *Host) invoke(ctx context.Context, req *hostv1.InvokeRequest) (reply *ho
 	}
 
 	live, err := h.admit(req.GetArtifact())
-	if errors.Is(err, errOverBudget) {
-		return invokeError("failed_precondition", err), nil, false
-	}
 	if err != nil {
-		return invokeError("resource_exhausted", err), nil, true
+		return invokeError(admitCode(err), err), nil, !errors.Is(err, errOverBudget)
 	}
 	h.publishState(req, functionsv1.InvocationStatus_INVOCATION_STATUS_STARTING, "", functionsv1.StartKind_START_KIND_UNSPECIFIED, 0)
 	instance, startKind := live.instance, functionsv1.StartKind_START_KIND_WARM
@@ -762,6 +759,14 @@ func (h *Host) admit(a *hostv1.Artifact) (*liveInstance, error) {
 		h.tasks.Go(func() { h.kill(victim) })
 	}
 	return h.trackLocked(a), nil
+}
+
+// admitCode fails an attempt that can never fit and hands on one that is full now.
+func admitCode(err error) string {
+	if errors.Is(err, errOverBudget) {
+		return "failed_precondition"
+	}
+	return "resource_exhausted"
 }
 
 // park returns live to the warm pool for its artifact. It reports false

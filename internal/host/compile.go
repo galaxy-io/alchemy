@@ -85,11 +85,8 @@ func (h *Host) handleCompile(ctx context.Context, data []byte) proto.Message {
 	}
 
 	live, err := h.admit(artifact)
-	if errors.Is(err, errOverBudget) {
-		return compileError("failed_precondition", err)
-	}
 	if err != nil {
-		return compileError("resource_exhausted", err)
+		return compileError(admitCode(err), err)
 	}
 	instance, kind, err := h.driver.Acquire(ctx, built)
 	if err != nil {

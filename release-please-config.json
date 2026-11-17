@@ -8,7 +8,8 @@
       "initial-version": "0.0.1",
       "include-component-in-tag": false,
       "exclude-paths": [
-        "examples"
+        "examples",
+        "api"
       ],
       "extra-files": [
         {
@@ -27,6 +28,13 @@
       "release-type": "node",
       "component": "alchemy-ui",
       "include-v-in-tag": false
+    },
+    "api": {
+      "release-type": "go",
+      "initial-version": "0.3.0",
+      "component": "api",
+      "include-component-in-tag": true,
+      "tag-separator": "/"
     }
   }
 }

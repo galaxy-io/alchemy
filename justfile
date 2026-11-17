@@ -134,8 +134,9 @@ docs:
 # generate all checked-in generated code
 gen: proto sqlc ui-gen
 
-# generate protobuf and ConnectRPC Go stubs
+# generate protobuf and ConnectRPC Go stubs; api/ is its own module, so only the generated files are cleared
 proto:
+    find api -name '*.pb.go' -o -name '*.connect.go' | xargs rm -f
     buf generate
 
 # generate sqlc Go code from datastore/postgres/{migrations,queries}
@@ -155,8 +156,7 @@ proto-format mode="fix":
     buf format {{ if mode == "check" { "-d --exit-code" } else { "-w" } }}
 
 # verify generated protobuf files are up to date
-proto-check:
-    buf generate
+proto-check: proto
     git diff --exit-code -- api
 
 # build the web UI into ui/build, which server embeds with -tags embedui
