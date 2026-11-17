@@ -73,7 +73,7 @@ host count="1" memory="512" warm="5m" prewarm="0": build-linux
           LOGS_BUCKET="s3://alchemy-logs?$bucket" \
           ARTIFACTS_BUCKET="s3://alchemy-artifacts?$bucket" \
           LOG_FORMAT=text LOG_LEVEL="${LOG_LEVEL:-info}" \
-          REGISTRY_ALLOW=192.168.5.2:5001 \
+          REGISTRY_ALLOW=192.168.5.2:5001,ghcr.io \
           HOST_NAME="host-$i" DATA_DIR="/var/lib/alchemy/host-$i" UID_BASE=$((10000000 * i)) \
           MEMORY_BUDGET_MIB={{ memory }} WARM_INSTANCE_TTL={{ warm }} PREWARM_COUNT={{ prewarm }} \
           bin/linux-arm64/host 2>&1 | sed -u "s/^/[host-$i] /" &
@@ -93,27 +93,27 @@ server mode="": migrate
       zitadel)
         export AUTH_ISSUER="${AUTH_ISSUER:-http://localhost:8301}" \
           AUTH_PAT="${AUTH_PAT:-$(cat .zitadel/pat 2>/dev/null)}" \
-          AUTH_UI_ORIGIN="${AUTH_UI_ORIGIN:-http://localhost:5173}" ;;
+          AUTH_UI_ORIGIN="${AUTH_UI_ORIGIN:-http://localhost:5174}" ;;
       keycloak)
         export AUTH_ISSUER="${AUTH_ISSUER:-http://localhost:8401/realms/alchemy}" \
           AUTH_CLIENT_ID="${AUTH_CLIENT_ID:-alchemy}" \
           AUTH_CLIENT_SECRET="${AUTH_CLIENT_SECRET:-alchemy}" \
           AUTH_ADMIN_USERNAME="${AUTH_ADMIN_USERNAME:-admin}" \
           AUTH_ADMIN_PASSWORD="${AUTH_ADMIN_PASSWORD:-admin}" \
-          AUTH_UI_ORIGIN="${AUTH_UI_ORIGIN:-http://localhost:5173}" ;;
+          AUTH_UI_ORIGIN="${AUTH_UI_ORIGIN:-http://localhost:5174}" ;;
     esac
     PERSISTENCE_DSN="${PERSISTENCE_DSN:-postgresql://alchemy:alchemy@localhost:5435/alchemy?sslmode=disable}" \
     NATS_URL="${NATS_URL:-nats://localhost:4223}" \
     LOGS_BUCKET="${LOGS_BUCKET:-s3://alchemy-logs?endpoint=http://localhost:9000&region=us-east-1&use_path_style=true&anonymous=true}" \
     ARTIFACTS_BUCKET="${ARTIFACTS_BUCKET:-s3://alchemy-artifacts?endpoint=http://localhost:9000&region=us-east-1&use_path_style=true&anonymous=true}" \
-    RUNTIME_IMAGE_PREFIX="${RUNTIME_IMAGE_PREFIX:-192.168.5.2:5001/galaxy-io/alchemy/runtime}" \
+    RUNTIME_IMAGE_PREFIX="${RUNTIME_IMAGE_PREFIX:-ghcr.io/galaxy-io/alchemy/runtime}" \
     ENCRYPTION_KEY="${ENCRYPTION_KEY:-ZGV2LW9ubHktYWxjaGVteS1lbmNyeXB0aW9uLWtleSE=}" \
     LOG_FORMAT="${LOG_FORMAT:-text}" \
     LOG_LEVEL="${LOG_LEVEL:-info}" \
     AUTH_PROVIDER="${AUTH_PROVIDER:-{{ mode }}}" \
     go run ./cmd/server
 
-# run the UI dev server on :5173, proxying the API to server on :8780
+# run the UI dev server on :5174, proxying the API to server on :8780
 ui:
     cd ui && pnpm install && pnpm dev
 
@@ -178,7 +178,7 @@ binaries arch=`go env GOARCH`: ui-build
     CGO_ENABLED=0 GOOS=linux GOARCH={{ arch }} go build -trimpath -ldflags='-s -w' -o bin/alchemy/host ./cmd/host
     CGO_ENABLED=0 GOOS=linux GOARCH={{ arch }} go build -trimpath -ldflags='-s -w' -o bin/alchemy/supervisor ./cmd/supervisor
 
-# build the server and host images for `arch`, and the runtimes, which go to the compose registry for the hosts
+# build the server and host images for `arch`, and the runtimes into the compose registry; `RUNTIME_IMAGE_PREFIX=192.168.5.2:5001/galaxy-io/alchemy/runtime just dev` runs on them
 images arch=`go env GOARCH`: (binaries arch)
     #!/usr/bin/env bash
     set -euo pipefail

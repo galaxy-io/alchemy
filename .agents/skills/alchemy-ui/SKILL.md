@@ -128,7 +128,7 @@ rg -n '·' --glob '!gen/**' .
 
 ## Verify
 
-`.agents/launch.json` names `alchemy-ui` (5173), `alchemy-ui-verify` (5175, its own Vite cache) and `alchemy-host-fixture` (5176, after `pnpm build:lib`). Verify against a real server (`just dev`), never a mock. Check Dark and Light, 1024px wide, every empty, filtered-empty, error and not-found state, and the URL after every interaction.
+`.agents/launch.json` names `alchemy-ui` (5174), `alchemy-ui-verify` (5175, its own Vite cache) and `alchemy-host-fixture` (5176, after `pnpm build:lib`). Verify against a real server (`just dev`), never a mock. Check Dark and Light, 1024px wide, every empty, filtered-empty, error and not-found state, and the URL after every interaction.
 
 ## Before you hand it over
 

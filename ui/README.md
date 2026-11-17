@@ -7,7 +7,7 @@ Web UI for Alchemy, built with Vite + React + [@galaxy-io/dls](https://www.npmjs
 ```bash
 just infra   # postgres + nats
 just vm      # the KVM host VM
-just dev     # host + server (:8780) + this UI (:5173)
+just dev     # host + server (:8780) + this UI (:5174)
 ```
 
 Or run the pieces individually: `just host`, `just server` and `just ui`.

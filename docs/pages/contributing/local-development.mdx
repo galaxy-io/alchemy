@@ -56,7 +56,7 @@ The repository has three Go modules: the root, `examples/embed/go` and
 | KVM VM | `just vm` | The `alchemy` Lima VM, mounting the repository at the same path |
 | Hosts | `just host [count] [memory] [warm] [prewarm]` | Inside the VM as root, each in its own systemd scope |
 | Server | `just server [mode]` | On the Mac with `go run ./cmd/server`, on `:8780` |
-| UI | `just ui` | Vite on `:5173`, proxying the API to `:8780` |
+| UI | `just ui` | Vite on `:5174`, proxying the API to `:8780` |
 
 `just host` cross-compiles the host and supervisor into `bin/linux-arm64/`
 first, then stops any running hosts and starts `count` new ones (1 by
@@ -73,15 +73,20 @@ auth on: `zitadel` or `keycloak` after `just infra zitadel` or
 
 `just status` shows the VM, the running hosts and the number of microVMs.
 
-### The local registry for runtimes
+### Runtimes
 
-`just images` builds every runtime and pushes it to the Compose registry as
-`localhost:5001/galaxy-io/alchemy/runtime/<tag>`. Hosts in the VM pull the same
-images from `192.168.5.2:5001`, the Mac's address on the Lima network, which
-needs no TLS. `just server` sets `RUNTIME_IMAGE_PREFIX` to
-`192.168.5.2:5001/galaxy-io/alchemy/runtime`, so a function created from source
-lands on the local build. Run `just images` again after changing anything
-under `runtimes/`.
+`just server` sets `RUNTIME_IMAGE_PREFIX` to `ghcr.io/galaxy-io/alchemy/runtime`,
+so functions built from source land on the published runtimes and hosts pull
+them from GitHub.
+
+To try a change under `runtimes/`, `just images` builds every runtime and pushes
+it to the Compose registry as `localhost:5001/galaxy-io/alchemy/runtime/<tag>`.
+Hosts in the VM reach that registry at `192.168.5.2:5001`, the Mac's address on
+the Lima network, which needs no TLS. Run Alchemy on the local builds with:
+
+```sh
+RUNTIME_IMAGE_PREFIX=192.168.5.2:5001/galaxy-io/alchemy/runtime just dev
+```
 
 <Note>
 `just server` falls back to a fixed `ENCRYPTION_KEY` so the secrets API works

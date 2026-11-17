@@ -233,6 +233,9 @@ func (h *Host) Run(ctx context.Context) error {
 
 var errShuttingDown = errors.New("host is shutting down")
 
+// errOverBudget is an artifact that needs more memory than the host has at all.
+var errOverBudget = errors.New("function needs more memory than the host budget")
+
 // shutdownGrace is how long in-flight builds and invocations get to finish
 // once the host stops taking work, inside the chart's termination grace.
 const shutdownGrace = 40 * time.Second
@@ -474,6 +477,9 @@ func (h *Host) invoke(ctx context.Context, req *hostv1.InvokeRequest) (reply *ho
 	}
 
 	live, err := h.admit(req.GetArtifact())
+	if errors.Is(err, errOverBudget) {
+		return invokeError("failed_precondition", err), nil, false
+	}
 	if err != nil {
 		return invokeError("resource_exhausted", err), nil, true
 	}
@@ -743,6 +749,9 @@ func (h *Host) admit(a *hostv1.Artifact) (*liveInstance, error) {
 		return live, nil
 	}
 	need := int64(a.GetMemoryMib())
+	if h.cfg.MemoryMiB > 0 && need > h.cfg.MemoryMiB {
+		return nil, fmt.Errorf("%w (%d of %d MiB)", errOverBudget, need, h.cfg.MemoryMiB)
+	}
 	for h.cfg.MemoryMiB > 0 && h.committedLocked()+need > h.cfg.MemoryMiB {
 		victim := h.oldestWarmLocked()
 		if victim == nil {

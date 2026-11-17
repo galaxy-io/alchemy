@@ -2,7 +2,7 @@ import path from "node:path";
 
 import { tanstackRouter } from "@tanstack/router-plugin/vite";
 import viteReact from "@vitejs/plugin-react";
-import { defineConfig } from "vite";
+import { defineConfig, type Plugin } from "vite";
 
 import { GalaxyTheme } from "@galaxy-io/dls/theme/enums";
 import { galaxyDls } from "@galaxy-io/dls/vite";
@@ -21,6 +21,24 @@ export const API_PROXY = Object.fromEntries(
     { target: API_PROXY_TARGET, changeOrigin: true },
   ]),
 );
+const DEV_PRODUCT_URLS = {
+  alchemy: process.env.GALAXY_ALCHEMY_URL ?? "http://localhost:5174",
+  filament: process.env.GALAXY_FILAMENT_URL ?? "http://localhost:5173",
+};
+
+const devRuntimeConfig = (): Plugin => ({
+  name: "alchemy-dev-runtime-config",
+  apply: "serve",
+  transformIndexHtml: () => [
+    {
+      tag: "script",
+      attrs: { type: "application/json", id: "alchemy-runtime-config" },
+      children: JSON.stringify({ products: DEV_PRODUCT_URLS }),
+      injectTo: "head-prepend",
+    },
+  ],
+});
+
 const VERIFY_MODE = "verify";
 const VERIFY_CACHE_DIR = "node_modules/.vite-verify";
 
@@ -35,9 +53,10 @@ export default defineConfig(({ mode }) => ({
     }),
     viteReact(),
     galaxyDls({ prefix: CLASS_PREFIX, theme: GalaxyTheme.SYSTEM }),
+    devRuntimeConfig(),
   ],
   server: {
-    port: 5173,
+    port: 5174,
     strictPort: true,
     proxy: API_PROXY,
   },

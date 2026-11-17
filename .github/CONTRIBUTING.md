@@ -33,16 +33,15 @@ Install the rest with your package manager. Then list the available tasks:
 just --list
 ```
 
-Firecracker needs KVM, so local hosts run in a Lima VM with nested virtualization. Start the local infrastructure, the VM and the runtime images, then run Alchemy:
+Firecracker needs KVM, so local hosts run in a Lima VM with nested virtualization. Start the local infrastructure and the VM, then run Alchemy:
 
 ```sh
 just infra
 just vm
-just images
 just dev
 ```
 
-Open <http://localhost:5173> to use the UI. When you finish, run `just vm down` and `just infra down`. Run `just infra down volumes` if you also want to delete local data.
+Open <http://localhost:5174> to use the UI. When you finish, run `just vm down` and `just infra down`. Run `just infra down volumes` if you also want to delete local data.
 
 ## Making a change
 

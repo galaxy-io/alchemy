@@ -89,7 +89,7 @@ The external providers use their SDK's default credential chain, such as the ser
 |---|---|---|---|
 | `AUTH_PROVIDER` | unset | `auth.type`, when `auth.enabled` | `keycloak`, `zitadel` or `proxy`. Unset leaves the API unauthenticated |
 | `AUTH_ISSUER` | unset | `auth.keycloak.issuer`, `auth.zitadel.issuer` | Keycloak realm URL or Zitadel base URL |
-| `AUTH_UI_ORIGIN` | `http://localhost:5173` | `auth.uiOrigin` | Origin the UI is served from. An https origin marks the session cookie Secure |
+| `AUTH_UI_ORIGIN` | `http://localhost:5174` | `auth.uiOrigin` | Origin the UI is served from. An https origin marks the session cookie Secure |
 | `AUTH_CLIENT_ID` | unset | `auth.keycloak.clientId` | Keycloak confidential client. Required for `keycloak` |
 | `AUTH_CLIENT_SECRET` | unset | `auth.keycloak.clientSecret` (Secret) | Its secret. Required for `keycloak` |
 | `AUTH_ADMIN_USERNAME` | unset | `auth.keycloak.adminUser` | Keycloak master-realm admin. With its password, the server creates the realm and client on boot |
