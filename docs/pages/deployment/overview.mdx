@@ -37,7 +37,7 @@ The server that accepts a call holds it in memory and waits for its result. Host
 
 | Component | Scales by | Notes |
 |---|---|---|
-| Server | Replicas, by hand or with a CPU HorizontalPodAutoscaler | Any replica serves any request. A server holds only the sync calls it is waiting on. Each applies migrations on start, one at a time under a PostgreSQL lock |
+| Server | Replicas, by hand or with a CPU HorizontalPodAutoscaler | Any replica serves any request. A server holds only the sync calls it is waiting on. Migrations run once per install or upgrade, in a hook Job |
 | Host | One per KVM node, by hand or with KEDA on queue demand | Capacity is `MAX_INSTANCES` slots per host and an optional guest memory budget. See [Autoscaling](/pages/deployment/autoscaling) |
 | PostgreSQL | Vertically | Read once per call for the function and version. Writes are batched records and keyed-call claims |
 | NATS | `INVOKE_QUEUE_REPLICAS` and `INVOCATION_STREAM_REPLICAS` for stream replication | Replication above 1 needs a NATS cluster with at least that many servers |

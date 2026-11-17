@@ -21,7 +21,7 @@ Give the server a database and a user that owns it, and pass the DSN as `PERSIST
 postgresql://USER:PASSWORD@HOST:5432/alchemy?sslmode=require
 ```
 
-Every server applies migrations when it starts, before it listens. Migrations take a PostgreSQL session lock, so servers starting together apply them one at a time and the rest wait. There is no separate migration step. The user needs the rights to create and alter tables in its schema.
+Migrations run as a separate step, `server -migrate`, which the chart runs as a hook Job once per install or upgrade. With `existingSecret` set and the bundled PostgreSQL off, the Job runs before the new servers start; otherwise it runs after the release is applied. Migrations take a PostgreSQL session lock, so two runs never apply them at once. The user needs the rights to create and alter tables in its schema.
 
 Nothing is written to PostgreSQL while an invocation runs. A call reads its function and version, hosts publish each invocation's record to NATS when it ends, and servers write records in batches. The one write a call makes is the claim on its idempotency key, and only keyed calls make it. Hosts never connect to PostgreSQL.
 

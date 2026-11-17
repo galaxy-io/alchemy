@@ -46,8 +46,6 @@ spec:
             - name: http
               containerPort: {{ .Values.server.service.port }}
               protocol: TCP
-          # The server applies migrations before it listens, so the startup
-          # probe allows for a slow first install.
           startupProbe:
             httpGet:
               path: /healthz

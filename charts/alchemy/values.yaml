@@ -123,9 +123,16 @@ auth:
     tenant: ""
 
 persistence:
+  # -- Run database migrations as a hook Job: pre-install/pre-upgrade when
+  # `existingSecret` is set and the vendored PostgreSQL is off, otherwise
+  # post-install/post-upgrade.
+  migrate: true
+  # -- Migration Job resource requests and limits.
+  migrateResources: {}
+
   postgresql:
     # -- PostgreSQL connection string stored in the chart-created Secret as `PERSISTENCE_DSN`.
-    # Required unless `existingSecret` is set. The server applies migrations on start.
+    # Required unless `existingSecret` is set.
     # @default -- required
     dsn: ""
 

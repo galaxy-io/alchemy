@@ -7,6 +7,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"flag"
 	"fmt"
 	"io"
 	"log/slog"
@@ -42,17 +43,35 @@ func main() {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(2)
 	}
-	if err := run(log); err != nil {
+	migrateOnly := flag.Bool("migrate", false, "run datastore migrations and exit")
+	flag.Parse()
+	if *migrateOnly {
+		err = migrate()
+	} else {
+		err = run(log)
+	}
+	if err != nil {
 		log.Error("server", "err", err)
 		os.Exit(1)
 	}
+}
+
+func migrate() error {
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+	store, err := postgres.Open(ctx, persistenceDSN())
+	if err != nil {
+		return err
+	}
+	defer store.Close()
+	return store.Migrate(ctx)
 }
 
 func run(log *slog.Logger) error { //nolint:funlen // reads every server setting in one place before wiring
 	cfg := server.DefaultConfig()
 
 	addr := envOr("ADDR", ":8780")
-	dsn := envOr("PERSISTENCE_DSN", "postgresql://alchemy:alchemy@localhost:5435/alchemy?sslmode=disable")
+	dsn := persistenceDSN()
 	natsURL := envOr("NATS_URL", "nats://localhost:4223")
 	// Empty keeps function logs on NATS only.
 	logsBucket := os.Getenv("LOGS_BUCKET")
@@ -74,9 +93,6 @@ func run(log *slog.Logger) error { //nolint:funlen // reads every server setting
 		return err
 	}
 	defer store.Close()
-	if err := store.Migrate(ctx); err != nil {
-		return err
-	}
 
 	b, err := bus.Connect(natsURL, "server")
 	if err != nil {
@@ -198,6 +214,10 @@ func secretProvider(ctx context.Context, store *postgres.Store, log *slog.Logger
 		return provider, func() {}, nil
 	}
 	return provider, func() { _ = closer.Close() }, nil
+}
+
+func persistenceDSN() string {
+	return envOr("PERSISTENCE_DSN", "postgresql://alchemy:alchemy@localhost:5435/alchemy?sslmode=disable")
 }
 
 func envOr(key, fallback string) string {
