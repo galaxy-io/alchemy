@@ -4,6 +4,7 @@ import { create } from "@bufbuild/protobuf";
 import { HammerIcon, PlayIcon } from "@phosphor-icons/react";
 
 import Button, { ButtonSize } from "@galaxy-io/dls/buttons/Button";
+import { IconWeight } from "@galaxy-io/dls/icons/Icon";
 import Divider from "@galaxy-io/dls/layout/Divider";
 import Flex, { AlignItems, FlexDirection, JustifyContent } from "@galaxy-io/dls/layout/Flex";
 import ResizablePanels, { ResizablePanel } from "@galaxy-io/dls/layout/ResizablePanels";
@@ -192,6 +193,7 @@ const FunctionWorkbench: FC<FunctionWorkbenchProps> = ({ functionId, version }) 
           <Button
             label="Run"
             icon={PlayIcon}
+            iconWeight={IconWeight.FILL}
             size={ButtonSize.SMALL}
             isDisabled={!canRun}
             isLoading={isRunning}
