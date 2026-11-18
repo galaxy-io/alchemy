@@ -199,6 +199,7 @@ const FunctionWorkbench: FC<FunctionWorkbenchProps> = ({ functionId, version }) 
             isLoading={isRunning}
             tooltip={isReady ? undefined : "Only a ready version can run"}
             hotKeys={["mod", "enter"]}
+            shouldBindHotKey
             onClick={handleRun}
           />
         </Flex>
