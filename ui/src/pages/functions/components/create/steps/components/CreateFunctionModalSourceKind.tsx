@@ -20,9 +20,14 @@ import {
   FUNCTION_SOURCE_KIND_TO_LABEL_MAP,
   FUNCTION_SOURCE_KINDS,
 } from "@/pages/functions/constants";
+import { FunctionSourceKind } from "@/pages/functions/types";
 
 const CreateFunctionModalSourceKind: FC = () => {
-  const { sourceKind } = useCreateFunctionModalState();
+  const { sourceKind, contractCaller, templates } = useCreateFunctionModalState();
+  const isTemplateAvailable = contractCaller === undefined && templates.length > 0;
+  const kinds = FUNCTION_SOURCE_KINDS.filter(
+    (kind) => kind !== FunctionSourceKind.TEMPLATE || isTemplateAvailable,
+  );
   const { setSourceKind } = useCreateFunctionModalActions();
 
   return (
@@ -44,7 +49,7 @@ const CreateFunctionModalSourceKind: FC = () => {
                 gap={8}
                 maxWidth={CREATE_FUNCTION_MODAL_SOURCE_TOOLTIP_MAX_WIDTH}
               >
-                {FUNCTION_SOURCE_KINDS.map((kind) => (
+                {kinds.map((kind) => (
                   <Flex
                     alignItems={AlignItems.START}
                     key={kind}
@@ -64,7 +69,7 @@ const CreateFunctionModalSourceKind: FC = () => {
           />
         </Flex>
         <Flex alignItems={AlignItems.STRETCH} gap={12} fillWidth>
-          {FUNCTION_SOURCE_KINDS.map((kind) => (
+          {kinds.map((kind) => (
             <CreateFunctionModalSourceOption
               key={kind}
               kind={kind}

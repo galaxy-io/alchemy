@@ -48,14 +48,24 @@ function regenerateRuntimeStarter(state: CreateFunctionModalState): CreateFuncti
   const runtime = getCreateFunctionModalRuntime(state);
   if (state.isSourceTouched || !runtime) return state;
   const sourceFiles = createFunctionSourceStarter(runtime, state.contractKind);
-  return { ...state, sourceFiles, sourceFile: sourceFiles[0]?.path ?? state.sourceFile };
+  return {
+    ...state,
+    sourceFiles,
+    sourceFile: sourceFiles[0]?.path ?? state.sourceFile,
+    sourceContractKind: state.contractKind,
+  };
 }
 
 function regenerateTemplateFiles(state: CreateFunctionModalState): CreateFunctionModalState {
   const template = getCreateFunctionModalTemplate(state);
   if (state.isSourceTouched || !template) return state;
   const sourceFiles = createCreateFunctionModalTemplateFiles(template, state.contractKind);
-  return { ...state, sourceFiles, sourceFile: sourceFiles[0]?.path ?? state.sourceFile };
+  return {
+    ...state,
+    sourceFiles,
+    sourceFile: sourceFiles[0]?.path ?? state.sourceFile,
+    sourceContractKind: state.contractKind,
+  };
 }
 
 function regenerateStarter(state: CreateFunctionModalState): CreateFunctionModalState {
@@ -95,12 +105,12 @@ function setSourceKind(
 ): CreateFunctionModalState {
   if (action.payload === state.sourceKind) return state;
   const next = { ...state, sourceKind: action.payload };
-  const template =
-    getCreateFunctionModalTemplate(state) ??
-    state.templates.find((candidate) => !candidate.comingSoon);
+  const template = state.templates[0];
   return match(action.payload)
     .with(FunctionSourceKind.TEMPLATE, () =>
-      template ? applyCreateFunctionModalTemplate(next, template) : next,
+      template && state.contractCaller === undefined
+        ? applyCreateFunctionModalTemplate(next, template)
+        : state,
     )
     .with(FunctionSourceKind.SOURCE, FunctionSourceKind.IMAGE, () =>
       regenerateStarter(clearCreateFunctionModalTemplate(next)),
@@ -113,7 +123,7 @@ function setTemplate(
   action: SetTemplateAction,
 ): CreateFunctionModalState {
   const template = state.templates.find((candidate) => candidate.id === action.payload);
-  return template && !template.comingSoon && template.id !== state.template
+  return template && template.id !== state.template
     ? applyCreateFunctionModalTemplate(state, template)
     : state;
 }
@@ -139,6 +149,7 @@ function setSourceFileContent(
   return {
     ...state,
     isSourceTouched: true,
+    sourceContractKind: state.contractKind,
     sourceFiles: state.sourceFiles.map((file) =>
       file.path === action.payload.path ? action.payload : file,
     ),

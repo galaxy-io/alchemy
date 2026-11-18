@@ -47,12 +47,7 @@ const CreateFunctionModalTemplateOption: FC<CreateFunctionModalTemplateOptionPro
       )}
       <Flex alignItems={AlignItems.START} direction={FlexDirection.COLUMN} gap={4} minWidth={0}>
         <Flex alignItems={AlignItems.CENTER} gap={8} minWidth={0}>
-          <Text
-            size={TextSize.BODY_LG}
-            weight={TextWeight.MEDIUM}
-            variant={template.comingSoon ? TextVariant.TERTIARY : undefined}
-            lineClamp={1}
-          >
+          <Text size={TextSize.BODY_LG} weight={TextWeight.MEDIUM} lineClamp={1}>
             {template.label}
           </Text>
           <Text size={TextSize.BODY_SM} variant={TextVariant.TERTIARY}>
@@ -60,20 +55,12 @@ const CreateFunctionModalTemplateOption: FC<CreateFunctionModalTemplateOptionPro
           </Text>
           <CreateFunctionModalTemplateLockup template={template} />
         </Flex>
-        <Text
-          size={TextSize.BODY_SM}
-          variant={template.comingSoon ? TextVariant.TERTIARY : TextVariant.SECONDARY}
-          lineClamp={3}
-        >
+        <Text size={TextSize.BODY_SM} variant={TextVariant.SECONDARY} lineClamp={3}>
           {template.description}
         </Text>
       </Flex>
     </Flex>
   );
-
-  if (template.comingSoon) {
-    return <Widget variant={WidgetVariant.PRIMARY}>{content}</Widget>;
-  }
 
   return (
     <Widget
@@ -81,6 +68,7 @@ const CreateFunctionModalTemplateOption: FC<CreateFunctionModalTemplateOptionPro
       isSelected={isSelected}
       variant={isSelected ? WidgetVariant.SECONDARY : WidgetVariant.PRIMARY}
       onClick={onSelect}
+      ariaLabel={template.label}
     >
       {content}
     </Widget>

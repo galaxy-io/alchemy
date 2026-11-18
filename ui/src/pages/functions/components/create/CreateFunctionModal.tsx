@@ -135,7 +135,7 @@ const CreateFunctionModal: FC<CreateFunctionModalProps> = ({
   const version = hasSource ? versionData?.version : seed;
   const { data: runtimesData } = useListRuntimesQuery({ options: { enabled: !!session } });
   const { data: templatesData, isError: isTemplatesError } = useListTemplatesQuery({
-    options: { enabled: !!session },
+    options: { enabled: !!session, retry: false },
   });
 
   if (!session) {

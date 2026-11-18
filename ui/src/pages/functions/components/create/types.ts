@@ -53,6 +53,10 @@ export interface CreateFunctionModalState {
   sourceFiles: FunctionSourceFile[];
   sourceFile: FunctionSourceFile["path"];
   isSourceTouched: boolean;
+  sourceContractKind: FunctionContractKind;
+  beforeTemplate: CreateFunctionModalTemplateSnapshot | undefined;
+  templateEnvKeys: string[];
+  functionNetwork: Network | undefined;
   command: FunctionSpec["command"];
   variables: KeyValueInputPair[];
   stored: KeyValueInputPair[];
@@ -70,6 +74,21 @@ export interface CreateFunctionModalState {
   network: Network;
   isSubmitting: boolean;
 }
+
+export type CreateFunctionModalTemplateSnapshot = Pick<
+  CreateFunctionModalState,
+  | "contractKind"
+  | "schemaTexts"
+  | "arrowFields"
+  | "runtime"
+  | "sourceFiles"
+  | "sourceFile"
+  | "isSourceTouched"
+  | "sourceContractKind"
+  | "network"
+  | "timeoutMs"
+  | "retries"
+>;
 
 export interface CreateFunctionModalDerivedState {
   steps: CreateFunctionModalStep[];

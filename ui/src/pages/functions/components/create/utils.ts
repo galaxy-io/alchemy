@@ -1,9 +1,9 @@
 import type { JsonValue } from "@bufbuild/protobuf";
 import { match } from "ts-pattern";
 
-import type { KeyValueInputPair } from "@galaxy-io/dls/inputs/KeyValueInput";
 import { formatBytes } from "@galaxy-io/dls/utils/format";
 
+import { Network } from "@/gen/functions/v1/common_pb";
 import type {
   Function as AlchemyFunction,
   FunctionVersion,
@@ -34,6 +34,7 @@ import {
   CreateFunctionModalMode,
   type CreateFunctionModalState,
   CreateFunctionModalStep,
+  type CreateFunctionModalTemplateSnapshot,
 } from "@/pages/functions/components/create/types";
 import {
   FUNCTION_CONTRACT_KIND_TO_LABEL_MAP,
@@ -113,20 +114,6 @@ const mapCreateFunctionModalFlowContract = (
 export const getCreateFunctionModalTemplate = (state: CreateFunctionModalState) =>
   state.templates.find((template) => template.id === state.template);
 
-const mergeTemplatePairs = (
-  pairs: KeyValueInputPair[],
-  removed: KeyValueInputPair[],
-  added: KeyValueInputPair[],
-) => {
-  const kept = pairs.filter((pair) => !removed.some(({ key }) => pair.key === key));
-  return [...kept, ...added.filter(({ key }) => !kept.some((pair) => pair.key === key))];
-};
-
-const createTemplateEnvPairs = (template: Template | undefined) => ({
-  variables: Object.entries(template?.env ?? {}).map(([key, value]) => ({ key, value })),
-  secrets: (template?.secrets ?? []).map((key) => ({ key, value: "" })),
-});
-
 export const createCreateFunctionModalTemplateFiles = (
   template: Template,
   contractKind: FunctionContractKind,
@@ -157,53 +144,74 @@ const mapCreateFunctionModalTemplateContracts = (template: Template) => {
   };
 };
 
+const removeCreateFunctionModalTemplateEnv = (
+  state: CreateFunctionModalState,
+): Pick<CreateFunctionModalState, "variables" | "secrets"> => ({
+  variables: state.variables.filter(({ key }) => !state.templateEnvKeys.includes(key)),
+  secrets: state.secrets.filter(({ key }) => !state.templateEnvKeys.includes(key)),
+});
+
+const createCreateFunctionModalTemplateSnapshot = (
+  state: CreateFunctionModalState,
+): CreateFunctionModalTemplateSnapshot => ({
+  contractKind: state.contractKind,
+  schemaTexts: state.schemaTexts,
+  arrowFields: state.arrowFields,
+  runtime: state.runtime,
+  sourceFiles: state.sourceFiles,
+  sourceFile: state.sourceFile,
+  isSourceTouched: state.isSourceTouched,
+  sourceContractKind: state.sourceContractKind,
+  network: state.network,
+  timeoutMs: state.timeoutMs,
+  retries: state.retries,
+});
+
 export const clearCreateFunctionModalTemplate = (
   state: CreateFunctionModalState,
-): CreateFunctionModalState => {
-  const template = getCreateFunctionModalTemplate(state);
-  if (!template) return state;
-  const removed = createTemplateEnvPairs(template);
-  return {
-    ...state,
-    template: "",
-    name: state.isNameTouched ? state.name : "",
-    isSourceTouched: false,
-    sourceFiles: [],
-    contractKind: CREATE_FUNCTION_MODAL_DEFAULT_STATE.contractKind,
-    schemaTexts: CREATE_FUNCTION_MODAL_DEFAULT_STATE.schemaTexts,
-    arrowFields: CREATE_FUNCTION_MODAL_DEFAULT_STATE.arrowFields,
-    variables: mergeTemplatePairs(state.variables, removed.variables, []),
-    secrets: mergeTemplatePairs(state.secrets, removed.secrets, []),
-    network:
-      state.network === template.network
-        ? CREATE_FUNCTION_MODAL_DEFAULT_STATE.network
-        : state.network,
-  };
-};
+): CreateFunctionModalState =>
+  state.beforeTemplate
+    ? {
+        ...state,
+        ...removeCreateFunctionModalTemplateEnv(state),
+        ...state.beforeTemplate,
+        beforeTemplate: undefined,
+        templateEnvKeys: [],
+        template: "",
+        name: state.isNameTouched ? state.name : "",
+      }
+    : state;
 
 export const applyCreateFunctionModalTemplate = (
   state: CreateFunctionModalState,
   template: Template,
 ): CreateFunctionModalState => {
-  const removed = createTemplateEnvPairs(getCreateFunctionModalTemplate(state));
-  const added = createTemplateEnvPairs(template);
+  const { variables, secrets } = removeCreateFunctionModalTemplateEnv(state);
+  const taken = [...variables, ...state.stored, ...secrets].map(({ key }) => key);
+  const addedVariables = Object.entries(template.env)
+    .filter(([key]) => !taken.includes(key))
+    .map(([key, value]) => ({ key, value }));
+  const addedSecrets = template.secrets
+    .filter((key) => !taken.includes(key))
+    .map((key) => ({ key, value: "" }));
   const sourceFiles = createCreateFunctionModalTemplateFiles(template, state.contractKind);
   return {
     ...state,
+    beforeTemplate: state.beforeTemplate ?? createCreateFunctionModalTemplateSnapshot(state),
+    templateEnvKeys: [...addedVariables, ...addedSecrets].map(({ key }) => key),
     template: template.id,
     name: state.isNameTouched ? state.name : template.id,
     runtime: template.runtime,
     sourceFiles,
     sourceFile: sourceFiles[0]?.path ?? "",
     isSourceTouched: false,
-    ...mapCreateFunctionModalTemplateContracts(template),
-    variables: mergeTemplatePairs(state.variables, removed.variables, added.variables),
-    secrets: mergeTemplatePairs(
-      state.secrets,
-      removed.secrets,
-      added.secrets.filter(({ key }) => !state.stored.some((pair) => pair.key === key)),
-    ),
+    sourceContractKind: state.contractKind,
+    ...(state.contractCaller === undefined && mapCreateFunctionModalTemplateContracts(template)),
+    variables: [...variables, ...addedVariables],
+    secrets: [...secrets, ...addedSecrets],
     network: template.network,
+    timeoutMs: template.timeoutMs > 0n ? Number(template.timeoutMs) : state.timeoutMs,
+    retries: template.retries,
   };
 };
 
@@ -241,12 +249,14 @@ export const createInitialCreateFunctionModalState = ({
     contractCaller: seededContract
       ? seed.returnLabel || CREATE_FUNCTION_MODAL_CONTRACT_DEFAULT_CALLER
       : undefined,
+    sourceContractKind: contractKind,
   };
   if (!alchemyFunction) return state;
   return {
     ...state,
     mode: CreateFunctionModalMode.VERSION,
     functionId: alchemyFunction.id,
+    functionNetwork: alchemyFunction.network,
     step: CreateFunctionModalStep.SOURCE,
     name: alchemyFunction.name,
     isNameTouched: true,
@@ -297,6 +307,11 @@ const getSourceHints = (state: CreateFunctionModalState) => [
     .with(FunctionSourceKind.TEMPLATE, () =>
       [
         getCreateFunctionModalTemplate(state) ? undefined : "Pick a template",
+        state.mode === CreateFunctionModalMode.VERSION &&
+        getCreateFunctionModalTemplate(state)?.network === Network.EGRESS &&
+        state.functionNetwork !== Network.EGRESS
+          ? "This template needs network egress. Turn it on in the function's settings first"
+          : undefined,
         state.secrets.some((pair) => !pair.value.trim()) ? "Every secret needs a value" : undefined,
       ].filter((hint): hint is string => hint !== undefined),
     )
@@ -312,6 +327,9 @@ const getCodeHints = (state: CreateFunctionModalState) => {
   );
   return [
     state.sourceFiles.some((file) => !file.content.trim()) ? "Every file needs content" : undefined,
+    state.sourceContractKind === state.contractKind
+      ? undefined
+      : `The code reads a ${FUNCTION_CONTRACT_KIND_TO_LABEL_MAP[state.sourceContractKind]} contract. Edit it for ${FUNCTION_CONTRACT_KIND_TO_LABEL_MAP[state.contractKind]}`,
     state.limits && state.sourceFiles.length > state.limits.maxFiles
       ? `At most ${state.limits.maxFiles} files`
       : undefined,
