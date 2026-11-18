@@ -26,6 +26,8 @@ const ListSearch: FC<ListSearchProps> = ({ placeholder }) => {
       placeholder={`${placeholder}...`}
       defaultValue={q}
       debounceMs={LIST_SEARCH_DEBOUNCE_MS}
+      hotKeys={["/"]}
+      shouldBindHotKey
       onSearch={handleSearch}
       fillWidth
     />

@@ -3,6 +3,7 @@ import type { FC } from "react";
 import { PlayIcon, PlusIcon } from "@phosphor-icons/react";
 
 import Button, { ButtonVariant } from "@galaxy-io/dls/buttons/Button";
+import { IconWeight } from "@galaxy-io/dls/icons/Icon";
 
 import type { Function as AlchemyFunction } from "@/gen/functions/v1/functions_pb";
 
@@ -31,6 +32,7 @@ const FunctionPageActions: FC<FunctionPageActionsProps> = ({ alchemyFunction }) 
       <Button
         label="Invoke"
         icon={PlayIcon}
+        iconWeight={IconWeight.FILL}
         isDisabled={!getFunctionCurrentVersion(alchemyFunction)}
         onClick={() =>
           void navigate({ to: AlchemyPath.FUNCTION_WORKBENCH, params: { id: alchemyFunction.id } })
