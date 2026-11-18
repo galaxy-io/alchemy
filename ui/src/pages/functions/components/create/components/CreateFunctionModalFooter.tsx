@@ -1,6 +1,6 @@
 import type { FC } from "react";
 
-import { ArrowLeftIcon, ArrowRightIcon, WarningIcon } from "@phosphor-icons/react";
+import { ArrowLeftIcon, WarningIcon } from "@phosphor-icons/react";
 import { match } from "ts-pattern";
 
 import Button, { ButtonVariant } from "@galaxy-io/dls/buttons/Button";
@@ -125,8 +125,6 @@ const CreateFunctionModalFooter: FC<CreateFunctionModalFooterProps> = ({ onCreat
         ) : (
           <Button
             label="Next"
-            icon={ArrowRightIcon}
-            isIconTrailing
             hotKeys={["mod", "enter"]}
             shouldBindHotKey
             isDisabled={isNextDisabled}
