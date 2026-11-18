@@ -6,6 +6,7 @@ use arrow::ipc::reader::StreamReader;
 use arrow::ipc::writer::StreamWriter;
 use arrow::record_batch::RecordBatch;
 
+// Log to stderr with eprintln!: stdout is the output, so println! would corrupt it.
 fn handler(batch: RecordBatch) -> Result<RecordBatch, Box<dyn Error>> {
     Ok(batch)
 }

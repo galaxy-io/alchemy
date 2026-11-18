@@ -2,11 +2,15 @@ package main
 
 import (
 	"fmt"
+	"log/slog"
 	"os"
 
 	"github.com/apache/arrow-go/v18/arrow"
 	"github.com/apache/arrow-go/v18/arrow/ipc"
 )
+
+// Log to stderr: stdout is the output, so fmt.Println would corrupt it.
+var logger = slog.New(slog.NewTextHandler(os.Stderr, nil))
 
 func handler(batch arrow.RecordBatch) (arrow.RecordBatch, error) {
 	batch.Retain()
