@@ -14,7 +14,7 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file functions/v1/templates.proto.
  */
 export const file_functions_v1_templates: GenFile = /*@__PURE__*/
-  fileDesc("ChxmdW5jdGlvbnMvdjEvdGVtcGxhdGVzLnByb3RvEgxmdW5jdGlvbnMudjEihgMKCFRlbXBsYXRlEgoKAmlkGAEgASgJEg0KBWxhYmVsGAIgASgJEhMKC2Rlc2NyaXB0aW9uGAMgASgJEg8KB3J1bnRpbWUYBCABKAkSMQoLanNvbl9zY2hlbWEYBSABKAsyHC5mdW5jdGlvbnMudjEuVGVtcGxhdGVTb3VyY2USKwoFYXJyb3cYBiABKAsyHC5mdW5jdGlvbnMudjEuVGVtcGxhdGVTb3VyY2USLAoDZW52GAcgAygLMh8uZnVuY3Rpb25zLnYxLlRlbXBsYXRlLkVudkVudHJ5Eg8KB3NlY3JldHMYCCADKAkSJgoHbmV0d29yaxgJIAEoDjIVLmZ1bmN0aW9ucy52MS5OZXR3b3JrEhMKC2NvbWluZ19zb29uGAogASgIEhcKD2RhcmtfbG9ja3VwX3VybBgLIAEoCRIYChBsaWdodF9sb2NrdXBfdXJsGAwgASgJGioKCEVudkVudHJ5EgsKA2tleRgBIAEoCRINCgV2YWx1ZRgCIAEoCToCOAEiYwoOVGVtcGxhdGVTb3VyY2USJwoFZmlsZXMYASADKAsyGC5mdW5jdGlvbnMudjEuU291cmNlRmlsZRIoCghjb250cmFjdBgCIAEoCzIWLmZ1bmN0aW9ucy52MS5Db250cmFjdCIWChRMaXN0VGVtcGxhdGVzUmVxdWVzdCJCChVMaXN0VGVtcGxhdGVzUmVzcG9uc2USKQoJdGVtcGxhdGVzGAEgAygLMhYuZnVuY3Rpb25zLnYxLlRlbXBsYXRlYgZwcm90bzM", [file_functions_v1_common, file_functions_v1_functions]);
+  fileDesc("ChxmdW5jdGlvbnMvdjEvdGVtcGxhdGVzLnByb3RvEgxmdW5jdGlvbnMudjEilgMKCFRlbXBsYXRlEgoKAmlkGAEgASgJEg0KBWxhYmVsGAIgASgJEhMKC2Rlc2NyaXB0aW9uGAMgASgJEg8KB3J1bnRpbWUYBCABKAkSMQoLanNvbl9zY2hlbWEYBSABKAsyHC5mdW5jdGlvbnMudjEuVGVtcGxhdGVTb3VyY2USKwoFYXJyb3cYBiABKAsyHC5mdW5jdGlvbnMudjEuVGVtcGxhdGVTb3VyY2USLAoDZW52GAcgAygLMh8uZnVuY3Rpb25zLnYxLlRlbXBsYXRlLkVudkVudHJ5Eg8KB3NlY3JldHMYCCADKAkSJgoHbmV0d29yaxgJIAEoDjIVLmZ1bmN0aW9ucy52MS5OZXR3b3JrEhcKD2RhcmtfbG9ja3VwX3VybBgKIAEoCRIYChBsaWdodF9sb2NrdXBfdXJsGAsgASgJEhIKCnRpbWVvdXRfbXMYDCABKAMSDwoHcmV0cmllcxgNIAEoBRoqCghFbnZFbnRyeRILCgNrZXkYASABKAkSDQoFdmFsdWUYAiABKAk6AjgBImMKDlRlbXBsYXRlU291cmNlEicKBWZpbGVzGAEgAygLMhguZnVuY3Rpb25zLnYxLlNvdXJjZUZpbGUSKAoIY29udHJhY3QYAiABKAsyFi5mdW5jdGlvbnMudjEuQ29udHJhY3QiFgoUTGlzdFRlbXBsYXRlc1JlcXVlc3QiQgoVTGlzdFRlbXBsYXRlc1Jlc3BvbnNlEikKCXRlbXBsYXRlcxgBIAMoCzIWLmZ1bmN0aW9ucy52MS5UZW1wbGF0ZWIGcHJvdG8z", [file_functions_v1_common, file_functions_v1_functions]);
 
 /**
  * Template is a function to build from: its source, a sample contract and the
@@ -80,25 +80,30 @@ export type Template = Message<"functions.v1.Template"> & {
   network: Network;
 
   /**
-   * coming_soon marks a template a client shows but cannot build from yet. It
-   * has no sources or settings.
-   *
-   * @generated from field: bool coming_soon = 10;
-   */
-  comingSoon: boolean;
-
-  /**
    * dark_lockup_url and light_lockup_url are the logo and name of the service
    * the source calls.
    *
-   * @generated from field: string dark_lockup_url = 11;
+   * @generated from field: string dark_lockup_url = 10;
    */
   darkLockupUrl: string;
 
   /**
-   * @generated from field: string light_lockup_url = 12;
+   * @generated from field: string light_lockup_url = 11;
    */
   lightLockupUrl: string;
+
+  /**
+   * timeout_ms and retries are the function settings the source needs. Each
+   * call costs money, so a template does not retry by default.
+   *
+   * @generated from field: int64 timeout_ms = 12;
+   */
+  timeoutMs: bigint;
+
+  /**
+   * @generated from field: int32 retries = 13;
+   */
+  retries: number;
 };
 
 /**

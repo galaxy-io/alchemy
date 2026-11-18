@@ -40,15 +40,16 @@ type Template struct {
 	// secrets are the secrets the source reads, by variable name.
 	Secrets []string `protobuf:"bytes,8,rep,name=secrets,proto3" json:"secrets,omitempty"`
 	Network Network  `protobuf:"varint,9,opt,name=network,proto3,enum=functions.v1.Network" json:"network,omitempty"`
-	// coming_soon marks a template a client shows but cannot build from yet. It
-	// has no sources or settings.
-	ComingSoon bool `protobuf:"varint,10,opt,name=coming_soon,json=comingSoon,proto3" json:"coming_soon,omitempty"`
 	// dark_lockup_url and light_lockup_url are the logo and name of the service
 	// the source calls.
-	DarkLockupUrl  string `protobuf:"bytes,11,opt,name=dark_lockup_url,json=darkLockupUrl,proto3" json:"dark_lockup_url,omitempty"`
-	LightLockupUrl string `protobuf:"bytes,12,opt,name=light_lockup_url,json=lightLockupUrl,proto3" json:"light_lockup_url,omitempty"`
-	unknownFields  protoimpl.UnknownFields
-	sizeCache      protoimpl.SizeCache
+	DarkLockupUrl  string `protobuf:"bytes,10,opt,name=dark_lockup_url,json=darkLockupUrl,proto3" json:"dark_lockup_url,omitempty"`
+	LightLockupUrl string `protobuf:"bytes,11,opt,name=light_lockup_url,json=lightLockupUrl,proto3" json:"light_lockup_url,omitempty"`
+	// timeout_ms and retries are the function settings the source needs. Each
+	// call costs money, so a template does not retry by default.
+	TimeoutMs     int64 `protobuf:"varint,12,opt,name=timeout_ms,json=timeoutMs,proto3" json:"timeout_ms,omitempty"`
+	Retries       int32 `protobuf:"varint,13,opt,name=retries,proto3" json:"retries,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *Template) Reset() {
@@ -144,13 +145,6 @@ func (x *Template) GetNetwork() Network {
 	return Network_NETWORK_UNSPECIFIED
 }
 
-func (x *Template) GetComingSoon() bool {
-	if x != nil {
-		return x.ComingSoon
-	}
-	return false
-}
-
 func (x *Template) GetDarkLockupUrl() string {
 	if x != nil {
 		return x.DarkLockupUrl
@@ -163,6 +157,20 @@ func (x *Template) GetLightLockupUrl() string {
 		return x.LightLockupUrl
 	}
 	return ""
+}
+
+func (x *Template) GetTimeoutMs() int64 {
+	if x != nil {
+		return x.TimeoutMs
+	}
+	return 0
+}
+
+func (x *Template) GetRetries() int32 {
+	if x != nil {
+		return x.Retries
+	}
+	return 0
 }
 
 // TemplateSource is a template's handler and sample contract for one contract
@@ -303,7 +311,7 @@ var File_functions_v1_templates_proto protoreflect.FileDescriptor
 
 const file_functions_v1_templates_proto_rawDesc = "" +
 	"\n" +
-	"\x1cfunctions/v1/templates.proto\x12\ffunctions.v1\x1a\x19functions/v1/common.proto\x1a\x1cfunctions/v1/functions.proto\"\x88\x04\n" +
+	"\x1cfunctions/v1/templates.proto\x12\ffunctions.v1\x1a\x19functions/v1/common.proto\x1a\x1cfunctions/v1/functions.proto\"\xa0\x04\n" +
 	"\bTemplate\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x14\n" +
 	"\x05label\x18\x02 \x01(\tR\x05label\x12 \n" +
@@ -314,12 +322,13 @@ const file_functions_v1_templates_proto_rawDesc = "" +
 	"\x05arrow\x18\x06 \x01(\v2\x1c.functions.v1.TemplateSourceR\x05arrow\x121\n" +
 	"\x03env\x18\a \x03(\v2\x1f.functions.v1.Template.EnvEntryR\x03env\x12\x18\n" +
 	"\asecrets\x18\b \x03(\tR\asecrets\x12/\n" +
-	"\anetwork\x18\t \x01(\x0e2\x15.functions.v1.NetworkR\anetwork\x12\x1f\n" +
-	"\vcoming_soon\x18\n" +
-	" \x01(\bR\n" +
-	"comingSoon\x12&\n" +
-	"\x0fdark_lockup_url\x18\v \x01(\tR\rdarkLockupUrl\x12(\n" +
-	"\x10light_lockup_url\x18\f \x01(\tR\x0elightLockupUrl\x1a6\n" +
+	"\anetwork\x18\t \x01(\x0e2\x15.functions.v1.NetworkR\anetwork\x12&\n" +
+	"\x0fdark_lockup_url\x18\n" +
+	" \x01(\tR\rdarkLockupUrl\x12(\n" +
+	"\x10light_lockup_url\x18\v \x01(\tR\x0elightLockupUrl\x12\x1d\n" +
+	"\n" +
+	"timeout_ms\x18\f \x01(\x03R\ttimeoutMs\x12\x18\n" +
+	"\aretries\x18\r \x01(\x05R\aretries\x1a6\n" +
 	"\bEnvEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
 	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"t\n" +

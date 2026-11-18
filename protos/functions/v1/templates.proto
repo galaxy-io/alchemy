@@ -23,13 +23,14 @@ message Template {
   // secrets are the secrets the source reads, by variable name.
   repeated string secrets = 8;
   Network network = 9;
-  // coming_soon marks a template a client shows but cannot build from yet. It
-  // has no sources or settings.
-  bool coming_soon = 10;
   // dark_lockup_url and light_lockup_url are the logo and name of the service
   // the source calls.
-  string dark_lockup_url = 11;
-  string light_lockup_url = 12;
+  string dark_lockup_url = 10;
+  string light_lockup_url = 11;
+  // timeout_ms and retries are the function settings the source needs. Each
+  // call costs money, so a template does not retry by default.
+  int64 timeout_ms = 12;
+  int32 retries = 13;
 }
 
 // TemplateSource is a template's handler and sample contract for one contract

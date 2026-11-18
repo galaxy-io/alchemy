@@ -20,9 +20,6 @@ func TestTemplatesCompile(t *testing.T) {
 		known[r.ID] = true
 	}
 	for _, tmpl := range list {
-		if tmpl.GetComingSoon() {
-			continue
-		}
 		if !known[tmpl.GetRuntime()] {
 			t.Errorf("%s: unknown runtime %q", tmpl.GetId(), tmpl.GetRuntime())
 		}
