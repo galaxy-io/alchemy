@@ -1,5 +1,5 @@
 import { clone, create } from "@bufbuild/protobuf";
-import { Field, Schema } from "apache-arrow";
+import { Schema } from "apache-arrow";
 import { match } from "ts-pattern";
 
 import { CodeEditorLanguage } from "@galaxy-io/dls/editor/CodeEditor";
@@ -34,8 +34,8 @@ import type {
 import {
   decodeArrowSchema,
   encodeArrowSchema,
-  formatArrowType,
-  parseArrowType,
+  formatArrowField,
+  parseArrowField,
 } from "@/utils/arrow";
 import { isJsonObject, parseJson } from "@/utils/json";
 
@@ -60,7 +60,7 @@ export const getFunctionSchemaError = (text: string) => {
 export const decodeFunctionArrowFields = (bytes: Uint8Array): FunctionArrowField[] =>
   (decodeArrowSchema(bytes)?.fields ?? []).map((field) => ({
     name: field.name,
-    type: formatArrowType(field.type),
+    type: formatArrowField(field),
     nullable: field.nullable,
   }));
 
@@ -68,9 +68,9 @@ export const encodeFunctionArrowFields = (fields: FunctionArrowField[]) =>
   encodeArrowSchema(
     new Schema(
       fields.map(({ name, type, nullable }) => {
-        const dataType = parseArrowType(type);
-        if (!dataType) throw new Error(`Unknown Arrow type ${type}`);
-        return new Field(name, dataType, nullable);
+        const field = parseArrowField(name, type, nullable);
+        if (!field) throw new Error(`Unknown Arrow type ${type}`);
+        return field;
       }),
     ),
   );

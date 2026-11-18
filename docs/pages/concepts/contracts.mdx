@@ -50,7 +50,12 @@ an Arrow IPC stream holding only the schema message, such as pyarrow's
 An input or output is an Arrow IPC stream holding exactly one record batch. Its
 schema is matched against the contract field by field:
 
-- Names and types must be equal. Field metadata is ignored.
+- Names and types must be equal. Field metadata is ignored, except the name of
+  an extension type.
+- Arrow's canonical `arrow.json` and `arrow.uuid` extension types are types of
+  their own. A `utf8` column does not match `arrow.json`, so a function builds
+  it with pyarrow's `pa.json_()` or `pa.uuid()`. The web UI calls them `json`
+  and `uuid`.
 - A field the contract marks nullable accepts a non-nullable column. A nullable
   column where the contract says non-nullable is a violation.
 - For list types, the child field's name and nullability are ignored, since
