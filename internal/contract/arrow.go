@@ -165,6 +165,18 @@ func fieldTypeEqual(a, b arrow.Field) bool {
 		return t.Len() == u.Len() && fieldTypeEqual(t.ElemField(), u.ElemField())
 	case arrow.ListLikeType:
 		return fieldTypeEqual(t.ElemField(), b.Type.(arrow.ListLikeType).ElemField())
+	case *arrow.StructType:
+		u := b.Type.(*arrow.StructType)
+		if t.NumFields() != u.NumFields() {
+			return false
+		}
+		for i, f := range t.Fields() {
+			g := u.Field(i)
+			if f.Name != g.Name || f.Nullable != g.Nullable || !fieldTypeEqual(f, g) {
+				return false
+			}
+		}
+		return true
 	default:
 		return arrow.TypeEqual(a.Type, b.Type)
 	}

@@ -61,6 +61,8 @@ const TOKEN_TO_ARROW_EXTENSION_MAP: Partial<Record<string, ArrowExtension>> = {
   uuid: ArrowExtension.UUID,
 };
 
+const ARROW_EXTENSION_TOKEN_PATTERN = /^extension<([^,<>]+), (.+)>$/;
+
 const getArrowExtension = (field: Field): ArrowExtension | undefined => {
   const name = field.metadata.get(ARROW_EXTENSION_NAME_KEY);
   return Object.values(ArrowExtension).find((extension) => extension === name);
@@ -93,8 +95,13 @@ const BIT_WIDTH_TO_PRECISION_MAP: Record<string, Precision> = {
 };
 
 export const formatArrowField = (field: Field): string => {
+  const name = field.metadata.get(ARROW_EXTENSION_NAME_KEY);
   const extension = getArrowExtension(field);
-  return extension ? ARROW_EXTENSION_TO_TOKEN_MAP[extension] : formatArrowType(field.type);
+  const storage = formatArrowType(field.type);
+  if (extension && storage === formatArrowType(ARROW_EXTENSION_TO_STORAGE_MAP[extension]())) {
+    return ARROW_EXTENSION_TO_TOKEN_MAP[extension];
+  }
+  return name ? `extension<${name}, ${storage}>` : storage;
 };
 
 export const formatArrowType = (type: DataType): string => {
@@ -130,6 +137,12 @@ export const parseArrowField = (
     const metadata = new Map([[ARROW_EXTENSION_NAME_KEY, extension]]);
     return new Field(name, ARROW_EXTENSION_TO_STORAGE_MAP[extension](), nullable, metadata);
   }
+  const named = ARROW_EXTENSION_TOKEN_PATTERN.exec(token);
+  if (named?.[1] && named[2]) {
+    const storage = parseArrowType(named[2]);
+    const metadata = new Map([[ARROW_EXTENSION_NAME_KEY, named[1]]]);
+    return storage && new Field(name, storage, nullable, metadata);
+  }
   const type = parseArrowType(token);
   return type && new Field(name, type, nullable);
 };
@@ -137,6 +150,8 @@ export const parseArrowField = (
 export const parseArrowType = (token: string): DataType | undefined => {
   const extension = TOKEN_TO_ARROW_EXTENSION_MAP[token];
   if (extension) return ARROW_EXTENSION_TO_STORAGE_MAP[extension]();
+  const named = ARROW_EXTENSION_TOKEN_PATTERN.exec(token);
+  if (named?.[2]) return parseArrowType(named[2]);
   const list = /^list<(.+)>$/.exec(token);
   if (list?.[1]) {
     const item = parseArrowField(LIST_ITEM_NAME, list[1], true);
@@ -193,10 +208,16 @@ export const decodeArrowSchema = (bytes: Uint8Array): Schema | undefined => {
 
 export const encodeArrowSchema = (schema: Schema): Uint8Array =>
   tableToIPC(new Table(schema), "stream");
-const encodeArrowUuid = (value: string) =>
-  Uint8Array.from(value.replace(/-/g, "").match(/../g) ?? [], (byte) =>
+const ARROW_UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+const encodeArrowUuid = (value: JsonValue) => {
+  if (typeof value !== "string" || !ARROW_UUID_PATTERN.test(value)) {
+    throw new Error(`${JSON.stringify(value)} is not a UUID`);
+  }
+  return Uint8Array.from(value.replace(/-/g, "").match(/../g) ?? [], (byte) =>
     Number.parseInt(byte, ARROW_HEX_RADIX),
   );
+};
 
 const decodeArrowUuid = (bytes: Uint8Array) =>
   Array.from(
@@ -206,10 +227,11 @@ const decodeArrowUuid = (bytes: Uint8Array) =>
   ).join("");
 
 const coerceArrowValue = (value: JsonValue | undefined, field: Field): unknown => {
-  if (value === null || value === undefined) return value;
   const extension = getArrowExtension(field);
+  if (extension === ArrowExtension.JSON && value === null && !field.nullable) return "null";
+  if (value === null || value === undefined) return value;
   if (extension === ArrowExtension.JSON) return JSON.stringify(value);
-  if (extension === ArrowExtension.UUID && typeof value === "string") return encodeArrowUuid(value);
+  if (extension === ArrowExtension.UUID) return encodeArrowUuid(value);
   const { type } = field;
   if ((DataType.isList(type) || DataType.isFixedSizeList(type)) && Array.isArray(value)) {
     return value.map((item) => coerceArrowValue(item, type.children[0]));
@@ -265,16 +287,15 @@ export const decodeArrowRows = (bytes: Uint8Array): JsonValue | undefined => {
   if (bytes.length === 0) return undefined;
   try {
     const table = tableFromIPC(bytes);
-    const rows = table
-      .toArray()
-      .map((row) =>
-        Object.fromEntries(
-          table.schema.fields.map((field) => [
-            field.name,
-            decodeArrowValue(row[field.name], field),
-          ]),
-        ),
-      );
+    const columns = table.schema.fields.map((_, index) => table.getChildAt(index));
+    const rows = Array.from({ length: table.numRows }, (_, row) =>
+      Object.fromEntries(
+        table.schema.fields.map((field, index) => [
+          field.name,
+          decodeArrowValue(columns[index]?.get(row), field),
+        ]),
+      ),
+    );
     return JSON.parse(JSON.stringify(rows)) as JsonValue;
   } catch {
     return undefined;
