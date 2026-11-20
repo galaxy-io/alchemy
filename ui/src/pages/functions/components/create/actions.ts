@@ -1,4 +1,5 @@
 import type { Runtime } from "@/gen/functions/v1/functions_pb";
+import type { Template } from "@/gen/functions/v1/templates_pb";
 
 import type {
   CreateFunctionModalArrowField,
@@ -18,6 +19,7 @@ export enum CreateFunctionModalActionType {
   SET_SOURCE_KIND = "SET_SOURCE_KIND",
   SET_IMAGE = "SET_IMAGE",
   SET_RUNTIME = "SET_RUNTIME",
+  SET_TEMPLATE = "SET_TEMPLATE",
   SET_SOURCE_FILE = "SET_SOURCE_FILE",
   SET_SOURCE_FILE_CONTENT = "SET_SOURCE_FILE_CONTENT",
   SET_COMMAND = "SET_COMMAND",
@@ -64,6 +66,11 @@ export interface SetImageAction {
 export interface SetRuntimeAction {
   type: CreateFunctionModalActionType.SET_RUNTIME;
   payload: Runtime["id"];
+}
+
+export interface SetTemplateAction {
+  type: CreateFunctionModalActionType.SET_TEMPLATE;
+  payload: Template["id"];
 }
 
 export interface SetSourceFileAction {
@@ -179,6 +186,7 @@ export type CreateFunctionModalAction =
   | SetSourceKindAction
   | SetImageAction
   | SetRuntimeAction
+  | SetTemplateAction
   | SetSourceFileAction
   | SetSourceFileContentAction
   | SetCommandAction

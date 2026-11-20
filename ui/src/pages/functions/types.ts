@@ -18,6 +18,7 @@ export enum FunctionContractSide {
 
 export enum FunctionSourceKind {
   SOURCE = "SOURCE",
+  TEMPLATE = "TEMPLATE",
   IMAGE = "IMAGE",
 }
 

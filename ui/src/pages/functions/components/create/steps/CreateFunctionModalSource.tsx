@@ -6,6 +6,7 @@ import SelectInput, { type SelectOption } from "@galaxy-io/dls/inputs/SelectInpu
 import TagInput from "@galaxy-io/dls/inputs/TagInput";
 import TextInput from "@galaxy-io/dls/inputs/TextInput";
 import Flex, { FlexDirection } from "@galaxy-io/dls/layout/Flex";
+import Grid from "@galaxy-io/dls/layout/Grid";
 import { FontFamily } from "@galaxy-io/dls/theme/enums";
 import Widget from "@galaxy-io/dls/widget/Widget";
 
@@ -13,15 +14,20 @@ import {
   useCreateFunctionModalActions,
   useCreateFunctionModalState,
 } from "@/pages/functions/components/create/CreateFunctionModalProvider";
-import { CREATE_FUNCTION_MODAL_COMMAND_SEPARATORS } from "@/pages/functions/components/create/constants";
+import {
+  CREATE_FUNCTION_MODAL_COMMAND_SEPARATORS,
+  CREATE_FUNCTION_MODAL_TEMPLATE_GRID_COLUMNS,
+} from "@/pages/functions/components/create/constants";
 import CreateFunctionModalEnv from "@/pages/functions/components/create/steps/components/CreateFunctionModalEnv";
 import CreateFunctionModalSourceKind from "@/pages/functions/components/create/steps/components/CreateFunctionModalSourceKind";
+import CreateFunctionModalTemplateOption from "@/pages/functions/components/create/steps/components/CreateFunctionModalTemplateOption";
 import FunctionRuntimeIcon from "@/pages/functions/components/FunctionRuntimeIcon";
 import { FunctionSourceKind } from "@/pages/functions/types";
 
 const CreateFunctionModalSource: FC = () => {
-  const { sourceKind, image, runtimes, runtime, command } = useCreateFunctionModalState();
-  const { setImage, setRuntime, setCommand } = useCreateFunctionModalActions();
+  const { sourceKind, image, runtimes, runtime, templates, template, command } =
+    useCreateFunctionModalState();
+  const { setImage, setRuntime, setTemplate, setCommand } = useCreateFunctionModalActions();
   const runtimeOptions: SelectOption[] = runtimes.map((candidate) => ({
     id: candidate.id,
     label: candidate.label,
@@ -45,6 +51,21 @@ const CreateFunctionModalSource: FC = () => {
             />
           </Widget>
         ))
+        .with(FunctionSourceKind.TEMPLATE, () => (
+          <Widget header="Template">
+            <Grid columns={CREATE_FUNCTION_MODAL_TEMPLATE_GRID_COLUMNS} gap={12}>
+              {templates.map((candidate) => (
+                <CreateFunctionModalTemplateOption
+                  key={candidate.id}
+                  template={candidate}
+                  runtime={runtimes.find(({ id }) => id === candidate.runtime)}
+                  isSelected={template === candidate.id}
+                  onSelect={() => setTemplate(candidate.id)}
+                />
+              ))}
+            </Grid>
+          </Widget>
+        ))
         .with(FunctionSourceKind.IMAGE, () => (
           <Widget header="Image">
             <TextInput
@@ -59,7 +80,7 @@ const CreateFunctionModalSource: FC = () => {
           </Widget>
         ))
         .exhaustive()}
-      <CreateFunctionModalEnv />
+      <CreateFunctionModalEnv key={template} />
       <Widget header="Advanced" isCollapsible defaultIsOpen={false}>
         <TagInput
           label="Command"
