@@ -83,10 +83,7 @@ An Arrow function receives a batch of rows and returns a batch with the same
 number of rows in the same order. The platform rejects an output whose row
 count differs from the input's.
 
-[`examples/embed/python/handler.py`](https://github.com/galaxy-io/alchemy/tree/main/examples/embed/python)
-is a complete one. It reads a batch with an `id` and a `text` column and
-returns, per row, the cleaned text, its token count and a 64-dimension
-embedding. Its shape is the runtime's Arrow starter:
+The runtime's Arrow starter returns the batch unchanged:
 
 ```python handler.py
 import sys
@@ -103,8 +100,68 @@ with pa.ipc.new_stream(sys.stdout.buffer, output.schema) as writer:
     writer.write_batch(output)
 ```
 
+A complete handler fills in `handler`. This one reads a batch with an `id`
+and a `text` column and returns, per row, the cleaned text, its token count
+and a 64-dimension embedding:
+
+```python handler.py
+import math
+import sys
+
+import pyarrow as pa
+
+DIMENSIONS = 64
+MODEL = "hash-trigram-64-v1"
+EMBEDDING = pa.list_(pa.float64(), DIMENSIONS)
+OUTPUT = pa.schema([
+    pa.field("id", pa.string(), nullable=False),
+    pa.field("cleaned_text", pa.string(), nullable=False),
+    pa.field("token_count", pa.uint32(), nullable=False),
+    pa.field("embedding", EMBEDDING, nullable=False),
+    pa.field("model", pa.string(), nullable=False),
+])
+
+
+def fnv1a(data: bytes) -> int:
+    h = 2166136261
+    for b in data:
+        h = ((h ^ b) * 16777619) & 0xFFFFFFFF
+    return h
+
+
+def embed(tokens: list[str]) -> list[float]:
+    v = [0.0] * DIMENSIONS
+    for token in tokens:
+        padded = f"<{token}>".encode()
+        for i in range(len(padded) - 2):
+            h = fnv1a(padded[i : i + 3])
+            v[h % DIMENSIONS] += -1.0 if h & 0x80000000 else 1.0
+    norm = math.sqrt(sum(x * x for x in v)) or 1.0
+    return [x / norm for x in v]
+
+
+def handler(batch: pa.RecordBatch) -> pa.RecordBatch:
+    cleaned = [" ".join((text or "").lower().split()) for text in batch.column("text").to_pylist()]
+    tokens = [text.split() for text in cleaned]
+    return pa.RecordBatch.from_arrays(
+        [
+            batch.column("id"),
+            pa.array(cleaned, pa.string()),
+            pa.array([len(t) for t in tokens], pa.uint32()),
+            pa.array([embed(t) for t in tokens], EMBEDDING),
+            pa.array([MODEL] * batch.num_rows, pa.string()),
+        ],
+        schema=OUTPUT,
+    )
+
+
+output = handler(pa.ipc.open_stream(sys.stdin.buffer).read_next_batch())
+with pa.ipc.new_stream(sys.stdout.buffer, output.schema) as writer:
+    writer.write_batch(output)
+```
+
 An Arrow contract carries both schemas as serialized Arrow IPC schema
-messages. Write them for the embed example with `pyarrow`:
+messages. Write them for this handler with `pyarrow`:
 
 ```python schemas.py
 import base64
@@ -230,19 +287,20 @@ To change the code, send a new spec with `CreateFunctionVersion`, or click
 ## Deploy as an image
 
 Ship an image when the function needs packages the runtime does not have.
-Build on the runtime so the entrypoint stays `python /app/handler.py`. The
-embed example's Dockerfile is two lines:
+Build on the runtime so the entrypoint stays `python /app/handler.py`. A
+Dockerfile for the handler above is two lines:
 
 ```dockerfile Dockerfile
 FROM ghcr.io/galaxy-io/alchemy/runtime/python:3.13
 COPY handler.py /app/
 ```
 
-Add a `RUN pip install ...` line for extra packages. Build for the hosts'
-architecture and push to a registry the hosts can pull from:
+Add a `RUN pip install ...` line for extra packages. From the directory that
+holds the Dockerfile and `handler.py`, build for the hosts' architecture and
+push to a registry the hosts can pull from:
 
 ```sh
-docker build --platform linux/amd64 -t registry.example.com/embed-python:1 examples/embed/python
+docker build --platform linux/amd64 -t registry.example.com/embed-python:1 .
 docker push registry.example.com/embed-python:1
 ```
 

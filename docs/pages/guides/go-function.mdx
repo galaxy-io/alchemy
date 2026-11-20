@@ -86,15 +86,119 @@ func fail(err error) {
 
 For an Arrow contract, read with `ipc.NewReader(os.Stdin)`, take one record
 batch, and write one batch with the same number of rows through
-`ipc.NewWriter(os.Stdout, ...)`.
-[`examples/embed/go/main.go`](https://github.com/galaxy-io/alchemy/tree/main/examples/embed/go)
-is a complete one. It reads `id` and `text` columns and returns the cleaned
-text, its token count and a 64-dimension embedding per row. It uses the same
-Arrow version as the runtime, so it compiles as a source unchanged.
+`ipc.NewWriter(os.Stdout, ...)`. This handler reads `id` and `text` columns
+and returns the cleaned text, its token count and a 64-dimension embedding
+per row. It uses the same Arrow version as the runtime, so it compiles as a
+source unchanged:
+
+```go main.go
+package main
+
+import (
+	"fmt"
+	"math"
+	"os"
+	"strings"
+
+	"github.com/apache/arrow-go/v18/arrow"
+	"github.com/apache/arrow-go/v18/arrow/array"
+	"github.com/apache/arrow-go/v18/arrow/ipc"
+	"github.com/apache/arrow-go/v18/arrow/memory"
+)
+
+const (
+	dimensions = 64
+	model      = "hash-trigram-64-v1"
+)
+
+var output = arrow.NewSchema([]arrow.Field{
+	{Name: "id", Type: arrow.BinaryTypes.String},
+	{Name: "cleaned_text", Type: arrow.BinaryTypes.String},
+	{Name: "token_count", Type: arrow.PrimitiveTypes.Uint32},
+	{Name: "embedding", Type: arrow.FixedSizeListOf(dimensions, arrow.PrimitiveTypes.Float64)},
+	{Name: "model", Type: arrow.BinaryTypes.String},
+}, nil)
+
+func handler(in arrow.RecordBatch) arrow.RecordBatch {
+	ids := in.Column(0).(*array.String)
+	texts := in.Column(1).(*array.String)
+	b := array.NewRecordBuilder(memory.DefaultAllocator, output)
+	defer b.Release()
+	embeddings := b.Field(3).(*array.FixedSizeListBuilder)
+	for i := range int(in.NumRows()) {
+		tokens := strings.Fields(strings.ToLower(texts.Value(i)))
+		b.Field(0).(*array.StringBuilder).Append(ids.Value(i))
+		b.Field(1).(*array.StringBuilder).Append(strings.Join(tokens, " "))
+		b.Field(2).(*array.Uint32Builder).Append(uint32(len(tokens)))
+		embeddings.Append(true)
+		embeddings.ValueBuilder().(*array.Float64Builder).AppendValues(embed(tokens), nil)
+		b.Field(4).(*array.StringBuilder).Append(model)
+	}
+	return b.NewRecordBatch()
+}
+
+func fnv1a(bytes []byte) uint32 {
+	h := uint32(2166136261)
+	for _, c := range bytes {
+		h = (h ^ uint32(c)) * 16777619
+	}
+	return h
+}
+
+func embed(tokens []string) []float64 {
+	v := make([]float64, dimensions)
+	for _, token := range tokens {
+		padded := []byte("<" + token + ">")
+		for i := 0; i+3 <= len(padded); i++ {
+			h := fnv1a(padded[i : i+3])
+			if h&0x80000000 == 0 {
+				v[h%dimensions]++
+			} else {
+				v[h%dimensions]--
+			}
+		}
+	}
+	var sum float64
+	for _, x := range v {
+		sum += x * x
+	}
+	if norm := math.Sqrt(sum); norm > 0 {
+		for i := range v {
+			v[i] /= norm
+		}
+	}
+	return v
+}
+
+func main() {
+	reader, err := ipc.NewReader(os.Stdin)
+	if err != nil {
+		fail(err)
+	}
+	defer reader.Release()
+	if !reader.Next() {
+		fail(fmt.Errorf("input holds no record batch: %v", reader.Err()))
+	}
+	out := handler(reader.RecordBatch())
+	defer out.Release()
+	w := ipc.NewWriter(os.Stdout, ipc.WithSchema(out.Schema()))
+	if err := w.Write(out); err != nil {
+		fail(err)
+	}
+	if err := w.Close(); err != nil {
+		fail(err)
+	}
+}
+
+func fail(err error) {
+	fmt.Fprintln(os.Stderr, err)
+	os.Exit(1)
+}
+```
 
 The Arrow contract's schemas are serialized Arrow IPC. Build them as in the
 [Python guide](/pages/guides/python-function), which writes `arrow.json` for
-the embed example, or define the fields in the web UI.
+the same handler, or define the fields in the web UI.
 
 ## Deploy from source
 
@@ -131,7 +235,7 @@ keeps your source, which `GetFunctionVersion` returns.
       -H 'Content-Type: application/json' -d '{}' \
       | jq -r '.runtimes[] | select(.id == "go") | .image')
 
-    jq -n --arg image "$IMAGE" --rawfile src examples/embed/go/main.go --slurpfile arrow arrow.json '{
+    jq -n --arg image "$IMAGE" --rawfile src main.go --slurpfile arrow arrow.json '{
       name: "embed-go",
       spec: {
         image: $image,
@@ -170,8 +274,9 @@ keeps your source, which `GetFunctionVersion` returns.
 
 ## Deploy as an image
 
-Build the binary yourself when it needs other modules or build flags. The
-embed example compiles in one stage and copies the binary onto `static:13`:
+Build the binary yourself when it needs other modules or build flags. This
+Dockerfile compiles your module, with its `go.mod` and `go.sum`, in one stage
+and copies the binary onto `static:13`:
 
 ```dockerfile Dockerfile
 FROM golang:1.26-alpine AS build
@@ -183,11 +288,11 @@ FROM ghcr.io/galaxy-io/alchemy/runtime/static:13
 COPY --from=build /out/handler /app/handler
 ```
 
-`static:13` has no libc, so build with `CGO_ENABLED=0`. Build for the hosts'
-architecture and push:
+`static:13` has no libc, so build with `CGO_ENABLED=0`. From the module's
+directory, build for the hosts' architecture and push:
 
 ```sh
-docker build --platform linux/amd64 -t registry.example.com/embed-go:1 examples/embed/go
+docker build --platform linux/amd64 -t registry.example.com/embed-go:1 .
 docker push registry.example.com/embed-go:1
 ```
 
@@ -210,7 +315,7 @@ registries.
 
 ## Invoke it
 
-POST the input with the contract's content type. For the Arrow example,
+POST the input with the contract's content type. For the Arrow handler,
 write `input.arrows` as in the [Python guide](/pages/guides/python-function):
 
 ```sh

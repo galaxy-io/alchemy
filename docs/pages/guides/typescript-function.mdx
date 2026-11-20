@@ -86,12 +86,77 @@ const output = handler(tableFromIPC(readFileSync(0)));
 writeSync(1, tableToIPC(output, "stream"));
 ```
 
-[`examples/embed/typescript/handler.ts`](https://github.com/galaxy-io/alchemy/tree/main/examples/embed/typescript)
-is a complete one. It reads `id` and `text` columns and returns per row the
-cleaned text, its token count and a 64-dimension embedding.
+A complete handler fills in `handler`. This one reads `id` and `text` columns
+and returns per row the cleaned text, its token count and a 64-dimension
+embedding:
 
-The contract carries both schemas as serialized Arrow IPC. Build them for the
-embed example with `apache-arrow`, in a directory where it is installed
+```ts handler.ts
+import { readFileSync, writeSync } from "node:fs";
+
+import {
+  Field,
+  FixedSizeList,
+  Float64,
+  RecordBatch,
+  Schema,
+  Struct,
+  Table,
+  Uint32,
+  Utf8,
+  makeData,
+  tableFromIPC,
+  tableToIPC,
+  vectorFromArray,
+} from "apache-arrow";
+
+const DIMENSIONS = 64;
+const MODEL = "hash-trigram-64-v1";
+const EMBEDDING = new FixedSizeList(DIMENSIONS, new Field("item", new Float64(), false));
+const OUTPUT = new Schema([
+  new Field("id", new Utf8(), false),
+  new Field("cleaned_text", new Utf8(), false),
+  new Field("token_count", new Uint32(), false),
+  new Field("embedding", EMBEDDING, false),
+  new Field("model", new Utf8(), false),
+]);
+
+const fnv1a = (bytes: Uint8Array) => bytes.reduce((h, b) => Math.imul(h ^ b, 16777619) >>> 0, 2166136261);
+
+const embed = (tokens: string[]): number[] => {
+  const v = new Array<number>(DIMENSIONS).fill(0);
+  for (const token of tokens) {
+    const padded = Buffer.from(`<${token}>`);
+    for (let i = 0; i + 3 <= padded.length; i++) {
+      const h = fnv1a(padded.subarray(i, i + 3));
+      v[h % DIMENSIONS] += h & 0x80000000 ? -1 : 1;
+    }
+  }
+  const norm = Math.hypot(...v) || 1;
+  return v.map((x) => x / norm);
+};
+
+const handler = (table: Table): Table => {
+  const texts: (string | null)[] = table.getChild("text")!.toArray();
+  const tokens = texts.map((text) => (text ?? "").toLowerCase().split(/\s+/).filter(Boolean));
+  const cleaned = tokens.map((t) => t.join(" "));
+  const columns = [
+    vectorFromArray(table.getChild("id")!.toArray(), new Utf8()),
+    vectorFromArray(cleaned, new Utf8()),
+    vectorFromArray(tokens.map((t) => t.length), new Uint32()),
+    vectorFromArray(tokens.map(embed), EMBEDDING),
+    vectorFromArray(cleaned.map(() => MODEL), new Utf8()),
+  ];
+  const children = columns.map((column) => column.data[0]);
+  const data = makeData({ type: new Struct(OUTPUT.fields), length: table.numRows, nullCount: 0, children });
+  return new Table(OUTPUT, [new RecordBatch(OUTPUT, data)]);
+};
+
+const output = handler(tableFromIPC(readFileSync(0)));
+writeSync(1, tableToIPC(output, "stream"));
+```
+
+The contract carries both schemas as serialized Arrow IPC. Build them for
+this handler with `apache-arrow`, in a directory where it is installed
 (`npm install apache-arrow@21.0.0`):
 
 ```ts schemas.ts
@@ -205,8 +270,8 @@ and nothing is installed.
 ## Deploy as an image
 
 Ship an image when the function needs packages beyond `apache-arrow`. Build
-on the runtime so the entrypoint stays `node /app/handler.ts`. The embed
-example's Dockerfile:
+on the runtime so the entrypoint stays `node /app/handler.ts`. A Dockerfile
+for the handler above:
 
 ```dockerfile Dockerfile
 FROM ghcr.io/galaxy-io/alchemy/runtime/node:24
@@ -215,10 +280,11 @@ COPY handler.ts /app/
 
 To add packages, copy your own `package.json` over the runtime's, keep
 `apache-arrow` in it if you use Arrow, and run `npm install` in the
-Dockerfile. Then build for the hosts' architecture and push:
+Dockerfile. Then, from the directory that holds the Dockerfile and
+`handler.ts`, build for the hosts' architecture and push:
 
 ```sh
-docker build --platform linux/amd64 -t registry.example.com/embed-typescript:1 examples/embed/typescript
+docker build --platform linux/amd64 -t registry.example.com/embed-typescript:1 .
 docker push registry.example.com/embed-typescript:1
 ```
 
