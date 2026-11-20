@@ -4,6 +4,7 @@ use std::process;
 
 use serde_json::Value;
 
+// Log to stderr with eprintln!: stdout is the output, so println! would corrupt it.
 fn handler(event: Value) -> Result<Value, Box<dyn Error>> {
     Ok(event)
 }
