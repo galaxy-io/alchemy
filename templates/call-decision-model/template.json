@@ -1,0 +1,96 @@
+{
+  "label": "Call a decision model",
+  "description": "Ask a decision model typed questions about each record: yes or no, how likely, or which of a set of options.",
+  "timeout": "2m",
+  "env": {
+    "DECISION_MODEL": "typesafe/jev-1.14"
+  },
+  "secrets": [
+    "OPENROUTER_API_KEY"
+  ],
+  "contract": {
+    "json_schema": {
+      "input": {
+        "type": "object",
+        "properties": {
+          "subject": {
+            "type": "string",
+            "description": "The message's subject"
+          },
+          "body": {
+            "type": "string",
+            "description": "The message's text"
+          }
+        },
+        "required": [
+          "body",
+          "subject"
+        ]
+      },
+      "output": {
+        "type": "object",
+        "properties": {
+          "urgent": {
+            "type": [
+              "boolean",
+              "null"
+            ],
+            "description": "Does this message need a reply today?"
+          },
+          "churn_risk": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "description": "How likely the sender is thinking of cancelling, from 0 to 1"
+          },
+          "team": {
+            "enum": [
+              "billing",
+              "support",
+              "sales",
+              null
+            ],
+            "description": "Which team should handle this message"
+          }
+        },
+        "required": [
+          "churn_risk",
+          "team",
+          "urgent"
+        ]
+      }
+    },
+    "arrow": {
+      "input": [
+        {
+          "name": "subject",
+          "type": "utf8",
+          "nullable": true
+        },
+        {
+          "name": "body",
+          "type": "utf8",
+          "nullable": true
+        }
+      ],
+      "output": [
+        {
+          "name": "urgent",
+          "type": "bool",
+          "nullable": true
+        },
+        {
+          "name": "churn_risk",
+          "type": "float64",
+          "nullable": true
+        },
+        {
+          "name": "team",
+          "type": "utf8",
+          "nullable": true
+        }
+      ]
+    }
+  }
+}

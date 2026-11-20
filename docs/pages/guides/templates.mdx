@@ -1,0 +1,136 @@
+---
+title: "Start from a template"
+sidebarTitle: "Templates"
+description: "Build a Python function from a template that calls a model through OpenRouter."
+---
+
+A template is a function to start from: a Python handler and a sample contract
+for each contract kind, and the settings they need. Pick one in the web UI, edit the contract and the code,
+and create the function like any other built from source.
+
+## The templates
+
+| Template | What it does | Variables | Secrets |
+|---|---|---|---|
+| Call a decision model | Asks a decision model typed questions about each record | `DECISION_MODEL` | `OPENROUTER_API_KEY` |
+| Generate embeddings | Turns each record's text fields into a vector | `EMBEDDING_MODEL` | `OPENROUTER_API_KEY` |
+| Prompt an LLM | Fills a prompt from each record and returns the completion | `LLM_MODEL` | `OPENROUTER_API_KEY` |
+| Enrich with web search | Searches the web for each record and fills in the fields you describe | `LLM_MODEL` | `OPENROUTER_API_KEY` |
+
+Each template has a `handler.py` for each contract kind on the `python:3.13`
+runtime, and the wizard uses the one for the kind you pick. With JSON Schema it
+reads one record on stdin and writes one on stdout. With Arrow it reads a
+record batch and writes one with the same rows, with its output schema in
+`OUTPUT`. Both call [OpenRouter](https://openrouter.ai). What a handler asks or
+embeds is a constant at the top of the file. Change the constant and the
+contract together.
+
+A failed call raises with OpenRouter's error message. Every call costs money,
+so a template sets the function's retries to 0 and a timeout sized for its
+work: 1 minute for embeddings, 2 for the decision model and prompts, and 5 for
+web search. The Arrow handlers that call the model once per row refuse a batch
+over `MAX_ROWS` rows, so send large batches in parts.
+
+### Call a decision model
+
+The handler sends each record as the state to OpenRouter's
+[Decisions API](https://openrouter.ai/docs/guides/features/decisions) with the
+questions in `QUESTIONS`, keyed by output field.
+
+| Question | Output |
+|---|---|
+| `noul` listed in `BOOLEANS` | `true` when the probability of yes is at least `THRESHOLD`, 0.5 by default |
+| `noul` | The probability of yes, from 0 to 1 |
+| `choice` | The option the model picks |
+
+The model may refuse a question, and the field is then null, so make every
+output field nullable. The sample asks whether a message needs a reply today,
+how likely the sender is to cancel and which team should handle it. The
+default model is `typesafe/jev-1.14`. Any OpenRouter decision model works.
+
+### Generate embeddings
+
+The handler joins the input fields in `FIELDS`, each as `name: value`, and
+embeds them through OpenRouter's
+[embeddings API](https://openrouter.ai/docs/api/reference/embeddings) into a
+vector of `DIMENSIONS` floats, 512 by default. It copies the record's `id` to
+the output. A record with no text gets a null embedding. The Arrow handler
+embeds a batch `BATCH` rows per request. Keep the output contract's `minItems` and `maxItems` equal to
+`DIMENSIONS`, or the `fixed_size_list` length in an Arrow contract. The default model is `openai/text-embedding-3-small`. Any
+OpenRouter embedding model that supports the size works.
+
+### Prompt an LLM
+
+The handler fills `PROMPT` with the record's fields, as `{name}` placeholders,
+and sends it to `LLM_MODEL` through OpenRouter's chat API. The completion goes
+to the output field in `OUTPUT_FIELD`. A placeholder with no matching input
+field fails the invocation. The default model is `anthropic/claude-haiku-5.5`.
+
+### Enrich with web search
+
+The handler asks `LLM_MODEL` to research the record with OpenRouter's
+[web search](https://openrouter.ai/docs/guides/features/web-search) and fill
+in each field in `FIELDS` as its description asks, or null when it cannot. The
+search engine is `ENGINE`, one of `exa`, `parallel`, `perplexity` or `native`,
+with up to `MAX_RESULTS` results. Only the input fields in `INPUT_FIELDS` are
+sent to the model and the search, and the prompt treats them as data, not
+instructions. The pages the answers came from go to the
+`sources` field. Web search is billed per request on top of the model.
+
+## Settings and secrets
+
+Choosing a template in the web UI adds its variables and secrets to the
+Environment section and turns on network egress.
+
+| Name | Kind | Default | Used for |
+|---|---|---|---|
+| `DECISION_MODEL` | Variable | `typesafe/jev-1.14` | The decision model, as an OpenRouter model id |
+| `EMBEDDING_MODEL` | Variable | `openai/text-embedding-3-small` | The embedding model, as an OpenRouter model id |
+| `LLM_MODEL` | Variable | `anthropic/claude-haiku-5.5` | The chat model for Prompt an LLM and Enrich with web search |
+| `OPENROUTER_API_KEY` | Secret | | An OpenRouter API key |
+
+Fill in the secret before you create the function. See
+[Secrets](/pages/concepts/secrets) for how its value reaches the function.
+Templates call OpenRouter, so the function needs `network: EGRESS`. See
+[Isolation](/pages/concepts/isolation#egress) for what egress allows.
+
+## Create a function from a template
+
+<Steps>
+  <Step title="Pick a template">
+    Click **New function**, choose **Template** and pick its card. The wizard
+    fills in the sample contract, the code, the variables, the secret and
+    egress.
+  </Step>
+  <Step title="Write the contract">
+    Pick JSON Schema or Arrow and edit the sample contract to the record you
+    send and the fields you want back.
+  </Step>
+  <Step title="Edit the code">
+    Change the constants at the top of `handler.py` to match the contract.
+  </Step>
+  <Step title="Create it">
+    Set the secret's value, resources and limits, name the function and
+    click **Create function**.
+  </Step>
+</Steps>
+
+On the API, `ListTemplates` returns each template's handler and sample
+contract for each kind, variables, secrets and network setting:
+
+```sh
+curl -s localhost:8780/functions.v1.FunctionsService/ListTemplates \
+  -H 'Content-Type: application/json' -d '{}' \
+  | jq '.templates[] | {id, label, env, secrets, network}'
+```
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="Contracts" icon="file-contract" href="/pages/concepts/contracts">
+    How input and output are checked against the contract.
+  </Card>
+  <Card title="Write a Python function" icon="python" href="/pages/guides/python-function">
+    The runtime the templates run on and how source is deployed.
+  </Card>
+</CardGroup>

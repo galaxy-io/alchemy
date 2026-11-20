@@ -21,6 +21,8 @@ import (
 )
 
 // files holds each template's directory.
+//
+//go:embed */template.json */*/handler.py
 var files embed.FS
 
 const (

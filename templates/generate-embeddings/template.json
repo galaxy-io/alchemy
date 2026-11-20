@@ -1,0 +1,93 @@
+{
+  "label": "Generate embeddings",
+  "description": "Turn each record's text fields into a vector for semantic search, clustering, deduplication and matching.",
+  "timeout": "1m",
+  "env": {
+    "EMBEDDING_MODEL": "openai/text-embedding-3-small"
+  },
+  "secrets": [
+    "OPENROUTER_API_KEY"
+  ],
+  "contract": {
+    "json_schema": {
+      "input": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "The record's id, copied to the output"
+          },
+          "title": {
+            "type": "string",
+            "description": "The document's title"
+          },
+          "body": {
+            "type": "string",
+            "description": "The document's text"
+          }
+        },
+        "required": [
+          "body",
+          "id",
+          "title"
+        ]
+      },
+      "output": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "The record's id"
+          },
+          "embedding": {
+            "type": [
+              "array",
+              "null"
+            ],
+            "items": {
+              "type": "number"
+            },
+            "minItems": 512,
+            "maxItems": 512,
+            "description": "The record's vector, or null when it has no text"
+          }
+        },
+        "required": [
+          "embedding",
+          "id"
+        ]
+      }
+    },
+    "arrow": {
+      "input": [
+        {
+          "name": "id",
+          "type": "utf8",
+          "nullable": true
+        },
+        {
+          "name": "title",
+          "type": "utf8",
+          "nullable": true
+        },
+        {
+          "name": "body",
+          "type": "utf8",
+          "nullable": true
+        }
+      ],
+      "output": [
+        {
+          "name": "id",
+          "type": "utf8",
+          "nullable": true
+        },
+        {
+          "name": "embedding",
+          "type": "fixed_size_list<float32>[512]",
+          "nullable": true
+        }
+      ]
+    }
+  }
+}
