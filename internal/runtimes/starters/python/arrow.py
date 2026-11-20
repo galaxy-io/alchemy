@@ -1,6 +1,11 @@
+import logging
 import sys
 
 import pyarrow as pa
+
+# Log to stderr: stdout is the output, so print() would corrupt it.
+logging.basicConfig(stream=sys.stderr, level=logging.INFO)
+logger = logging.getLogger("handler")
 
 
 def handler(batch: pa.RecordBatch) -> pa.RecordBatch:

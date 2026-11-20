@@ -106,7 +106,7 @@ func readBatch(raw []byte, want *arrow.Schema, side string) (int64, []*functions
 
 // matchSchema compares got against want field by field: names and types
 // must be equal, and a nullable column is only allowed where the contract
-// says so. Metadata is ignored.
+// says so. Metadata is ignored, except a canonical extension type's name.
 func matchSchema(got, want *arrow.Schema) []*functionsv1.ContractViolation {
 	var violations []*functionsv1.ContractViolation
 	if got.NumFields() != want.NumFields() {
@@ -118,8 +118,8 @@ func matchSchema(got, want *arrow.Schema) []*functionsv1.ContractViolation {
 		switch {
 		case g.Name != w.Name:
 			violations = append(violations, violation(path, "name", "field %d is named %q, want %q", i, g.Name, w.Name))
-		case !typeEqual(g.Type, w.Type):
-			violations = append(violations, violation(path, "type", "field %q has type %s, want %s", w.Name, g.Type, w.Type))
+		case !fieldTypeEqual(g, w):
+			violations = append(violations, violation(path, "type", "field %q has type %s, want %s", w.Name, fieldType(g), fieldType(w)))
 		case g.Nullable && !w.Nullable:
 			violations = append(violations, violation(path, "nullable", "field %q is nullable, but the contract does not allow nulls", w.Name))
 		}
@@ -127,21 +127,45 @@ func matchSchema(got, want *arrow.Schema) []*functionsv1.ContractViolation {
 	return violations
 }
 
-// typeEqual compares types structurally. For list-like types the child
-// field's name and nullability are ignored, because Arrow libraries disagree
-// on their defaults ("item" versus "element", nullable or not) for the same
-// logical type.
-func typeEqual(a, b arrow.DataType) bool {
-	if a.ID() != b.ID() {
+// extensionNameKey is the field metadata key naming an extension type, such as arrow.json.
+const extensionNameKey = "ARROW:extension:name"
+
+func extensionName(f arrow.Field) string {
+	if i := f.Metadata.FindKey(extensionNameKey); i >= 0 {
+		return f.Metadata.Values()[i]
+	}
+	return ""
+}
+
+// fieldType names f's type, or its extension type when it has one.
+func fieldType(f arrow.Field) string {
+	if name := extensionName(f); name != "" {
+		return fmt.Sprintf("%s<%s>", name, f.Type)
+	}
+	switch t := f.Type.(type) {
+	case *arrow.FixedSizeListType:
+		return fmt.Sprintf("%s<%s>[%d]", t.Name(), fieldType(t.ElemField()), t.Len())
+	case *arrow.ListType, *arrow.LargeListType:
+		return fmt.Sprintf("%s<%s>", t.Name(), fieldType(t.(arrow.ListLikeType).ElemField()))
+	}
+	return f.Type.String()
+}
+
+// fieldTypeEqual compares types structurally, extension names included. For
+// list-like types the child field's name and nullability are ignored, because
+// Arrow libraries disagree on their defaults ("item" versus "element",
+// nullable or not) for the same logical type.
+func fieldTypeEqual(a, b arrow.Field) bool {
+	if extensionName(a) != extensionName(b) || a.Type.ID() != b.Type.ID() {
 		return false
 	}
-	switch a := a.(type) {
+	switch t := a.Type.(type) {
 	case *arrow.FixedSizeListType:
-		b := b.(*arrow.FixedSizeListType)
-		return a.Len() == b.Len() && typeEqual(a.Elem(), b.Elem())
+		u := b.Type.(*arrow.FixedSizeListType)
+		return t.Len() == u.Len() && fieldTypeEqual(t.ElemField(), u.ElemField())
 	case arrow.ListLikeType:
-		return typeEqual(a.Elem(), b.(arrow.ListLikeType).Elem())
+		return fieldTypeEqual(t.ElemField(), b.Type.(arrow.ListLikeType).ElemField())
 	default:
-		return arrow.TypeEqual(a, b)
+		return arrow.TypeEqual(a.Type, b.Type)
 	}
 }

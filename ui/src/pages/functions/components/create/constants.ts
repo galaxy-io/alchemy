@@ -163,6 +163,8 @@ export const CREATE_FUNCTION_MODAL_ARROW_TYPES = [
   "float32",
   "float64",
   "bool",
+  "json",
+  "uuid",
   "timestamp[us]",
   "timestamp[us, tz=UTC]",
   "date32",
