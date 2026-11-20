@@ -1,0 +1,47 @@
+syntax = "proto3";
+
+package functions.v1;
+
+import "functions/v1/common.proto";
+import "functions/v1/functions.proto";
+
+// Template is a function to build from: its source, a sample contract and the
+// settings the source needs.
+message Template {
+  // id names the template, e.g. call-decision-model.
+  string id = 1;
+  string label = 2;
+  string description = 3;
+  // runtime is the id of the Runtime the files run on.
+  string runtime = 4;
+  // json_schema and arrow are the source and sample contract for each
+  // contract kind; a client offers the one matching the contract it builds.
+  TemplateSource json_schema = 5;
+  TemplateSource arrow = 6;
+  // env are the variables the source reads, with their defaults.
+  map<string, string> env = 7;
+  // secrets are the secrets the source reads, by variable name.
+  repeated string secrets = 8;
+  Network network = 9;
+  // dark_lockup_url and light_lockup_url are the logo and name of the service
+  // the source calls.
+  string dark_lockup_url = 10;
+  string light_lockup_url = 11;
+  // timeout_ms and retries are the function settings the source needs. Each
+  // call costs money, so a template does not retry by default.
+  int64 timeout_ms = 12;
+  int32 retries = 13;
+}
+
+// TemplateSource is a template's handler and sample contract for one contract
+// kind.
+message TemplateSource {
+  repeated SourceFile files = 1;
+  Contract contract = 2;
+}
+
+message ListTemplatesRequest {}
+
+message ListTemplatesResponse {
+  repeated Template templates = 1;
+}
