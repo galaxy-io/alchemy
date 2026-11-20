@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"strings"
 
 	"github.com/apache/arrow-go/v18/arrow"
 	"github.com/apache/arrow-go/v18/arrow/ipc"
@@ -148,12 +147,6 @@ func fieldType(f arrow.Field) string {
 		return fmt.Sprintf("%s<%s>[%d]", t.Name(), fieldType(t.ElemField()), t.Len())
 	case *arrow.ListType, *arrow.LargeListType:
 		return fmt.Sprintf("%s<%s>", t.Name(), fieldType(t.(arrow.ListLikeType).ElemField()))
-	case *arrow.StructType:
-		children := make([]string, t.NumFields())
-		for i, c := range t.Fields() {
-			children[i] = c.Name + ": " + fieldType(c)
-		}
-		return fmt.Sprintf("%s<%s>", t.Name(), strings.Join(children, ", "))
 	}
 	return f.Type.String()
 }
@@ -185,17 +178,6 @@ func fieldTypeEqual(a, b arrow.Field) bool {
 		}
 		return true
 	default:
-		if !arrow.TypeEqual(a.Type, b.Type) {
-			return false
-		}
-		// TypeEqual skips child metadata, so check the extension names of any other nested type's children.
-		if n, ok := a.Type.(arrow.NestedType); ok {
-			for i, f := range n.Fields() {
-				if !fieldTypeEqual(f, b.Type.(arrow.NestedType).Fields()[i]) {
-					return false
-				}
-			}
-		}
-		return true
+		return arrow.TypeEqual(a.Type, b.Type)
 	}
 }
