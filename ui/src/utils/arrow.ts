@@ -56,10 +56,10 @@ const ARROW_EXTENSION_TO_STORAGE_MAP: Record<ArrowExtension, () => DataType> = {
   [ArrowExtension.UUID]: () => new FixedSizeBinary(ARROW_UUID_BYTE_WIDTH),
 };
 
-const TOKEN_TO_ARROW_EXTENSION_MAP: Partial<Record<string, ArrowExtension>> = {
-  json: ArrowExtension.JSON,
-  uuid: ArrowExtension.UUID,
-};
+const TOKEN_TO_ARROW_EXTENSION_MAP = new Map<string, ArrowExtension>([
+  ["json", ArrowExtension.JSON],
+  ["uuid", ArrowExtension.UUID],
+]);
 
 const ARROW_EXTENSION_TOKEN_PATTERN = /^extension<([^,<>]+), (.+)>$/;
 
@@ -132,7 +132,7 @@ export const parseArrowField = (
   token: string,
   nullable: boolean,
 ): Field | undefined => {
-  const extension = TOKEN_TO_ARROW_EXTENSION_MAP[token];
+  const extension = TOKEN_TO_ARROW_EXTENSION_MAP.get(token);
   if (extension) {
     const metadata = new Map([[ARROW_EXTENSION_NAME_KEY, extension]]);
     return new Field(name, ARROW_EXTENSION_TO_STORAGE_MAP[extension](), nullable, metadata);
@@ -148,7 +148,7 @@ export const parseArrowField = (
 };
 
 export const parseArrowType = (token: string): DataType | undefined => {
-  const extension = TOKEN_TO_ARROW_EXTENSION_MAP[token];
+  const extension = TOKEN_TO_ARROW_EXTENSION_MAP.get(token);
   if (extension) return ARROW_EXTENSION_TO_STORAGE_MAP[extension]();
   const named = ARROW_EXTENSION_TOKEN_PATTERN.exec(token);
   if (named?.[2]) return parseArrowType(named[2]);
@@ -259,7 +259,11 @@ export const encodeArrowRows = (schema: Schema, rows: JsonObject[]): Uint8Array 
   return tableToIPC(new Table([new RecordBatch(schema, data)]), "stream");
 };
 
+const ARROW_JSON_LONG_INTEGER_PATTERN = /-?\d{16,}/g;
+
 const parseArrowJson = (value: string): unknown => {
+  const integers = value.match(ARROW_JSON_LONG_INTEGER_PATTERN) ?? [];
+  if (!integers.every((integer) => Number.isSafeInteger(Number(integer)))) return value;
   try {
     return JSON.parse(value);
   } catch {
