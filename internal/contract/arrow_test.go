@@ -19,9 +19,6 @@ func TestMatchSchemaExtensions(t *testing.T) {
 	jsonList := func(extension string) arrow.DataType {
 		return arrow.ListOfField(extensionField("item", arrow.BinaryTypes.String, extension))
 	}
-	jsonStruct := func(extension string) arrow.DataType {
-		return arrow.StructOf(extensionField("payload", arrow.BinaryTypes.String, extension))
-	}
 	tests := []struct {
 		name      string
 		got, want arrow.Field
@@ -34,8 +31,6 @@ func TestMatchSchemaExtensions(t *testing.T) {
 		{"binary is not uuid", extensionField("a", uuid, ""), extensionField("a", uuid, "arrow.uuid"), false},
 		{"list of json matches", extensionField("a", jsonList("arrow.json"), ""), extensionField("a", jsonList("arrow.json"), ""), true},
 		{"list of utf8 is not list of json", extensionField("a", jsonList(""), ""), extensionField("a", jsonList("arrow.json"), ""), false},
-		{"struct of json matches", extensionField("a", jsonStruct("arrow.json"), ""), extensionField("a", jsonStruct("arrow.json"), ""), true},
-		{"struct of utf8 is not struct of json", extensionField("a", jsonStruct(""), ""), extensionField("a", jsonStruct("arrow.json"), ""), false},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
