@@ -119,14 +119,113 @@ fn run() -> Result<(), Box<dyn Error>> {
 ```
 
 The output batch must have as many rows as the input, in the same order.
-[`examples/embed/rust`](https://github.com/galaxy-io/alchemy/tree/main/examples/embed/rust)
-is a complete Arrow function that returns the cleaned text, its token count
-and a 64-dimension embedding per row. It is a standalone crate on `arrow` 57,
-built as an image below.
+This complete Arrow function reads `id` and `text` columns and returns the
+cleaned text, its token count and a 64-dimension embedding per row:
+
+```rust main.rs
+use std::error::Error;
+use std::io;
+use std::process;
+use std::sync::Arc;
+
+use arrow::array::{ArrayRef, AsArray, FixedSizeListArray, Float64Array, StringArray, UInt32Array};
+use arrow::datatypes::{DataType, Field, Schema};
+use arrow::ipc::reader::StreamReader;
+use arrow::ipc::writer::StreamWriter;
+use arrow::record_batch::RecordBatch;
+
+const DIMENSIONS: usize = 64;
+const MODEL: &str = "hash-trigram-64-v1";
+
+fn fnv1a(bytes: &[u8]) -> u32 {
+    bytes.iter().fold(2166136261, |h, &b| {
+        (h ^ u32::from(b)).wrapping_mul(16777619)
+    })
+}
+
+fn embed(tokens: &[&str]) -> Vec<f64> {
+    let mut v = vec![0.0; DIMENSIONS];
+    for token in tokens {
+        for window in format!("<{token}>").as_bytes().windows(3) {
+            let h = fnv1a(window);
+            v[h as usize % DIMENSIONS] += if h & 0x8000_0000 == 0 { 1.0 } else { -1.0 };
+        }
+    }
+    let norm = v.iter().map(|x| x * x).sum::<f64>().sqrt();
+    if norm > 0.0 {
+        v.iter_mut().for_each(|x| *x /= norm);
+    }
+    v
+}
+
+fn handler(batch: RecordBatch) -> Result<RecordBatch, Box<dyn Error>> {
+    let texts = batch
+        .column_by_name("text")
+        .ok_or("no text column")?
+        .as_string::<i32>();
+    let cleaned: Vec<String> = texts
+        .iter()
+        .map(|text| {
+            text.unwrap_or("")
+                .to_lowercase()
+                .split_whitespace()
+                .collect::<Vec<_>>()
+                .join(" ")
+        })
+        .collect();
+    let tokens: Vec<Vec<&str>> = cleaned
+        .iter()
+        .map(|text| text.split_whitespace().collect())
+        .collect();
+
+    let item = Arc::new(Field::new("item", DataType::Float64, false));
+    let values = Float64Array::from(tokens.iter().flat_map(|t| embed(t)).collect::<Vec<_>>());
+    let embeddings =
+        FixedSizeListArray::try_new(item.clone(), DIMENSIONS as i32, Arc::new(values), None)?;
+    let schema = Schema::new(vec![
+        Field::new("id", DataType::Utf8, false),
+        Field::new("cleaned_text", DataType::Utf8, false),
+        Field::new("token_count", DataType::UInt32, false),
+        Field::new(
+            "embedding",
+            DataType::FixedSizeList(item, DIMENSIONS as i32),
+            false,
+        ),
+        Field::new("model", DataType::Utf8, false),
+    ]);
+    let columns: Vec<ArrayRef> = vec![
+        batch.column_by_name("id").ok_or("no id column")?.clone(),
+        Arc::new(StringArray::from_iter_values(&cleaned)),
+        Arc::new(UInt32Array::from_iter_values(
+            tokens.iter().map(|t| t.len() as u32),
+        )),
+        Arc::new(embeddings),
+        Arc::new(StringArray::from(vec![MODEL; batch.num_rows()])),
+    ];
+    Ok(RecordBatch::try_new(Arc::new(schema), columns)?)
+}
+
+fn main() {
+    if let Err(err) = run() {
+        eprintln!("{err}");
+        process::exit(1);
+    }
+}
+
+fn run() -> Result<(), Box<dyn Error>> {
+    let mut reader = StreamReader::try_new(io::stdin().lock(), None)?;
+    let batch = reader.next().ok_or("input holds no record batch")??;
+    let output = handler(batch)?;
+    let mut writer = StreamWriter::try_new(io::stdout().lock(), &output.schema())?;
+    writer.write(&output)?;
+    writer.finish()?;
+    Ok(())
+}
+```
 
 The Arrow contract's schemas are serialized Arrow IPC. Build them as in the
 [Python guide](/pages/guides/python-function), which writes `arrow.json` for
-the embed example, or define the fields in the web UI.
+the same handler, or define the fields in the web UI.
 
 ## Deploy from source
 
@@ -200,8 +299,9 @@ republished build image compiles afresh.
 
 ## Deploy as an image
 
-Build the binary yourself for other crates or build settings. The embed
-example builds against musl and copies the binary onto `static:13`:
+Build the binary yourself for other crates or build settings. This
+Dockerfile builds a crate named `embed`, with `main.rs` under `src/`, against
+musl and copies the binary onto `static:13`:
 
 ```dockerfile Dockerfile
 FROM rust:1-alpine AS build
@@ -216,11 +316,11 @@ COPY --from=build /src/target/release/embed /app/handler
 ```
 
 `static:13` has no libc, so the binary must be fully static, which the
-Alpine (musl) toolchain gives by default. Build for the hosts' architecture
-and push:
+Alpine (musl) toolchain gives by default. From the crate's directory, build
+for the hosts' architecture and push:
 
 ```sh
-docker build --platform linux/amd64 -t registry.example.com/embed-rust:1 examples/embed/rust
+docker build --platform linux/amd64 -t registry.example.com/embed-rust:1 .
 docker push registry.example.com/embed-rust:1
 ```
 
