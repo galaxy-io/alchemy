@@ -31,6 +31,9 @@ import { createJsonSchemaSample } from "@/utils/jsonSchema";
 export const isFunctionWorkbenchFile = (id: string): id is FunctionWorkbenchFile =>
   FUNCTION_WORKBENCH_FILES.some((file) => file === id);
 
+export const isFunctionWorkbenchReadOnlyFile = (id: string) =>
+  isFunctionWorkbenchFile(id) && id !== FunctionWorkbenchFile.INPUT;
+
 export const getFunctionWorkbenchSourcePath = (id: string) =>
   id.startsWith(FUNCTION_WORKBENCH_SOURCE_PREFIX)
     ? id.slice(FUNCTION_WORKBENCH_SOURCE_PREFIX.length)
