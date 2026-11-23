@@ -34,6 +34,7 @@ import (
 	"github.com/galaxy-io/alchemy/internal/bus"
 	"github.com/galaxy-io/alchemy/internal/logs"
 	"github.com/galaxy-io/alchemy/internal/server"
+	"github.com/galaxy-io/alchemy/internal/version"
 	"github.com/galaxy-io/alchemy/ui"
 )
 
@@ -181,6 +182,7 @@ func routes(svc *server.Service, auth authv1connect.AuthServiceHandler, intercep
 	mux.Handle(authv1connect.NewAuthServiceHandler(auth, opts))
 	mux.Handle("POST /functions/{function}/invoke", interceptor.Handler(functionsv1connect.FunctionsServiceInvokeProcedure, http.HandlerFunc(svc.InvokeHTTP)))
 	mux.Handle("GET /invocations/{id}", interceptor.Handler(functionsv1connect.FunctionsServiceGetInvocationProcedure, http.HandlerFunc(svc.GetInvocationHTTP)))
+	mux.Handle("/version", version.Handler())
 	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusNoContent)
 	})

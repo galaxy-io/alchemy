@@ -17,7 +17,11 @@ import {
 } from "@/module/nav";
 import { createAlchemyHref } from "@/module/paths";
 
+import { useGetVersionQuery } from "@/api/queries/version";
+
 import { GITHUB_REPO_URL } from "@/constants";
+
+import { formatServerVersion } from "@/utils/format";
 
 interface MainLayoutSidebarProps {
   footer?: ReactNode;
@@ -25,6 +29,9 @@ interface MainLayoutSidebarProps {
 
 const MainLayoutSidebar: FC<MainLayoutSidebarProps> = ({ footer }) => {
   const matchRoute = useAlchemyMatchRoute();
+  const { data: versionData } = useGetVersionQuery();
+
+  const version = versionData?.version ? formatServerVersion(versionData.version) : undefined;
 
   const activeItem = ALCHEMY_NAV_ITEMS.find((item) =>
     matchRoute(ALCHEMY_NAV_ITEM_TO_PATH_MAP[item], { fuzzy: true }),
@@ -43,9 +50,11 @@ const MainLayoutSidebar: FC<MainLayoutSidebarProps> = ({ footer }) => {
             height={t.size.control.xLarge}
           >
             <PoweredBy
+              label={null}
               wordmark={PoweredByWordmark.ALCHEMY}
               href={GITHUB_REPO_URL}
               ariaLabel="Alchemy on GitHub"
+              trailing={version}
             />
             <AppFrameToggle />
           </Flex>

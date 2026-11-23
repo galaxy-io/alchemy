@@ -5,6 +5,8 @@ package functions.v1;
 import "functions/v1/functions.proto";
 import "functions/v1/host.proto";
 import "functions/v1/invocations.proto";
+import "functions/v1/templates.proto";
+import "functions/v1/version.proto";
 
 // FunctionsService is the control plane for typed, image-based functions:
 // it registers functions and their versions, and runs them in microVMs.
@@ -25,6 +27,13 @@ service FunctionsService {
   // Runtimes a function can be built from source on, with a starter handler
   // for each, and the limits a source is held to.
   rpc ListRuntimes(ListRuntimesRequest) returns (ListRuntimesResponse);
+
+  // Templates a function can be built from, each with a handler and a sample
+  // contract per contract kind.
+  rpc ListTemplates(ListTemplatesRequest) returns (ListTemplatesResponse);
+
+  // The build the server runs.
+  rpc GetVersion(GetVersionRequest) returns (GetVersionResponse);
 
   // Invocation; validate input, run one version against it, validate output.
   // An RPC error means the function did not produce a result: the request was

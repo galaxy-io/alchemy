@@ -44,7 +44,7 @@ export const mapCreateFunctionModalStateToContract = (
 export const mapCreateFunctionModalStateToSpec = (
   state: CreateFunctionModalState,
 ): FunctionSpec | undefined => {
-  const isSource = state.sourceKind === FunctionSourceKind.SOURCE;
+  const isSource = state.sourceKind !== FunctionSourceKind.IMAGE;
   const { env, secrets } = serializeFunctionEnv(state);
   try {
     return create(FunctionSpecSchema, {
