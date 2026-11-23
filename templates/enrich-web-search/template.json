@@ -1,0 +1,107 @@
+{
+  "label": "Enrich with web search",
+  "description": "Search the web for each record and fill in the fields you describe, with the pages the answers came from.",
+  "timeout": "5m",
+  "env": {
+    "LLM_MODEL": "anthropic/claude-haiku-5.5"
+  },
+  "secrets": [
+    "OPENROUTER_API_KEY"
+  ],
+  "contract": {
+    "json_schema": {
+      "input": {
+        "type": "object",
+        "properties": {
+          "company": {
+            "type": "string",
+            "description": "The company's name"
+          },
+          "domain": {
+            "type": "string",
+            "description": "The company's website domain"
+          }
+        },
+        "required": [
+          "company",
+          "domain"
+        ]
+      },
+      "output": {
+        "type": "object",
+        "properties": {
+          "industry": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The company's primary industry"
+          },
+          "employees": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Approximate number of employees"
+          },
+          "headquarters": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "City and country of the headquarters"
+          },
+          "sources": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Pages the answers came from"
+          }
+        },
+        "required": [
+          "employees",
+          "headquarters",
+          "industry",
+          "sources"
+        ]
+      }
+    },
+    "arrow": {
+      "input": [
+        {
+          "name": "company",
+          "type": "utf8",
+          "nullable": true
+        },
+        {
+          "name": "domain",
+          "type": "utf8",
+          "nullable": true
+        }
+      ],
+      "output": [
+        {
+          "name": "industry",
+          "type": "utf8",
+          "nullable": true
+        },
+        {
+          "name": "employees",
+          "type": "utf8",
+          "nullable": true
+        },
+        {
+          "name": "headquarters",
+          "type": "utf8",
+          "nullable": true
+        },
+        {
+          "name": "sources",
+          "type": "list<utf8>",
+          "nullable": true
+        }
+      ]
+    }
+  }
+}

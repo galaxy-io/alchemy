@@ -8,8 +8,7 @@ import { IconWeight } from "@galaxy-io/dls/icons/Icon";
 import Divider from "@galaxy-io/dls/layout/Divider";
 import Flex, { AlignItems, FlexDirection, JustifyContent } from "@galaxy-io/dls/layout/Flex";
 import ResizablePanels, { ResizablePanel } from "@galaxy-io/dls/layout/ResizablePanels";
-import Text, { TextSize } from "@galaxy-io/dls/text/Text";
-import { FontFamily, Orientation } from "@galaxy-io/dls/theme/enums";
+import { Orientation } from "@galaxy-io/dls/theme/enums";
 import { ToastVariant } from "@galaxy-io/dls/toast/Toast";
 import { useToast } from "@galaxy-io/dls/toast/useToast";
 
@@ -35,6 +34,7 @@ import {
 import FunctionWorkbenchEditor from "@/pages/functions/workbench/FunctionWorkbenchEditor";
 import FunctionWorkbenchFiles from "@/pages/functions/workbench/FunctionWorkbenchFiles";
 import FunctionWorkbenchResult from "@/pages/functions/workbench/FunctionWorkbenchResult";
+import FunctionWorkbenchTitle from "@/pages/functions/workbench/FunctionWorkbenchTitle";
 import type { FunctionWorkbenchState } from "@/pages/functions/workbench/types";
 import {
   createFunctionWorkbenchDefaultInput,
@@ -175,10 +175,10 @@ const FunctionWorkbench: FC<FunctionWorkbenchProps> = ({ functionId, version }) 
         padding={[8, 16]}
         shrink={0}
       >
-        <Text size={TextSize.BODY_SM} family={FontFamily.MONO}>
-          {title}
-        </Text>
-        <Flex gap={8}>
+        <Flex grow={1} minWidth={0}>
+          {title !== undefined && <FunctionWorkbenchTitle file={file} path={title} />}
+        </Flex>
+        <Flex gap={8} shrink={0}>
           {hasSource && (
             <Button
               label="Build"
