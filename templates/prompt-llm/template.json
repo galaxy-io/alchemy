@@ -1,0 +1,65 @@
+{
+  "label": "Prompt an LLM",
+  "description": "Fill a prompt template from each record's fields and return the model's completion as an output field.",
+  "timeout": "2m",
+  "env": {
+    "LLM_MODEL": "anthropic/claude-haiku-5.5"
+  },
+  "secrets": [
+    "OPENROUTER_API_KEY"
+  ],
+  "contract": {
+    "json_schema": {
+      "input": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "The customer's first name"
+          },
+          "product": {
+            "type": "string",
+            "description": "The product they signed up for"
+          }
+        },
+        "required": [
+          "name",
+          "product"
+        ]
+      },
+      "output": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string",
+            "description": "The welcome email"
+          }
+        },
+        "required": [
+          "email"
+        ]
+      }
+    },
+    "arrow": {
+      "input": [
+        {
+          "name": "name",
+          "type": "utf8",
+          "nullable": true
+        },
+        {
+          "name": "product",
+          "type": "utf8",
+          "nullable": true
+        }
+      ],
+      "output": [
+        {
+          "name": "email",
+          "type": "utf8",
+          "nullable": true
+        }
+      ]
+    }
+  }
+}

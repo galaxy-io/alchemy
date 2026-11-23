@@ -103,7 +103,7 @@ export const getFunctionVersionRuntime = (
   version?.spec?.source ? getFunctionRuntime(runtimes, version.spec.image) : undefined;
 
 export const getFunctionRuntimeIconUrl = (
-  runtime: Runtime,
+  runtime: Pick<Runtime, "darkIconUrl" | "lightIconUrl">,
   theme: GalaxyTheme.DARK | GalaxyTheme.LIGHT,
 ) =>
   match(theme)

@@ -18,7 +18,7 @@ const FunctionRuntimeImage = styled.img<{ $size: number }>`
 `;
 
 interface FunctionRuntimeIconProps {
-  runtime: Runtime;
+  runtime: Pick<Runtime, "label" | "darkIconUrl" | "lightIconUrl">;
   size?: number;
 }
 

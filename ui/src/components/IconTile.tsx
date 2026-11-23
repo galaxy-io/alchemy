@@ -1,4 +1,4 @@
-import type { FC } from "react";
+import type { FC, ReactNode } from "react";
 
 import { styled } from "@linaria/react";
 import type { Icon as PhosphorIcon } from "@phosphor-icons/react";
@@ -21,14 +21,20 @@ const TileWrapper = styled.div<{ $size: number }>`
 `;
 
 interface IconTileProps {
-  icon: PhosphorIcon;
+  icon?: PhosphorIcon;
+  children?: ReactNode;
   size?: number;
   variant?: IconVariant;
 }
 
-const IconTile: FC<IconTileProps> = ({ icon, size = 32, variant = IconVariant.SECONDARY }) => (
+const IconTile: FC<IconTileProps> = ({
+  icon,
+  children,
+  size = 32,
+  variant = IconVariant.SECONDARY,
+}) => (
   <TileWrapper $size={size}>
-    <Icon component={icon} size={size / 2} variant={variant} />
+    {children ?? (icon && <Icon component={icon} size={size / 2} variant={variant} />)}
   </TileWrapper>
 );
 

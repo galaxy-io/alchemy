@@ -60,6 +60,9 @@ const (
 	// FunctionsServiceListRuntimesProcedure is the fully-qualified name of the FunctionsService's
 	// ListRuntimes RPC.
 	FunctionsServiceListRuntimesProcedure = "/functions.v1.FunctionsService/ListRuntimes"
+	// FunctionsServiceListTemplatesProcedure is the fully-qualified name of the FunctionsService's
+	// ListTemplates RPC.
+	FunctionsServiceListTemplatesProcedure = "/functions.v1.FunctionsService/ListTemplates"
 	// FunctionsServiceGetVersionProcedure is the fully-qualified name of the FunctionsService's
 	// GetVersion RPC.
 	FunctionsServiceGetVersionProcedure = "/functions.v1.FunctionsService/GetVersion"
@@ -107,6 +110,9 @@ type FunctionsServiceClient interface {
 	// Runtimes a function can be built from source on, with a starter handler
 	// for each, and the limits a source is held to.
 	ListRuntimes(context.Context, *connect.Request[v1.ListRuntimesRequest]) (*connect.Response[v1.ListRuntimesResponse], error)
+	// Templates a function can be built from, each with a handler and a sample
+	// contract per contract kind.
+	ListTemplates(context.Context, *connect.Request[v1.ListTemplatesRequest]) (*connect.Response[v1.ListTemplatesResponse], error)
 	// The build the server runs.
 	GetVersion(context.Context, *connect.Request[v1.GetVersionRequest]) (*connect.Response[v1.GetVersionResponse], error)
 	// Invocation; validate input, run one version against it, validate output.
@@ -202,6 +208,12 @@ func NewFunctionsServiceClient(httpClient connect.HTTPClient, baseURL string, op
 			connect.WithSchema(functionsServiceMethods.ByName("ListRuntimes")),
 			connect.WithClientOptions(opts...),
 		),
+		listTemplates: connect.NewClient[v1.ListTemplatesRequest, v1.ListTemplatesResponse](
+			httpClient,
+			baseURL+FunctionsServiceListTemplatesProcedure,
+			connect.WithSchema(functionsServiceMethods.ByName("ListTemplates")),
+			connect.WithClientOptions(opts...),
+		),
 		getVersion: connect.NewClient[v1.GetVersionRequest, v1.GetVersionResponse](
 			httpClient,
 			baseURL+FunctionsServiceGetVersionProcedure,
@@ -276,6 +288,7 @@ type functionsServiceClient struct {
 	getFunctionVersion    *connect.Client[v1.GetFunctionVersionRequest, v1.GetFunctionVersionResponse]
 	listFunctionVersions  *connect.Client[v1.ListFunctionVersionsRequest, v1.ListFunctionVersionsResponse]
 	listRuntimes          *connect.Client[v1.ListRuntimesRequest, v1.ListRuntimesResponse]
+	listTemplates         *connect.Client[v1.ListTemplatesRequest, v1.ListTemplatesResponse]
 	getVersion            *connect.Client[v1.GetVersionRequest, v1.GetVersionResponse]
 	invoke                *connect.Client[v1.InvokeRequest, v1.InvokeResponse]
 	invokeAsync           *connect.Client[v1.InvokeAsyncRequest, v1.InvokeAsyncResponse]
@@ -331,6 +344,11 @@ func (c *functionsServiceClient) ListFunctionVersions(ctx context.Context, req *
 // ListRuntimes calls functions.v1.FunctionsService.ListRuntimes.
 func (c *functionsServiceClient) ListRuntimes(ctx context.Context, req *connect.Request[v1.ListRuntimesRequest]) (*connect.Response[v1.ListRuntimesResponse], error) {
 	return c.listRuntimes.CallUnary(ctx, req)
+}
+
+// ListTemplates calls functions.v1.FunctionsService.ListTemplates.
+func (c *functionsServiceClient) ListTemplates(ctx context.Context, req *connect.Request[v1.ListTemplatesRequest]) (*connect.Response[v1.ListTemplatesResponse], error) {
+	return c.listTemplates.CallUnary(ctx, req)
 }
 
 // GetVersion calls functions.v1.FunctionsService.GetVersion.
@@ -399,6 +417,9 @@ type FunctionsServiceHandler interface {
 	// Runtimes a function can be built from source on, with a starter handler
 	// for each, and the limits a source is held to.
 	ListRuntimes(context.Context, *connect.Request[v1.ListRuntimesRequest]) (*connect.Response[v1.ListRuntimesResponse], error)
+	// Templates a function can be built from, each with a handler and a sample
+	// contract per contract kind.
+	ListTemplates(context.Context, *connect.Request[v1.ListTemplatesRequest]) (*connect.Response[v1.ListTemplatesResponse], error)
 	// The build the server runs.
 	GetVersion(context.Context, *connect.Request[v1.GetVersionRequest]) (*connect.Response[v1.GetVersionResponse], error)
 	// Invocation; validate input, run one version against it, validate output.
@@ -490,6 +511,12 @@ func NewFunctionsServiceHandler(svc FunctionsServiceHandler, opts ...connect.Han
 		connect.WithSchema(functionsServiceMethods.ByName("ListRuntimes")),
 		connect.WithHandlerOptions(opts...),
 	)
+	functionsServiceListTemplatesHandler := connect.NewUnaryHandler(
+		FunctionsServiceListTemplatesProcedure,
+		svc.ListTemplates,
+		connect.WithSchema(functionsServiceMethods.ByName("ListTemplates")),
+		connect.WithHandlerOptions(opts...),
+	)
 	functionsServiceGetVersionHandler := connect.NewUnaryHandler(
 		FunctionsServiceGetVersionProcedure,
 		svc.GetVersion,
@@ -570,6 +597,8 @@ func NewFunctionsServiceHandler(svc FunctionsServiceHandler, opts ...connect.Han
 			functionsServiceListFunctionVersionsHandler.ServeHTTP(w, r)
 		case FunctionsServiceListRuntimesProcedure:
 			functionsServiceListRuntimesHandler.ServeHTTP(w, r)
+		case FunctionsServiceListTemplatesProcedure:
+			functionsServiceListTemplatesHandler.ServeHTTP(w, r)
 		case FunctionsServiceGetVersionProcedure:
 			functionsServiceGetVersionHandler.ServeHTTP(w, r)
 		case FunctionsServiceInvokeProcedure:
@@ -633,6 +662,10 @@ func (UnimplementedFunctionsServiceHandler) ListFunctionVersions(context.Context
 
 func (UnimplementedFunctionsServiceHandler) ListRuntimes(context.Context, *connect.Request[v1.ListRuntimesRequest]) (*connect.Response[v1.ListRuntimesResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("functions.v1.FunctionsService.ListRuntimes is not implemented"))
+}
+
+func (UnimplementedFunctionsServiceHandler) ListTemplates(context.Context, *connect.Request[v1.ListTemplatesRequest]) (*connect.Response[v1.ListTemplatesResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("functions.v1.FunctionsService.ListTemplates is not implemented"))
 }
 
 func (UnimplementedFunctionsServiceHandler) GetVersion(context.Context, *connect.Request[v1.GetVersionRequest]) (*connect.Response[v1.GetVersionResponse], error) {
