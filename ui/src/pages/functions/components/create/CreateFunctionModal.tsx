@@ -39,6 +39,7 @@ import {
 } from "@/api/queries/function_versions";
 import { createGetFunctionInput, useGetFunctionQuery } from "@/api/queries/functions";
 import { useListRuntimesQuery } from "@/api/queries/runtimes";
+import { useListTemplatesQuery } from "@/api/queries/templates";
 
 import { useOverlaySession } from "@/hooks/useOverlaySession";
 
@@ -133,12 +134,19 @@ const CreateFunctionModal: FC<CreateFunctionModalProps> = ({
   });
   const version = hasSource ? versionData?.version : seed;
   const { data: runtimesData } = useListRuntimesQuery({ options: { enabled: !!session } });
+  const { data: templatesData, isError: isTemplatesError } = useListTemplatesQuery({
+    options: { enabled: !!session, retry: false },
+  });
 
   if (!session) {
     return null;
   }
 
-  if (!runtimesData || (functionId && (!alchemyFunction || !version))) {
+  if (
+    !runtimesData ||
+    (!templatesData && !isTemplatesError) ||
+    (functionId && (!alchemyFunction || !version))
+  ) {
     return (
       <Modal
         isOpen={isOpen}
@@ -166,6 +174,7 @@ const CreateFunctionModal: FC<CreateFunctionModalProps> = ({
       version={version}
       runtimes={runtimesData.runtimes}
       limits={runtimesData.limits}
+      templates={templatesData?.templates ?? []}
       flowSeed={flowSeed}
     >
       <CreateFunctionModalContent isOpen={isOpen} onClose={onClose} onCreated={onCreated} />

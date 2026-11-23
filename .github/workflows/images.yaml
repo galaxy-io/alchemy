@@ -91,9 +91,15 @@ jobs:
         env:
           CGO_ENABLED: "0"
           GOOS: linux
+          VERSION: ${{ inputs.tag }}
         run: |
+          # an untagged build keeps the version Go stamps from the module
+          ldflags="-s -w"
+          if [[ -n "$VERSION" ]]; then
+            ldflags+=" -X github.com/galaxy-io/alchemy/internal/version.Version=$VERSION"
+          fi
           for cmd in ${{ matrix.binaries }}; do
-            go build ${{ matrix.buildtags }} -trimpath -ldflags="-s -w" -o "bin/alchemy/$cmd" "./cmd/$cmd"
+            go build ${{ matrix.buildtags }} -trimpath -ldflags="$ldflags" -o "bin/alchemy/$cmd" "./cmd/$cmd"
           done
 
       - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1

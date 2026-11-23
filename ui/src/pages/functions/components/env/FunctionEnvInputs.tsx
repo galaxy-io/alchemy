@@ -7,7 +7,7 @@ import Field from "@galaxy-io/dls/inputs/Field";
 import KeyValueInput, { type KeyValueInputPair } from "@galaxy-io/dls/inputs/KeyValueInput";
 import PasswordInput from "@galaxy-io/dls/inputs/PasswordInput";
 import TextInput from "@galaxy-io/dls/inputs/TextInput";
-import Flex, { FlexDirection } from "@galaxy-io/dls/layout/Flex";
+import Flex, { AlignItems, FlexDirection } from "@galaxy-io/dls/layout/Flex";
 import Grid from "@galaxy-io/dls/layout/Grid";
 import { FontFamily } from "@galaxy-io/dls/theme/enums";
 
@@ -41,7 +41,7 @@ const FunctionEnvInputs: FC<FunctionEnvInputsProps> = ({
       fillWidth
     />
     <Field label="Secrets" labelTooltip={FUNCTION_ENV_SECRET_DESCRIPTION} fillWidth>
-      <Flex direction={FlexDirection.COLUMN} gap={8}>
+      <Flex alignItems={AlignItems.STRETCH} direction={FlexDirection.COLUMN} gap={8} fillWidth>
         {env.stored.map((pair) => (
           <Grid key={pair.key} columns={FUNCTION_ENV_STORED_SECRET_COLUMNS} gap={8}>
             <TextInput
@@ -74,6 +74,7 @@ const FunctionEnvInputs: FC<FunctionEnvInputsProps> = ({
           ariaLabel="New secrets"
           value={env.secrets}
           onChange={onSecretsChange}
+          isMasked
           fillWidth
         />
       </Flex>

@@ -9,6 +9,7 @@ import {
 } from "react";
 
 import type { Runtime } from "@/gen/functions/v1/functions_pb";
+import type { Template } from "@/gen/functions/v1/templates_pb";
 
 import {
   type CreateFunctionModalAction,
@@ -79,6 +80,8 @@ export const useCreateFunctionModalActions = () => {
         dispatch({ type: CreateFunctionModalActionType.SET_IMAGE, payload }),
       setRuntime: (payload: Runtime["id"]) =>
         dispatch({ type: CreateFunctionModalActionType.SET_RUNTIME, payload }),
+      setTemplate: (payload: Template["id"]) =>
+        dispatch({ type: CreateFunctionModalActionType.SET_TEMPLATE, payload }),
       setSourceFile: (payload: FunctionSourceFile["path"]) =>
         dispatch({ type: CreateFunctionModalActionType.SET_SOURCE_FILE, payload }),
       setSourceFileContent: (payload: FunctionSourceFile) =>
@@ -147,12 +150,13 @@ const CreateFunctionModalProvider: FC<PropsWithChildren<CreateFunctionModalSeed>
   version,
   runtimes,
   limits,
+  templates,
   flowSeed,
   children,
 }) => {
   const [state, dispatch] = useReducer(
     createFunctionModalReducer,
-    { alchemyFunction, version, runtimes, limits, flowSeed },
+    { alchemyFunction, version, runtimes, limits, templates, flowSeed },
     createInitialCreateFunctionModalState,
   );
 

@@ -22,6 +22,8 @@ export const FUNCTION_WORKBENCH_DEFAULT_FILE: string = FunctionWorkbenchFile.INP
 
 export const FUNCTION_WORKBENCH_SOURCE_PREFIX = "source:";
 
+export const FUNCTION_WORKBENCH_READ_ONLY_LABEL = "Read-only";
+
 export const FUNCTION_WORKBENCH_FILES = Object.values(FunctionWorkbenchFile);
 
 export const FUNCTION_WORKBENCH_FILE_TO_PATH_MAP: Record<FunctionWorkbenchFile, string> = {
