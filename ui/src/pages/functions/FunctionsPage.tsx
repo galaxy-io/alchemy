@@ -55,7 +55,7 @@ const FunctionsPage: FC = () => {
         <EmptyLayout
           icon={CubeIcon}
           header="No functions yet"
-          description="An image or a handler plus a typed contract, built once and booted on demand"
+          description="Build an image or handler with a typed contract that runs on demand"
           actions={
             <Button
               label={FUNCTION_CREATE_TITLE}
