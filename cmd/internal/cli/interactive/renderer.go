@@ -15,6 +15,7 @@ import (
 
 	"github.com/galaxy-io/alchemy/api/functions/v1/functionsv1connect"
 	"github.com/galaxy-io/alchemy/cmd/internal/cli/style"
+	"github.com/galaxy-io/alchemy/cmd/internal/cli/text"
 )
 
 const (
@@ -24,6 +25,9 @@ const (
 	fallbackWidth  = 96
 	maxValueLines  = 8
 	cellPad        = " "
+	// chromeRows are the lines a menu draws besides its header and choices.
+	chromeRows = 4
+	minChoices = 5
 )
 
 // Section is where the menus open.
@@ -236,11 +240,7 @@ type menuHeader struct {
 
 // Frame draws the header. The toast shares the title row, so menus keep their height.
 func (h menuHeader) Frame(width int) *inline.Frame {
-	height := 1 + len(h.lines)
-	if h.gap {
-		height++
-	}
-	frame := inline.NewFrame(max(width, 0), height)
+	frame := inline.NewFrame(max(width, 0), h.height())
 	x := draw(frame, 0, 0, h.title, h.theme.Accent.Bold(true))
 	if h.notice != "" {
 		marker, tone := "✗", h.theme.Error
@@ -262,11 +262,19 @@ func (h menuHeader) Frame(width int) *inline.Frame {
 	return frame
 }
 
+func (h menuHeader) height() int {
+	height := 1 + len(h.lines)
+	if h.gap {
+		height++
+	}
+	return height
+}
+
 // detailLines gives every line of a value its own row, capped per value.
 func detailLines(pairs [][2]string) [][2]string {
 	lines := make([][2]string, 0, len(pairs))
 	for _, pair := range pairs {
-		parts := strings.Split(strings.ReplaceAll(strings.TrimSpace(pair[1]), "\t", style.Indent), "\n")
+		parts := strings.Split(text.Printable(strings.ReplaceAll(strings.TrimSpace(pair[1]), "\t", style.Indent)), "\n")
 		if len(parts) > maxValueLines {
 			parts = append(parts[:maxValueLines], "…")
 		}
@@ -303,13 +311,22 @@ func (r *Renderer) chooseUnder(ctx context.Context, header menuHeader, descripti
 			Value: item.value, Label: item.label, Description: item.description, Disabled: item.disabled,
 		})
 	}
-	field := inline.NewSelectField(selectionField, description, choices...).Required()
+	field := inline.NewSelectField(selectionField, description, choices...).Required().MaxVisibleChoices(r.visibleChoices(header))
 	result, err := r.runForm(ctx, inline.NewForm("").SetHeader(header).Add(field))
 	if err != nil {
 		return "", err
 	}
 	selected, _ := result[selectionField].(string)
 	return selected, nil
+}
+
+// visibleChoices is how many choices fit under header, or zero for no limit.
+func (r *Renderer) visibleChoices(header menuHeader) int {
+	_, height := terminalSize(r.out)
+	if height == 0 {
+		return 0
+	}
+	return max(height-header.height()-chromeRows, minChoices)
 }
 
 func (r *Renderer) runForm(ctx context.Context, form *inline.Form) (inline.FormResult, error) {
@@ -354,20 +371,21 @@ func interrupted(err error) bool {
 	return errors.Is(err, inline.ErrFormInterrupted) || errors.Is(err, context.Canceled)
 }
 
-func draw(frame *inline.Frame, x, y int, text string, look tcell.Style) int {
-	frame.DrawString(x, y, text, look)
-	return x + style.Width(text)
+func draw(frame *inline.Frame, x, y int, label string, look tcell.Style) int {
+	frame.DrawString(x, y, label, look)
+	return x + style.Width(label)
 }
 
-func pad(text string, width int) string {
-	return text + strings.Repeat(" ", max(width-style.Width(text), 0))
+func pad(label string, width int) string {
+	return label + strings.Repeat(" ", max(width-style.Width(label), 0))
 }
 
-func renderWidth(writer io.Writer) int {
+// terminalSize is the writer's terminal size, or the fallback width and no height.
+func terminalSize(writer io.Writer) (int, int) {
 	if output, ok := writer.(*os.File); ok {
-		if width, _, err := term.GetSize(int(output.Fd())); err == nil && width > 1 { //nolint:gosec // a file descriptor fits an int
-			return width - 1
+		if width, height, err := term.GetSize(int(output.Fd())); err == nil && width > 1 { //nolint:gosec // a file descriptor fits an int
+			return width - 1, height
 		}
 	}
-	return fallbackWidth
+	return fallbackWidth, 0
 }

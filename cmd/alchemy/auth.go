@@ -10,6 +10,7 @@ import (
 	"net/url"
 	"regexp"
 	"strings"
+	"time"
 
 	"connectrpc.com/connect"
 	"github.com/spf13/cobra"
@@ -30,6 +31,8 @@ import (
 const (
 	verifyPageSize      = 1
 	fallbackContextName = "remote"
+	firstSuffix         = 2
+	loginTimeout        = 30 * time.Second
 )
 
 var (
@@ -84,32 +87,20 @@ func (a *cliApp) authLogin(ctx context.Context, server, clientID, clientSecret s
 	if err := contexts.ValidateEndpoint(server); err != nil {
 		return fmt.Errorf("--server: %w", err)
 	}
-	client := authv1connect.NewAuthServiceClient(http.DefaultClient, server)
-	config, err := client.GetAuthConfig(ctx, connect.NewRequest(&authv1.GetAuthConfigRequest{}))
-	if err != nil {
-		return fmt.Errorf("reach %s: %w", server, err)
-	}
-	if config.Msg.GetIssuer() == "" {
-		return fmt.Errorf("%s runs without authentication; add it with `alchemy context add NAME --server %s`", server, server)
-	}
-	if clientID, clientSecret, err = a.promptCredentials(clientID, clientSecret); err != nil {
+	if err := requireAuth(ctx, server); err != nil {
 		return err
 	}
-
-	profile := cliauth.Profile{Server: server, ClientID: clientID, ClientSecret: clientSecret}
-	cache, err := cliauth.Mint(ctx, profile)
+	if err := contexts.RequireSecure(server); err != nil {
+		return err
+	}
+	clientID, clientSecret, err := a.promptCredentials(ctx, clientID, clientSecret)
 	if err != nil {
-		return fmt.Errorf("login to %s failed: %w", server, err)
+		return err
 	}
-	verify := connect.NewRequest(&functionsv1.ListFunctionsRequest{
-		Pagination: &functionsv1.PaginationRequest{PageSize: verifyPageSize},
-	})
-	setBearer(verify.Header(), cache.AccessToken)
-	if _, err := functionsv1connect.NewFunctionsServiceClient(http.DefaultClient, server).ListFunctions(ctx, verify); err != nil {
-		return fmt.Errorf("%s rejected the minted token: %w", server, err)
+	profile := cliauth.Profile{Server: server, ClientID: clientID, ClientSecret: clientSecret}
+	if profile.Cache, err = proveCredentials(ctx, server, profile); err != nil {
+		return err
 	}
-	profile.Cache = &cache
-
 	name, err := a.saveLogin(server, profile)
 	if err != nil {
 		return err
@@ -117,30 +108,64 @@ func (a *cliApp) authLogin(ctx context.Context, server, clientID, clientSecret s
 	return printSuccess(a.statusWriter(), fmt.Sprintf("Logged in to %s as %s (context %s)", server, clientID, name))
 }
 
+// requireAuth fails for a server that is unreachable or runs without authentication.
+func requireAuth(ctx context.Context, server string) error {
+	ctx, cancel := context.WithTimeout(ctx, loginTimeout)
+	defer cancel()
+	config, err := authv1connect.NewAuthServiceClient(http.DefaultClient, server).GetAuthConfig(ctx, connect.NewRequest(&authv1.GetAuthConfigRequest{}))
+	if err != nil {
+		return fmt.Errorf("reach %s: %w", server, err)
+	}
+	if config.Msg.GetIssuer() == "" {
+		return fmt.Errorf("%s runs without authentication; add it with `alchemy context add NAME --server %s`", server, server)
+	}
+	return nil
+}
+
+// proveCredentials mints a token and checks the server accepts it.
+func proveCredentials(ctx context.Context, server string, profile cliauth.Profile) (*cliauth.Cache, error) {
+	ctx, cancel := context.WithTimeout(ctx, loginTimeout)
+	defer cancel()
+	cache, err := cliauth.Mint(ctx, profile)
+	if err != nil {
+		return nil, fmt.Errorf("login to %s failed: %w", server, err)
+	}
+	verify := connect.NewRequest(&functionsv1.ListFunctionsRequest{
+		Pagination: &functionsv1.PaginationRequest{PageSize: verifyPageSize},
+	})
+	setBearer(verify.Header(), cache.AccessToken)
+	if _, err := functionsv1connect.NewFunctionsServiceClient(http.DefaultClient, server).ListFunctions(ctx, verify); err != nil {
+		return nil, fmt.Errorf("%s rejected the minted token: %w", server, err)
+	}
+	return &cache, nil
+}
+
 // saveLogin stores the profile and selects its context, undoing the first if the second fails.
 func (a *cliApp) saveLogin(server string, profile cliauth.Profile) (string, error) {
 	registry := a.contextRegistry()
+	items, err := registry.List()
+	if err != nil {
+		return "", err
+	}
 	name := a.contextName
 	if name == "" {
-		var err error
-		if name, err = availableContextName(registry, serverContextName(server), server); err != nil {
-			return "", err
-		}
+		name = availableContextName(items, serverContextName(server), server)
 	}
+	key := profileKey(items, name)
 	store := a.credentialStore()
 	credentials, err := store.Load()
 	if err != nil {
 		return "", err
 	}
-	previous, hadPrevious := credentials.Profiles[name]
-	if err := store.Put(name, profile); err != nil {
+	previous, hadPrevious := credentials.Profiles[key]
+	if err := store.Put(key, profile); err != nil {
 		return "", err
 	}
-	if _, err := registry.SetAndUse(name, contexts.Target{Endpoint: server, AuthProfile: name}); err != nil {
+	if _, err := registry.SetAndUse(name, contexts.Target{Endpoint: server, AuthProfile: key}); err != nil {
 		if hadPrevious {
-			return "", errors.Join(err, store.Put(name, previous))
+			return "", errors.Join(err, store.Put(key, previous))
 		}
-		return "", errors.Join(err, store.Delete(name))
+		return "", errors.Join(err, store.Delete(key))
 	}
 	return name, nil
 }
@@ -206,48 +231,72 @@ func serverContextName(server string) string {
 }
 
 // availableContextName reuses base for the same server, or numbers a new one.
-func availableContextName(registry *contexts.Registry, base, endpoint string) (string, error) {
-	items, err := registry.List()
-	if err != nil {
-		return "", err
-	}
+func availableContextName(items []contexts.NamedTarget, base, endpoint string) string {
 	used := make(map[string]contexts.Target, len(items))
 	for _, item := range items {
 		used[item.Name] = item.Target
 	}
 	if target, exists := used[base]; !exists || target.Endpoint == endpoint {
-		return base, nil
+		return base
 	}
-	for suffix := 2; ; suffix++ {
-		candidate := fmt.Sprintf("%s-%d", base, suffix)
-		if _, exists := used[candidate]; !exists {
-			return candidate, nil
+	return numbered(base, func(candidate string) bool {
+		_, exists := used[candidate]
+		return exists
+	})
+}
+
+// profileKey keeps the context's own profile, or picks a key no other context uses.
+func profileKey(items []contexts.NamedTarget, name string) string {
+	current := ""
+	shared := map[string]bool{}
+	for _, item := range items {
+		if item.Name == name {
+			current = item.Target.AuthProfile
+			continue
+		}
+		shared[item.Target.AuthProfile] = true
+	}
+	switch {
+	case current != "" && !shared[current]:
+		return current
+	case !shared[name]:
+		return name
+	default:
+		return numbered(name, func(candidate string) bool { return shared[candidate] })
+	}
+}
+
+// numbered appends the first suffix that makes base free.
+func numbered(base string, taken func(string) bool) string {
+	for suffix := firstSuffix; ; suffix++ {
+		if candidate := fmt.Sprintf("%s-%d", base, suffix); !taken(candidate) {
+			return candidate
 		}
 	}
 }
 
 // promptCredentials fills whichever credential flags were omitted.
-func (a *cliApp) promptCredentials(clientID, clientSecret string) (string, string, error) {
+func (a *cliApp) promptCredentials(ctx context.Context, clientID, clientSecret string) (string, string, error) {
 	reader := bufio.NewReader(a.stdin)
 	var err error
 	if clientID == "" {
-		if clientID, err = promptValue(reader, a.statusWriter(), "Client ID: "); err != nil {
+		if clientID, err = promptValue(ctx, reader, a.statusWriter(), "Client ID: "); err != nil {
 			return "", "", err
 		}
 	}
 	if clientSecret == "" {
-		if clientSecret, err = promptSecret(a.stdin, reader, a.statusWriter(), "Client secret: "); err != nil {
+		if clientSecret, err = promptSecret(ctx, a.stdin, reader, a.statusWriter(), "Client secret: "); err != nil {
 			return "", "", err
 		}
 	}
 	return clientID, clientSecret, nil
 }
 
-func promptValue(reader *bufio.Reader, out io.Writer, label string) (string, error) {
+func promptValue(ctx context.Context, reader *bufio.Reader, out io.Writer, label string) (string, error) {
 	if _, err := fmt.Fprint(out, label); err != nil {
 		return "", err
 	}
-	line, err := reader.ReadString('\n')
+	line, err := readLine(ctx, reader)
 	if err != nil && !errors.Is(err, io.EOF) {
 		return "", err
 	}
@@ -259,15 +308,24 @@ func promptValue(reader *bufio.Reader, out io.Writer, label string) (string, err
 }
 
 // promptSecret reads without echo on a terminal.
-func promptSecret(in io.Reader, reader *bufio.Reader, out io.Writer, label string) (string, error) {
+func promptSecret(ctx context.Context, in io.Reader, reader *bufio.Reader, out io.Writer, label string) (string, error) {
 	file, ok := style.Terminal(in)
 	if !ok {
-		return promptValue(reader, out, label)
+		return promptValue(ctx, reader, out, label)
 	}
 	if _, err := fmt.Fprint(out, label); err != nil {
 		return "", err
 	}
-	secret, err := term.ReadPassword(int(file.Fd())) //nolint:gosec // a file descriptor fits an int
+	descriptor := int(file.Fd()) //nolint:gosec // a file descriptor fits an int
+	echoing, err := term.GetState(descriptor)
+	if err != nil {
+		return "", err
+	}
+	secret, err := await(ctx, func() ([]byte, error) { return term.ReadPassword(descriptor) })
+	if ctx.Err() != nil {
+		// The abandoned read never restores echo, so it is restored here.
+		_ = term.Restore(descriptor, echoing)
+	}
 	if _, printErr := fmt.Fprintln(out); printErr != nil {
 		return "", printErr
 	}

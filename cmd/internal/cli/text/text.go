@@ -7,6 +7,7 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"unicode"
 
 	functionsv1 "github.com/galaxy-io/alchemy/api/functions/v1"
 	"github.com/galaxy-io/alchemy/cmd/internal/cli/style"
@@ -255,7 +256,7 @@ func Details(w io.Writer, rows [][2]string) error {
 		width = max(width, len(row[0]))
 	}
 	for _, row := range rows {
-		value := row[1]
+		value := Printable(row[1])
 		if row[0] == statusLabel {
 			value = p.Status(value, value)
 		}
@@ -266,6 +267,19 @@ func Details(w io.Writer, rows [][2]string) error {
 		}
 	}
 	return nil
+}
+
+// Printable escapes control characters, so a value cannot drive the terminal.
+func Printable(value string) string {
+	var out strings.Builder
+	for _, char := range value {
+		if unicode.IsControl(char) && char != '\n' && char != '\t' {
+			fmt.Fprintf(&out, "\\x%02x", char)
+			continue
+		}
+		out.WriteRune(char)
+	}
+	return out.String()
 }
 
 func (r Renderer) table(title string, columns []style.Column, rows [][]string) error {

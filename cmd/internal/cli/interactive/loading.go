@@ -15,7 +15,7 @@ func (r *Renderer) loading(label string, fn func() error) error {
 	go func() { done <- fn() }()
 	ticker := time.NewTicker(spinnerInterval)
 	defer ticker.Stop()
-	width := renderWidth(r.out)
+	width, _ := terminalSize(r.out)
 	frames := r.theme.Status.SpinnerFrames
 	if len(frames) == 0 {
 		frames = []string{"·"}

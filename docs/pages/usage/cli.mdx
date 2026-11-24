@@ -24,7 +24,7 @@ Open the main menu in a terminal:
 alchemy -i
 ```
 
-The menu can invoke a function, browse functions and their versions, browse invocations and read their logs, and change the table layout. `alchemy function -i` and `alchemy invocation -i` open at that section, and `alchemy invoke` with no function picks one from a list.
+The menu can invoke a function, browse functions, browse invocations and read their logs, and change the table layout. For a function's version history, run `alchemy function get <function-id>`. `alchemy function -i` and `alchemy invocation -i` open at that section, and `alchemy invoke` with no function picks one from a list.
 
 Invoking from the menu takes the input as JSON, prints the output to the terminal and leaves it in scrollback, as logs do. A function with an Arrow contract is invoked with flags.
 
@@ -112,7 +112,7 @@ alchemy --context production auth login \
   --server https://alchemy.example.com
 ```
 
-The CLI prompts for the client ID and secret when they are not passed as flags. It verifies the credentials, creates and selects the context, and refreshes access tokens when needed. `alchemy auth status` shows the current state. `alchemy auth logout` removes the context's credentials.
+The server must use HTTPS unless it runs on this machine, so credentials are never sent unencrypted. The CLI prompts for the client ID and secret when they are not passed as flags. It verifies the credentials, creates and selects the context, and refreshes access tokens when needed. `alchemy auth status` shows the current state. `alchemy auth logout` removes the context's credentials.
 
 Contexts and credentials are stored separately under `~/.config/alchemy`, or `$XDG_CONFIG_HOME/alchemy` when it is set, with owner-only permissions.
 

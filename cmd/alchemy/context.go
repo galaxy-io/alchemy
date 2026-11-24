@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"path/filepath"
@@ -169,8 +170,8 @@ func (a *cliApp) contextAddCommand() *cobra.Command {
 		Use:   "add <name>",
 		Short: "Add a context for a server",
 		Args:  cobra.ExactArgs(1),
-		RunE: func(_ *cobra.Command, args []string) error {
-			return a.addContext(args[0], contexts.Target{Endpoint: endpoint, AuthProfile: authProfile}, force)
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return a.addContext(cmd.Context(), args[0], contexts.Target{Endpoint: endpoint, AuthProfile: authProfile}, force)
 		},
 	}
 	add.Flags().StringVar(&endpoint, "server", "", "Alchemy server `URL`")
@@ -180,7 +181,7 @@ func (a *cliApp) contextAddCommand() *cobra.Command {
 	return add
 }
 
-func (a *cliApp) addContext(name string, target contexts.Target, force bool) error {
+func (a *cliApp) addContext(ctx context.Context, name string, target contexts.Target, force bool) error {
 	if target.AuthProfile != "" {
 		if _, err := a.credentialStore().Get(target.AuthProfile); err != nil {
 			return err
@@ -190,7 +191,7 @@ func (a *cliApp) addContext(name string, target contexts.Target, force bool) err
 	existing, err := registry.Resolve(name)
 	replacing := err == nil
 	if replacing && !force {
-		confirmed, err := a.confirm(fmt.Sprintf("Context %q already exists (%s); replace it?", name, existing.Target.Endpoint))
+		confirmed, err := a.confirm(ctx, fmt.Sprintf("Context %q already exists (%s); replace it?", name, existing.Target.Endpoint))
 		if err != nil || !confirmed {
 			return err
 		}

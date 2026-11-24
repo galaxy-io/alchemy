@@ -10,7 +10,7 @@ import type { Template } from "@/gen/functions/v1/templates_pb";
 import IconTile from "@/components/IconTile";
 
 import {
-  CREATE_FUNCTION_MODAL_TEMPLATE_CARD_HEIGHT,
+  CREATE_FUNCTION_MODAL_TEMPLATE_CARD_MIN_HEIGHT,
   CREATE_FUNCTION_MODAL_TEMPLATE_TILE_SIZE,
 } from "@/pages/functions/components/create/constants";
 import CreateFunctionModalTemplateLockup from "@/pages/functions/components/create/steps/components/CreateFunctionModalTemplateLockup";
@@ -35,7 +35,7 @@ const CreateFunctionModalTemplateOption: FC<CreateFunctionModalTemplateOptionPro
       direction={FlexDirection.COLUMN}
       justifyContent={JustifyContent.SPACE_BETWEEN}
       gap={12}
-      height={CREATE_FUNCTION_MODAL_TEMPLATE_CARD_HEIGHT}
+      minHeight={CREATE_FUNCTION_MODAL_TEMPLATE_CARD_MIN_HEIGHT}
     >
       {runtime && (
         <IconTile size={CREATE_FUNCTION_MODAL_TEMPLATE_TILE_SIZE}>

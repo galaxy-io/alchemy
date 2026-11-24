@@ -33,7 +33,7 @@ func (a *cliApp) invocationListCommand() *cobra.Command {
 				return err
 			}
 			request := &functionsv1.ListInvocationsRequest{Pagination: pagination}
-			subject, command := allFunctions, "alchemy invocation list"
+			subject, command := allFunctions, a.commandLine("invocation list")
 			if len(args) == 1 {
 				request.FunctionIds = args
 				subject, command = args[0], command+" "+args[0]
@@ -42,7 +42,7 @@ func (a *cliApp) invocationListCommand() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			return a.text().Invocations(res.Msg.GetInvocations(), res.Msg.GetPagination(), subject, command)
+			return a.text().Invocations(res.Msg.GetInvocations(), res.Msg.GetPagination(), subject, page.continuation(command))
 		},
 	}
 	page.add(cmd)
