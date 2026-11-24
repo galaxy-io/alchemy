@@ -4,3 +4,5 @@ api/**/*.connect.go           linguist-generated=true
 datastore/postgres/sqlcgen/** linguist-generated=true
 ui/src/gen/**                 linguist-generated=true
 ui/src/host/routeTree.gen.ts  linguist-generated=true
+sdks/python/src/alchemy/**   linguist-generated=true
+sdks/typescript/src/**        linguist-generated=true

@@ -68,11 +68,14 @@ The protos in `protos/` drive both the Go API and the UI's types. After a
 change, regenerate both and commit the output:
 
 ```sh
-just proto     # Go stubs into api/
+just proto     # Go stubs and the OpenAPI specs into api/
 just ui-gen    # TypeScript clients into ui/src/gen/
 ```
 
-`just proto-check` fails if `api/` is out of date. The UI job in CI runs on
+`just proto-check` fails if `api/` is out of date. Do not regenerate the SDKs
+by hand. When `api/openapi.json`, `api/auth.openapi.json` or `fern/` changes on
+`main`, the SDKs workflow runs Fern and opens a pull request with the new
+clients under `sdks/`. The UI job in CI runs on
 any change under `protos/`, so a proto change without a fresh `ui/src/gen/`
 shows up there. A new service also needs a proxy entry in
 `ui/vite.config.ts`.
@@ -103,6 +106,8 @@ open for each component:
 |---|---|---|
 | Alchemy | `v<version>` | The server and host images, the `alchemy` CLI with its Homebrew cask, then the Helm chart, whose version and app version Release Please bumps to match |
 | `alchemy-ui` | `alchemy-ui-<version>` | `@galaxy-io/alchemy-ui` to npm, after `just ui-check` passes |
+| `alchemy-py` | `alchemy-py-<version>` | `alchemy-py` to PyPI |
+| `alchemy-ts` | `alchemy-ts-<version>` | `@galaxy-io/alchemy-ts` to npm |
 
 Before 1.0, a breaking change bumps the minor version, not the major. The
 runtime images are not part of a release: they publish whenever something

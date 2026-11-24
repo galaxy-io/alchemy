@@ -1,0 +1,33 @@
+[build-system]
+requires = ["hatchling>=1.27,<2"]
+build-backend = "hatchling.build"
+
+[project]
+name = "alchemy-py"
+version = "0.0.0"
+description = "Generated Python client for the Alchemy API"
+readme = "README.md"
+license = "Apache-2.0"
+license-files = ["LICENSE"]
+requires-python = ">=3.10"
+dependencies = [
+    "anyio>=4,<5",
+    "httpx>=0.28,<1",
+    "pydantic>=2.8,<3",
+    "typing-extensions>=4.10,<5",
+]
+
+[project.urls]
+Repository = "https://github.com/galaxy-io/alchemy"
+Issues = "https://github.com/galaxy-io/alchemy/issues"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/alchemy"]
+exclude = ["src/alchemy/tests"]
+
+[tool.hatch.build.targets.wheel.force-include]
+"py.typed" = "alchemy/py.typed"
+
+[tool.hatch.build.targets.sdist]
+include = ["src/alchemy", "pyproject.toml", "README.md", "LICENSE", "py.typed"]
+exclude = ["src/alchemy/tests"]

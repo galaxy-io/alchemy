@@ -1,0 +1,3673 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "API",
+    "description": "API documentation for API",
+    "version": "1.0.0"
+  },
+  "paths": {
+    "/functions.v1.FunctionsService/CreateFunction": {
+      "post": {
+        "tags": [
+          "functions.v1.FunctionsService"
+        ],
+        "summary": "CreateFunction",
+        "description": "Functions; the stable handle callers invoke.",
+        "operationId": "functions.v1.FunctionsService.CreateFunction",
+        "parameters": [
+          {
+            "name": "Connect-Protocol-Version",
+            "in": "header",
+            "description": "Define the version of the Connect protocol",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/connect-protocol-version"
+            },
+            "example": 1
+          },
+          {
+            "name": "Connect-Timeout-Ms",
+            "in": "header",
+            "description": "Define the timeout, in ms",
+            "schema": {
+              "$ref": "#/components/schemas/connect-timeout-header"
+            },
+            "example": 1000
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/functions.v1.CreateFunctionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/connect.error"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/functions.v1.CreateFunctionResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/functions.v1.FunctionsService/CreateFunctionVersion": {
+      "post": {
+        "tags": [
+          "functions.v1.FunctionsService"
+        ],
+        "summary": "CreateFunctionVersion",
+        "description": "Function versions; immutable image + contract + resources. Builds are\n asynchronous: poll GetFunctionVersion until status leaves BUILDING.",
+        "operationId": "functions.v1.FunctionsService.CreateFunctionVersion",
+        "parameters": [
+          {
+            "name": "Connect-Protocol-Version",
+            "in": "header",
+            "description": "Define the version of the Connect protocol",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/connect-protocol-version"
+            },
+            "example": 1
+          },
+          {
+            "name": "Connect-Timeout-Ms",
+            "in": "header",
+            "description": "Define the timeout, in ms",
+            "schema": {
+              "$ref": "#/components/schemas/connect-timeout-header"
+            },
+            "example": 1000
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/functions.v1.CreateFunctionVersionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/connect.error"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/functions.v1.CreateFunctionVersionResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/functions.v1.FunctionsService/DeleteFunction": {
+      "post": {
+        "tags": [
+          "functions.v1.FunctionsService"
+        ],
+        "summary": "DeleteFunction",
+        "operationId": "functions.v1.FunctionsService.DeleteFunction",
+        "parameters": [
+          {
+            "name": "Connect-Protocol-Version",
+            "in": "header",
+            "description": "Define the version of the Connect protocol",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/connect-protocol-version"
+            },
+            "example": 1
+          },
+          {
+            "name": "Connect-Timeout-Ms",
+            "in": "header",
+            "description": "Define the timeout, in ms",
+            "schema": {
+              "$ref": "#/components/schemas/connect-timeout-header"
+            },
+            "example": 1000
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/functions.v1.DeleteFunctionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/connect.error"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/functions.v1.DeleteFunctionResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/functions.v1.FunctionsService/GetFunction": {
+      "post": {
+        "tags": [
+          "functions.v1.FunctionsService"
+        ],
+        "summary": "GetFunction",
+        "operationId": "functions.v1.FunctionsService.GetFunction",
+        "parameters": [
+          {
+            "name": "Connect-Protocol-Version",
+            "in": "header",
+            "description": "Define the version of the Connect protocol",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/connect-protocol-version"
+            },
+            "example": 1
+          },
+          {
+            "name": "Connect-Timeout-Ms",
+            "in": "header",
+            "description": "Define the timeout, in ms",
+            "schema": {
+              "$ref": "#/components/schemas/connect-timeout-header"
+            },
+            "example": 1000
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/functions.v1.GetFunctionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/connect.error"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/functions.v1.GetFunctionResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/functions.v1.FunctionsService/GetFunctionVersion": {
+      "post": {
+        "tags": [
+          "functions.v1.FunctionsService"
+        ],
+        "summary": "GetFunctionVersion",
+        "operationId": "functions.v1.FunctionsService.GetFunctionVersion",
+        "parameters": [
+          {
+            "name": "Connect-Protocol-Version",
+            "in": "header",
+            "description": "Define the version of the Connect protocol",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/connect-protocol-version"
+            },
+            "example": 1
+          },
+          {
+            "name": "Connect-Timeout-Ms",
+            "in": "header",
+            "description": "Define the timeout, in ms",
+            "schema": {
+              "$ref": "#/components/schemas/connect-timeout-header"
+            },
+            "example": 1000
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/functions.v1.GetFunctionVersionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/connect.error"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/functions.v1.GetFunctionVersionResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/functions.v1.FunctionsService/GetHost": {
+      "post": {
+        "tags": [
+          "functions.v1.FunctionsService"
+        ],
+        "summary": "GetHost",
+        "operationId": "functions.v1.FunctionsService.GetHost",
+        "parameters": [
+          {
+            "name": "Connect-Protocol-Version",
+            "in": "header",
+            "description": "Define the version of the Connect protocol",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/connect-protocol-version"
+            },
+            "example": 1
+          },
+          {
+            "name": "Connect-Timeout-Ms",
+            "in": "header",
+            "description": "Define the timeout, in ms",
+            "schema": {
+              "$ref": "#/components/schemas/connect-timeout-header"
+            },
+            "example": 1000
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/functions.v1.GetHostRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/connect.error"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/functions.v1.GetHostResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/functions.v1.FunctionsService/GetInvocation": {
+      "post": {
+        "tags": [
+          "functions.v1.FunctionsService"
+        ],
+        "summary": "GetInvocation",
+        "description": "Invocations; the persisted record of every Invoke, newest first.",
+        "operationId": "functions.v1.FunctionsService.GetInvocation",
+        "parameters": [
+          {
+            "name": "Connect-Protocol-Version",
+            "in": "header",
+            "description": "Define the version of the Connect protocol",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/connect-protocol-version"
+            },
+            "example": 1
+          },
+          {
+            "name": "Connect-Timeout-Ms",
+            "in": "header",
+            "description": "Define the timeout, in ms",
+            "schema": {
+              "$ref": "#/components/schemas/connect-timeout-header"
+            },
+            "example": 1000
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/functions.v1.GetInvocationRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/connect.error"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/functions.v1.GetInvocationResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/functions.v1.FunctionsService/GetInvocationLogs": {},
+    "/functions.v1.FunctionsService/GetVersion": {
+      "post": {
+        "tags": [
+          "functions.v1.FunctionsService"
+        ],
+        "summary": "GetVersion",
+        "description": "The build the server runs.",
+        "operationId": "functions.v1.FunctionsService.GetVersion",
+        "parameters": [
+          {
+            "name": "Connect-Protocol-Version",
+            "in": "header",
+            "description": "Define the version of the Connect protocol",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/connect-protocol-version"
+            },
+            "example": 1
+          },
+          {
+            "name": "Connect-Timeout-Ms",
+            "in": "header",
+            "description": "Define the timeout, in ms",
+            "schema": {
+              "$ref": "#/components/schemas/connect-timeout-header"
+            },
+            "example": 1000
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/functions.v1.GetVersionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/connect.error"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/functions.v1.GetVersionResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/functions.v1.FunctionsService/Invoke": {
+      "post": {
+        "tags": [
+          "functions.v1.FunctionsService"
+        ],
+        "summary": "Invoke",
+        "description": "Invocation; validate input, run one version against it, validate output.\n An RPC error means the function did not produce a result: the request was\n rejected (unknown function, input violates the contract, no capacity) or\n the platform failed. Input violations are INVALID_ARGUMENT with one\n ContractViolation error detail each. If the function ran, the RPC\n succeeds and the response carries its output or a FunctionError. A\n function that raised, crashed or timed out, or a platform that could\n not run it, runs again up to the call's or the function's retries, with\n exponential backoff, while the call's deadline leaves room. An input\n that violates the contract never runs again.",
+        "operationId": "functions.v1.FunctionsService.Invoke",
+        "parameters": [
+          {
+            "name": "Connect-Protocol-Version",
+            "in": "header",
+            "description": "Define the version of the Connect protocol",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/connect-protocol-version"
+            },
+            "example": 1
+          },
+          {
+            "name": "Connect-Timeout-Ms",
+            "in": "header",
+            "description": "Define the timeout, in ms",
+            "schema": {
+              "$ref": "#/components/schemas/connect-timeout-header"
+            },
+            "example": 1000
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/functions.v1.InvokeRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/connect.error"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/functions.v1.InvokeResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/functions.v1.FunctionsService/InvokeAsync": {
+      "post": {
+        "tags": [
+          "functions.v1.FunctionsService"
+        ],
+        "summary": "InvokeAsync",
+        "description": "InvokeAsync queues the invocation and returns its id without waiting.\n The output is dropped. It retries as Invoke does. An idempotency_key\n seen within the window returns the invocation it queued.",
+        "operationId": "functions.v1.FunctionsService.InvokeAsync",
+        "parameters": [
+          {
+            "name": "Connect-Protocol-Version",
+            "in": "header",
+            "description": "Define the version of the Connect protocol",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/connect-protocol-version"
+            },
+            "example": 1
+          },
+          {
+            "name": "Connect-Timeout-Ms",
+            "in": "header",
+            "description": "Define the timeout, in ms",
+            "schema": {
+              "$ref": "#/components/schemas/connect-timeout-header"
+            },
+            "example": 1000
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/functions.v1.InvokeAsyncRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/connect.error"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/functions.v1.InvokeAsyncResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/functions.v1.FunctionsService/ListFunctionVersions": {
+      "post": {
+        "tags": [
+          "functions.v1.FunctionsService"
+        ],
+        "summary": "ListFunctionVersions",
+        "operationId": "functions.v1.FunctionsService.ListFunctionVersions",
+        "parameters": [
+          {
+            "name": "Connect-Protocol-Version",
+            "in": "header",
+            "description": "Define the version of the Connect protocol",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/connect-protocol-version"
+            },
+            "example": 1
+          },
+          {
+            "name": "Connect-Timeout-Ms",
+            "in": "header",
+            "description": "Define the timeout, in ms",
+            "schema": {
+              "$ref": "#/components/schemas/connect-timeout-header"
+            },
+            "example": 1000
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/functions.v1.ListFunctionVersionsRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/connect.error"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/functions.v1.ListFunctionVersionsResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/functions.v1.FunctionsService/ListFunctions": {
+      "post": {
+        "tags": [
+          "functions.v1.FunctionsService"
+        ],
+        "summary": "ListFunctions",
+        "operationId": "functions.v1.FunctionsService.ListFunctions",
+        "parameters": [
+          {
+            "name": "Connect-Protocol-Version",
+            "in": "header",
+            "description": "Define the version of the Connect protocol",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/connect-protocol-version"
+            },
+            "example": 1
+          },
+          {
+            "name": "Connect-Timeout-Ms",
+            "in": "header",
+            "description": "Define the timeout, in ms",
+            "schema": {
+              "$ref": "#/components/schemas/connect-timeout-header"
+            },
+            "example": 1000
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/functions.v1.ListFunctionsRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/connect.error"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/functions.v1.ListFunctionsResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/functions.v1.FunctionsService/ListHosts": {
+      "post": {
+        "tags": [
+          "functions.v1.FunctionsService"
+        ],
+        "summary": "ListHosts",
+        "operationId": "functions.v1.FunctionsService.ListHosts",
+        "parameters": [
+          {
+            "name": "Connect-Protocol-Version",
+            "in": "header",
+            "description": "Define the version of the Connect protocol",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/connect-protocol-version"
+            },
+            "example": 1
+          },
+          {
+            "name": "Connect-Timeout-Ms",
+            "in": "header",
+            "description": "Define the timeout, in ms",
+            "schema": {
+              "$ref": "#/components/schemas/connect-timeout-header"
+            },
+            "example": 1000
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/functions.v1.ListHostsRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/connect.error"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/functions.v1.ListHostsResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/functions.v1.FunctionsService/ListInstances": {
+      "post": {
+        "tags": [
+          "functions.v1.FunctionsService"
+        ],
+        "summary": "ListInstances",
+        "description": "Host; what the hosts are running right now.",
+        "operationId": "functions.v1.FunctionsService.ListInstances",
+        "parameters": [
+          {
+            "name": "Connect-Protocol-Version",
+            "in": "header",
+            "description": "Define the version of the Connect protocol",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/connect-protocol-version"
+            },
+            "example": 1
+          },
+          {
+            "name": "Connect-Timeout-Ms",
+            "in": "header",
+            "description": "Define the timeout, in ms",
+            "schema": {
+              "$ref": "#/components/schemas/connect-timeout-header"
+            },
+            "example": 1000
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/functions.v1.ListInstancesRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/connect.error"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/functions.v1.ListInstancesResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/functions.v1.FunctionsService/ListInvocations": {
+      "post": {
+        "tags": [
+          "functions.v1.FunctionsService"
+        ],
+        "summary": "ListInvocations",
+        "operationId": "functions.v1.FunctionsService.ListInvocations",
+        "parameters": [
+          {
+            "name": "Connect-Protocol-Version",
+            "in": "header",
+            "description": "Define the version of the Connect protocol",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/connect-protocol-version"
+            },
+            "example": 1
+          },
+          {
+            "name": "Connect-Timeout-Ms",
+            "in": "header",
+            "description": "Define the timeout, in ms",
+            "schema": {
+              "$ref": "#/components/schemas/connect-timeout-header"
+            },
+            "example": 1000
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/functions.v1.ListInvocationsRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/connect.error"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/functions.v1.ListInvocationsResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/functions.v1.FunctionsService/ListRuntimes": {
+      "post": {
+        "tags": [
+          "functions.v1.FunctionsService"
+        ],
+        "summary": "ListRuntimes",
+        "description": "Runtimes a function can be built from source on, with a starter handler\n for each, and the limits a source is held to.",
+        "operationId": "functions.v1.FunctionsService.ListRuntimes",
+        "parameters": [
+          {
+            "name": "Connect-Protocol-Version",
+            "in": "header",
+            "description": "Define the version of the Connect protocol",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/connect-protocol-version"
+            },
+            "example": 1
+          },
+          {
+            "name": "Connect-Timeout-Ms",
+            "in": "header",
+            "description": "Define the timeout, in ms",
+            "schema": {
+              "$ref": "#/components/schemas/connect-timeout-header"
+            },
+            "example": 1000
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/functions.v1.ListRuntimesRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/connect.error"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/functions.v1.ListRuntimesResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/functions.v1.FunctionsService/ListTemplates": {
+      "post": {
+        "tags": [
+          "functions.v1.FunctionsService"
+        ],
+        "summary": "ListTemplates",
+        "description": "Templates a function can be built from, each with a handler and a sample\n contract per contract kind.",
+        "operationId": "functions.v1.FunctionsService.ListTemplates",
+        "parameters": [
+          {
+            "name": "Connect-Protocol-Version",
+            "in": "header",
+            "description": "Define the version of the Connect protocol",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/connect-protocol-version"
+            },
+            "example": 1
+          },
+          {
+            "name": "Connect-Timeout-Ms",
+            "in": "header",
+            "description": "Define the timeout, in ms",
+            "schema": {
+              "$ref": "#/components/schemas/connect-timeout-header"
+            },
+            "example": 1000
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/functions.v1.ListTemplatesRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/connect.error"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/functions.v1.ListTemplatesResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/functions.v1.FunctionsService/TailInvocations": {},
+    "/functions.v1.FunctionsService/UpdateFunction": {
+      "post": {
+        "tags": [
+          "functions.v1.FunctionsService"
+        ],
+        "summary": "UpdateFunction",
+        "operationId": "functions.v1.FunctionsService.UpdateFunction",
+        "parameters": [
+          {
+            "name": "Connect-Protocol-Version",
+            "in": "header",
+            "description": "Define the version of the Connect protocol",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/connect-protocol-version"
+            },
+            "example": 1
+          },
+          {
+            "name": "Connect-Timeout-Ms",
+            "in": "header",
+            "description": "Define the timeout, in ms",
+            "schema": {
+              "$ref": "#/components/schemas/connect-timeout-header"
+            },
+            "example": 1000
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/functions.v1.UpdateFunctionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/connect.error"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/functions.v1.UpdateFunctionResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/metrics.v1.MetricsService/GetQueue": {
+      "post": {
+        "tags": [
+          "metrics.v1.MetricsService"
+        ],
+        "summary": "GetQueue",
+        "description": "GetQueue is what is in flight right now, from the queue rather than\n the invocations table: invocations waiting to start, and running.",
+        "operationId": "metrics.v1.MetricsService.GetQueue",
+        "parameters": [
+          {
+            "name": "Connect-Protocol-Version",
+            "in": "header",
+            "description": "Define the version of the Connect protocol",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/connect-protocol-version"
+            },
+            "example": 1
+          },
+          {
+            "name": "Connect-Timeout-Ms",
+            "in": "header",
+            "description": "Define the timeout, in ms",
+            "schema": {
+              "$ref": "#/components/schemas/connect-timeout-header"
+            },
+            "example": 1000
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/metrics.v1.GetQueueRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/connect.error"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/metrics.v1.GetQueueResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/metrics.v1.MetricsService/QueryAggregate": {
+      "post": {
+        "tags": [
+          "metrics.v1.MetricsService"
+        ],
+        "summary": "QueryAggregate",
+        "operationId": "metrics.v1.MetricsService.QueryAggregate",
+        "parameters": [
+          {
+            "name": "Connect-Protocol-Version",
+            "in": "header",
+            "description": "Define the version of the Connect protocol",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/connect-protocol-version"
+            },
+            "example": 1
+          },
+          {
+            "name": "Connect-Timeout-Ms",
+            "in": "header",
+            "description": "Define the timeout, in ms",
+            "schema": {
+              "$ref": "#/components/schemas/connect-timeout-header"
+            },
+            "example": 1000
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/metrics.v1.QueryAggregateRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/connect.error"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/metrics.v1.QueryAggregateResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/metrics.v1.MetricsService/QueryTimeseries": {
+      "post": {
+        "tags": [
+          "metrics.v1.MetricsService"
+        ],
+        "summary": "QueryTimeseries",
+        "operationId": "metrics.v1.MetricsService.QueryTimeseries",
+        "parameters": [
+          {
+            "name": "Connect-Protocol-Version",
+            "in": "header",
+            "description": "Define the version of the Connect protocol",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/connect-protocol-version"
+            },
+            "example": 1
+          },
+          {
+            "name": "Connect-Timeout-Ms",
+            "in": "header",
+            "description": "Define the timeout, in ms",
+            "schema": {
+              "$ref": "#/components/schemas/connect-timeout-header"
+            },
+            "example": 1000
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/metrics.v1.QueryTimeseriesRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/connect.error"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/metrics.v1.QueryTimeseriesResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "connect-protocol-version": {
+        "type": "number",
+        "examples": [
+          1
+        ],
+        "title": "Connect-Protocol-Version",
+        "description": "Define the version of the Connect protocol",
+        "const": 1
+      },
+      "connect-timeout-header": {
+        "type": "number",
+        "examples": [
+          1000
+        ],
+        "title": "Connect-Timeout-Ms",
+        "description": "Define the timeout, in ms"
+      },
+      "connect.error": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string",
+            "examples": [
+              "not_found"
+            ],
+            "enum": [
+              "canceled",
+              "unknown",
+              "invalid_argument",
+              "deadline_exceeded",
+              "not_found",
+              "already_exists",
+              "permission_denied",
+              "resource_exhausted",
+              "failed_precondition",
+              "aborted",
+              "out_of_range",
+              "unimplemented",
+              "internal",
+              "unavailable",
+              "data_loss",
+              "unauthenticated"
+            ],
+            "description": "The status code, which should be an enum value of [google.rpc.Code][google.rpc.Code]."
+          },
+          "message": {
+            "type": "string",
+            "description": "A developer-facing error message, which should be in English. Any user-facing error message should be localized and sent in the [google.rpc.Status.details][google.rpc.Status.details] field, or localized by the client."
+          },
+          "details": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/connect.error_details.Any"
+            },
+            "description": "A list of messages that carry the error details. There is no limit on the number of messages."
+          }
+        },
+        "title": "Connect Error",
+        "additionalProperties": true,
+        "description": "Error type returned by Connect: https://connectrpc.com/docs/go/errors/#http-representation"
+      },
+      "connect.error_details.Any": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "description": "A URL that acts as a globally unique identifier for the type of the serialized message. For example: `type.googleapis.com/google.rpc.ErrorInfo`."
+          },
+          "value": {
+            "type": "string",
+            "format": "binary",
+            "description": "The Protobuf message, serialized as bytes and base64-encoded. The specific message type is identified by the `type` field."
+          },
+          "debug": {
+            "type": "object",
+            "title": "Debug",
+            "additionalProperties": true,
+            "description": "Deserialized error detail payload. The 'type' field indicates the schema. This field is for easier debugging and should not be relied upon for application logic."
+          }
+        },
+        "additionalProperties": true,
+        "description": "Contains an arbitrary serialized message along with a @type that describes the type of the serialized message, with an additional debug field for ConnectRPC error details."
+      },
+      "functions.v1.ArrowContract": {
+        "type": "object",
+        "properties": {
+          "inputSchema": {
+            "type": "string",
+            "title": "input_schema",
+            "format": "byte",
+            "description": "input_schema and output_schema are Arrow schemas serialized as an IPC\n stream containing only the schema message, e.g. pyarrow's\n `schema.serialize()`."
+          },
+          "outputSchema": {
+            "type": "string",
+            "title": "output_schema",
+            "format": "byte"
+          }
+        },
+        "title": "ArrowContract",
+        "additionalProperties": false,
+        "description": "ArrowContract types the boundary with Arrow schemas, for functions that\n operate on a batch of rows at a time. Input and output are one record\n batch each, as an Arrow IPC stream, on both the API and the function\n process's stdin/stdout. The output is row-aligned with the input: the same number\n of rows in the same order, so per-row bookkeeping the caller holds (such as\n an operation vector) applies to the output unchanged.\n\n Schemas are matched on field names, types and nullability; field metadata\n is ignored. A field the contract marks nullable accepts a non-nullable\n column."
+      },
+      "functions.v1.Contract": {
+        "type": "object",
+        "anyOf": [
+          {
+            "type": "object",
+            "properties": {
+              "arrow": {
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/functions.v1.ArrowContract"
+                  }
+                ],
+                "title": "arrow"
+              }
+            },
+            "title": "arrow"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "jsonSchema": {
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/functions.v1.JsonSchemaContract"
+                  }
+                ],
+                "title": "json_schema"
+              }
+            },
+            "title": "json_schema"
+          }
+        ],
+        "unevaluatedProperties": false,
+        "not": {
+          "allOf": [
+            {
+              "anyOf": [
+                {
+                  "required": [
+                    "arrow"
+                  ]
+                },
+                {
+                  "required": [
+                    "jsonSchema"
+                  ]
+                }
+              ]
+            },
+            {
+              "not": {
+                "oneOf": [
+                  {
+                    "required": [
+                      "arrow"
+                    ]
+                  },
+                  {
+                    "required": [
+                      "jsonSchema"
+                    ]
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        "title": "Contract",
+        "description": "Contract is the typed I/O boundary of a function version. The platform\n enforces it on both sides: input before any compute is acquired, output\n before it is returned to the caller. It is a oneof so that other schema\n languages can be added later without changing FunctionSpec."
+      },
+      "functions.v1.ContractViolation": {
+        "type": "object",
+        "properties": {
+          "instancePath": {
+            "type": "string",
+            "title": "instance_path"
+          },
+          "schemaPath": {
+            "type": "string",
+            "title": "schema_path"
+          },
+          "message": {
+            "type": "string",
+            "title": "message"
+          }
+        },
+        "title": "ContractViolation",
+        "additionalProperties": false,
+        "description": "ContractViolation is one schema validation failure. instance_path and\n schema_path are JSON Pointers (RFC 6901) into the value and the schema."
+      },
+      "functions.v1.CreateFunctionRequest": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "name"
+          },
+          "description": {
+            "type": "string",
+            "title": "description"
+          },
+          "spec": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/functions.v1.FunctionSpec"
+              }
+            ],
+            "title": "spec"
+          },
+          "secretValues": {
+            "type": "object",
+            "title": "secret_values",
+            "additionalProperties": {
+              "type": "string",
+              "title": "value"
+            },
+            "description": "secret_values are secrets to create for this version, variable name to\n value. Each is stored under the tenant as a new secret of its own, so a\n later version never changes what this one reads, and named in\n spec.secrets."
+          },
+          "timeoutMs": {
+            "type": "string",
+            "title": "timeout_ms",
+            "format": "int64",
+            "description": "timeout_ms, max_concurrency and resources are as on Function. Zero\n values take the server defaults."
+          },
+          "maxConcurrency": {
+            "type": "integer",
+            "title": "max_concurrency",
+            "format": "int32"
+          },
+          "resources": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/functions.v1.Resources"
+              }
+            ],
+            "title": "resources"
+          },
+          "retries": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "title": "retries",
+            "format": "int32",
+            "description": "retries is as on Function. Unset takes the default of 2."
+          },
+          "network": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/functions.v1.Network"
+              }
+            ],
+            "title": "network"
+          }
+        },
+        "title": "CreateFunctionRequest",
+        "additionalProperties": false,
+        "description": "CreateFunction creates the function and version 1 from spec. It returns as\n soon as the version is accepted, in BUILDING."
+      },
+      "functions.v1.CreateFunctionResponse": {
+        "type": "object",
+        "properties": {
+          "function": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/functions.v1.Function"
+              }
+            ],
+            "title": "function"
+          },
+          "version": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/functions.v1.FunctionVersion"
+              }
+            ],
+            "title": "version"
+          }
+        },
+        "title": "CreateFunctionResponse",
+        "additionalProperties": false
+      },
+      "functions.v1.CreateFunctionVersionRequest": {
+        "type": "object",
+        "properties": {
+          "functionId": {
+            "type": "string",
+            "title": "function_id"
+          },
+          "spec": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/functions.v1.FunctionSpec"
+              }
+            ],
+            "title": "spec"
+          },
+          "secretValues": {
+            "type": "object",
+            "title": "secret_values",
+            "additionalProperties": {
+              "type": "string",
+              "title": "value"
+            },
+            "description": "secret_values are as in CreateFunctionRequest."
+          }
+        },
+        "title": "CreateFunctionVersionRequest",
+        "additionalProperties": false,
+        "description": "CreateFunctionVersion adds a new immutable version. It becomes the\n function's current_version when it reaches READY."
+      },
+      "functions.v1.CreateFunctionVersionResponse": {
+        "type": "object",
+        "properties": {
+          "version": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/functions.v1.FunctionVersion"
+              }
+            ],
+            "title": "version"
+          }
+        },
+        "title": "CreateFunctionVersionResponse",
+        "additionalProperties": false
+      },
+      "functions.v1.DeleteFunctionRequest": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "id"
+          }
+        },
+        "title": "DeleteFunctionRequest",
+        "additionalProperties": false
+      },
+      "functions.v1.DeleteFunctionResponse": {
+        "type": "object",
+        "title": "DeleteFunctionResponse",
+        "additionalProperties": false
+      },
+      "functions.v1.Function": {
+        "type": "object",
+        "properties": {
+          "tenantId": {
+            "type": "string",
+            "title": "tenant_id"
+          },
+          "id": {
+            "type": "string",
+            "title": "id"
+          },
+          "name": {
+            "type": "string",
+            "title": "name"
+          },
+          "description": {
+            "type": "string",
+            "title": "description"
+          },
+          "currentVersion": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/functions.v1.FunctionVersion"
+              }
+            ],
+            "title": "current_version"
+          },
+          "versions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/functions.v1.FunctionVersion"
+            },
+            "title": "versions"
+          },
+          "createdAt": {
+            "type": "string",
+            "title": "created_at",
+            "format": "int64"
+          },
+          "updatedAt": {
+            "type": "string",
+            "title": "updated_at",
+            "format": "int64"
+          },
+          "createdByUserId": {
+            "type": "string",
+            "title": "created_by_user_id"
+          },
+          "updatedByUserId": {
+            "type": "string",
+            "title": "updated_by_user_id"
+          },
+          "timeoutMs": {
+            "type": "string",
+            "title": "timeout_ms",
+            "format": "int64",
+            "description": "timeout_ms bounds a single invocation's run time, measured from the\n moment input is handed to the function, whichever version runs."
+          },
+          "maxConcurrency": {
+            "type": "integer",
+            "title": "max_concurrency",
+            "format": "int32",
+            "description": "max_concurrency is how many invocations of the function may run at once\n across every host. Invocations past it wait in the queue. 0 means no\n limit."
+          },
+          "resources": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/functions.v1.Resources"
+              }
+            ],
+            "title": "resources",
+            "description": "resources size the microVM every invocation of any version runs in. A\n change applies to the next invocation; each host snapshots the function\n again at the new size the first time it runs it."
+          },
+          "retries": {
+            "type": "integer",
+            "title": "retries",
+            "format": "int32",
+            "description": "retries is how many more times an invocation runs after its function\n raised, crashed or timed out, or the platform could not run it, with\n exponential backoff between attempts. A call may set its own."
+          },
+          "network": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/functions.v1.Network"
+              }
+            ],
+            "title": "network",
+            "description": "network is what the microVM can reach. A change applies to the next\n invocation, as resources do."
+          }
+        },
+        "title": "Function",
+        "additionalProperties": false,
+        "description": "Function is a stable, named handle that callers invoke. It carries no\n behaviour of its own: current_version is the newest version that reached\n READY, and is what Invoke runs unless the caller pins a version. Lifecycle\n stamps are epoch millis; 0 means unset."
+      },
+      "functions.v1.FunctionError": {
+        "type": "object",
+        "properties": {
+          "kind": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/functions.v1.FunctionErrorKind"
+              }
+            ],
+            "title": "kind"
+          },
+          "message": {
+            "type": "string",
+            "title": "message"
+          },
+          "type": {
+            "type": "string",
+            "title": "type"
+          },
+          "violations": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/functions.v1.ContractViolation"
+            },
+            "title": "violations"
+          }
+        },
+        "title": "FunctionError",
+        "additionalProperties": false,
+        "description": "FunctionError describes a function that ran and failed. type is the\n function-supplied error type, set for RAISED only; violations is set for\n OUTPUT_INVALID only."
+      },
+      "functions.v1.FunctionErrorKind": {
+        "type": "string",
+        "title": "FunctionErrorKind",
+        "enum": [
+          "FUNCTION_ERROR_KIND_UNSPECIFIED",
+          "FUNCTION_ERROR_KIND_RAISED",
+          "FUNCTION_ERROR_KIND_CRASHED",
+          "FUNCTION_ERROR_KIND_TIMEOUT",
+          "FUNCTION_ERROR_KIND_OUTPUT_INVALID",
+          "FUNCTION_ERROR_KIND_INPUT_INVALID"
+        ],
+        "description": "FunctionErrorKind classifies a failure attributable to the function rather\n than to the caller or the platform."
+      },
+      "functions.v1.FunctionSpec": {
+        "type": "object",
+        "properties": {
+          "image": {
+            "type": "string",
+            "title": "image",
+            "description": "image is an OCI reference, e.g. ghcr.io/galaxy-io/enrich-company:1.4.0.\n With source set it is the runtime the files land on, such as\n ghcr.io/galaxy-io/alchemy/runtime/python:3.13."
+          },
+          "command": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "title": "command",
+            "description": "command is the process to run, as an argv. Empty means the image's own\n Entrypoint + Cmd."
+          },
+          "env": {
+            "type": "object",
+            "title": "env",
+            "additionalProperties": {
+              "type": "string",
+              "title": "value"
+            },
+            "description": "env is added on top of the image's Env. Not for secrets: the values are\n part of the version and visible wherever it is."
+          },
+          "secrets": {
+            "type": "object",
+            "title": "secrets",
+            "additionalProperties": {
+              "type": "string",
+              "title": "value"
+            },
+            "description": "secrets names the tenant's secrets the function receives in its\n environment, variable name to secret name. The values are fetched by\n the host at invocation and never stored with the version."
+          },
+          "protocol": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/functions.v1.InvocationProtocol"
+              }
+            ],
+            "title": "protocol"
+          },
+          "contract": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/functions.v1.Contract"
+              }
+            ],
+            "title": "contract"
+          },
+          "source": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/functions.v1.Source"
+              }
+            ],
+            "title": "source",
+            "description": "source makes the version a function built from source: files extracted\n over image under /app, where the runtime images look for the handler."
+          }
+        },
+        "title": "FunctionSpec",
+        "additionalProperties": false,
+        "description": "FunctionSpec is everything needed to build and run one version."
+      },
+      "functions.v1.FunctionVersion": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "id"
+          },
+          "version": {
+            "type": "string",
+            "title": "version",
+            "format": "int64"
+          },
+          "createdAt": {
+            "type": "string",
+            "title": "created_at",
+            "format": "int64"
+          },
+          "spec": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/functions.v1.FunctionSpec"
+              }
+            ],
+            "title": "spec"
+          },
+          "status": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/functions.v1.FunctionVersionStatus"
+              }
+            ],
+            "title": "status"
+          },
+          "statusMessage": {
+            "type": "string",
+            "title": "status_message"
+          },
+          "imageDigest": {
+            "type": "string",
+            "title": "image_digest",
+            "description": "image_digest is the content digest (sha256:...) spec.image resolved to at\n build time. The version always runs this digest, even if the tag moves."
+          },
+          "buildStartedAt": {
+            "type": "string",
+            "title": "build_started_at",
+            "format": "int64"
+          },
+          "buildEndedAt": {
+            "type": "string",
+            "title": "build_ended_at",
+            "format": "int64"
+          },
+          "rootfsBytes": {
+            "type": "string",
+            "title": "rootfs_bytes",
+            "format": "int64",
+            "description": "rootfs_bytes is the size of the built root filesystem image."
+          },
+          "buildLog": {
+            "type": "string",
+            "title": "build_log",
+            "description": "build_log is the tail of the build's output, for FAILED versions mostly."
+          },
+          "createdByUserId": {
+            "type": "string",
+            "title": "created_by_user_id"
+          }
+        },
+        "title": "FunctionVersion",
+        "additionalProperties": false,
+        "description": "FunctionVersion is an immutable, buildable version of a function. The\n contract is part of the version, so it never changes underneath a caller\n that pins one. version increases monotonically per function. Lifecycle\n stamps are epoch millis; 0 means unset."
+      },
+      "functions.v1.FunctionVersionStatus": {
+        "type": "string",
+        "title": "FunctionVersionStatus",
+        "enum": [
+          "FUNCTION_VERSION_STATUS_UNSPECIFIED",
+          "FUNCTION_VERSION_STATUS_BUILDING",
+          "FUNCTION_VERSION_STATUS_READY",
+          "FUNCTION_VERSION_STATUS_FAILED"
+        ],
+        "description": "FunctionVersionStatus is the lifecycle of the build that turns a spec into\n something bootable."
+      },
+      "functions.v1.GetFunctionRequest": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "id"
+          },
+          "includeVersions": {
+            "type": "boolean",
+            "title": "include_versions"
+          }
+        },
+        "title": "GetFunctionRequest",
+        "additionalProperties": false
+      },
+      "functions.v1.GetFunctionResponse": {
+        "type": "object",
+        "properties": {
+          "function": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/functions.v1.Function"
+              }
+            ],
+            "title": "function"
+          }
+        },
+        "title": "GetFunctionResponse",
+        "additionalProperties": false
+      },
+      "functions.v1.GetFunctionVersionRequest": {
+        "type": "object",
+        "properties": {
+          "functionId": {
+            "type": "string",
+            "title": "function_id"
+          },
+          "version": {
+            "type": "string",
+            "title": "version",
+            "format": "int64"
+          }
+        },
+        "title": "GetFunctionVersionRequest",
+        "additionalProperties": false
+      },
+      "functions.v1.GetFunctionVersionResponse": {
+        "type": "object",
+        "properties": {
+          "version": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/functions.v1.FunctionVersion"
+              }
+            ],
+            "title": "version"
+          }
+        },
+        "title": "GetFunctionVersionResponse",
+        "additionalProperties": false
+      },
+      "functions.v1.GetHostRequest": {
+        "type": "object",
+        "title": "GetHostRequest",
+        "additionalProperties": false
+      },
+      "functions.v1.GetHostResponse": {
+        "type": "object",
+        "properties": {
+          "host": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/functions.v1.Host"
+              }
+            ],
+            "title": "host"
+          }
+        },
+        "title": "GetHostResponse",
+        "additionalProperties": false
+      },
+      "functions.v1.GetInvocationLogsRequest": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "id"
+          },
+          "follow": {
+            "type": "boolean",
+            "title": "follow"
+          },
+          "attempt": {
+            "type": "integer",
+            "title": "attempt",
+            "format": "int32",
+            "description": "attempt picks one attempt of the invocation, counting from 1. 0 is the\n latest."
+          }
+        },
+        "title": "GetInvocationLogsRequest",
+        "additionalProperties": false,
+        "description": "GetInvocationLogs streams what an invocation's function wrote to stderr.\n With follow, the stream stays open while the invocation runs and ends when\n it does; without, it ends at what has been written so far."
+      },
+      "functions.v1.GetInvocationLogsResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "string",
+            "title": "data",
+            "format": "byte"
+          }
+        },
+        "title": "GetInvocationLogsResponse",
+        "additionalProperties": false,
+        "description": "GetInvocationLogsResponse is the next piece of the log, in order. Pieces\n are not split on line boundaries."
+      },
+      "functions.v1.GetInvocationRequest": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "id"
+          }
+        },
+        "title": "GetInvocationRequest",
+        "additionalProperties": false
+      },
+      "functions.v1.GetInvocationResponse": {
+        "type": "object",
+        "properties": {
+          "invocation": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/functions.v1.Invocation"
+              }
+            ],
+            "title": "invocation"
+          }
+        },
+        "title": "GetInvocationResponse",
+        "additionalProperties": false
+      },
+      "functions.v1.GetVersionRequest": {
+        "type": "object",
+        "title": "GetVersionRequest",
+        "additionalProperties": false
+      },
+      "functions.v1.GetVersionResponse": {
+        "type": "object",
+        "properties": {
+          "version": {
+            "type": "string",
+            "title": "version"
+          },
+          "commit": {
+            "type": "string",
+            "title": "commit"
+          },
+          "date": {
+            "type": "string",
+            "title": "date"
+          }
+        },
+        "title": "GetVersionResponse",
+        "additionalProperties": false,
+        "description": "GetVersionResponse is the build the server runs."
+      },
+      "functions.v1.Host": {
+        "type": "object",
+        "properties": {
+          "hostname": {
+            "type": "string",
+            "title": "hostname"
+          },
+          "startedAt": {
+            "type": "string",
+            "title": "started_at",
+            "format": "int64"
+          },
+          "slots": {
+            "type": "integer",
+            "title": "slots",
+            "format": "int32",
+            "description": "slots is how many invocations may hold a instance at once; slots_in_use\n is how many do right now."
+          },
+          "slotsInUse": {
+            "type": "integer",
+            "title": "slots_in_use",
+            "format": "int32"
+          },
+          "memoryMibCommitted": {
+            "type": "string",
+            "title": "memory_mib_committed",
+            "format": "int64",
+            "description": "memory_mib_committed is the guest memory of all live instances."
+          },
+          "firecrackerVersion": {
+            "type": "string",
+            "title": "firecracker_version"
+          },
+          "kernel": {
+            "type": "string",
+            "title": "kernel"
+          },
+          "rootfsCacheBytes": {
+            "type": "string",
+            "title": "rootfs_cache_bytes",
+            "format": "int64"
+          },
+          "rootfsCacheImages": {
+            "type": "integer",
+            "title": "rootfs_cache_images",
+            "format": "int32"
+          }
+        },
+        "title": "Host",
+        "additionalProperties": false,
+        "description": "Host describes one host process and the machine it runs on."
+      },
+      "functions.v1.Instance": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "id"
+          },
+          "functionId": {
+            "type": "string",
+            "title": "function_id"
+          },
+          "version": {
+            "type": "string",
+            "title": "version",
+            "format": "int64"
+          },
+          "status": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/functions.v1.InstanceStatus"
+              }
+            ],
+            "title": "status"
+          },
+          "startKind": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/functions.v1.StartKind"
+              }
+            ],
+            "title": "start_kind"
+          },
+          "startedAt": {
+            "type": "string",
+            "title": "started_at",
+            "format": "int64"
+          },
+          "invocationId": {
+            "type": "string",
+            "title": "invocation_id"
+          },
+          "vcpus": {
+            "type": "integer",
+            "title": "vcpus"
+          },
+          "memoryMib": {
+            "type": "integer",
+            "title": "memory_mib"
+          },
+          "artifactId": {
+            "type": "string",
+            "title": "artifact_id"
+          },
+          "host": {
+            "type": "string",
+            "title": "host"
+          },
+          "tenantId": {
+            "type": "string",
+            "title": "tenant_id"
+          }
+        },
+        "title": "Instance",
+        "additionalProperties": false,
+        "description": "Instance is one microVM on a host. A host knows the artifact it runs;\n the server fills in function_id and version from the artifact.\n invocation_id is set while BUSY."
+      },
+      "functions.v1.InstanceStatus": {
+        "type": "string",
+        "title": "InstanceStatus",
+        "enum": [
+          "INSTANCE_STATUS_UNSPECIFIED",
+          "INSTANCE_STATUS_BOOTING",
+          "INSTANCE_STATUS_READY",
+          "INSTANCE_STATUS_BUSY",
+          "INSTANCE_STATUS_RELEASING"
+        ],
+        "description": "InstanceStatus is the live state of one microVM. Instances are not\n persisted: they die with the host process."
+      },
+      "functions.v1.Invocation": {
+        "type": "object",
+        "properties": {
+          "tenantId": {
+            "type": "string",
+            "title": "tenant_id"
+          },
+          "id": {
+            "type": "string",
+            "title": "id"
+          },
+          "functionId": {
+            "type": "string",
+            "title": "function_id"
+          },
+          "version": {
+            "type": "string",
+            "title": "version",
+            "format": "int64"
+          },
+          "status": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/functions.v1.InvocationStatus"
+              }
+            ],
+            "title": "status"
+          },
+          "startKind": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/functions.v1.StartKind"
+              }
+            ],
+            "title": "start_kind"
+          },
+          "createdAt": {
+            "type": "string",
+            "title": "created_at",
+            "format": "int64"
+          },
+          "startedAt": {
+            "type": "string",
+            "title": "started_at",
+            "format": "int64"
+          },
+          "endedAt": {
+            "type": "string",
+            "title": "ended_at",
+            "format": "int64"
+          },
+          "stats": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/functions.v1.InvocationStats"
+              }
+            ],
+            "title": "stats"
+          },
+          "error": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/functions.v1.FunctionError"
+              }
+            ],
+            "title": "error"
+          },
+          "platformError": {
+            "type": "string",
+            "title": "platform_error"
+          },
+          "inputBytes": {
+            "type": "string",
+            "title": "input_bytes",
+            "format": "int64"
+          },
+          "outputBytes": {
+            "type": "string",
+            "title": "output_bytes",
+            "format": "int64"
+          },
+          "instanceId": {
+            "type": "string",
+            "title": "instance_id",
+            "description": "instance_id names the microVM that served it, while it exists."
+          },
+          "createdByUserId": {
+            "type": "string",
+            "title": "created_by_user_id"
+          },
+          "idempotencyKey": {
+            "type": "string",
+            "title": "idempotency_key",
+            "description": "idempotency_key is the caller's key, when the call carried one."
+          },
+          "host": {
+            "type": "string",
+            "title": "host",
+            "description": "host is the host the invocation was sent to, empty when none took\n it. Set by the server when it sends it and by the host in its record."
+          },
+          "attempts": {
+            "type": "integer",
+            "title": "attempts",
+            "format": "int32",
+            "description": "attempts is how many times a host has started to run it."
+          },
+          "async": {
+            "type": "boolean",
+            "title": "async",
+            "description": "async is set when the caller did not wait for the result."
+          }
+        },
+        "title": "Invocation",
+        "additionalProperties": false,
+        "description": "Invocation is the persisted record of one Invoke call. Lifecycle stamps\n are epoch millis; 0 means unset. started_at is when the function received\n its input, ended_at when the record reached a terminal status."
+      },
+      "functions.v1.InvocationProtocol": {
+        "type": "string",
+        "title": "InvocationProtocol",
+        "enum": [
+          "INVOCATION_PROTOCOL_UNSPECIFIED",
+          "INVOCATION_PROTOCOL_EXEC",
+          "INVOCATION_PROTOCOL_RUNTIME_API"
+        ],
+        "description": "InvocationProtocol selects the ABI between the supervisor and the\n function process. Both are specified in docs/architecture.md."
+      },
+      "functions.v1.InvocationStats": {
+        "type": "object",
+        "properties": {
+          "startKind": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/functions.v1.StartKind"
+              }
+            ],
+            "title": "start_kind"
+          },
+          "acquireUs": {
+            "type": "string",
+            "title": "acquire_us",
+            "format": "int64"
+          },
+          "runUs": {
+            "type": "string",
+            "title": "run_us",
+            "format": "int64"
+          },
+          "totalUs": {
+            "type": "string",
+            "title": "total_us",
+            "format": "int64"
+          }
+        },
+        "title": "InvocationStats",
+        "additionalProperties": false,
+        "description": "InvocationStats breaks down where the time went, in microseconds, so the\n cost of each start path can be read directly off a response. acquire_us is\n from accepting the request to having a microVM ready to take input; run_us\n is from handing input to the function to receiving its result; total_us is\n the whole request as seen by the server, including both validations."
+      },
+      "functions.v1.InvocationStatus": {
+        "type": "string",
+        "title": "InvocationStatus",
+        "enum": [
+          "INVOCATION_STATUS_UNSPECIFIED",
+          "INVOCATION_STATUS_PENDING",
+          "INVOCATION_STATUS_STARTING",
+          "INVOCATION_STATUS_RUNNING",
+          "INVOCATION_STATUS_SUCCEEDED",
+          "INVOCATION_STATUS_FAILED",
+          "INVOCATION_STATUS_ERRORED",
+          "INVOCATION_STATUS_CANCELED",
+          "INVOCATION_STATUS_REJECTED"
+        ],
+        "description": "InvocationStatus is the persisted lifecycle state of an invocation."
+      },
+      "functions.v1.InvokeAsyncRequest": {
+        "type": "object",
+        "properties": {
+          "functionId": {
+            "type": "string",
+            "title": "function_id"
+          },
+          "version": {
+            "type": "string",
+            "title": "version",
+            "format": "int64"
+          },
+          "input": {
+            "type": "string",
+            "title": "input",
+            "format": "byte"
+          },
+          "idempotencyKey": {
+            "type": "string",
+            "title": "idempotency_key"
+          },
+          "retries": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "title": "retries",
+            "format": "int32"
+          }
+        },
+        "title": "InvokeAsyncRequest",
+        "additionalProperties": false,
+        "description": "InvokeAsyncRequest is InvokeRequest for a caller that does not wait.\n idempotency_key returns the invocation an earlier call with the key\n queued instead of queueing another."
+      },
+      "functions.v1.InvokeAsyncResponse": {
+        "type": "object",
+        "properties": {
+          "invocationId": {
+            "type": "string",
+            "title": "invocation_id"
+          },
+          "replayed": {
+            "type": "boolean",
+            "title": "replayed",
+            "description": "replayed is set when an earlier call with the same idempotency_key\n queued invocation_id, and nothing was queued for this call."
+          }
+        },
+        "title": "InvokeAsyncResponse",
+        "additionalProperties": false,
+        "description": "InvokeAsyncResponse is returned once the invocation is queued. Nothing\n waits for it to run and its output is dropped. GetInvocation follows its\n status, attempts and error."
+      },
+      "functions.v1.InvokeRequest": {
+        "type": "object",
+        "properties": {
+          "functionId": {
+            "type": "string",
+            "title": "function_id"
+          },
+          "version": {
+            "type": "string",
+            "title": "version",
+            "format": "int64"
+          },
+          "input": {
+            "type": "string",
+            "title": "input",
+            "format": "byte"
+          },
+          "idempotencyKey": {
+            "type": "string",
+            "title": "idempotency_key",
+            "description": "idempotency_key makes the call safe to retry. Within the server's\n idempotency window, every call to the same function with the same key\n returns the invocation the first call started, with its output or\n error, instead of running again. The key is released, so that a retry\n runs, only when the platform never sent the invocation to a host. A\n call a host took but never reported on has an unknown outcome and holds\n the key: a retry gets ABORTED, and a new key runs again."
+          },
+          "retries": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "title": "retries",
+            "format": "int32",
+            "description": "retries, when set, is how many more times this call runs after a failed\n attempt instead of the function's retries."
+          }
+        },
+        "title": "InvokeRequest",
+        "additionalProperties": false,
+        "description": "Invoke runs a function synchronously. version 0 runs the function's\n current_version; any other value pins that version. input is opaque to the\n platform: the version's contract says what it must be (a JSON value for a\n JSON Schema contract, an Arrow IPC stream for an Arrow contract) and\n checks it before anything runs."
+      },
+      "functions.v1.InvokeResponse": {
+        "type": "object",
+        "anyOf": [
+          {
+            "type": "object",
+            "properties": {
+              "error": {
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/functions.v1.FunctionError"
+                  }
+                ],
+                "title": "error"
+              }
+            },
+            "title": "error"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "output": {
+                "type": "string",
+                "title": "output",
+                "format": "byte"
+              }
+            },
+            "title": "output"
+          }
+        ],
+        "unevaluatedProperties": false,
+        "not": {
+          "allOf": [
+            {
+              "anyOf": [
+                {
+                  "required": [
+                    "error"
+                  ]
+                },
+                {
+                  "required": [
+                    "output"
+                  ]
+                }
+              ]
+            },
+            {
+              "not": {
+                "oneOf": [
+                  {
+                    "required": [
+                      "error"
+                    ]
+                  },
+                  {
+                    "required": [
+                      "output"
+                    ]
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        "properties": {
+          "invocationId": {
+            "type": "string",
+            "title": "invocation_id"
+          },
+          "version": {
+            "type": "string",
+            "title": "version",
+            "format": "int64"
+          },
+          "stats": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/functions.v1.InvocationStats"
+              }
+            ],
+            "title": "stats"
+          },
+          "replayed": {
+            "type": "boolean",
+            "title": "replayed",
+            "description": "replayed is set when the result is an earlier invocation's, found by\n the request's idempotency_key, and nothing ran for this call."
+          },
+          "attempts": {
+            "type": "integer",
+            "title": "attempts",
+            "format": "int32",
+            "description": "attempts is how many times the function ran for this result."
+          }
+        },
+        "title": "InvokeResponse",
+        "description": "InvokeResponse is returned whenever the function ran. output is the\n function's result in the encoding the contract defines, already checked\n against the output schema; error means the function ran and failed.\n version is the one that actually ran."
+      },
+      "functions.v1.JsonSchemaContract": {
+        "type": "object",
+        "properties": {
+          "input": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/google.protobuf.Struct"
+              }
+            ],
+            "title": "input"
+          },
+          "output": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/google.protobuf.Struct"
+              }
+            ],
+            "title": "output"
+          }
+        },
+        "title": "JsonSchemaContract",
+        "additionalProperties": false,
+        "description": "JsonSchemaContract types the boundary with JSON Schema, draft 2020-12.\n Input and output are one JSON value each, on both the API and the function\n process's stdin/stdout. Each document must be self-contained: $ref may only\n point inside it."
+      },
+      "functions.v1.ListFunctionVersionsRequest": {
+        "type": "object",
+        "properties": {
+          "functionId": {
+            "type": "string",
+            "title": "function_id"
+          },
+          "pagination": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/functions.v1.PaginationRequest"
+              }
+            ],
+            "title": "pagination"
+          }
+        },
+        "title": "ListFunctionVersionsRequest",
+        "additionalProperties": false
+      },
+      "functions.v1.ListFunctionVersionsResponse": {
+        "type": "object",
+        "properties": {
+          "versions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/functions.v1.FunctionVersion"
+            },
+            "title": "versions"
+          },
+          "pagination": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/functions.v1.PaginationResponse"
+              }
+            ],
+            "title": "pagination"
+          }
+        },
+        "title": "ListFunctionVersionsResponse",
+        "additionalProperties": false
+      },
+      "functions.v1.ListFunctionsRequest": {
+        "type": "object",
+        "properties": {
+          "pagination": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/functions.v1.PaginationRequest"
+              }
+            ],
+            "title": "pagination"
+          },
+          "search": {
+            "type": "string",
+            "title": "search"
+          }
+        },
+        "title": "ListFunctionsRequest",
+        "additionalProperties": false
+      },
+      "functions.v1.ListFunctionsResponse": {
+        "type": "object",
+        "properties": {
+          "functions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/functions.v1.Function"
+            },
+            "title": "functions"
+          },
+          "pagination": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/functions.v1.PaginationResponse"
+              }
+            ],
+            "title": "pagination"
+          }
+        },
+        "title": "ListFunctionsResponse",
+        "additionalProperties": false
+      },
+      "functions.v1.ListHostsRequest": {
+        "type": "object",
+        "title": "ListHostsRequest",
+        "additionalProperties": false
+      },
+      "functions.v1.ListHostsResponse": {
+        "type": "object",
+        "properties": {
+          "hosts": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/functions.v1.Host"
+            },
+            "title": "hosts",
+            "description": "Every host that has sent a heartbeat recently, by hostname."
+          }
+        },
+        "title": "ListHostsResponse",
+        "additionalProperties": false
+      },
+      "functions.v1.ListInstancesRequest": {
+        "type": "object",
+        "properties": {
+          "functionId": {
+            "type": "string",
+            "title": "function_id"
+          }
+        },
+        "title": "ListInstancesRequest",
+        "additionalProperties": false
+      },
+      "functions.v1.ListInstancesResponse": {
+        "type": "object",
+        "properties": {
+          "instances": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/functions.v1.Instance"
+            },
+            "title": "instances"
+          }
+        },
+        "title": "ListInstancesResponse",
+        "additionalProperties": false
+      },
+      "functions.v1.ListInvocationsRequest": {
+        "type": "object",
+        "properties": {
+          "functionIds": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "title": "function_ids",
+            "description": "Empty lists match everything."
+          },
+          "statuses": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/functions.v1.InvocationStatus"
+            },
+            "title": "statuses"
+          },
+          "startKinds": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/functions.v1.StartKind"
+            },
+            "title": "start_kinds"
+          },
+          "pagination": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/functions.v1.PaginationRequest"
+              }
+            ],
+            "title": "pagination"
+          },
+          "sinceMs": {
+            "type": "string",
+            "title": "since_ms",
+            "format": "int64"
+          },
+          "untilMs": {
+            "type": "string",
+            "title": "until_ms",
+            "format": "int64"
+          }
+        },
+        "title": "ListInvocationsRequest",
+        "additionalProperties": false,
+        "description": "ListInvocations returns newest first. Empty function_id lists the tenant's\n invocations across functions; empty statuses lists every status. since_ms\n (inclusive) and until_ms (exclusive) window on created_at; 0 means\n unbounded."
+      },
+      "functions.v1.ListInvocationsResponse": {
+        "type": "object",
+        "properties": {
+          "invocations": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/functions.v1.Invocation"
+            },
+            "title": "invocations"
+          },
+          "pagination": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/functions.v1.PaginationResponse"
+              }
+            ],
+            "title": "pagination"
+          }
+        },
+        "title": "ListInvocationsResponse",
+        "additionalProperties": false
+      },
+      "functions.v1.ListRuntimesRequest": {
+        "type": "object",
+        "title": "ListRuntimesRequest",
+        "additionalProperties": false
+      },
+      "functions.v1.ListRuntimesResponse": {
+        "type": "object",
+        "properties": {
+          "runtimes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/functions.v1.Runtime"
+            },
+            "title": "runtimes"
+          },
+          "limits": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/functions.v1.SourceLimits"
+              }
+            ],
+            "title": "limits"
+          }
+        },
+        "title": "ListRuntimesResponse",
+        "additionalProperties": false
+      },
+      "functions.v1.ListTemplatesRequest": {
+        "type": "object",
+        "title": "ListTemplatesRequest",
+        "additionalProperties": false
+      },
+      "functions.v1.ListTemplatesResponse": {
+        "type": "object",
+        "properties": {
+          "templates": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/functions.v1.Template"
+            },
+            "title": "templates"
+          }
+        },
+        "title": "ListTemplatesResponse",
+        "additionalProperties": false
+      },
+      "functions.v1.Network": {
+        "type": "string",
+        "title": "Network",
+        "enum": [
+          "NETWORK_UNSPECIFIED",
+          "NETWORK_NONE",
+          "NETWORK_EGRESS"
+        ],
+        "description": "Network is what a function's microVM can reach."
+      },
+      "functions.v1.PaginationRequest": {
+        "type": "object",
+        "properties": {
+          "pageSize": {
+            "type": "integer",
+            "title": "page_size",
+            "format": "int32"
+          },
+          "cursor": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "title": "cursor"
+          }
+        },
+        "title": "PaginationRequest",
+        "additionalProperties": false,
+        "description": "PaginationRequest narrows a List response to one page. Absent means the\n full result. page_size is defaulted and capped server-side;\n cursor is an opaque token from a prior response, absent meaning the first\n page."
+      },
+      "functions.v1.PaginationResponse": {
+        "type": "object",
+        "properties": {
+          "total": {
+            "type": "integer",
+            "title": "total",
+            "format": "int32"
+          },
+          "previousCursor": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "title": "previous_cursor"
+          },
+          "nextCursor": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "title": "next_cursor"
+          }
+        },
+        "title": "PaginationResponse",
+        "additionalProperties": false,
+        "description": "PaginationResponse reports how many items matched before the page was cut,\n plus opaque cursors for the adjacent pages. Absent cursors mean no page in\n that direction."
+      },
+      "functions.v1.Resources": {
+        "type": "object",
+        "properties": {
+          "vcpus": {
+            "type": "integer",
+            "title": "vcpus"
+          },
+          "memoryMib": {
+            "type": "integer",
+            "title": "memory_mib"
+          }
+        },
+        "title": "Resources",
+        "additionalProperties": false,
+        "description": "Resources sizes the microVM. Zero fields take server defaults."
+      },
+      "functions.v1.Runtime": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "id",
+            "description": "id names the runtime in a request, e.g. python."
+          },
+          "label": {
+            "type": "string",
+            "title": "label",
+            "description": "label is the runtime's name for people, e.g. Python 3.13."
+          },
+          "image": {
+            "type": "string",
+            "title": "image",
+            "description": "image is the reference a source spec sets as spec.image."
+          },
+          "handlerPath": {
+            "type": "string",
+            "title": "handler_path",
+            "description": "handler_path is the file under /app the image runs, e.g. handler.py."
+          },
+          "darkIconUrl": {
+            "type": "string",
+            "title": "dark_icon_url"
+          },
+          "lightIconUrl": {
+            "type": "string",
+            "title": "light_icon_url"
+          },
+          "starters": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/functions.v1.RuntimeStarters"
+              }
+            ],
+            "title": "starters"
+          }
+        },
+        "title": "Runtime",
+        "additionalProperties": false,
+        "description": "Runtime is an image a function built from source lands on, with what a\n client needs to offer it: the handler the image runs and a starter for it."
+      },
+      "functions.v1.RuntimeStarters": {
+        "type": "object",
+        "properties": {
+          "jsonSchema": {
+            "type": "string",
+            "title": "json_schema"
+          },
+          "arrow": {
+            "type": "string",
+            "title": "arrow"
+          }
+        },
+        "title": "RuntimeStarters",
+        "additionalProperties": false,
+        "description": "RuntimeStarters are handlers that read one input and write one output, per\n contract kind, for a function to start from."
+      },
+      "functions.v1.Source": {
+        "type": "object",
+        "properties": {
+          "files": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/functions.v1.SourceFile"
+            },
+            "title": "files"
+          },
+          "layer": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/functions.v1.SourceLayer"
+              }
+            ],
+            "title": "layer"
+          }
+        },
+        "title": "Source",
+        "additionalProperties": false,
+        "description": "Source is the files of a function built from source. A request carries\n their content; the server keeps them as an archive in the artifacts bucket\n and the version's spec names the archive and lists the files, with their\n content again on GetFunctionVersion. A spec that names an archive and\n carries no content, such as a version's own spec sent back to build it\n again, reuses the archive."
+      },
+      "functions.v1.SourceFile": {
+        "type": "object",
+        "properties": {
+          "path": {
+            "type": "string",
+            "title": "path",
+            "description": "path is relative to /app, e.g. handler.py."
+          },
+          "content": {
+            "type": "string",
+            "title": "content",
+            "format": "byte"
+          },
+          "size": {
+            "type": "string",
+            "title": "size",
+            "format": "int64",
+            "description": "size is the content's length, set by the server."
+          }
+        },
+        "title": "SourceFile",
+        "additionalProperties": false
+      },
+      "functions.v1.SourceLayer": {
+        "type": "object",
+        "properties": {
+          "key": {
+            "type": "string",
+            "title": "key"
+          },
+          "sha256": {
+            "type": "string",
+            "title": "sha256",
+            "description": "sha256 is the archive's content digest, in hex."
+          }
+        },
+        "title": "SourceLayer",
+        "additionalProperties": false,
+        "description": "SourceLayer is the archive of a Source's files in the artifacts bucket."
+      },
+      "functions.v1.SourceLimits": {
+        "type": "object",
+        "properties": {
+          "maxFiles": {
+            "type": "integer",
+            "title": "max_files",
+            "format": "int32"
+          },
+          "maxBytes": {
+            "type": "string",
+            "title": "max_bytes",
+            "format": "int64"
+          }
+        },
+        "title": "SourceLimits",
+        "additionalProperties": false,
+        "description": "SourceLimits bound a Source."
+      },
+      "functions.v1.StartKind": {
+        "type": "string",
+        "title": "StartKind",
+        "enum": [
+          "START_KIND_UNSPECIFIED",
+          "START_KIND_COLD_BOOT",
+          "START_KIND_SNAPSHOT_RESTORE",
+          "START_KIND_WARM"
+        ],
+        "description": "StartKind is how the microVM that served an invocation came to exist."
+      },
+      "functions.v1.TailInvocationsRequest": {
+        "type": "object",
+        "properties": {
+          "functionId": {
+            "type": "string",
+            "title": "function_id"
+          },
+          "shouldReplay": {
+            "type": "boolean",
+            "title": "should_replay"
+          }
+        },
+        "title": "TailInvocationsRequest",
+        "additionalProperties": false,
+        "description": "TailInvocations streams invocation changes. With should_replay the stream\n first emits every non-terminal invocation (each marked replay=true) so a\n reconnecting client is current before live events arrive."
+      },
+      "functions.v1.TailInvocationsResponse": {
+        "type": "object",
+        "properties": {
+          "invocation": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/functions.v1.Invocation"
+              }
+            ],
+            "title": "invocation"
+          },
+          "eventType": {
+            "type": "string",
+            "title": "event_type"
+          },
+          "replay": {
+            "type": "boolean",
+            "title": "replay"
+          },
+          "emittedAt": {
+            "type": "string",
+            "title": "emitted_at",
+            "format": "int64"
+          }
+        },
+        "title": "TailInvocationsResponse",
+        "additionalProperties": false,
+        "description": "TailInvocationsResponse is one lifecycle transition. event_type is the new\n status as a wire token (e.g. \"running\", \"succeeded\")."
+      },
+      "functions.v1.Template": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "id",
+            "description": "id names the template, e.g. call-decision-model."
+          },
+          "label": {
+            "type": "string",
+            "title": "label"
+          },
+          "description": {
+            "type": "string",
+            "title": "description"
+          },
+          "runtime": {
+            "type": "string",
+            "title": "runtime",
+            "description": "runtime is the id of the Runtime the files run on."
+          },
+          "jsonSchema": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/functions.v1.TemplateSource"
+              }
+            ],
+            "title": "json_schema",
+            "description": "json_schema and arrow are the source and sample contract for each\n contract kind; a client offers the one matching the contract it builds."
+          },
+          "arrow": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/functions.v1.TemplateSource"
+              }
+            ],
+            "title": "arrow"
+          },
+          "env": {
+            "type": "object",
+            "title": "env",
+            "additionalProperties": {
+              "type": "string",
+              "title": "value"
+            },
+            "description": "env are the variables the source reads, with their defaults."
+          },
+          "secrets": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "title": "secrets",
+            "description": "secrets are the secrets the source reads, by variable name."
+          },
+          "network": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/functions.v1.Network"
+              }
+            ],
+            "title": "network"
+          },
+          "darkLockupUrl": {
+            "type": "string",
+            "title": "dark_lockup_url",
+            "description": "dark_lockup_url and light_lockup_url are the logo and name of the service\n the source calls."
+          },
+          "lightLockupUrl": {
+            "type": "string",
+            "title": "light_lockup_url"
+          },
+          "timeoutMs": {
+            "type": "string",
+            "title": "timeout_ms",
+            "format": "int64",
+            "description": "timeout_ms and retries are the function settings the source needs. Each\n call costs money, so a template does not retry by default."
+          },
+          "retries": {
+            "type": "integer",
+            "title": "retries",
+            "format": "int32"
+          }
+        },
+        "title": "Template",
+        "additionalProperties": false,
+        "description": "Template is a function to build from: its source, a sample contract and the\n settings the source needs."
+      },
+      "functions.v1.TemplateSource": {
+        "type": "object",
+        "properties": {
+          "files": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/functions.v1.SourceFile"
+            },
+            "title": "files"
+          },
+          "contract": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/functions.v1.Contract"
+              }
+            ],
+            "title": "contract"
+          }
+        },
+        "title": "TemplateSource",
+        "additionalProperties": false,
+        "description": "TemplateSource is a template's handler and sample contract for one contract\n kind."
+      },
+      "functions.v1.UpdateFunctionRequest": {
+        "type": "object",
+        "properties": {
+          "functionId": {
+            "type": "string",
+            "title": "function_id"
+          },
+          "name": {
+            "type": "string",
+            "title": "name"
+          },
+          "description": {
+            "type": "string",
+            "title": "description"
+          },
+          "timeoutMs": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "title": "timeout_ms",
+            "format": "int64"
+          },
+          "maxConcurrency": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "title": "max_concurrency",
+            "format": "int32"
+          },
+          "resources": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/functions.v1.Resources"
+              }
+            ],
+            "title": "resources"
+          },
+          "retries": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "title": "retries",
+            "format": "int32"
+          },
+          "network": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/functions.v1.Network"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "network"
+          }
+        },
+        "title": "UpdateFunctionRequest",
+        "additionalProperties": false,
+        "description": "UpdateFunction changes a function's settings. They apply to the next\n invocation of any version. timeout_ms, max_concurrency, resources,\n retries and network change only when set."
+      },
+      "functions.v1.UpdateFunctionResponse": {
+        "type": "object",
+        "properties": {
+          "function": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/functions.v1.Function"
+              }
+            ],
+            "title": "function"
+          }
+        },
+        "title": "UpdateFunctionResponse",
+        "additionalProperties": false
+      },
+      "google.protobuf.ListValue": {
+        "type": "array",
+        "items": {
+          "$ref": "#/components/schemas/google.protobuf.Value"
+        },
+        "description": "A JSON array whose elements may be any JSON value."
+      },
+      "google.protobuf.NullValue": {
+        "type": "string",
+        "title": "NullValue",
+        "enum": [
+          "NULL_VALUE"
+        ],
+        "description": "Represents a JSON `null`.\n\n `NullValue` is a sentinel, using an enum with only one value to represent\n the null value for the `Value` type union.\n\n A field of type `NullValue` with any value other than `0` is considered\n invalid. Most ProtoJSON serializers will emit a `Value` with a `null_value`\n set as a JSON `null` regardless of the integer value, and so will round trip\n to a `0` value."
+      },
+      "google.protobuf.Struct": {
+        "type": "object",
+        "additionalProperties": {
+          "$ref": "#/components/schemas/google.protobuf.Value"
+        },
+        "description": "A JSON object whose property values may be any JSON value."
+      },
+      "google.protobuf.Value": {
+        "oneOf": [
+          {
+            "type": "null"
+          },
+          {
+            "type": "number"
+          },
+          {
+            "type": "string"
+          },
+          {
+            "type": "boolean"
+          },
+          {
+            "type": "array"
+          },
+          {
+            "type": "object",
+            "additionalProperties": true
+          }
+        ],
+        "description": "Any JSON value: `null`, number, string, boolean, array, or object."
+      },
+      "metrics.v1.AggregateRow": {
+        "type": "object",
+        "properties": {
+          "key": {
+            "type": "string",
+            "title": "key"
+          },
+          "values": {
+            "type": "array",
+            "items": {
+              "type": "number",
+              "format": "double"
+            },
+            "title": "values"
+          }
+        },
+        "title": "AggregateRow",
+        "additionalProperties": false,
+        "description": "AggregateRow.values[i] is request.metrics[i] for this group."
+      },
+      "metrics.v1.GetQueueRequest": {
+        "type": "object",
+        "properties": {
+          "functionIds": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "title": "function_ids"
+          }
+        },
+        "title": "GetQueueRequest",
+        "additionalProperties": false,
+        "description": "GetQueueRequest narrows the counts to function_ids, or every function of\n the tenant when empty."
+      },
+      "metrics.v1.GetQueueResponse": {
+        "type": "object",
+        "properties": {
+          "queued": {
+            "type": "string",
+            "title": "queued",
+            "format": "int64",
+            "description": "queued is invocations waiting to start: in the queue, or taken by a host\n that is building the function or waiting on its max_concurrency."
+          },
+          "running": {
+            "type": "string",
+            "title": "running",
+            "format": "int64"
+          }
+        },
+        "title": "GetQueueResponse",
+        "additionalProperties": false
+      },
+      "metrics.v1.Metric": {
+        "type": "string",
+        "title": "Metric",
+        "enum": [
+          "METRIC_UNSPECIFIED",
+          "METRIC_INVOCATION_COUNT",
+          "METRIC_INVOCATION_ACQUIRE_DURATION",
+          "METRIC_INVOCATION_RUN_DURATION",
+          "METRIC_INVOCATION_TOTAL_DURATION",
+          "METRIC_INVOCATION_INPUT_BYTES",
+          "METRIC_INVOCATION_OUTPUT_BYTES"
+        ],
+        "description": "Metric is an aggregatable measure over invocations. COUNT and the byte\n metrics are sums. The duration metrics are means in milliseconds over\n invocations that recorded the phase (a zero column means the phase never\n happened, e.g. acquire on an errored call, and is excluded)."
+      },
+      "metrics.v1.MetricDimension": {
+        "type": "string",
+        "title": "MetricDimension",
+        "enum": [
+          "METRIC_DIMENSION_UNSPECIFIED",
+          "METRIC_DIMENSION_TENANT_ID",
+          "METRIC_DIMENSION_FUNCTION_ID",
+          "METRIC_DIMENSION_STATUS",
+          "METRIC_DIMENSION_START_KIND"
+        ],
+        "description": "MetricDimension names an invocations column usable for grouping and\n filtering. STATUS and START_KIND values are the lowercase wire tokens\n (\"succeeded\", \"cold_boot\"); the id dimensions are UUIDs."
+      },
+      "metrics.v1.MetricFilter": {
+        "type": "object",
+        "properties": {
+          "dimension": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/metrics.v1.MetricDimension"
+              }
+            ],
+            "title": "dimension"
+          },
+          "values": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "title": "values"
+          }
+        },
+        "title": "MetricFilter",
+        "additionalProperties": false,
+        "description": "MetricFilter narrows a query to invocations whose dimension is one of\n values."
+      },
+      "metrics.v1.MetricGranularity": {
+        "type": "string",
+        "title": "MetricGranularity",
+        "enum": [
+          "METRIC_GRANULARITY_UNSPECIFIED",
+          "METRIC_GRANULARITY_MINUTE",
+          "METRIC_GRANULARITY_HOUR",
+          "METRIC_GRANULARITY_DAY"
+        ],
+        "description": "MetricGranularity is the bucket width for timeseries queries."
+      },
+      "metrics.v1.QueryAggregateRequest": {
+        "type": "object",
+        "properties": {
+          "metrics": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/metrics.v1.Metric"
+            },
+            "title": "metrics"
+          },
+          "sinceMs": {
+            "type": "string",
+            "title": "since_ms",
+            "format": "int64",
+            "description": "inclusive"
+          },
+          "untilMs": {
+            "type": "string",
+            "title": "until_ms",
+            "format": "int64",
+            "description": "exclusive; unset = now"
+          },
+          "groupBy": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/metrics.v1.MetricDimension"
+              }
+            ],
+            "title": "group_by",
+            "description": "UNSPECIFIED = single total row, key \"\""
+          },
+          "filters": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/metrics.v1.MetricFilter"
+            },
+            "title": "filters"
+          }
+        },
+        "title": "QueryAggregateRequest",
+        "additionalProperties": false
+      },
+      "metrics.v1.QueryAggregateResponse": {
+        "type": "object",
+        "properties": {
+          "rows": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/metrics.v1.AggregateRow"
+            },
+            "title": "rows"
+          }
+        },
+        "title": "QueryAggregateResponse",
+        "additionalProperties": false
+      },
+      "metrics.v1.QueryTimeseriesRequest": {
+        "type": "object",
+        "properties": {
+          "metrics": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/metrics.v1.Metric"
+            },
+            "title": "metrics",
+            "description": "metrics are computed together per bucket; point values align with this\n order positionally."
+          },
+          "sinceMs": {
+            "type": "string",
+            "title": "since_ms",
+            "format": "int64",
+            "description": "inclusive"
+          },
+          "untilMs": {
+            "type": "string",
+            "title": "until_ms",
+            "format": "int64",
+            "description": "exclusive; unset = now"
+          },
+          "granularity": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/metrics.v1.MetricGranularity"
+              }
+            ],
+            "title": "granularity"
+          },
+          "tzOffsetMinutes": {
+            "type": "integer",
+            "title": "tz_offset_minutes",
+            "format": "int32",
+            "description": "tz_offset_minutes shifts bucket boundaries east of UTC so DAY buckets\n match the viewer's local calendar day."
+          },
+          "groupBy": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/metrics.v1.MetricDimension"
+              }
+            ],
+            "title": "group_by",
+            "description": "UNSPECIFIED = one total series, key \"\""
+          },
+          "filters": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/metrics.v1.MetricFilter"
+            },
+            "title": "filters"
+          }
+        },
+        "title": "QueryTimeseriesRequest",
+        "additionalProperties": false
+      },
+      "metrics.v1.QueryTimeseriesResponse": {
+        "type": "object",
+        "properties": {
+          "series": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/metrics.v1.Timeseries"
+            },
+            "title": "series"
+          }
+        },
+        "title": "QueryTimeseriesResponse",
+        "additionalProperties": false
+      },
+      "metrics.v1.Timeseries": {
+        "type": "object",
+        "properties": {
+          "key": {
+            "type": "string",
+            "title": "key"
+          },
+          "points": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/metrics.v1.TimeseriesPoint"
+            },
+            "title": "points"
+          }
+        },
+        "title": "Timeseries",
+        "additionalProperties": false,
+        "description": "Timeseries.key is the group_by dimension's value. Points are dense: every\n bucket in [since_ms, until_ms) is present, zero-filled, ascending; all\n series of a response are index-aligned. When a filter covers the group_by\n dimension, one series per requested value is returned in request order."
+      },
+      "metrics.v1.TimeseriesPoint": {
+        "type": "object",
+        "properties": {
+          "bucketStartMs": {
+            "type": "string",
+            "title": "bucket_start_ms",
+            "format": "int64"
+          },
+          "values": {
+            "type": "array",
+            "items": {
+              "type": "number",
+              "format": "double"
+            },
+            "title": "values"
+          }
+        },
+        "title": "TimeseriesPoint",
+        "additionalProperties": false,
+        "description": "TimeseriesPoint.values[i] is request.metrics[i] for this bucket."
+      }
+    }
+  },
+  "security": [],
+  "tags": [
+    {
+      "name": "functions.v1.FunctionsService",
+      "description": "FunctionsService is the control plane for typed, image-based functions:\n it registers functions and their versions, and runs them in microVMs."
+    },
+    {
+      "name": "metrics.v1.MetricsService",
+      "description": "MetricsService is a generic, read-only aggregation surface over\n invocations: two query primitives (bucketed timeseries, windowed aggregate)\n parameterized by metric and dimension enums. New metrics and dimensions\n are enum additions; the RPC surface never changes."
+    }
+  ]
+}

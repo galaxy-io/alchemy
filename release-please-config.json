@@ -8,7 +8,8 @@
       "initial-version": "0.0.1",
       "include-component-in-tag": false,
       "exclude-paths": [
-        "api"
+        "api",
+        "sdks"
       ],
       "extra-files": [
         {
@@ -26,6 +27,16 @@
     "ui": {
       "release-type": "node",
       "component": "alchemy-ui",
+      "include-v-in-tag": false
+    },
+    "sdks/python": {
+      "release-type": "python",
+      "component": "alchemy-py",
+      "include-v-in-tag": false
+    },
+    "sdks/typescript": {
+      "release-type": "node",
+      "component": "alchemy-ts",
       "include-v-in-tag": false
     },
     "api": {

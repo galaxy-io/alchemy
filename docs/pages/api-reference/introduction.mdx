@@ -14,8 +14,8 @@ The server mounts three services on one listener:
 | `metrics.v1.MetricsService` | Read-only aggregations over invocations, and the live queue |
 | `auth.v1.AuthService` | Sign-in, members and service accounts, from `github.com/galaxy-io/modules/identity` |
 
-The built-in web UI, the `@galaxy-io/alchemy-ui` module and the CLI call this
-same API.
+The built-in web UI, the `@galaxy-io/alchemy-ui` module, the CLI and the SDKs
+call this same API.
 
 Every RPC has a Connect HTTP POST route at `/<package.Service>/<Method>`:
 
@@ -63,6 +63,26 @@ Unary calls may set a deadline with `Connect-Timeout-Ms` (or `grpc-timeout`).
 `Invoke` waits for its result until that deadline, capped at
 `INVOKE_MAX_DEADLINE` (default 1 hour), or `INVOKE_DEADLINE` (default 5
 minutes) when the call sets none.
+
+## OpenAPI
+
+`just proto` regenerates the Go bindings and two OpenAPI 3.1 specifications:
+`api/openapi.json` for `FunctionsService` and `MetricsService`, and
+`api/auth.openapi.json` for `AuthService`. The pinned
+[protoc-gen-connect-openapi](https://github.com/sudorandom/protoc-gen-connect-openapi)
+plugin in `buf.gen.yaml` exports them for the unary Connect JSON endpoints. Buf
+runs the plugin remotely, so generation needs network access to the Buf Schema
+Registry.
+
+The specifications describe request and response types, Connect headers and
+error responses. Fern generates the SDKs from them, with method names and
+authentication metadata configured in `fern/`.
+
+## SDKs
+
+Generated clients wrap this API for [Python](/pages/sdks/python) and
+[TypeScript](/pages/sdks/typescript). Both cover the unary methods and the
+plain HTTP invoke route. The streaming RPCs are not included.
 
 ## Authentication
 

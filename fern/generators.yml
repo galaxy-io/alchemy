@@ -1,0 +1,52 @@
+# yaml-language-server: $schema=https://schema.buildwithfern.dev/generators-yml.json
+api:
+  headers:
+    Connect-Protocol-Version: literal<"1">
+  # Service accounts hand the client their id and secret, and the client mints through GetToken.
+  auth-schemes:
+    ServiceAccount:
+      scheme: oauth
+      type: client-credentials
+      get-token:
+        endpoint: "POST /auth.v1.AuthService/GetToken"
+        request-properties:
+          client-id: $request.clientId
+          client-secret: $request.clientSecret
+        response-properties:
+          access-token: $response.accessToken
+          expires-in: $response.expiresIn
+  auth: ServiceAccount
+  specs:
+    - openapi: ../api/openapi.json
+      overrides: ./openapi-overrides.yml
+    - openapi: ../api/auth.openapi.json
+      overrides: ./auth-openapi-overrides.yml
+default-group: python
+groups:
+  python:
+    generators:
+      - name: fern-python-sdk
+        version: 5.33.0
+        output:
+          location: local-file-system
+          path: ../sdks/python/src/alchemy
+        config:
+          package_name: alchemy
+          client:
+            class_name: Alchemy
+          inline_request_params: true
+          # Authentication is off by default on the server.
+          optional_auth: true
+          # Mutations and invokes are not generally idempotent.
+          default_max_retries: 0
+  typescript:
+    generators:
+      - name: fern-typescript-sdk
+        version: 3.98.0
+        output:
+          location: local-file-system
+          path: ../sdks/typescript/src
+        config:
+          namespaceExport: Alchemy
+          noSerdeLayer: true
+          inlinePathParameters: true

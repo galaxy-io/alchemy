@@ -134,10 +134,17 @@ docs:
 # generate all checked-in generated code
 gen: proto sqlc ui-gen
 
-# generate protobuf and ConnectRPC Go stubs; api/ is its own module, so only the generated files are cleared
+# generate protobuf and ConnectRPC Go stubs and the OpenAPI specs; api/ is its own module, so only the generated files are cleared
 proto:
     find api -name '*.pb.go' -o -name '*.connect.go' | xargs rm -f
     buf generate
+    buf generate --template buf.gen.auth.yaml
+
+# preview the Python and TypeScript SDKs locally (needs a Fern login); CI generates the committed ones
+sdks: proto
+    fern check
+    fern generate --group python
+    fern generate --group typescript
 
 # install the alchemy CLI into GOBIN
 cli:

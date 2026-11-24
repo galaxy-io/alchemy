@@ -127,6 +127,13 @@
         ]
       },
       {
+        "group": "SDKs",
+        "pages": [
+          "pages/sdks/python",
+          "pages/sdks/typescript"
+        ]
+      },
+      {
         "group": "Concepts",
         "pages": [
           "pages/concepts/overview",
