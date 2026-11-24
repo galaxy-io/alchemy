@@ -1,0 +1,176 @@
+---
+title: "Alchemy Python SDK"
+sidebarTitle: "Python SDK"
+description: "Create functions, ship versions and invoke them from Python"
+---
+
+`alchemy-py` is the generated Python client for Alchemy's API. It ships a
+synchronous `Alchemy` client and an asynchronous `AsyncAlchemy` client with the
+same methods, and requires Python 3.10 or newer.
+
+## Installation
+
+Install [alchemy-py from PyPI](https://pypi.org/project/alchemy-py/):
+
+<CodeGroup>
+
+```sh uv
+uv add alchemy-py
+```
+
+```sh pip
+pip install alchemy-py
+```
+
+```sh poetry
+poetry add alchemy-py
+```
+
+</CodeGroup>
+
+## Connect
+
+```python
+import os
+
+from alchemy import Alchemy
+
+alchemy = Alchemy(
+    base_url=os.getenv("ALCHEMY_URL", "http://localhost:8780"),
+    token=os.getenv("ALCHEMY_TOKEN", "local"),
+)
+
+for function in alchemy.function.list().functions or []:
+    print(function.id, function.name)
+```
+
+The client always needs a credential. A server with authentication disabled
+ignores it, so any placeholder works as `token` there. See
+[Authentication](#authentication) for a deployed server. Request timeouts are
+set with `Alchemy(..., timeout=30)`, in seconds.
+
+## Authentication
+
+When the server runs with an [identity provider](/pages/deployment/authentication),
+the SDK authenticates as a service account. Create one with
+`alchemy.service_account.create(...)` while signed in as an admin. It returns a
+client id and a client secret, and the secret is shown once.
+
+Pass them to the client. It mints an access token through the server and mints
+again as the token nears expiry.
+
+```python
+alchemy = Alchemy(
+    base_url=os.getenv("ALCHEMY_URL", "http://localhost:8780"),
+    client_id=os.getenv("ALCHEMY_CLIENT_ID"),
+    client_secret=os.getenv("ALCHEMY_CLIENT_SECRET"),
+)
+```
+
+A token minted elsewhere works as `token`.
+
+## Invoke a function
+
+`function.invoke` is the [plain HTTP route](/pages/usage/http). It sends the
+input as JSON and returns the output with no envelope, so it fits functions
+with a JSON Schema contract.
+
+```python
+output = alchemy.function.invoke(
+    "<function-id>",
+    request={"id": "abc"},
+)
+print(output)
+```
+
+Pass `version=3` to pin a version and `idempotency_key="..."` to make the call
+safe to retry.
+
+`invocation.invoke` is the RPC form. It returns the invocation with its id,
+status and error, and it carries the input and output as base64, which is how
+an Arrow contract's IPC stream travels over JSON.
+
+```python
+import base64
+import json
+
+response = alchemy.invocation.invoke(
+    function_id="<function-id>",
+    input=base64.b64encode(json.dumps({"id": "abc"}).encode()).decode(),
+)
+```
+
+`invocation.invoke_async` queues the call and returns its id at once. Read the
+result later with `invocation.get`.
+
+## Async usage
+
+`AsyncAlchemy` exposes the same groups and methods.
+
+```python
+import asyncio
+import os
+
+from alchemy import AsyncAlchemy
+
+async def main():
+    alchemy = AsyncAlchemy(
+        base_url=os.getenv("ALCHEMY_URL", "http://localhost:8780"),
+        token=os.getenv("ALCHEMY_TOKEN", "local"),
+    )
+    response = await alchemy.function.list()
+    for function in response.functions or []:
+        print(function.id, function.name)
+
+asyncio.run(main())
+```
+
+## API groups
+
+| Group | Methods |
+| --- | --- |
+| `function` | `create`, `get`, `list`, `update`, `delete`, `invoke` |
+| `function.version` | `create`, `get`, `list` |
+| `invocation` | `invoke`, `invoke_async`, `get`, `list` |
+| `runtime` | `list` |
+| `template` | `list` |
+| `host` | `get`, `list` |
+| `instance` | `list` |
+| `metrics` | `query_timeseries`, `query_aggregate`, `get_queue` |
+| `auth` | `get_config`, `get_session`, `login`, `logout` |
+| `member` | `list`, `invite`, `set_role`, `remove` |
+| `service_account` | `create`, `list`, `rotate_secret`, `remove` |
+
+`alchemy.get_version(request={})` reports the server's build. Methods whose
+request message has no fields take an empty `request`.
+
+The SDK covers unary API methods. The streaming `GetInvocationLogs` and
+`TailInvocations` are not included. Read logs with the
+[CLI](/pages/usage/cli).
+
+## Responses
+
+Methods return generated models. `function.create(...)` returns a response
+whose `function` property holds the created function.
+
+Fields the server omits are `None`, including lists, so iterate with
+`response.functions or []`. Protobuf 64-bit integer fields, such as version
+numbers and timestamps, can be decimal strings. Use `int(value)` when needed.
+
+## Errors and retries
+
+```python
+from alchemy.core.api_error import ApiError
+
+try:
+    alchemy.function.get(id="missing-function")
+except ApiError as error:
+    print(error.status_code)
+    print(error.body)
+```
+
+`error.body` holds the Connect error code, the message and any details.
+
+Automatic retries are disabled because mutations and invokes are not generally
+idempotent. For a read you want retried, pass
+`request_options={"max_retries": 2}` on the call.

@@ -1,0 +1,116 @@
+# SDK metadata only. Request and response schemas come from api/auth.openapi.json.
+info:
+  title: Alchemy
+  description: Alchemy API over Connect JSON.
+servers:
+  - url: http://localhost:8780
+components:
+  schemas:
+    connect-protocol-version:
+      type: string
+      const: "1"
+      examples: ["1"]
+    auth.v1.GetTokenRequest:
+      required: [clientId, clientSecret]
+    auth.v1.GetTokenResponse:
+      required: [accessToken, expiresIn]
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      description: Access token from the configured identity provider.
+security:
+  - BearerAuth: []
+paths:
+  /auth.v1.AuthService/AcceptInvite:
+    post:
+      parameters: &connect_headers
+        - name: Connect-Protocol-Version
+          in: header
+          required: true
+          schema:
+            $ref: '#/components/schemas/connect-protocol-version'
+          example: "1"
+        - name: Connect-Timeout-Ms
+          in: header
+          required: false
+          schema:
+            $ref: '#/components/schemas/connect-timeout-header'
+      x-fern-sdk-group-name: "auth"
+      x-fern-sdk-method-name: accept_invite
+      security: []
+  /auth.v1.AuthService/CreateServiceAccount:
+    post:
+      parameters: *connect_headers
+      x-fern-sdk-group-name: "service_account"
+      x-fern-sdk-method-name: create
+  /auth.v1.AuthService/GetAuthConfig:
+    post:
+      parameters: *connect_headers
+      x-fern-sdk-group-name: "auth"
+      x-fern-sdk-method-name: get_config
+      security: []
+  /auth.v1.AuthService/GetSession:
+    post:
+      parameters: *connect_headers
+      x-fern-sdk-group-name: "auth"
+      x-fern-sdk-method-name: get_session
+  /auth.v1.AuthService/GetToken:
+    post:
+      parameters: *connect_headers
+      x-fern-sdk-group-name: "auth"
+      x-fern-sdk-method-name: get_token
+      security: []
+  /auth.v1.AuthService/InviteMember:
+    post:
+      parameters: *connect_headers
+      x-fern-sdk-group-name: "member"
+      x-fern-sdk-method-name: invite
+  /auth.v1.AuthService/ListMembers:
+    post:
+      parameters: *connect_headers
+      x-fern-sdk-group-name: "member"
+      x-fern-sdk-method-name: list
+  /auth.v1.AuthService/ListServiceAccounts:
+    post:
+      parameters: *connect_headers
+      x-fern-sdk-group-name: "service_account"
+      x-fern-sdk-method-name: list
+  /auth.v1.AuthService/Login:
+    post:
+      parameters: *connect_headers
+      x-fern-sdk-group-name: "auth"
+      x-fern-sdk-method-name: login
+      security: []
+  /auth.v1.AuthService/Logout:
+    post:
+      parameters: *connect_headers
+      x-fern-sdk-group-name: "auth"
+      x-fern-sdk-method-name: logout
+      security: []
+  /auth.v1.AuthService/Register:
+    post:
+      parameters: *connect_headers
+      x-fern-sdk-group-name: "auth"
+      x-fern-sdk-method-name: register
+      security: []
+  /auth.v1.AuthService/RemoveMember:
+    post:
+      parameters: *connect_headers
+      x-fern-sdk-group-name: "member"
+      x-fern-sdk-method-name: remove
+  /auth.v1.AuthService/RemoveServiceAccount:
+    post:
+      parameters: *connect_headers
+      x-fern-sdk-group-name: "service_account"
+      x-fern-sdk-method-name: remove
+  /auth.v1.AuthService/RotateServiceAccountSecret:
+    post:
+      parameters: *connect_headers
+      x-fern-sdk-group-name: "service_account"
+      x-fern-sdk-method-name: rotate_secret
+  /auth.v1.AuthService/SetMemberRole:
+    post:
+      parameters: *connect_headers
+      x-fern-sdk-group-name: "member"
+      x-fern-sdk-method-name: set_role

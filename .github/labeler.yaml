@@ -39,6 +39,12 @@ cli:
           - "cmd/alchemy/**"
           - "cmd/internal/cli/**"
 
+sdks:
+  - changed-files:
+      - any-glob-to-any-file:
+          - "sdks/**"
+          - "fern/**"
+
 docs:
   - changed-files:
       - any-glob-to-any-file: "docs/**"

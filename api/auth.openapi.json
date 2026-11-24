@@ -1,0 +1,1513 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "API",
+    "description": "API documentation for API",
+    "version": "1.0.0"
+  },
+  "paths": {
+    "/auth.v1.AuthService/AcceptInvite": {
+      "post": {
+        "tags": [
+          "auth.v1.AuthService"
+        ],
+        "summary": "AcceptInvite",
+        "operationId": "auth.v1.AuthService.AcceptInvite",
+        "parameters": [
+          {
+            "name": "Connect-Protocol-Version",
+            "in": "header",
+            "description": "Define the version of the Connect protocol",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/connect-protocol-version"
+            },
+            "example": 1
+          },
+          {
+            "name": "Connect-Timeout-Ms",
+            "in": "header",
+            "description": "Define the timeout, in ms",
+            "schema": {
+              "$ref": "#/components/schemas/connect-timeout-header"
+            },
+            "example": 1000
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/auth.v1.AcceptInviteRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/connect.error"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/auth.v1.AcceptInviteResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/auth.v1.AuthService/CreateServiceAccount": {
+      "post": {
+        "tags": [
+          "auth.v1.AuthService"
+        ],
+        "summary": "CreateServiceAccount",
+        "operationId": "auth.v1.AuthService.CreateServiceAccount",
+        "parameters": [
+          {
+            "name": "Connect-Protocol-Version",
+            "in": "header",
+            "description": "Define the version of the Connect protocol",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/connect-protocol-version"
+            },
+            "example": 1
+          },
+          {
+            "name": "Connect-Timeout-Ms",
+            "in": "header",
+            "description": "Define the timeout, in ms",
+            "schema": {
+              "$ref": "#/components/schemas/connect-timeout-header"
+            },
+            "example": 1000
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/auth.v1.CreateServiceAccountRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/connect.error"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/auth.v1.CreateServiceAccountResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/auth.v1.AuthService/GetAuthConfig": {
+      "post": {
+        "tags": [
+          "auth.v1.AuthService"
+        ],
+        "summary": "GetAuthConfig",
+        "description": "Session; pre-token, public. An empty issuer means auth is disabled.",
+        "operationId": "auth.v1.AuthService.GetAuthConfig",
+        "parameters": [
+          {
+            "name": "Connect-Protocol-Version",
+            "in": "header",
+            "description": "Define the version of the Connect protocol",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/connect-protocol-version"
+            },
+            "example": 1
+          },
+          {
+            "name": "Connect-Timeout-Ms",
+            "in": "header",
+            "description": "Define the timeout, in ms",
+            "schema": {
+              "$ref": "#/components/schemas/connect-timeout-header"
+            },
+            "example": 1000
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/auth.v1.GetAuthConfigRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/connect.error"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/auth.v1.GetAuthConfigResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/auth.v1.AuthService/GetSession": {
+      "post": {
+        "tags": [
+          "auth.v1.AuthService"
+        ],
+        "summary": "GetSession",
+        "description": "Session; authenticated. The UI's sign-in check.",
+        "operationId": "auth.v1.AuthService.GetSession",
+        "parameters": [
+          {
+            "name": "Connect-Protocol-Version",
+            "in": "header",
+            "description": "Define the version of the Connect protocol",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/connect-protocol-version"
+            },
+            "example": 1
+          },
+          {
+            "name": "Connect-Timeout-Ms",
+            "in": "header",
+            "description": "Define the timeout, in ms",
+            "schema": {
+              "$ref": "#/components/schemas/connect-timeout-header"
+            },
+            "example": 1000
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/auth.v1.GetSessionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/connect.error"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/auth.v1.GetSessionResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/auth.v1.AuthService/GetToken": {
+      "post": {
+        "tags": [
+          "auth.v1.AuthService"
+        ],
+        "summary": "GetToken",
+        "operationId": "auth.v1.AuthService.GetToken",
+        "parameters": [
+          {
+            "name": "Connect-Protocol-Version",
+            "in": "header",
+            "description": "Define the version of the Connect protocol",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/connect-protocol-version"
+            },
+            "example": 1
+          },
+          {
+            "name": "Connect-Timeout-Ms",
+            "in": "header",
+            "description": "Define the timeout, in ms",
+            "schema": {
+              "$ref": "#/components/schemas/connect-timeout-header"
+            },
+            "example": 1000
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/auth.v1.GetTokenRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/connect.error"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/auth.v1.GetTokenResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/auth.v1.AuthService/InviteMember": {
+      "post": {
+        "tags": [
+          "auth.v1.AuthService"
+        ],
+        "summary": "InviteMember",
+        "operationId": "auth.v1.AuthService.InviteMember",
+        "parameters": [
+          {
+            "name": "Connect-Protocol-Version",
+            "in": "header",
+            "description": "Define the version of the Connect protocol",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/connect-protocol-version"
+            },
+            "example": 1
+          },
+          {
+            "name": "Connect-Timeout-Ms",
+            "in": "header",
+            "description": "Define the timeout, in ms",
+            "schema": {
+              "$ref": "#/components/schemas/connect-timeout-header"
+            },
+            "example": 1000
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/auth.v1.InviteMemberRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/connect.error"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/auth.v1.InviteMemberResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/auth.v1.AuthService/ListMembers": {
+      "post": {
+        "tags": [
+          "auth.v1.AuthService"
+        ],
+        "summary": "ListMembers",
+        "description": "Members; authenticated tenant administration.",
+        "operationId": "auth.v1.AuthService.ListMembers",
+        "parameters": [
+          {
+            "name": "Connect-Protocol-Version",
+            "in": "header",
+            "description": "Define the version of the Connect protocol",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/connect-protocol-version"
+            },
+            "example": 1
+          },
+          {
+            "name": "Connect-Timeout-Ms",
+            "in": "header",
+            "description": "Define the timeout, in ms",
+            "schema": {
+              "$ref": "#/components/schemas/connect-timeout-header"
+            },
+            "example": 1000
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/auth.v1.ListMembersRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/connect.error"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/auth.v1.ListMembersResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/auth.v1.AuthService/ListServiceAccounts": {
+      "post": {
+        "tags": [
+          "auth.v1.AuthService"
+        ],
+        "summary": "ListServiceAccounts",
+        "description": "Service accounts; authenticated tenant administration. Secrets are only\n returned by create and rotate and cannot be retrieved later.",
+        "operationId": "auth.v1.AuthService.ListServiceAccounts",
+        "parameters": [
+          {
+            "name": "Connect-Protocol-Version",
+            "in": "header",
+            "description": "Define the version of the Connect protocol",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/connect-protocol-version"
+            },
+            "example": 1
+          },
+          {
+            "name": "Connect-Timeout-Ms",
+            "in": "header",
+            "description": "Define the timeout, in ms",
+            "schema": {
+              "$ref": "#/components/schemas/connect-timeout-header"
+            },
+            "example": 1000
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/auth.v1.ListServiceAccountsRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/connect.error"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/auth.v1.ListServiceAccountsResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/auth.v1.AuthService/Login": {
+      "post": {
+        "tags": [
+          "auth.v1.AuthService"
+        ],
+        "summary": "Login",
+        "operationId": "auth.v1.AuthService.Login",
+        "parameters": [
+          {
+            "name": "Connect-Protocol-Version",
+            "in": "header",
+            "description": "Define the version of the Connect protocol",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/connect-protocol-version"
+            },
+            "example": 1
+          },
+          {
+            "name": "Connect-Timeout-Ms",
+            "in": "header",
+            "description": "Define the timeout, in ms",
+            "schema": {
+              "$ref": "#/components/schemas/connect-timeout-header"
+            },
+            "example": 1000
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/auth.v1.LoginRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/connect.error"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/auth.v1.LoginResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/auth.v1.AuthService/Logout": {
+      "post": {
+        "tags": [
+          "auth.v1.AuthService"
+        ],
+        "summary": "Logout",
+        "operationId": "auth.v1.AuthService.Logout",
+        "parameters": [
+          {
+            "name": "Connect-Protocol-Version",
+            "in": "header",
+            "description": "Define the version of the Connect protocol",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/connect-protocol-version"
+            },
+            "example": 1
+          },
+          {
+            "name": "Connect-Timeout-Ms",
+            "in": "header",
+            "description": "Define the timeout, in ms",
+            "schema": {
+              "$ref": "#/components/schemas/connect-timeout-header"
+            },
+            "example": 1000
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/auth.v1.LogoutRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/connect.error"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/auth.v1.LogoutResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/auth.v1.AuthService/Register": {
+      "post": {
+        "tags": [
+          "auth.v1.AuthService"
+        ],
+        "summary": "Register",
+        "operationId": "auth.v1.AuthService.Register",
+        "parameters": [
+          {
+            "name": "Connect-Protocol-Version",
+            "in": "header",
+            "description": "Define the version of the Connect protocol",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/connect-protocol-version"
+            },
+            "example": 1
+          },
+          {
+            "name": "Connect-Timeout-Ms",
+            "in": "header",
+            "description": "Define the timeout, in ms",
+            "schema": {
+              "$ref": "#/components/schemas/connect-timeout-header"
+            },
+            "example": 1000
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/auth.v1.RegisterRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/connect.error"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/auth.v1.RegisterResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/auth.v1.AuthService/RemoveMember": {
+      "post": {
+        "tags": [
+          "auth.v1.AuthService"
+        ],
+        "summary": "RemoveMember",
+        "operationId": "auth.v1.AuthService.RemoveMember",
+        "parameters": [
+          {
+            "name": "Connect-Protocol-Version",
+            "in": "header",
+            "description": "Define the version of the Connect protocol",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/connect-protocol-version"
+            },
+            "example": 1
+          },
+          {
+            "name": "Connect-Timeout-Ms",
+            "in": "header",
+            "description": "Define the timeout, in ms",
+            "schema": {
+              "$ref": "#/components/schemas/connect-timeout-header"
+            },
+            "example": 1000
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/auth.v1.RemoveMemberRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/connect.error"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/auth.v1.RemoveMemberResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/auth.v1.AuthService/RemoveServiceAccount": {
+      "post": {
+        "tags": [
+          "auth.v1.AuthService"
+        ],
+        "summary": "RemoveServiceAccount",
+        "operationId": "auth.v1.AuthService.RemoveServiceAccount",
+        "parameters": [
+          {
+            "name": "Connect-Protocol-Version",
+            "in": "header",
+            "description": "Define the version of the Connect protocol",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/connect-protocol-version"
+            },
+            "example": 1
+          },
+          {
+            "name": "Connect-Timeout-Ms",
+            "in": "header",
+            "description": "Define the timeout, in ms",
+            "schema": {
+              "$ref": "#/components/schemas/connect-timeout-header"
+            },
+            "example": 1000
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/auth.v1.RemoveServiceAccountRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/connect.error"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/auth.v1.RemoveServiceAccountResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/auth.v1.AuthService/RotateServiceAccountSecret": {
+      "post": {
+        "tags": [
+          "auth.v1.AuthService"
+        ],
+        "summary": "RotateServiceAccountSecret",
+        "operationId": "auth.v1.AuthService.RotateServiceAccountSecret",
+        "parameters": [
+          {
+            "name": "Connect-Protocol-Version",
+            "in": "header",
+            "description": "Define the version of the Connect protocol",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/connect-protocol-version"
+            },
+            "example": 1
+          },
+          {
+            "name": "Connect-Timeout-Ms",
+            "in": "header",
+            "description": "Define the timeout, in ms",
+            "schema": {
+              "$ref": "#/components/schemas/connect-timeout-header"
+            },
+            "example": 1000
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/auth.v1.RotateServiceAccountSecretRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/connect.error"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/auth.v1.RotateServiceAccountSecretResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/auth.v1.AuthService/SetMemberRole": {
+      "post": {
+        "tags": [
+          "auth.v1.AuthService"
+        ],
+        "summary": "SetMemberRole",
+        "operationId": "auth.v1.AuthService.SetMemberRole",
+        "parameters": [
+          {
+            "name": "Connect-Protocol-Version",
+            "in": "header",
+            "description": "Define the version of the Connect protocol",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/connect-protocol-version"
+            },
+            "example": 1
+          },
+          {
+            "name": "Connect-Timeout-Ms",
+            "in": "header",
+            "description": "Define the timeout, in ms",
+            "schema": {
+              "$ref": "#/components/schemas/connect-timeout-header"
+            },
+            "example": 1000
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/auth.v1.SetMemberRoleRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/connect.error"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/auth.v1.SetMemberRoleResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "auth.v1.AcceptInviteRequest": {
+        "type": "object",
+        "properties": {
+          "userId": {
+            "type": "string",
+            "title": "user_id"
+          },
+          "code": {
+            "type": "string",
+            "title": "code"
+          },
+          "password": {
+            "type": "string",
+            "title": "password"
+          }
+        },
+        "title": "AcceptInviteRequest",
+        "additionalProperties": false,
+        "description": "AcceptInviteRequest redeems an invite and sets the new member's password.\n The code is the credential, which is why this RPC is public."
+      },
+      "auth.v1.AcceptInviteResponse": {
+        "type": "object",
+        "title": "AcceptInviteResponse",
+        "additionalProperties": false
+      },
+      "auth.v1.CreateServiceAccountRequest": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "name"
+          },
+          "description": {
+            "type": "string",
+            "title": "description"
+          },
+          "role": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/auth.v1.Role"
+              }
+            ],
+            "title": "role"
+          }
+        },
+        "title": "CreateServiceAccountRequest",
+        "additionalProperties": false
+      },
+      "auth.v1.CreateServiceAccountResponse": {
+        "type": "object",
+        "properties": {
+          "serviceAccount": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/auth.v1.ServiceAccount"
+              }
+            ],
+            "title": "service_account"
+          },
+          "clientSecret": {
+            "type": "string",
+            "title": "client_secret"
+          }
+        },
+        "title": "CreateServiceAccountResponse",
+        "additionalProperties": false,
+        "description": "CreateServiceAccountResponse returns client_secret exactly once. The app\n does not persist it and Zitadel cannot retrieve it again."
+      },
+      "auth.v1.GetAuthConfigRequest": {
+        "type": "object",
+        "title": "GetAuthConfigRequest",
+        "additionalProperties": false
+      },
+      "auth.v1.GetAuthConfigResponse": {
+        "type": "object",
+        "properties": {
+          "issuer": {
+            "type": "string",
+            "title": "issuer"
+          },
+          "serviceAccountScopes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "title": "service_account_scopes",
+            "description": "service_account_scopes are requested by non-interactive clients. The\n provider owns these values so clients do not need provider-specific\n project IDs or reserved scope knowledge."
+          },
+          "inviteOnly": {
+            "type": "boolean",
+            "title": "invite_only",
+            "description": "invite_only means sign-up is closed: Register is refused and the UI\n offers no way to create an organization. People join by invitation."
+          }
+        },
+        "title": "GetAuthConfigResponse",
+        "additionalProperties": false,
+        "description": "GetAuthConfigResponse tells clients how to authenticate. An empty issuer\n means no provider is configured: the UI renders without a session and every\n other AuthService RPC is unimplemented."
+      },
+      "auth.v1.GetSessionRequest": {
+        "type": "object",
+        "title": "GetSessionRequest",
+        "additionalProperties": false,
+        "description": "GetSessionRequest resolves the caller behind the session cookie. It is the\n UI's sign-in check: unauthenticated means show the login page."
+      },
+      "auth.v1.GetSessionResponse": {
+        "type": "object",
+        "properties": {
+          "userId": {
+            "type": "string",
+            "title": "user_id"
+          },
+          "name": {
+            "type": "string",
+            "title": "name"
+          },
+          "email": {
+            "type": "string",
+            "title": "email"
+          },
+          "avatarUrl": {
+            "type": "string",
+            "title": "avatar_url"
+          }
+        },
+        "title": "GetSessionResponse",
+        "additionalProperties": false
+      },
+      "auth.v1.GetTokenRequest": {
+        "type": "object",
+        "properties": {
+          "clientId": {
+            "type": "string",
+            "title": "client_id"
+          },
+          "clientSecret": {
+            "type": "string",
+            "title": "client_secret"
+          }
+        },
+        "title": "GetTokenRequest",
+        "additionalProperties": false,
+        "description": "GetTokenRequest exchanges a service account's credentials for an access\n token. The server runs the grant against the provider, so SDKs and the\n CLI need no provider knowledge and no route to it."
+      },
+      "auth.v1.GetTokenResponse": {
+        "type": "object",
+        "properties": {
+          "accessToken": {
+            "type": "string",
+            "title": "access_token"
+          },
+          "expiresIn": {
+            "type": "integer",
+            "title": "expires_in",
+            "format": "int32"
+          }
+        },
+        "title": "GetTokenResponse",
+        "additionalProperties": false,
+        "description": "GetTokenResponse carries a bearer token and its lifetime in seconds.\n Clients mint again as it nears expiry."
+      },
+      "auth.v1.InviteMemberRequest": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string",
+            "title": "email"
+          },
+          "givenName": {
+            "type": "string",
+            "title": "given_name"
+          },
+          "familyName": {
+            "type": "string",
+            "title": "family_name"
+          },
+          "role": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/auth.v1.Role"
+              }
+            ],
+            "title": "role"
+          }
+        },
+        "title": "InviteMemberRequest",
+        "additionalProperties": false
+      },
+      "auth.v1.InviteMemberResponse": {
+        "type": "object",
+        "properties": {
+          "userId": {
+            "type": "string",
+            "title": "user_id"
+          },
+          "code": {
+            "type": "string",
+            "title": "code"
+          }
+        },
+        "title": "InviteMemberResponse",
+        "additionalProperties": false,
+        "description": "InviteMemberResponse carries the invitation an admin shares out of band.\n Nothing is emailed."
+      },
+      "auth.v1.ListMembersRequest": {
+        "type": "object",
+        "title": "ListMembersRequest",
+        "additionalProperties": false
+      },
+      "auth.v1.ListMembersResponse": {
+        "type": "object",
+        "properties": {
+          "members": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/auth.v1.Member"
+            },
+            "title": "members"
+          },
+          "canManage": {
+            "type": "boolean",
+            "title": "can_manage",
+            "description": "can_manage reports whether the caller may invite, re-role, or remove.\n The UI renders read-only when false."
+          }
+        },
+        "title": "ListMembersResponse",
+        "additionalProperties": false
+      },
+      "auth.v1.ListServiceAccountsRequest": {
+        "type": "object",
+        "title": "ListServiceAccountsRequest",
+        "additionalProperties": false
+      },
+      "auth.v1.ListServiceAccountsResponse": {
+        "type": "object",
+        "properties": {
+          "serviceAccounts": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/auth.v1.ServiceAccount"
+            },
+            "title": "service_accounts"
+          },
+          "canManage": {
+            "type": "boolean",
+            "title": "can_manage"
+          }
+        },
+        "title": "ListServiceAccountsResponse",
+        "additionalProperties": false
+      },
+      "auth.v1.LoginRequest": {
+        "type": "object",
+        "properties": {
+          "loginName": {
+            "type": "string",
+            "title": "login_name"
+          },
+          "password": {
+            "type": "string",
+            "title": "password"
+          }
+        },
+        "title": "LoginRequest",
+        "additionalProperties": false,
+        "description": "LoginRequest carries the credentials the app's own login page collected.\n A successful login answers with an HttpOnly session cookie that every later\n RPC carries; nothing about the provider reaches the browser."
+      },
+      "auth.v1.LoginResponse": {
+        "type": "object",
+        "title": "LoginResponse",
+        "additionalProperties": false
+      },
+      "auth.v1.LogoutRequest": {
+        "type": "object",
+        "title": "LogoutRequest",
+        "additionalProperties": false,
+        "description": "LogoutRequest ends the session and clears its cookie."
+      },
+      "auth.v1.LogoutResponse": {
+        "type": "object",
+        "title": "LogoutResponse",
+        "additionalProperties": false
+      },
+      "auth.v1.Member": {
+        "type": "object",
+        "properties": {
+          "userId": {
+            "type": "string",
+            "title": "user_id"
+          },
+          "name": {
+            "type": "string",
+            "title": "name"
+          },
+          "email": {
+            "type": "string",
+            "title": "email"
+          },
+          "role": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/auth.v1.Role"
+              }
+            ],
+            "title": "role"
+          }
+        },
+        "title": "Member",
+        "additionalProperties": false,
+        "description": "Member is one user of a tenant."
+      },
+      "auth.v1.RegisterRequest": {
+        "type": "object",
+        "properties": {
+          "orgName": {
+            "type": "string",
+            "title": "org_name"
+          },
+          "givenName": {
+            "type": "string",
+            "title": "given_name"
+          },
+          "familyName": {
+            "type": "string",
+            "title": "family_name"
+          },
+          "email": {
+            "type": "string",
+            "title": "email"
+          },
+          "password": {
+            "type": "string",
+            "title": "password"
+          }
+        },
+        "title": "RegisterRequest",
+        "additionalProperties": false,
+        "description": "RegisterRequest creates a tenant and its first admin."
+      },
+      "auth.v1.RegisterResponse": {
+        "type": "object",
+        "properties": {
+          "tenantId": {
+            "type": "string",
+            "title": "tenant_id"
+          }
+        },
+        "title": "RegisterResponse",
+        "additionalProperties": false
+      },
+      "auth.v1.RemoveMemberRequest": {
+        "type": "object",
+        "properties": {
+          "userId": {
+            "type": "string",
+            "title": "user_id"
+          }
+        },
+        "title": "RemoveMemberRequest",
+        "additionalProperties": false
+      },
+      "auth.v1.RemoveMemberResponse": {
+        "type": "object",
+        "title": "RemoveMemberResponse",
+        "additionalProperties": false
+      },
+      "auth.v1.RemoveServiceAccountRequest": {
+        "type": "object",
+        "properties": {
+          "userId": {
+            "type": "string",
+            "title": "user_id"
+          }
+        },
+        "title": "RemoveServiceAccountRequest",
+        "additionalProperties": false
+      },
+      "auth.v1.RemoveServiceAccountResponse": {
+        "type": "object",
+        "title": "RemoveServiceAccountResponse",
+        "additionalProperties": false
+      },
+      "auth.v1.Role": {
+        "type": "string",
+        "title": "Role",
+        "enum": [
+          "ROLE_UNSPECIFIED",
+          "ROLE_ADMIN",
+          "ROLE_CREATOR",
+          "ROLE_VIEWER"
+        ],
+        "description": "Role is an app permission level. The vocabulary is the app's, not the\n provider's: an adapter maps whatever grants it stores onto these."
+      },
+      "auth.v1.RotateServiceAccountSecretRequest": {
+        "type": "object",
+        "properties": {
+          "userId": {
+            "type": "string",
+            "title": "user_id"
+          }
+        },
+        "title": "RotateServiceAccountSecretRequest",
+        "additionalProperties": false
+      },
+      "auth.v1.RotateServiceAccountSecretResponse": {
+        "type": "object",
+        "properties": {
+          "clientId": {
+            "type": "string",
+            "title": "client_id"
+          },
+          "clientSecret": {
+            "type": "string",
+            "title": "client_secret"
+          }
+        },
+        "title": "RotateServiceAccountSecretResponse",
+        "additionalProperties": false,
+        "description": "RotateServiceAccountSecretResponse returns the replacement secret exactly\n once. The previous secret is invalid after rotation."
+      },
+      "auth.v1.ServiceAccount": {
+        "type": "object",
+        "properties": {
+          "userId": {
+            "type": "string",
+            "title": "user_id"
+          },
+          "clientId": {
+            "type": "string",
+            "title": "client_id"
+          },
+          "name": {
+            "type": "string",
+            "title": "name"
+          },
+          "description": {
+            "type": "string",
+            "title": "description"
+          },
+          "role": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/auth.v1.Role"
+              }
+            ],
+            "title": "role"
+          }
+        },
+        "title": "ServiceAccount",
+        "additionalProperties": false,
+        "description": "ServiceAccount is a non-human identity used by automation such as the\n app's CLI. Its client secret is never returned by list operations."
+      },
+      "auth.v1.SetMemberRoleRequest": {
+        "type": "object",
+        "properties": {
+          "userId": {
+            "type": "string",
+            "title": "user_id"
+          },
+          "role": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/auth.v1.Role"
+              }
+            ],
+            "title": "role"
+          }
+        },
+        "title": "SetMemberRoleRequest",
+        "additionalProperties": false
+      },
+      "auth.v1.SetMemberRoleResponse": {
+        "type": "object",
+        "title": "SetMemberRoleResponse",
+        "additionalProperties": false
+      },
+      "connect-protocol-version": {
+        "type": "number",
+        "examples": [
+          1
+        ],
+        "title": "Connect-Protocol-Version",
+        "description": "Define the version of the Connect protocol",
+        "const": 1
+      },
+      "connect-timeout-header": {
+        "type": "number",
+        "examples": [
+          1000
+        ],
+        "title": "Connect-Timeout-Ms",
+        "description": "Define the timeout, in ms"
+      },
+      "connect.error": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string",
+            "examples": [
+              "not_found"
+            ],
+            "enum": [
+              "canceled",
+              "unknown",
+              "invalid_argument",
+              "deadline_exceeded",
+              "not_found",
+              "already_exists",
+              "permission_denied",
+              "resource_exhausted",
+              "failed_precondition",
+              "aborted",
+              "out_of_range",
+              "unimplemented",
+              "internal",
+              "unavailable",
+              "data_loss",
+              "unauthenticated"
+            ],
+            "description": "The status code, which should be an enum value of [google.rpc.Code][google.rpc.Code]."
+          },
+          "message": {
+            "type": "string",
+            "description": "A developer-facing error message, which should be in English. Any user-facing error message should be localized and sent in the [google.rpc.Status.details][google.rpc.Status.details] field, or localized by the client."
+          },
+          "details": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/connect.error_details.Any"
+            },
+            "description": "A list of messages that carry the error details. There is no limit on the number of messages."
+          }
+        },
+        "title": "Connect Error",
+        "additionalProperties": true,
+        "description": "Error type returned by Connect: https://connectrpc.com/docs/go/errors/#http-representation"
+      },
+      "connect.error_details.Any": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "description": "A URL that acts as a globally unique identifier for the type of the serialized message. For example: `type.googleapis.com/google.rpc.ErrorInfo`."
+          },
+          "value": {
+            "type": "string",
+            "format": "binary",
+            "description": "The Protobuf message, serialized as bytes and base64-encoded. The specific message type is identified by the `type` field."
+          },
+          "debug": {
+            "type": "object",
+            "title": "Debug",
+            "additionalProperties": true,
+            "description": "Deserialized error detail payload. The 'type' field indicates the schema. This field is for easier debugging and should not be relied upon for application logic."
+          }
+        },
+        "additionalProperties": true,
+        "description": "Contains an arbitrary serialized message along with a @type that describes the type of the serialized message, with an additional debug field for ConnectRPC error details."
+      }
+    }
+  },
+  "security": [],
+  "tags": [
+    {
+      "name": "auth.v1.AuthService",
+      "description": "AuthService is an app's identity surface. It is optional: with no\n provider configured the server leaves it unimplemented and the API is\n unauthenticated.\n\n The session RPCs run before the caller holds a bearer token, so they are\n the server's only public procedures and carry no tenant_id — there is no\n tenant until sign-in completes. Everything else is authenticated and\n scoped to the caller's own tenant."
+    }
+  ]
+}

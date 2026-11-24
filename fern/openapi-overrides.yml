@@ -1,0 +1,182 @@
+# SDK metadata and the plain HTTP invoke route. RPC schemas come from api/openapi.json.
+info:
+  title: Alchemy
+  description: Alchemy API over Connect JSON.
+# A default server makes the base URL optional.
+servers:
+  - url: http://localhost:8780
+components:
+  schemas:
+    connect-protocol-version:
+      type: string
+      const: "1"
+      examples: ["1"]
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      description: Access token from the configured identity provider.
+security:
+  - BearerAuth: []
+paths:
+  /functions.v1.FunctionsService/CreateFunction:
+    post:
+      parameters: &connect_headers
+        - name: Connect-Protocol-Version
+          in: header
+          required: true
+          schema:
+            $ref: '#/components/schemas/connect-protocol-version'
+          example: "1"
+        - name: Connect-Timeout-Ms
+          in: header
+          required: false
+          schema:
+            $ref: '#/components/schemas/connect-timeout-header'
+      x-fern-sdk-group-name: "function"
+      x-fern-sdk-method-name: create
+  /functions.v1.FunctionsService/CreateFunctionVersion:
+    post:
+      parameters: *connect_headers
+      x-fern-sdk-group-name: ["function", "version"]
+      x-fern-sdk-method-name: create
+  /functions.v1.FunctionsService/DeleteFunction:
+    post:
+      parameters: *connect_headers
+      x-fern-sdk-group-name: "function"
+      x-fern-sdk-method-name: delete
+  /functions.v1.FunctionsService/GetFunction:
+    post:
+      parameters: *connect_headers
+      x-fern-sdk-group-name: "function"
+      x-fern-sdk-method-name: get
+  /functions.v1.FunctionsService/GetFunctionVersion:
+    post:
+      parameters: *connect_headers
+      x-fern-sdk-group-name: ["function", "version"]
+      x-fern-sdk-method-name: get
+  /functions.v1.FunctionsService/GetHost:
+    post:
+      parameters: *connect_headers
+      x-fern-sdk-group-name: "host"
+      x-fern-sdk-method-name: get
+  /functions.v1.FunctionsService/GetInvocation:
+    post:
+      parameters: *connect_headers
+      x-fern-sdk-group-name: "invocation"
+      x-fern-sdk-method-name: get
+  /functions.v1.FunctionsService/GetVersion:
+    post:
+      parameters: *connect_headers
+      x-fern-sdk-method-name: get_version
+  /functions.v1.FunctionsService/Invoke:
+    post:
+      parameters: *connect_headers
+      x-fern-sdk-group-name: "invocation"
+      x-fern-sdk-method-name: invoke
+  /functions.v1.FunctionsService/InvokeAsync:
+    post:
+      parameters: *connect_headers
+      x-fern-sdk-group-name: "invocation"
+      x-fern-sdk-method-name: invoke_async
+  /functions.v1.FunctionsService/ListFunctionVersions:
+    post:
+      parameters: *connect_headers
+      x-fern-sdk-group-name: ["function", "version"]
+      x-fern-sdk-method-name: list
+  /functions.v1.FunctionsService/ListFunctions:
+    post:
+      parameters: *connect_headers
+      x-fern-sdk-group-name: "function"
+      x-fern-sdk-method-name: list
+  /functions.v1.FunctionsService/ListHosts:
+    post:
+      parameters: *connect_headers
+      x-fern-sdk-group-name: "host"
+      x-fern-sdk-method-name: list
+  /functions.v1.FunctionsService/ListInstances:
+    post:
+      parameters: *connect_headers
+      x-fern-sdk-group-name: "instance"
+      x-fern-sdk-method-name: list
+  /functions.v1.FunctionsService/ListInvocations:
+    post:
+      parameters: *connect_headers
+      x-fern-sdk-group-name: "invocation"
+      x-fern-sdk-method-name: list
+  /functions.v1.FunctionsService/ListRuntimes:
+    post:
+      parameters: *connect_headers
+      x-fern-sdk-group-name: "runtime"
+      x-fern-sdk-method-name: list
+  /functions.v1.FunctionsService/ListTemplates:
+    post:
+      parameters: *connect_headers
+      x-fern-sdk-group-name: "template"
+      x-fern-sdk-method-name: list
+  /functions.v1.FunctionsService/UpdateFunction:
+    post:
+      parameters: *connect_headers
+      x-fern-sdk-group-name: "function"
+      x-fern-sdk-method-name: update
+  /metrics.v1.MetricsService/GetQueue:
+    post:
+      parameters: *connect_headers
+      x-fern-sdk-group-name: "metrics"
+      x-fern-sdk-method-name: get_queue
+  /metrics.v1.MetricsService/QueryAggregate:
+    post:
+      parameters: *connect_headers
+      x-fern-sdk-group-name: "metrics"
+      x-fern-sdk-method-name: query_aggregate
+  /metrics.v1.MetricsService/QueryTimeseries:
+    post:
+      parameters: *connect_headers
+      x-fern-sdk-group-name: "metrics"
+      x-fern-sdk-method-name: query_timeseries
+  # The plain HTTP route: the body is the input and the response is the output.
+  /functions/{function}/invoke:
+    post:
+      operationId: invokeFunction
+      summary: Invoke a function with JSON
+      description: Runs a function that has a JSON Schema contract. The request body is the input and the response body is the output, with no envelope.
+      x-fern-sdk-group-name: "function"
+      x-fern-sdk-method-name: invoke
+      parameters:
+        - name: function
+          in: path
+          required: true
+          description: The function id.
+          schema:
+            type: string
+        - name: version
+          in: query
+          required: false
+          description: Pins a version. Absent runs the function's current version.
+          schema:
+            type: integer
+        - name: Idempotency-Key
+          in: header
+          required: false
+          x-fern-parameter-name: idempotency_key
+          description: Makes the call safe to retry.
+          schema:
+            type: string
+        - name: Alchemy-Retries
+          in: header
+          required: false
+          x-fern-parameter-name: retries
+          description: This call's retries instead of the function's.
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {}
+      responses:
+        "200":
+          description: The function's output.
+          content:
+            application/json:
+              schema: {}

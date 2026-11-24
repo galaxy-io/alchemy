@@ -21,6 +21,9 @@ All work in `ui/` follows the `alchemy-ui` skill, loaded with the org's `galaxy-
 - `@galaxy-io/alchemy-ui` ships to npm through release-please (`alchemy-ui` component) and `.github/workflows/ui-release.yaml`.
 - Gates: `just ui-check` (or `pnpm check` plus the route-tree diff from `ui/`).
 
-## CLI
+## CLI and SDKs
 
 - `cmd/alchemy` is the CLI, built the way filament's is: cobra commands over the generated Go client, with the shared pieces (`style`, `text`, `interactive`, `contexts`, `auth`, `settings`, `configfile`) under `cmd/internal/cli`. `alchemy -i` opens the interactive menus, drawn with `dado`. It ships through GoReleaser (`.goreleaser.yaml`, `.github/workflows/cli.yaml`) on every `v*` release, with a cask in `galaxy-io/homebrew-tap`.
+- `just proto` also writes `api/openapi.json` and `api/auth.openapi.json`. Commit both. Name SDK methods in the `fern/*-overrides.yml` files.
+- CI generates the SDKs. When the specs or `fern/` change on main, `.github/workflows/sdks.yaml` runs Fern and opens a pull request with `sdks/python/src/alchemy` and `sdks/typescript/src`. Never generate, edit or commit that code by hand. `just sdks` is a local preview only.
+- `alchemy-py` and `@galaxy-io/alchemy-ts` release through release-please (`alchemy-py`, `alchemy-ts` components) and `.github/workflows/sdk-release.yaml`.
