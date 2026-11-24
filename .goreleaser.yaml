@@ -1,0 +1,62 @@
+version: 2
+
+project_name: alchemy
+
+builds:
+  - id: alchemy
+    main: ./cmd/alchemy
+    binary: alchemy
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - linux
+      - darwin
+    goarch:
+      - amd64
+      - arm64
+    flags:
+      - -trimpath
+    ldflags:
+      - -s -w
+      - -X github.com/galaxy-io/alchemy/internal/version.Version={{ .Tag }}
+      - -X github.com/galaxy-io/alchemy/internal/version.Commit={{ .ShortCommit }}
+      - -X github.com/galaxy-io/alchemy/internal/version.Date={{ .CommitDate }}
+    mod_timestamp: "{{ .CommitTimestamp }}"
+
+archives:
+  - formats:
+      - tar.gz
+    name_template: "{{ .ProjectName }}_{{ .Os }}_{{ .Arch }}"
+
+checksum:
+  name_template: checksums.txt
+
+changelog:
+  disable: true
+
+release:
+  mode: keep-existing
+  replace_existing_artifacts: true
+  prerelease: auto
+
+homebrew_casks:
+  - name: alchemy
+    repository:
+      owner: galaxy-io
+      name: homebrew-tap
+      token: "{{ .Env.HOMEBREW_TAP_TOKEN }}"
+    directory: Casks
+    commit_author:
+      name: gx-null[bot]
+      email: 286761379+gx-null[bot]@users.noreply.github.com
+    skip_upload: auto
+    homepage: "https://github.com/galaxy-io/alchemy"
+    description: "Client for Alchemy, a runtime for fast, isolated, strongly typed compute functions"
+    binaries:
+      - alchemy
+    hooks:
+      post:
+        install_steps: |
+          on_macos do
+            run "/usr/bin/xattr", args: ["-dr", "com.apple.quarantine", "{{ .StagedPath }}/alchemy"]
+          end

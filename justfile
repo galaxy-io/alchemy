@@ -139,6 +139,10 @@ proto:
     find api -name '*.pb.go' -o -name '*.connect.go' | xargs rm -f
     buf generate
 
+# install the alchemy CLI into GOBIN
+cli:
+    CGO_ENABLED=0 go install -trimpath -ldflags='-s -w' ./cmd/alchemy
+
 # generate sqlc Go code from datastore/postgres/{migrations,queries}
 sqlc:
     sqlc generate -f datastore/postgres/sqlc.yaml

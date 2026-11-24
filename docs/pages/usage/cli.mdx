@@ -1,0 +1,121 @@
+---
+title: "Alchemy CLI"
+sidebarTitle: "CLI"
+description: "Inspect functions, invoke them, and read invocations and their logs from the command line or its interactive menus, against a local or deployed Alchemy server."
+---
+
+The `alchemy` CLI inspects functions, invokes them, and reads invocations and their logs. A context selects the server it runs against. Creating functions and shipping versions stay in the [web UI](/pages/usage/web) and the [API](/pages/api-reference/introduction).
+
+## Install
+
+On macOS, use Homebrew:
+
+```sh
+brew install galaxy-io/tap/alchemy
+```
+
+Prebuilt binaries for Linux and macOS are available from [GitHub Releases](https://github.com/galaxy-io/alchemy/releases). From a checkout, `just cli` installs it into `GOBIN`. Confirm the installation with `alchemy version`.
+
+## Interactive mode
+
+Open the main menu in a terminal:
+
+```sh
+alchemy -i
+```
+
+The menu can invoke a function, browse functions, browse invocations and read their logs, and change the table layout. For a function's version history, run `alchemy function get <function-id>`. `alchemy function -i` and `alchemy invocation -i` open at that section, and `alchemy invoke` with no function picks one from a list.
+
+Invoking from the menu takes the input as JSON, prints the output to the terminal and leaves it in scrollback, as logs do. A function with an Arrow contract is invoked with flags.
+
+Interactive mode is optional. Every operation also has flags for scripts and CI.
+
+## Commands
+
+| Command | What it does |
+|---|---|
+| `alchemy function <list\|get>` | List functions, or show one with its versions |
+| `alchemy invoke [function]` | Run a function and print its output |
+| `alchemy invocation <list\|get\|logs>` | List invocations, show one, or print its logs |
+| `alchemy status` | Show the selected context and whether its server answers |
+| `alchemy context <add\|list\|current\|use\|rename\|delete>` | Manage servers |
+| `alchemy auth <login\|status\|logout>` | Manage authentication |
+| `alchemy version` | Print the version |
+
+`list` can be shortened to `ls`, and `context` to `ctx`. Add `--help` after a command to see its flags. Functions and invocations are named by their ids, which the list commands print.
+
+The global flags work in any position:
+
+| Flag | What it does |
+|---|---|
+| `--context NAME` | Use a context for one command |
+| `-i`, `--interactive` | Open interactive menus |
+| `--layout boxed\|plain` | Select the table layout |
+
+## Functions
+
+```sh
+alchemy function ls
+alchemy function get <function-id>
+```
+
+`get` shows the function's current version, image, resources and timeout, then every version with its build status.
+
+## Invoke
+
+The input comes from `--data`, from a file with `--file`, or from stdin. The output goes to stdout, so it pipes.
+
+```sh
+alchemy invoke <function-id> --data '{"id":"abc"}'
+alchemy invoke <function-id> --file input.json
+cat input.json | alchemy invoke <function-id> | jq .
+```
+
+| Flag | What it does |
+|---|---|
+| `-d`, `--data` | The input as a string |
+| `-f`, `--file` | The input from a file, or `-` for stdin |
+| `--version` | Pins a version. Absent runs the current version |
+| `--async` | Queues the call and prints its invocation |
+| `--arrow` | Sends the input as an Arrow IPC stream, for an Arrow contract |
+
+`invoke` calls the [plain HTTP route](/pages/usage/http), so a failed call prints the status and the error body to stderr and exits with 1.
+
+## Invocations and logs
+
+```sh
+alchemy invocation ls
+alchemy invocation ls <function-id>
+alchemy invocation get <invocation-id>
+alchemy invocation logs <invocation-id> --follow
+```
+
+`get` shows the status, start kind, duration, sizes, host and error. `logs --follow` keeps printing until the invocation ends.
+
+List commands show 25 items by default. Use `--limit` to change the page size and the printed `--next` cursor to fetch the next page.
+
+## Contexts
+
+The built-in `local` context points at `http://localhost:8780`, where `just dev` serves. Add another server and select it:
+
+```sh
+alchemy context add production --server https://alchemy.example.com
+alchemy context use production
+```
+
+Use `--context production` to select it for one command instead. `alchemy status` shows the active context, whether its server is reachable and the server's version.
+
+For a server with [authentication](/pages/deployment/authentication) on, log in with a service account:
+
+```sh
+alchemy --context production auth login \
+  --server https://alchemy.example.com
+```
+
+The server must use HTTPS unless it runs on this machine, so credentials are never sent unencrypted. The CLI prompts for the client ID and secret when they are not passed as flags. It verifies the credentials, creates and selects the context, and refreshes access tokens when needed. `alchemy auth status` shows the current state. `alchemy auth logout` removes the context's credentials.
+
+Contexts and credentials are stored separately under `~/.config/alchemy`, or `$XDG_CONFIG_HOME/alchemy` when it is set, with owner-only permissions.
+
+## Output
+
+Tables use the boxed layout by default. Select a plain layout with `--layout plain` or `ALCHEMY_LAYOUT=plain`. A layout chosen from the interactive Settings menu is saved for later commands. Set `NO_COLOR` to disable terminal colors.

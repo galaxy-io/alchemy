@@ -35,6 +35,14 @@ helm upgrade --install alchemy oci://ghcr.io/galaxy-io/charts/alchemy --set exis
 
 See [Installation](https://alchemy.getgalaxy.io/pages/get-started/installation) for the images and how to verify a release.
 
+Install the `alchemy` CLI on macOS via Homebrew:
+
+```sh
+brew install galaxy-io/tap/alchemy
+```
+
+Prebuilt binaries for Linux and macOS are on the [releases page](https://github.com/galaxy-io/alchemy/releases).
+
 ## Getting started
 
 To run Alchemy locally, install Go, Docker, `just`, Node.js, pnpm and Lima. On macOS, the repository's `Brewfile` installs Go, `just`, Lima, Buf and golangci-lint:

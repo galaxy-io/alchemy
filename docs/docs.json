@@ -122,7 +122,8 @@
         "group": "Usage",
         "pages": [
           "pages/usage/web",
-          "pages/usage/http"
+          "pages/usage/http",
+          "pages/usage/cli"
         ]
       },
       {

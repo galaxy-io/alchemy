@@ -14,7 +14,8 @@ The server mounts three services on one listener:
 | `metrics.v1.MetricsService` | Read-only aggregations over invocations, and the live queue |
 | `auth.v1.AuthService` | Sign-in, members and service accounts, from `github.com/galaxy-io/modules/identity` |
 
-The built-in web UI and the `@galaxy-io/alchemy-ui` module call this same API.
+The built-in web UI, the `@galaxy-io/alchemy-ui` module and the CLI call this
+same API.
 
 Every RPC has a Connect HTTP POST route at `/<package.Service>/<Method>`:
 
