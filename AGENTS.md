@@ -20,3 +20,7 @@ All work in `ui/` follows the `alchemy-ui` skill, loaded with the org's `galaxy-
 - The server embeds `ui/build` when built with `-tags embedui` (`just binaries`); without the tag `ui.Handler()` serves a placeholder, so `go build ./...` needs no Node.
 - `@galaxy-io/alchemy-ui` ships to npm through release-please (`alchemy-ui` component) and `.github/workflows/ui-release.yaml`.
 - Gates: `just ui-check` (or `pnpm check` plus the route-tree diff from `ui/`).
+
+## CLI
+
+- `cmd/alchemy` is the CLI, built the way filament's is: cobra commands over the generated Go client, with the shared pieces (`style`, `text`, `interactive`, `contexts`, `auth`, `settings`, `configfile`) under `cmd/internal/cli`. `alchemy -i` opens the interactive menus, drawn with `dado`. It ships through GoReleaser (`.goreleaser.yaml`, `.github/workflows/cli.yaml`) on every `v*` release, with a cask in `galaxy-io/homebrew-tap`.

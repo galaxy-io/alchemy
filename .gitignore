@@ -39,4 +39,7 @@ charts/alchemy/values-*.yaml
 
 # Cargo build output
 target/
+
+# GoReleaser output
+/dist/
 .zitadel/

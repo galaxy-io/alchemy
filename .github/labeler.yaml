@@ -33,6 +33,12 @@ ui:
   - changed-files:
       - any-glob-to-any-file: "ui/**"
 
+cli:
+  - changed-files:
+      - any-glob-to-any-file:
+          - "cmd/alchemy/**"
+          - "cmd/internal/cli/**"
+
 docs:
   - changed-files:
       - any-glob-to-any-file: "docs/**"

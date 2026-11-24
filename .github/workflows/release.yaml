@@ -35,13 +35,21 @@ jobs:
       prerelease: false
     secrets: inherit
 
+  cli:
+    needs: release
+    uses: ./.github/workflows/cli.yaml
+    with:
+      ref: ${{ needs.release.outputs.tag }}
+      tag: ${{ needs.release.outputs.tag }}
+    secrets: inherit
+
   # After the images, so the chart never names a version that cannot be pulled.
   chart:
     needs: [release, images]
     uses: ./.github/workflows/chart.yaml
 
   announce:
-    needs: [release, images, chart]
+    needs: [release, images, cli, chart]
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -64,6 +72,7 @@ jobs:
 
           install=$(cat <<INSTALL
           \`\`\`
+          brew upgrade galaxy-io/tap/alchemy
           helm upgrade alchemy oci://ghcr.io/galaxy-io/charts/alchemy --version ${version}
           \`\`\`
           INSTALL
