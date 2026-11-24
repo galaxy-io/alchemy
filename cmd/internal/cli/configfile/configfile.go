@@ -9,6 +9,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"syscall"
 
 	"gopkg.in/yaml.v3"
 )
@@ -17,6 +18,7 @@ const (
 	dirMode    = 0o700
 	fileMode   = 0o600
 	yamlIndent = 2
+	lockSuffix = ".lock"
 )
 
 // ErrMalformed marks a file that exists but does not parse.
@@ -37,6 +39,30 @@ func Load(path string, out any) error {
 		return fmt.Errorf("%w %s: %w", ErrMalformed, path, err)
 	}
 	return nil
+}
+
+// Update loads the file at path into doc and saves it when change reports a change. A lock keeps other CLI runs from interleaving.
+func Update(path string, doc any, change func() (bool, error)) error {
+	if err := os.MkdirAll(filepath.Dir(path), dirMode); err != nil {
+		return fmt.Errorf("create %s: %w", filepath.Dir(path), err)
+	}
+	// The lock is a sidecar file, because Save replaces the file itself.
+	lock, err := os.OpenFile(path+lockSuffix, os.O_CREATE|os.O_RDWR, fileMode) //nolint:gosec // the CLI names its own config files
+	if err != nil {
+		return fmt.Errorf("lock %s: %w", path, err)
+	}
+	defer func() { _ = lock.Close() }()
+	if err := syscall.Flock(int(lock.Fd()), syscall.LOCK_EX); err != nil { //nolint:gosec // a file descriptor fits an int
+		return fmt.Errorf("lock %s: %w", path, err)
+	}
+	if err := Load(path, doc); err != nil {
+		return err
+	}
+	changed, err := change()
+	if err != nil || !changed {
+		return err
+	}
+	return Save(path, doc)
 }
 
 // Save atomically replaces the file at path with doc, readable by its owner only.

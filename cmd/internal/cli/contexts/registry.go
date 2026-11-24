@@ -4,9 +4,11 @@ package contexts
 import (
 	"errors"
 	"fmt"
+	"net"
 	"net/url"
 	"regexp"
 	"sort"
+	"strings"
 
 	"github.com/galaxy-io/alchemy/cmd/internal/cli/configfile"
 )
@@ -90,6 +92,7 @@ func (r *Registry) Resolve(name string) (NamedTarget, error) {
 
 // Set validates and upserts a context without changing the selection.
 func (r *Registry) Set(name string, target Target) error {
+	target = clean(target)
 	if err := validate(name, target); err != nil {
 		return err
 	}
@@ -103,6 +106,7 @@ func (r *Registry) Set(name string, target Target) error {
 
 // SetAndUse persists a context and selects it in one file replacement.
 func (r *Registry) SetAndUse(name string, target Target) (NamedTarget, error) {
+	target = clean(target)
 	if err := validate(name, target); err != nil {
 		return NamedTarget{}, err
 	}
@@ -193,9 +197,11 @@ func (r *Registry) load() (Document, error) {
 		doc.Current = DefaultName
 	}
 	for name, target := range doc.Contexts {
+		target = clean(target)
 		if err := validate(name, target); err != nil {
 			return Document{}, err
 		}
+		doc.Contexts[name] = target
 	}
 	if _, exists := doc.Contexts[doc.Current]; !exists {
 		return Document{}, fmt.Errorf("current context %q does not exist", doc.Current)
@@ -220,6 +226,12 @@ func (s Store) Write(doc Document) error {
 	return configfile.Save(s.Path, doc)
 }
 
+// clean drops the endpoint's trailing slash, so routes join it with one.
+func clean(target Target) Target {
+	target.Endpoint = strings.TrimRight(target.Endpoint, "/")
+	return target
+}
+
 func validate(name string, target Target) error {
 	if !namePattern.MatchString(name) {
 		return fmt.Errorf("context name %q must match %s", name, namePattern)
@@ -237,4 +249,24 @@ func ValidateEndpoint(endpoint string) error {
 		return errors.New("server must be an absolute HTTP(S) URL")
 	}
 	return nil
+}
+
+// RequireSecure rejects sending credentials over plain HTTP to anything but this machine.
+func RequireSecure(endpoint string) error {
+	parsed, err := url.Parse(endpoint)
+	if err != nil {
+		return err
+	}
+	if parsed.Scheme == "https" || loopback(parsed.Hostname()) {
+		return nil
+	}
+	return fmt.Errorf("%s would send credentials unencrypted; use an https URL", endpoint)
+}
+
+func loopback(host string) bool {
+	if host == "localhost" {
+		return true
+	}
+	address := net.ParseIP(host)
+	return address != nil && address.IsLoopback()
 }

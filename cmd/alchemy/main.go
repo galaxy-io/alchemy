@@ -3,6 +3,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"os/signal"
@@ -24,8 +25,16 @@ func runMain() int {
 	cli := &cliApp{stdin: os.Stdin, stdout: os.Stdout, stderr: os.Stderr, contextPath: path}
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM, syscall.SIGHUP)
 	defer stop()
+	// Once cancelled, signals fall back to their defaults, so a second interrupt ends the process.
+	go func() {
+		<-ctx.Done()
+		stop()
+	}()
 	if err := cli.run(ctx, os.Args[1:]); err != nil {
-		printCLIError(err)
+		// An interrupt needs no explanation.
+		if !errors.Is(err, context.Canceled) {
+			printCLIError(err)
+		}
 		return exitFailure
 	}
 	return 0

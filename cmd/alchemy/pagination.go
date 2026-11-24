@@ -2,6 +2,7 @@ package main
 
 import (
 	"errors"
+	"fmt"
 
 	"github.com/spf13/cobra"
 
@@ -30,4 +31,12 @@ func (f listPageFlags) request() (*functionsv1.PaginationRequest, error) {
 		request.Cursor = &f.next
 	}
 	return request, nil
+}
+
+// continuation is command with the page size it ran with, for the next-page hint.
+func (f listPageFlags) continuation(command string) string {
+	if f.limit == defaultPageSize {
+		return command
+	}
+	return fmt.Sprintf("%s --limit %d", command, f.limit)
 }

@@ -2,12 +2,14 @@ package main
 
 import (
 	"context"
+	"errors"
 	"net/http"
 
 	"connectrpc.com/connect"
 
 	"github.com/galaxy-io/alchemy/api/functions/v1/functionsv1connect"
 	cliauth "github.com/galaxy-io/alchemy/cmd/internal/cli/auth"
+	"github.com/galaxy-io/alchemy/cmd/internal/cli/contexts"
 )
 
 // dial resolves the context and builds its client once.
@@ -22,6 +24,9 @@ func (a *cliApp) dial() error {
 	a.target = selected
 	var options []connect.ClientOption
 	if profile := selected.Target.AuthProfile; profile != "" {
+		if err := contexts.RequireSecure(selected.Target.Endpoint); err != nil {
+			return err
+		}
 		a.tokens = &cliauth.Source{Store: a.credentialStore(), Profile: profile}
 		options = append(options, connect.WithInterceptors(bearerInterceptor{tokens: *a.tokens}))
 	}
@@ -79,7 +84,7 @@ func (i bearerInterceptor) WrapUnary(next connect.UnaryFunc) connect.UnaryFunc {
 func (i bearerInterceptor) WrapStreamingClient(next connect.StreamingClientFunc) connect.StreamingClientFunc {
 	return func(ctx context.Context, spec connect.Spec) connect.StreamingClientConn {
 		conn := next(ctx, spec)
-		return &streamConn{StreamingClientConn: conn, err: authorize(ctx, i.tokens, conn.RequestHeader())}
+		return &streamConn{StreamingClientConn: conn, tokens: i.tokens, err: authorize(ctx, i.tokens, conn.RequestHeader())}
 	}
 }
 
@@ -90,7 +95,8 @@ func (i bearerInterceptor) WrapStreamingHandler(next connect.StreamingHandlerFun
 // streamConn surfaces a token failure from the first Send or Receive.
 type streamConn struct {
 	connect.StreamingClientConn
-	err error
+	tokens cliauth.Source
+	err    error
 }
 
 func (c *streamConn) Send(message any) error {
@@ -104,5 +110,12 @@ func (c *streamConn) Receive(message any) error {
 	if c.err != nil {
 		return c.err
 	}
-	return c.StreamingClientConn.Receive(message)
+	err := c.StreamingClientConn.Receive(message)
+	// A stream cannot be replayed, so a rejected token is dropped for the next attempt.
+	if connect.CodeOf(err) == connect.CodeUnauthenticated {
+		if dropErr := c.tokens.Invalidate(); dropErr != nil {
+			return errors.Join(err, dropErr)
+		}
+	}
+	return err
 }

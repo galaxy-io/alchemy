@@ -59,7 +59,10 @@ func (a *cliApp) invokeCommand() *cobra.Command {
 
 // invoke calls the plain HTTP route, so the output reaches stdout as is.
 func (a *cliApp) invoke(ctx context.Context, function string, flags invokeFlags) error {
-	input, err := a.input(flags.data, flags.file)
+	if flags.version < 0 {
+		return errors.New("--version must be a positive integer")
+	}
+	input, err := a.input(ctx, flags.data, flags.file)
 	if err != nil {
 		return err
 	}
@@ -124,7 +127,7 @@ func (a *cliApp) postInvoke(ctx context.Context, function string, flags invokeFl
 }
 
 // input reads the invoke body: --data, then --file, then piped stdin.
-func (a *cliApp) input(data, file string) ([]byte, error) {
+func (a *cliApp) input(ctx context.Context, data, file string) ([]byte, error) {
 	_, typed := style.Terminal(a.stdin)
 	switch {
 	case data != "" && file != "":
@@ -136,6 +139,6 @@ func (a *cliApp) input(data, file string) ([]byte, error) {
 	case file == "" && typed:
 		return nil, errors.New("no input; pass --data, --file, or pipe it on stdin")
 	default:
-		return io.ReadAll(a.stdin)
+		return await(ctx, func() ([]byte, error) { return io.ReadAll(a.stdin) })
 	}
 }

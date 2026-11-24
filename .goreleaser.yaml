@@ -36,6 +36,7 @@ changelog:
 
 release:
   mode: keep-existing
+  replace_existing_artifacts: true
   prerelease: auto
 
 homebrew_casks:

@@ -53,49 +53,60 @@ func (s Store) Put(name string, profile Profile) error {
 	if profile.Server == "" || profile.ClientID == "" || profile.ClientSecret == "" {
 		return fmt.Errorf("%w: %s needs a server, client id, and client secret", ErrProfileInvalid, name)
 	}
-	doc, err := s.Load()
-	if err != nil {
-		return err
-	}
-	doc.Profiles[name] = profile
-	return s.Write(doc)
+	return s.update(func(profiles map[string]Profile) bool {
+		profiles[name] = profile
+		return true
+	})
 }
 
 // Delete removes a profile. Deleting an absent profile is not an error.
 func (s Store) Delete(name string) error {
-	doc, err := s.Load()
-	if err != nil {
-		return err
-	}
-	if _, ok := doc.Profiles[name]; !ok {
-		return nil
-	}
-	delete(doc.Profiles, name)
-	return s.Write(doc)
+	return s.update(func(profiles map[string]Profile) bool {
+		_, stored := profiles[name]
+		delete(profiles, name)
+		return stored
+	})
 }
 
-// SaveCache persists a freshly minted token against an existing profile.
-func (s Store) SaveCache(name string, cache Cache) error {
-	return s.setCache(name, &cache)
+// SaveCache keeps a token minted with used, unless the profile's credentials have changed since.
+func (s Store) SaveCache(name string, used Profile, cache Cache) error {
+	return s.update(func(profiles map[string]Profile) bool {
+		profile, stored := profiles[name]
+		if !stored || !profile.sameCredentials(used) {
+			return false
+		}
+		profile.Cache = &cache
+		profiles[name] = profile
+		return true
+	})
 }
 
 // ClearCache drops a profile's cached token so the next Token call mints.
 func (s Store) ClearCache(name string) error {
-	return s.setCache(name, nil)
+	return s.update(func(profiles map[string]Profile) bool {
+		profile, stored := profiles[name]
+		if !stored || profile.Cache == nil {
+			return false
+		}
+		profile.Cache = nil
+		profiles[name] = profile
+		return true
+	})
 }
 
-func (s Store) setCache(name string, cache *Cache) error {
-	doc, err := s.Load()
-	if err != nil {
-		return err
-	}
-	profile, ok := doc.Profiles[name]
-	if !ok {
-		return fmt.Errorf("%w for %s", ErrProfileNotFound, name)
-	}
-	profile.Cache = cache
-	doc.Profiles[name] = profile
-	return s.Write(doc)
+func (p Profile) sameCredentials(other Profile) bool {
+	return p.Server == other.Server && p.ClientID == other.ClientID && p.ClientSecret == other.ClientSecret
+}
+
+// update changes the stored profiles under a lock and saves them when change reports a change.
+func (s Store) update(change func(profiles map[string]Profile) bool) error {
+	var doc Document
+	return configfile.Update(s.Path, &doc, func() (bool, error) {
+		if doc.Profiles == nil {
+			doc.Profiles = map[string]Profile{}
+		}
+		return change(doc.Profiles), nil
+	})
 }
 
 // Load reads the credential document. A missing file is an empty store.
@@ -108,9 +119,4 @@ func (s Store) Load() (Document, error) {
 		doc.Profiles = map[string]Profile{}
 	}
 	return doc, nil
-}
-
-// Write atomically replaces the credential document with owner-only permissions.
-func (s Store) Write(doc Document) error {
-	return configfile.Save(s.Path, doc)
 }

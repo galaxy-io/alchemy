@@ -53,7 +53,7 @@ func (s Source) Token(ctx context.Context) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	if err := s.Store.SaveCache(s.Profile, cache); err != nil {
+	if err := s.Store.SaveCache(s.Profile, profile, cache); err != nil {
 		return "", err
 	}
 	return cache.AccessToken, nil

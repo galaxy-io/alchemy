@@ -34,7 +34,7 @@ func (a *cliApp) functionListCommand() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			return a.text().Functions(res.Msg.GetFunctions(), res.Msg.GetPagination(), a.target.Name, "alchemy function list")
+			return a.text().Functions(res.Msg.GetFunctions(), res.Msg.GetPagination(), a.target.Name, page.continuation(a.commandLine("function list")))
 		},
 	}
 	page.add(cmd)

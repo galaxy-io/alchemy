@@ -154,13 +154,45 @@ func printSuccess(w io.Writer, message string) error {
 	return err
 }
 
+// commandLine spells a command with the context it ran against.
+func (a *cliApp) commandLine(command string) string {
+	if a.contextName == "" {
+		return "alchemy " + command
+	}
+	return "alchemy --context " + a.contextName + " " + command
+}
+
+// await runs a blocking read and gives up when ctx ends.
+func await[T any](ctx context.Context, read func() (T, error)) (T, error) {
+	type outcome struct {
+		value T
+		err   error
+	}
+	done := make(chan outcome, 1)
+	go func() {
+		value, err := read()
+		done <- outcome{value: value, err: err}
+	}()
+	select {
+	case <-ctx.Done():
+		var none T
+		return none, ctx.Err()
+	case result := <-done:
+		return result.value, result.err
+	}
+}
+
+func readLine(ctx context.Context, reader *bufio.Reader) (string, error) {
+	return await(ctx, func() (string, error) { return reader.ReadString('\n') })
+}
+
 // confirm asks a yes/no question. A closed stdin is an error, not a refusal.
-func (a *cliApp) confirm(question string) (bool, error) {
+func (a *cliApp) confirm(ctx context.Context, question string) (bool, error) {
 	out := a.statusWriter()
 	if _, err := fmt.Fprintf(out, "%s [y/N] ", question); err != nil {
 		return false, err
 	}
-	answer, err := bufio.NewReader(a.stdin).ReadString('\n')
+	answer, err := readLine(ctx, bufio.NewReader(a.stdin))
 	if err != nil && !errors.Is(err, io.EOF) {
 		return false, fmt.Errorf("read confirmation: %w", err)
 	}

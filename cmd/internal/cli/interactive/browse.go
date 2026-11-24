@@ -85,6 +85,10 @@ func (r *Renderer) pick(ctx context.Context, title, empty string, table []option
 		options = append(options, option{label: "Done", value: back})
 	}
 	selected, err := r.choose(ctx, title, description, options)
+	// An interrupt also reads as a cancel, so it is checked first.
+	if interrupted(err) {
+		return "", err
+	}
 	if cancelled(err) {
 		return back, nil
 	}
