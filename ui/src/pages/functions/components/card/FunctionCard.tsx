@@ -18,7 +18,8 @@ import FunctionCardHeader from "@/pages/functions/components/card/FunctionCardHe
 import FunctionCardRecentInvocations from "@/pages/functions/components/card/FunctionCardRecentInvocations";
 import type { FunctionCardMetrics } from "@/pages/functions/components/card/types";
 import FunctionVersionChip from "@/pages/functions/components/FunctionVersionChip";
-import { getFunctionCurrentVersion, getFunctionVersionRuntime } from "@/pages/functions/utils";
+import { useFunctionRuntime } from "@/pages/functions/hooks/useFunctionRuntime";
+import { getFunctionCurrentVersion } from "@/pages/functions/utils";
 
 import { useAlchemyNavigate } from "@/module/hooks";
 import { AlchemyPath } from "@/module/paths";
@@ -34,7 +35,7 @@ interface FunctionCardProps {
 const FunctionCard: FC<FunctionCardProps> = ({ alchemyFunction, metrics, runtimes }) => {
   const navigate = useAlchemyNavigate();
   const currentVersion = getFunctionCurrentVersion(alchemyFunction);
-  const runtime = getFunctionVersionRuntime(runtimes, currentVersion);
+  const runtime = useFunctionRuntime(alchemyFunction, runtimes);
 
   const handleOpen = () => {
     void navigate({ to: AlchemyPath.FUNCTION, params: { id: alchemyFunction.id } });

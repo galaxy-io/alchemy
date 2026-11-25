@@ -10,10 +10,9 @@ import type { Function as AlchemyFunction } from "@/gen/functions/v1/functions_p
 import { FUNCTION_NAME_SKELETON_WIDTH } from "@/components/functions/constants";
 
 import FunctionRuntimeIcon from "@/pages/functions/components/FunctionRuntimeIcon";
-import { getFunctionCurrentVersion, getFunctionVersionRuntime } from "@/pages/functions/utils";
+import { useFunctionRuntime } from "@/pages/functions/hooks/useFunctionRuntime";
 
 import { createGetFunctionInput, useGetFunctionQuery } from "@/api/queries/functions";
-import { useListRuntimesQuery } from "@/api/queries/runtimes";
 
 interface FunctionNameWithRuntimeIconProps {
   functionId: AlchemyFunction["id"];
@@ -24,14 +23,8 @@ const FunctionNameWithRuntimeIcon: FC<FunctionNameWithRuntimeIconProps> = ({ fun
     input: createGetFunctionInput(functionId),
     options: { retry: false },
   });
-  const { data: runtimesData } = useListRuntimesQuery();
   const alchemyFunction = data?.function;
-  const runtime = alchemyFunction
-    ? getFunctionVersionRuntime(
-        runtimesData?.runtimes ?? [],
-        getFunctionCurrentVersion(alchemyFunction),
-      )
-    : undefined;
+  const runtime = useFunctionRuntime(alchemyFunction);
 
   if (isLoading) {
     return (
