@@ -18,16 +18,22 @@ import {
 
 import RouterLink from "@/components/RouterLink";
 
+import FunctionRuntimeIcon from "@/pages/functions/components/FunctionRuntimeIcon";
 import FunctionPageVersionSelect from "@/pages/functions/components/header/FunctionPageVersionSelect";
 import {
   FUNCTION_DESCRIPTION_MAX_LENGTH,
   FUNCTION_NAME_MAX_LENGTH,
 } from "@/pages/functions/constants";
-import { getFunctionNameError } from "@/pages/functions/utils";
+import {
+  getFunctionCurrentVersion,
+  getFunctionNameError,
+  getFunctionVersionRuntime,
+} from "@/pages/functions/utils";
 
 import { AlchemyPath, createAlchemyHref } from "@/module/paths";
 
 import { useUpdateFunctionMutation } from "@/api/queries/functions";
+import { useListRuntimesQuery } from "@/api/queries/runtimes";
 
 import { getErrorMessage } from "@/utils/errors";
 
@@ -38,6 +44,11 @@ interface FunctionPageHeadingProps {
 const FunctionPageHeading: FC<FunctionPageHeadingProps> = ({ alchemyFunction }) => {
   const { toast } = useToast();
   const { mutate: updateFunction } = useUpdateFunctionMutation();
+  const { data: runtimesData } = useListRuntimesQuery();
+  const runtime = getFunctionVersionRuntime(
+    runtimesData?.runtimes ?? [],
+    getFunctionCurrentVersion(alchemyFunction),
+  );
 
   const handleUpdate = (patch: Pick<UpdateFunctionRequest, "name" | "description">) => {
     updateFunction(
@@ -81,6 +92,7 @@ const FunctionPageHeading: FC<FunctionPageHeadingProps> = ({ alchemyFunction }) 
         href={createAlchemyHref(AlchemyPath.FUNCTIONS)}
         as={RouterLink}
       />
+      {runtime ? <FunctionRuntimeIcon runtime={runtime} /> : null}
       <EditableText
         ariaLabel="Function name"
         value={alchemyFunction.name}
