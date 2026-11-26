@@ -27,17 +27,18 @@ const OBSERVABILITY_HISTORY_WIDGET_CSS = css`
 `;
 
 const ObservabilityHistoryWidget: FC = () => {
-  const { timeframe, invocationsBucket, invocationsStatus, refreshInterval } =
+  const { timeframe, invocationsBucket, invocationsStatus, invocationsFunction, refreshInterval } =
     useObservabilitySearch();
   const { granularity } = INVOCATIONS_TIMEFRAME_TO_CONFIG_MAP[timeframe];
   const bucketStartMs = useObservabilityBucketStart(granularity);
 
   const input = useMemo(
     () => ({
+      functionIds: invocationsFunction === undefined ? [] : [invocationsFunction],
       statuses: invocationsStatus === undefined ? [] : [invocationsStatus],
       ...createHistoryWindowInput(timeframe, bucketStartMs, invocationsBucket),
     }),
-    [timeframe, bucketStartMs, invocationsBucket, invocationsStatus],
+    [timeframe, bucketStartMs, invocationsBucket, invocationsStatus, invocationsFunction],
   );
 
   const { data, isLoading, hasNextPage, isFetchingNextPage, fetchNextPage } =

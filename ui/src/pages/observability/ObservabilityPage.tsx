@@ -2,6 +2,7 @@ import type { FC } from "react";
 
 import { css } from "@linaria/core";
 
+import GalaxyAlchemyWordmark from "@galaxy-io/dls/brand/GalaxyAlchemyWordmark";
 import ChartGroupProvider from "@galaxy-io/dls/charts/ChartGroupProvider";
 import Flex, { FlexDirection } from "@galaxy-io/dls/layout/Flex";
 import Grid from "@galaxy-io/dls/layout/Grid";
@@ -15,7 +16,10 @@ import ObservabilityLatencyWidget from "@/pages/observability/components/latency
 import ObservabilityMetricsWidget from "@/pages/observability/components/metrics/ObservabilityMetricsWidget";
 import ObservabilityPageActions from "@/pages/observability/components/ObservabilityPageActions";
 import ObservabilityTrafficWidget from "@/pages/observability/components/traffic/ObservabilityTrafficWidget";
-import { OBSERVABILITY_CHART_MIN_WIDTH } from "@/pages/observability/constants";
+import {
+  OBSERVABILITY_CHART_MIN_WIDTH,
+  OBSERVABILITY_WORDMARK_SIZE,
+} from "@/pages/observability/constants";
 import { useObservabilityScrollTakeover } from "@/pages/observability/hooks/useObservabilityScrollTakeover";
 
 const OBSERVABILITY_PAGE_SCROLL_CSS = css`
@@ -28,7 +32,10 @@ const ObservabilityPage: FC = () => {
   const { scrollRef, takeoverRef } = useObservabilityScrollTakeover();
 
   return (
-    <PageLayout header="Observability" actions={<ObservabilityPageActions />}>
+    <PageLayout
+      header={<GalaxyAlchemyWordmark size={OBSERVABILITY_WORDMARK_SIZE} ariaLabel="Alchemy" />}
+      actions={<ObservabilityPageActions />}
+    >
       <ChartGroupProvider shouldShareTooltip>
         <ScrollArea ref={scrollRef} className={OBSERVABILITY_PAGE_SCROLL_CSS}>
           <Flex direction={FlexDirection.COLUMN} gap={12} padding={16}>

@@ -14,6 +14,7 @@ import { INVOCATIONS_DEFAULT_TIMEFRAME } from "@/components/invocations/constant
 
 import { FUNCTION_WORKBENCH_DEFAULT_FILE } from "@/pages/functions/workbench/constants";
 import {
+  OBSERVABILITY_DEFAULT_INVOCATIONS_GROUP,
   OBSERVABILITY_DEFAULT_REFRESH_INTERVAL,
   OBSERVABILITY_DEFAULT_TRAFFIC_FILL,
 } from "@/pages/observability/constants";
@@ -139,6 +140,8 @@ export const useObservabilitySearch = () =>
         refreshInterval: parsed.refreshInterval ?? OBSERVABILITY_DEFAULT_REFRESH_INTERVAL,
         invocationsBucket: parsed.invocationsBucket,
         invocationsStatus: parsed.invocationsStatus,
+        invocationsGroup: parsed.invocationsGroup ?? OBSERVABILITY_DEFAULT_INVOCATIONS_GROUP,
+        invocationsFunction: parsed.invocationsFunction,
       };
     },
   });

@@ -229,8 +229,8 @@ importers:
         specifier: ^2.1.0
         version: 2.2.0(@bufbuild/protobuf@2.16.0)(@connectrpc/connect@2.2.0(@bufbuild/protobuf@2.16.0))
       '@galaxy-io/dls':
-        specifier: ^2.14.0
-        version: 2.14.0(50e1cb584994dbb51741323ed2c71c7d)
+        specifier: ^2.14.7
+        version: 2.14.7(27035bba499cfa7ec7ca95c3e4da699d)
       '@lezer/highlight':
         specifier: ^1.2.3
         version: 1.2.5
@@ -723,14 +723,15 @@ packages:
   '@floating-ui/utils@0.2.12':
     resolution: {integrity: sha512-HpCo8tmWzLVad5s2d19EhAz5zqrrQ6s69qd6moPMQvkOuSwDT1YgRfWSVuc4ennqrgv3OHppiOGMQ7oC13yIww==}
 
-  '@galaxy-io/dls@2.14.0':
-    resolution: {integrity: sha512-DoEigYKDO1DBzWLgw+hXmP3BfpoawvQITlur44+d4tjiGPM32HN6pgUoges5F0HUrdB23i3u7VyQBs5RTHBkYA==}
+  '@galaxy-io/dls@2.14.7':
+    resolution: {integrity: sha512-QYiFkJWUFrAhu9wmHomBS0fhuwVnPfLqTuEq8iiJWnneWmLdQIzv73g54MoND/Eo8L+0MS3Koc0s68Cpu+6YUw==}
     engines: {node: '>=22'}
     peerDependencies:
       '@babel/preset-react': ^7.24.0
       '@babel/preset-typescript': ^7.24.0
       '@biomejs/biome': ^2.5.15
       '@codemirror/autocomplete': ^6.20.3
+      '@codemirror/language': ^6.12.3
       '@codemirror/state': 6.7.5
       '@codemirror/view': 6.43.12
       '@lezer/highlight': ^1.2.3
@@ -760,6 +761,8 @@ packages:
       '@biomejs/biome':
         optional: true
       '@codemirror/autocomplete':
+        optional: true
+      '@codemirror/language':
         optional: true
       '@codemirror/state':
         optional: true
@@ -2668,7 +2671,7 @@ snapshots:
 
   '@floating-ui/utils@0.2.12': {}
 
-  '@galaxy-io/dls@2.14.0(50e1cb584994dbb51741323ed2c71c7d)':
+  '@galaxy-io/dls@2.14.7(27035bba499cfa7ec7ca95c3e4da699d)':
     dependencies:
       '@floating-ui/react': 0.27.20(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
       '@linaria/core': 7.0.0
@@ -2684,6 +2687,7 @@ snapshots:
       '@babel/preset-typescript': 7.29.7(@babel/core@7.29.7)
       '@biomejs/biome': 2.5.15
       '@codemirror/autocomplete': 6.20.3
+      '@codemirror/language': 6.13.1
       '@codemirror/state': 6.7.5
       '@codemirror/view': 6.43.12
       '@lezer/highlight': 1.2.5
