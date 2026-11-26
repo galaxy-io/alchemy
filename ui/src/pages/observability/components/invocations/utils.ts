@@ -25,22 +25,24 @@ import { mapWireTokenToInvocationStatus } from "@/components/invocations/utils";
 import {
   OBSERVABILITY_INVOCATIONS_COLOR,
   OBSERVABILITY_INVOCATIONS_FUNCTION_COLORS,
+  OBSERVABILITY_INVOCATIONS_GROUP_TO_DIMENSION_MAP,
   OBSERVABILITY_INVOCATIONS_LABEL,
 } from "@/pages/observability/components/invocations/constants";
 import type {
   ObservabilityInvocationsMetric,
   ObservabilityInvocationsSeriesEntry,
 } from "@/pages/observability/components/invocations/types";
+import { ObservabilityInvocationsGroup } from "@/pages/observability/types";
 import { createObservabilityTimeseriesInput } from "@/pages/observability/utils";
 
 export const createObservabilityInvocationsInput = (
   timeframe: InvocationsTimeframe,
   bucketStartMs: number,
-  group: MetricDimension,
+  group: ObservabilityInvocationsGroup,
 ) =>
   createObservabilityTimeseriesInput(timeframe, bucketStartMs, {
     metrics: [Metric.INVOCATION_COUNT],
-    groupBy: group,
+    groupBy: OBSERVABILITY_INVOCATIONS_GROUP_TO_DIMENSION_MAP[group],
     filters: [
       create(MetricFilterSchema, {
         dimension: MetricDimension.STATUS,
@@ -86,26 +88,29 @@ const getObservabilityInvocationsFunctionEntries = (
     }));
 
 const getObservabilityInvocationsEntries = (
-  group: MetricDimension,
+  group: ObservabilityInvocationsGroup,
   series: Timeseries[],
   functionsById: Map<AlchemyFunction["id"], AlchemyFunction>,
 ): ObservabilityInvocationsSeriesEntry[] =>
   match(group)
-    .with(MetricDimension.STATUS, () => getObservabilityInvocationsStatusEntries(series))
-    .with(MetricDimension.FUNCTION_ID, () =>
-      getObservabilityInvocationsFunctionEntries(series, functionsById),
-    )
-    .otherwise(() => [
+    .with(ObservabilityInvocationsGroup.NONE, () => [
       {
         key: OBSERVABILITY_INVOCATIONS_LABEL,
         label: OBSERVABILITY_INVOCATIONS_LABEL,
         color: OBSERVABILITY_INVOCATIONS_COLOR,
         points: series[0]?.points ?? [],
       },
-    ]);
+    ])
+    .with(ObservabilityInvocationsGroup.STATUS, () =>
+      getObservabilityInvocationsStatusEntries(series),
+    )
+    .with(ObservabilityInvocationsGroup.FUNCTION, () =>
+      getObservabilityInvocationsFunctionEntries(series, functionsById),
+    )
+    .exhaustive();
 
 export const mapTimeseriesToInvocationsGroups = (
-  group: MetricDimension,
+  group: ObservabilityInvocationsGroup,
   series: Timeseries[],
   functionsById: Map<AlchemyFunction["id"], AlchemyFunction>,
 ): BarChartGroupDatum<ObservabilityInvocationsMetric>[] => {
@@ -128,43 +133,57 @@ export const mapTimeseriesToInvocationsGroups = (
   }));
 };
 
+export const getObservabilityInvocationsFunctionIds = (
+  group: ObservabilityInvocationsGroup,
+  series: Timeseries[],
+) =>
+  match(group)
+    .with(ObservabilityInvocationsGroup.FUNCTION, () =>
+      series
+        .filter((functionSeries) => functionSeries.key !== "" && sumTimeseries(functionSeries) > 0)
+        .map(({ key }) => key),
+    )
+    .with(ObservabilityInvocationsGroup.NONE, ObservabilityInvocationsGroup.STATUS, () => [])
+    .exhaustive();
+
 export const getObservabilityInvocationsSeriesKey = (
-  group: MetricDimension,
+  group: ObservabilityInvocationsGroup,
   invocationsStatus: InvocationStatus | undefined,
   invocationsFunction: AlchemyFunction["id"] | undefined,
 ) =>
   match(group)
-    .with(MetricDimension.STATUS, () =>
+    .with(ObservabilityInvocationsGroup.NONE, () => undefined)
+    .with(ObservabilityInvocationsGroup.STATUS, () =>
       invocationsStatus === undefined
         ? undefined
         : INVOCATION_STATUS_TO_WIRE_TOKEN_MAP[invocationsStatus],
     )
-    .with(MetricDimension.FUNCTION_ID, () => invocationsFunction)
-    .otherwise(() => undefined);
+    .with(ObservabilityInvocationsGroup.FUNCTION, () => invocationsFunction)
+    .exhaustive();
 
-const mapSeriesKeyToInvocationsStatus = (seriesKey: string) => {
-  const status = mapWireTokenToInvocationStatus(seriesKey);
+const mapSeriesKeyToInvocationsStatus = (seriesKey: string | undefined) => {
+  const status = mapWireTokenToInvocationStatus(seriesKey ?? "");
   return status === InvocationStatus.UNSPECIFIED ? undefined : status;
 };
 
 export const mapChartSelectionToInvocationsFilter = (
-  group: MetricDimension,
+  group: ObservabilityInvocationsGroup,
   selection: ChartSelection | undefined,
-) => {
-  const seriesKey = selection?.seriesKey;
-  return {
-    invocationsBucket:
-      selection?.categoryKey === undefined ? undefined : BigInt(selection.categoryKey),
-    invocationsStatus:
-      group === MetricDimension.STATUS && seriesKey !== undefined
-        ? mapSeriesKeyToInvocationsStatus(seriesKey)
-        : undefined,
-    invocationsFunction: group === MetricDimension.FUNCTION_ID && seriesKey ? seriesKey : undefined,
-  };
-};
-
-export const getObservabilityInvocationsAriaLabel = (group: MetricDimension) =>
-  match(group)
-    .with(MetricDimension.STATUS, () => "Invocations by status")
-    .with(MetricDimension.FUNCTION_ID, () => "Invocations by function")
-    .otherwise(() => OBSERVABILITY_INVOCATIONS_LABEL);
+) => ({
+  invocationsBucket:
+    selection?.categoryKey === undefined ? undefined : BigInt(selection.categoryKey),
+  ...match(group)
+    .with(ObservabilityInvocationsGroup.NONE, () => ({
+      invocationsStatus: undefined,
+      invocationsFunction: undefined,
+    }))
+    .with(ObservabilityInvocationsGroup.STATUS, () => ({
+      invocationsStatus: mapSeriesKeyToInvocationsStatus(selection?.seriesKey),
+      invocationsFunction: undefined,
+    }))
+    .with(ObservabilityInvocationsGroup.FUNCTION, () => ({
+      invocationsStatus: undefined,
+      invocationsFunction: selection?.seriesKey || undefined,
+    }))
+    .exhaustive(),
+});

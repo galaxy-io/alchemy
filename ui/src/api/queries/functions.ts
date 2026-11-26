@@ -2,6 +2,7 @@ import { create } from "@bufbuild/protobuf";
 import type { Transport } from "@connectrpc/connect";
 import {
   createConnectQueryKey,
+  createQueryOptions,
   type UseMutationOptions,
   type UseQueryOptions,
   useMutation,
@@ -10,7 +11,7 @@ import {
   useSuspenseQuery,
   useTransport,
 } from "@connectrpc/connect-query";
-import { useQueryClient } from "@tanstack/react-query";
+import { type UseQueryResult, useQueries, useQueryClient } from "@tanstack/react-query";
 
 import {
   type Function as AlchemyFunction,
@@ -106,6 +107,24 @@ export const useGetFunctionQuery = ({
   return useQuery(FunctionsService.method.getFunction, input, {
     refetchInterval: (query) => getGetFunctionRefetchInterval(query.state.data?.function),
     ...options,
+  });
+};
+
+const combineGetFunctionsResults = (results: UseQueryResult<GetFunctionResponse>[]) => ({
+  functions: results.flatMap(({ data }) => (data?.function ? [data.function] : [])),
+  isLoading: results.some(({ isLoading }) => isLoading),
+});
+
+export const useGetFunctionsQueries = ({ ids }: { ids: AlchemyFunction["id"][] }) => {
+  const transport = useTransport();
+  return useQueries({
+    queries: ids.map((id) => ({
+      ...createQueryOptions(FunctionsService.method.getFunction, createGetFunctionInput(id), {
+        transport,
+      }),
+      retry: false,
+    })),
+    combine: combineGetFunctionsResults,
   });
 };
 

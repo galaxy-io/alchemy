@@ -1,5 +1,5 @@
 import { StartKind } from "@/gen/functions/v1/invocations_pb";
-import { MetricDimension, MetricGranularity } from "@/gen/metrics/v1/metrics_pb";
+import { MetricGranularity } from "@/gen/metrics/v1/metrics_pb";
 
 import {
   INVOCATIONS_DAY_MS,
@@ -8,13 +8,14 @@ import {
 } from "@/components/invocations/constants";
 
 import {
+  ObservabilityInvocationsGroup,
   ObservabilityRefreshInterval,
   ObservabilityTrafficFill,
 } from "@/pages/observability/types";
 
 export const OBSERVABILITY_DEFAULT_TRAFFIC_FILL = ObservabilityTrafficFill.VOLUME;
 
-export const OBSERVABILITY_DEFAULT_INVOCATIONS_GROUP = MetricDimension.STATUS;
+export const OBSERVABILITY_DEFAULT_INVOCATIONS_GROUP = ObservabilityInvocationsGroup.STATUS;
 
 export const OBSERVABILITY_DEFAULT_REFRESH_INTERVAL = ObservabilityRefreshInterval.ONE_MINUTE;
 

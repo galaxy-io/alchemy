@@ -31,7 +31,7 @@ The design reference is the `feat/examples` proof of concept: same screens, same
 
 | Route (module-relative) | Page | Job |
 |---|---|---|
-| `./observability` | `ObservabilityPage` | KPI row, invocations by status, mean latency by start kind, weekday × hour traffic heatmap, then History: a flush, full-height infinite invocations table that takes over the scroll, windowed to the timeframe and filtered by the chart selection (`invocationsBucket`, `invocationsStatus`) |
+| `./observability` | `ObservabilityPage` | The page header is `GalaxyAlchemyWordmark`, not a title. KPI row, invocations by status or by function (a clearable Group by select in the widget's `actions`, `invocationsGroup`, Status by default), mean latency by start kind, weekday × hour traffic heatmap, then History: a flush, full-height infinite invocations table that takes over the scroll, windowed to the timeframe and filtered by the chart selection (`invocationsBucket`, plus `invocationsStatus` or `invocationsFunction`, whichever the grouping owns) |
 | `./functions` | `FunctionsPage` | Cards: current version, invocations in the last 24 hours, success, mean duration, last ten statuses. New function (`Flow.CREATE_FUNCTION`) |
 | `./functions/$id` | `FunctionPage` + `FunctionOverviewPage` | Heading with version select, build banner, New version (`Flow.CREATE_FUNCTION_VERSION`) and Invoke. Overview: 24h KPIs and the function's invocations |
 | `./functions/$id/workbench` | `FunctionWorkbenchPage` | Files, editor and result. The tree holds the version's source files first (from `GetFunctionVersion`, editable, `?file=source:<path>`; Build ships the edits as a new version), then `input.json` (editable), `contract/input.json`, `contract/output.json` and `spec.json` (read-only); `?file=` selects one, and the toolbar names it in the wizard's file pill (runtime logo, path) with a lock after a read-only one; ⌘↵ runs the READY version. The result is the drawer's layout: the full invocation id (opens the drawer) with a copy button, `InvocationOutcome` (the outcome header, then on a failure the reason in mono (`platform_error` or the function error's message) with one line per contract violation, path then message, then the phase bar), the output, and `InvocationLogsSplit`'s resizable logs strip |
@@ -87,6 +87,7 @@ The create wizard (`flow=CREATE_FUNCTION`, `components/create/`) is a fullscreen
 | Run status mark | `InvocationStatusSwatch` (square), a pulsing `Beacon` while starting or running. Instance state is a `Beacon` |
 | Timeframes | `InvocationsTimeframe` (1 hour, 24 hours, 7 days) in `components/invocations`, shared by Observability and both invocation lists. Lists send it as `sinceMs`, rounded to the minute by `useInvocationsTimeframeSince` |
 | Metrics | Never compute stats from a page of invocations in the browser |
+| Branching on a proto enum | `ts-pattern` cannot prove a numeric proto enum exhaustive. Give the view its own string enum (`ObservabilityInvocationsGroup`), match on that with `.exhaustive()`, and map it to the proto enum with a `Record` in `constants.ts` |
 
 ## The layout of `ui/src`
 

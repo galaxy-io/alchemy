@@ -1,12 +1,12 @@
 import z from "zod";
 
 import { InvocationStatus } from "@/gen/functions/v1/invocations_pb";
-import { MetricDimension } from "@/gen/metrics/v1/metrics_pb";
 
 import { InvocationsTimeframe } from "@/components/invocations/types";
 
 import type { FunctionContractKind } from "@/pages/functions/types";
 import {
+  ObservabilityInvocationsGroup,
   ObservabilityRefreshInterval,
   ObservabilityTrafficFill,
 } from "@/pages/observability/types";
@@ -64,7 +64,7 @@ export const observabilitySearchSchema = z.object({
   refreshInterval: z.enum(ObservabilityRefreshInterval).optional().catch(undefined),
   invocationsBucket: z.coerce.bigint().positive().optional().catch(undefined),
   invocationsStatus: z.enum(InvocationStatus).optional().catch(undefined),
-  invocationsGroup: z.enum(MetricDimension).optional().catch(undefined),
+  invocationsGroup: z.enum(ObservabilityInvocationsGroup).optional().catch(undefined),
   invocationsFunction: z.string().min(1).optional().catch(undefined),
 });
 

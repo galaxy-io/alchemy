@@ -11,15 +11,17 @@ import {
 import Box from "@galaxy-io/dls/layout/Box";
 import Widget from "@galaxy-io/dls/widget/Widget";
 
-import { MetricDimension } from "@/gen/metrics/v1/metrics_pb";
-
 import { INVOCATIONS_TIMEFRAME_TO_CONFIG_MAP } from "@/components/invocations/constants";
 
-import { OBSERVABILITY_INVOCATIONS_SERIES } from "@/pages/observability/components/invocations/constants";
+import {
+  OBSERVABILITY_INVOCATIONS_GROUP_TO_ARIA_LABEL_MAP,
+  OBSERVABILITY_INVOCATIONS_LABEL,
+  OBSERVABILITY_INVOCATIONS_SERIES,
+} from "@/pages/observability/components/invocations/constants";
 import ObservabilityInvocationsGroupSelect from "@/pages/observability/components/invocations/ObservabilityInvocationsGroupSelect";
 import {
   createObservabilityInvocationsInput,
-  getObservabilityInvocationsAriaLabel,
+  getObservabilityInvocationsFunctionIds,
   getObservabilityInvocationsSeriesKey,
   mapChartSelectionToInvocationsFilter,
   mapTimeseriesToInvocationsGroups,
@@ -59,9 +61,12 @@ const ObservabilityInvocationsWidget: FC = () => {
     options: { refetchInterval: OBSERVABILITY_REFRESH_INTERVAL_TO_MS_MAP[refreshInterval] },
   });
 
-  const { functionsById, isLoading: isFunctionsLoading } = useObservabilityFunctionsById(
-    invocationsGroup === MetricDimension.FUNCTION_ID,
+  const functionIds = useMemo(
+    () => getObservabilityInvocationsFunctionIds(invocationsGroup, data?.series ?? []),
+    [invocationsGroup, data],
   );
+  const { functionsById, isLoading: isFunctionsLoading } =
+    useObservabilityFunctionsById(functionIds);
 
   const groups = useMemo(
     () => mapTimeseriesToInvocationsGroups(invocationsGroup, data?.series ?? [], functionsById),
@@ -86,7 +91,7 @@ const ObservabilityInvocationsWidget: FC = () => {
 
   return (
     <Widget
-      header="Invocations"
+      header={OBSERVABILITY_INVOCATIONS_LABEL}
       icon={ChartBarIcon}
       actions={<ObservabilityInvocationsGroupSelect />}
       isFlush
@@ -94,7 +99,7 @@ const ObservabilityInvocationsWidget: FC = () => {
     >
       <Box height={OBSERVABILITY_CHART_HEIGHT} padding={[12, 16]}>
         <BarChart
-          ariaLabel={getObservabilityInvocationsAriaLabel(invocationsGroup)}
+          ariaLabel={OBSERVABILITY_INVOCATIONS_GROUP_TO_ARIA_LABEL_MAP[invocationsGroup]}
           series={OBSERVABILITY_INVOCATIONS_SERIES}
           groups={groups}
           labelFormatter={getBucketLabelFormatter(granularity)}
