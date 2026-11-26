@@ -99,6 +99,7 @@ func (s *Service) checkCall(raw []byte, key string, retries *int32) error {
 // run announces one tracked invocation, sends it to a host and returns its
 // result.
 func (s *Service) run(ctx context.Context, start time.Time, inv *invocation, cv *compiledVersion, raw []byte) (*connect.Response[functionsv1.InvokeResponse], error) {
+	defer inv.observeCall(ctx, start)
 	inv.announce()
 	timeout := cv.timeout
 	accepted := inv.accepted
@@ -127,6 +128,7 @@ func (s *Service) run(ctx context.Context, start time.Time, inv *invocation, cv 
 		} else {
 			inv.errored(err.Error())
 		}
+		inv.countUnserved(ctx)
 		return nil, platformError(ctx, err)
 	}
 	if e := out.GetError(); e != nil {
@@ -362,6 +364,24 @@ func (i *invocation) end(fn func(*functionsv1.Invocation)) *functionsv1.Invocati
 	}
 	i.s.publishInvocation(inv)
 	return inv
+}
+
+// countUnserved counts an invocation that ended with no host to count it.
+func (i *invocation) countUnserved(ctx context.Context) {
+	inv := i.s.tracker.get(i.accepted.GetId())
+	if inv == nil {
+		return
+	}
+	if host := inv.GetHost(); host == "" || host == queuedHost {
+		i.s.metrics.InvocationUnserved(ctx, inv)
+	}
+}
+
+// observeCall records how long the caller waited since start.
+func (i *invocation) observeCall(ctx context.Context, start time.Time) {
+	if inv := i.s.tracker.get(i.accepted.GetId()); inv != nil && terminal(inv.GetStatus()) {
+		i.s.metrics.CallEnded(ctx, inv, time.Since(start))
+	}
 }
 
 // finished records the caller's view of a reply from a host. The host

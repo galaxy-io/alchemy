@@ -86,6 +86,8 @@ github.com/awslabs/amazon-ecr-credential-helper/ecr-login v0.12.0 h1:JFWXO6QPihC
 github.com/awslabs/amazon-ecr-credential-helper/ecr-login v0.12.0/go.mod h1:046/oLyFlYdAghYQE2yHXi/E//VM5Cf3/dFmA+3CZ0c=
 github.com/bmatcuk/doublestar/v4 v4.10.4 h1:oTKkRmRuOsKMqFe1AQazd9gGBFNEpOmgKp/xzB97dnA=
 github.com/bmatcuk/doublestar/v4 v4.10.4/go.mod h1:xBQ8jztBU6kakFMg+8WGxn0c6z1fTSPVIjEY1Wr7jzc=
+github.com/cenkalti/backoff/v5 v5.0.3 h1:ZN+IMa753KfX5hd8vVaMixjnqRZ3y8CuJKRKj1xcsSM=
+github.com/cenkalti/backoff/v5 v5.0.3/go.mod h1:rkhZdG3JZukswDf7f0cwqPNk4K0sa+F97BxZthm/crw=
 github.com/cespare/xxhash/v2 v2.3.0 h1:UL815xU9SqsFlibzuggzjXhog7bL6oX9BbNZnL2UFvs=
 github.com/cespare/xxhash/v2 v2.3.0/go.mod h1:VGX0DQ3Q6kWi7AoAeZDth3/j3BFtOZR5XLFGgcrjCOs=
 github.com/cncf/xds/go v0.0.0-20260202195803-dba9d589def2 h1:aBangftG7EVZoUb69Os8IaYg++6uMOdKK83QtkkvJik=
@@ -254,6 +256,10 @@ go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.71.0 h1:3g7B90U
 go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.71.0/go.mod h1:Ef8SuTh59BT7+ofpDxN9z+yOlc4t2GjLmKDgYNJL/NU=
 go.opentelemetry.io/otel v1.47.0 h1:j7ALJ/zgkS7Z6aeJW09p8VC9804bC+PpeTfCD4XPnOM=
 go.opentelemetry.io/otel v1.47.0/go.mod h1:8wS9O2qfXrYrzp6hIF/HOYJJf/wIhFPhR2xLuP+iXQU=
+go.opentelemetry.io/otel/exporters/otlp/otlpmetric/otlpmetricgrpc v1.47.0 h1:LaLVGJtIzHcvHjVs2OftmKcc+M9mdOqS8vZ1fBD1Yes=
+go.opentelemetry.io/otel/exporters/otlp/otlpmetric/otlpmetricgrpc v1.47.0/go.mod h1:vF6H5sNDuQBJWgSX00iZgbIqk2MZZoVMH0ar5t5bOpw=
+go.opentelemetry.io/otel/exporters/otlp/otlpmetric/otlpmetrichttp v1.47.0 h1:7kszRN4Ze5GeAkUnBjBSUIunVBMA+mZIG04auueqguM=
+go.opentelemetry.io/otel/exporters/otlp/otlpmetric/otlpmetrichttp v1.47.0/go.mod h1:CLzakYy8jOdkBfcveCWYkeKJxujcF4xPhh2Z7IfE98U=
 go.opentelemetry.io/otel/exporters/stdout/stdoutmetric v1.46.0 h1:PR9eAf7o0dQs3hshZNZpE9aW2dXWX/KdDf6pJilVD3U=
 go.opentelemetry.io/otel/exporters/stdout/stdoutmetric v1.46.0/go.mod h1:2Z4KyNdH1uuzivdinyfGsxzNNT/Rl45pwtVwfYVI0xk=
 go.opentelemetry.io/otel/log v1.47.0 h1:cOTS1CcLbSQeZKanGJ+0JpF/+t4PELi3O3bbl2lqCcI=
@@ -268,6 +274,8 @@ go.opentelemetry.io/otel/sdk/metric v1.47.0 h1:lfISg2j93VT6yqdk9OfUaZmw/GfcZqCCV
 go.opentelemetry.io/otel/sdk/metric v1.47.0/go.mod h1:ypLp+mW1Nt2x+Szt3b5/i1syodyts49lMOwxpDI3VGw=
 go.opentelemetry.io/otel/trace v1.47.0 h1:JOjX/Oci8K94QHddo+bbfya/Ai/nf6/dt9ZfrFNWSrM=
 go.opentelemetry.io/otel/trace v1.47.0/go.mod h1:jNaSLa2PZEYFG6fRjJABAu+bw4FS08uDmPg28lTghu0=
+go.opentelemetry.io/proto/otlp v1.11.0 h1:5rrYs0Ykyj50sdU/JU0x8etU+LubXWb+gED6TbEdMIk=
+go.opentelemetry.io/proto/otlp v1.11.0/go.mod h1:SmVizdCOAm3XBtG1g1NnOdhW6jtddT72hLMhv8VwA8E=
 go.uber.org/multierr v1.11.0 h1:blXXJkSxSSfBVBlC76pxqeO+LN3aDfLQo+309xJstO0=
 go.uber.org/multierr v1.11.0/go.mod h1:20+QtiLqy0Nd6FdQB9TLXag12DsQkrbs3htMFfDN80Y=
 go.yaml.in/yaml/v3 v3.0.5 h1:N6y/pJk8buWs9NY5ERU2HSMfm+IuD/OtfdAnq6kESPw=

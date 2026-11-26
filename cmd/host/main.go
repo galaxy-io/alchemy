@@ -19,6 +19,7 @@ import (
 	"gocloud.dev/blob"
 
 	"github.com/galaxy-io/alchemy/cmd/internal/logger"
+	"github.com/galaxy-io/alchemy/cmd/internal/otel"
 	"github.com/galaxy-io/alchemy/internal/bus"
 	"github.com/galaxy-io/alchemy/internal/driver/firecracker"
 	"github.com/galaxy-io/alchemy/internal/host"
@@ -116,7 +117,13 @@ func run(log *slog.Logger) error {
 		defer func() { _ = artifacts.Close() }()
 	}
 
-	return host.New(cfg, drv, b, bucket, artifacts, log).Run(ctx)
+	metrics, flushMetrics, err := otel.FromEnv(ctx, log)
+	if err != nil {
+		return err
+	}
+	defer flushMetrics()
+
+	return host.New(cfg, drv, b, bucket, artifacts, metrics, log).Run(ctx)
 }
 
 // envList splits a comma-separated variable, dropping empty entries.

@@ -15,6 +15,7 @@ import (
 	hostv1 "github.com/galaxy-io/alchemy/api/host/v1"
 	"github.com/galaxy-io/alchemy/internal/artifact"
 	"github.com/galaxy-io/alchemy/internal/bus"
+	"github.com/galaxy-io/alchemy/internal/telemetry"
 )
 
 const (
@@ -107,7 +108,12 @@ func (h *Host) take(ctx context.Context, q *bus.InvokeQueue, p *bus.Pulled) {
 	if d := req.GetDeadlineMs(); d > 0 && time.Now().UnixMilli() > d {
 		log.Info("dropping invocation past its deadline")
 		if !req.GetAsync() {
-			// Its caller has stopped waiting, and recorded how it ended.
+			// Its caller has stopped waiting, and recorded how it ended. A
+			// server that saw an attempt fail leaves the counting to a host.
+			if failures > 0 {
+				inv.Attempts = int32(failures) //nolint:gosec // bounded by retries
+				h.metrics.InvocationEnded(ctx, ended("", inv, functionsv1.InvocationStatus_INVOCATION_STATUS_ERRORED, "expired in the queue before its next attempt"), nil)
+			}
 			_ = p.Done(ctx)
 			return
 		}
@@ -147,6 +153,7 @@ func (h *Host) take(ctx context.Context, q *bus.InvokeQueue, p *bus.Pulled) {
 				log.Warn("take lease", "err", err)
 			}
 			if l == nil {
+				h.metrics.InvocationHandedBack(ctx, telemetry.HandbackConcurrency)
 				_ = p.Retry(leaseFullDelay + rand.N(leaseFullDelay)) //nolint:gosec // jitter, not a secret
 				return
 			}
@@ -162,6 +169,7 @@ func (h *Host) take(ctx context.Context, q *bus.InvokeQueue, p *bus.Pulled) {
 		// out its backoff rather than circle the hosts.
 		if retry && resp.GetError().GetCode() == "resource_exhausted" {
 			log.Info("handing invocation back to the queue", "reason", resp.GetError().GetMessage())
+			h.metrics.InvocationHandedBack(ctx, telemetry.HandbackNoRoom)
 			_ = p.Retry(retryDelay)
 			return
 		}
@@ -205,6 +213,7 @@ func (h *Host) settle(ctx context.Context, q *bus.InvokeQueue, p *bus.Pulled, cf
 		return
 	}
 	log.Info("retrying invocation", "attempt", inv.GetAttempts(), "after", delay)
+	h.metrics.InvocationRetried(ctx, inv.GetFunctionId())
 	waiting := proto.CloneOf(rec)
 	waiting.Status = functionsv1.InvocationStatus_INVOCATION_STATUS_PENDING
 	waiting.EndedAt = 0
@@ -220,6 +229,7 @@ func (h *Host) settle(ctx context.Context, q *bus.InvokeQueue, p *bus.Pulled, cf
 func (h *Host) end(ctx context.Context, q *bus.InvokeQueue, p *bus.Pulled, rec *functionsv1.Invocation, resp *hostv1.InvokeResponse, counted bool, log *slog.Logger) {
 	req := p.Request
 	h.records.add(rec)
+	h.metrics.InvocationEnded(ctx, rec, resp.GetFunctionError())
 	if req.GetAsync() {
 		h.publishInvocation(rec, log)
 	}

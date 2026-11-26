@@ -30,6 +30,7 @@ import (
 	"github.com/galaxy-io/alchemy/internal/contract"
 	"github.com/galaxy-io/alchemy/internal/driver"
 	"github.com/galaxy-io/alchemy/internal/logs"
+	"github.com/galaxy-io/alchemy/internal/telemetry"
 )
 
 const (
@@ -105,6 +106,7 @@ type Host struct {
 	records   *recordQueue
 	contracts *contractCache
 	secrets   secretCache
+	metrics   *telemetry.Set
 
 	// drives orders builds against eviction. A build holds it shared from
 	// the driver's Build until it serves the artifact, and eviction holds it
@@ -137,10 +139,10 @@ type Host struct {
 
 // New returns a host that is not yet serving; Run starts it. Function logs
 // are uploaded to logBucket, when there is one. Builds read their layers
-// from artifactBucket.
-func New(cfg Config, d driver.Driver, b *bus.Bus, logBucket, artifactBucket *blob.Bucket, log *slog.Logger) *Host {
+// from artifactBucket. It records metrics to metrics, which may be nil.
+func New(cfg Config, d driver.Driver, b *bus.Bus, logBucket, artifactBucket *blob.Bucket, metrics *telemetry.Set, log *slog.Logger) *Host {
 	bg, stop := context.WithCancel(context.Background())
-	return &Host{
+	h := &Host{
 		cfg:             cfg,
 		driver:          d,
 		bus:             b,
@@ -152,6 +154,7 @@ func New(cfg Config, d driver.Driver, b *bus.Bus, logBucket, artifactBucket *blo
 		records:         newRecordQueue(b, log),
 		contracts:       newContractCache(),
 		secrets:         secretCache{values: make(map[string]cachedSecret)},
+		metrics:         metrics,
 		background:      bg,
 		stop:            stop,
 		artifacts:       make(map[string]*hostv1.Artifact),
@@ -164,6 +167,11 @@ func New(cfg Config, d driver.Driver, b *bus.Bus, logBucket, artifactBucket *blo
 		running:         make(map[functionKey]int32),
 		functionConfigs: make(map[functionKey]cachedFunctionConfig),
 	}
+	if err := metrics.WatchHost(h.state); err != nil {
+		log.Warn("watch host metrics", "err", err)
+	}
+	metrics.Started(bg, telemetry.Host)
+	return h
 }
 
 // Run subscribes to the host subjects and heartbeats until ctx ends, then
@@ -178,7 +186,7 @@ func (h *Host) Run(ctx context.Context) error {
 		// A server sends a host the builds and compiles it chose it for.
 		// Invocations come from the queue.
 		{bus.HostBuildSubject(h.cfg.Name), "", h.handleBuild, buildError("unavailable", errShuttingDown)},
-		{bus.HostCompileSubject(h.cfg.Name), "", h.handleCompile, compileError("unavailable", errShuttingDown)},
+		{bus.HostCompileSubject(h.cfg.Name), "", h.countCompile, compileError("unavailable", errShuttingDown)},
 		{bus.DescribeSubject, "", h.handleDescribe, nil},
 		{bus.InstancesSubject, "", h.handleInstances, nil},
 		{bus.HostSecretsInvalidateSubject, "", h.handleSecretsInvalidate, nil},
@@ -332,10 +340,11 @@ func (h *Host) handleBuild(ctx context.Context, data []byte) proto.Message {
 
 // build builds and snapshots req's artifact, serves it, and returns the
 // reply to send.
-func (h *Host) build(ctx context.Context, req *hostv1.BuildRequest) *hostv1.BuildResponse {
+func (h *Host) build(ctx context.Context, req *hostv1.BuildRequest) (reply *hostv1.BuildResponse) {
 	ctx, cancel := context.WithTimeout(ctx, h.cfg.BuildTimeout)
 	defer cancel()
 	start := time.Now()
+	defer func() { h.metrics.ArtifactBuilt(ctx, reply.GetError() != nil, time.Since(start)) }()
 	layers, err := h.driverLayers(req.GetLayers())
 	if err != nil {
 		return buildError("failed_precondition", err)
@@ -440,10 +449,12 @@ func (h *Host) evictVersions(now time.Time) {
 		keep = append(keep, fromProto(a))
 	}
 	h.mu.Unlock()
+	h.metrics.WarmEvicted(h.background, telemetry.EvictedForVersion, len(idle))
 	for _, live := range idle {
 		h.release(live)
 	}
 	for _, a := range evicted {
+		h.metrics.VersionEvicted(h.background)
 		if err := h.driver.Forget(h.background, fromProto(a), keep); err != nil {
 			h.log.Warn("forget artifact", "artifact_id", a.GetId(), "err", err)
 		}
@@ -470,15 +481,23 @@ func (h *Host) invoke(ctx context.Context, req *hostv1.InvokeRequest) (reply *ho
 	log := h.log.With("invocation_id", id, "artifact_id", req.GetArtifact().GetId())
 	start := time.Now()
 
-	// A rejected input is the caller's mistake, so it ends here.
-	c, input, rejected := h.checkInput(req, start)
+	// A rejected input is the caller's mistake, so it ends here, with the
+	// rejection as its record.
+	c, input, rejected := h.checkInput(req)
 	if rejected != nil {
-		return rejected, nil, false
+		if rejected.GetFunctionError() != nil {
+			rec = record(h.cfg.Name, req.GetInvocation(), rejected, start, time.Time{})
+		}
+		return rejected, rec, false
 	}
 
-	live, err := h.admit(req.GetArtifact())
+	live, err := h.admit(ctx, req.GetArtifact())
 	if err != nil {
 		return invokeError(admitCode(err), err), nil, !errors.Is(err, errOverBudget)
+	}
+	// Only a first attempt has waited since the invocation was accepted.
+	if inv := req.GetInvocation(); inv.GetAttempts() <= 1 {
+		h.metrics.InvocationAdmitted(ctx, time.Since(time.UnixMilli(inv.GetCreatedAt())))
 	}
 	h.publishState(req, functionsv1.InvocationStatus_INVOCATION_STATUS_STARTING, "", functionsv1.StartKind_START_KIND_UNSPECIFIED, 0)
 	instance, startKind := live.instance, functionsv1.StartKind_START_KIND_WARM
@@ -489,6 +508,7 @@ func (h *Host) invoke(ctx context.Context, req *hostv1.InvokeRequest) (reply *ho
 			log.Warn("acquire instance", "err", err)
 			return invokeError("unavailable", fmt.Errorf("acquire instance: %w", err)), nil, true
 		}
+		h.metrics.InstanceStarted(ctx, startKind, telemetry.PurposeInvocation)
 	}
 	live.ready(instance, startKind, id)
 	// An instance whose supervisor answered can take the next invocation;
@@ -561,8 +581,8 @@ func (h *Host) invoke(ctx context.Context, req *hostv1.InvokeRequest) (reply *ho
 }
 
 // checkInput compiles the artifact's contract and checks the input against
-// it. A rejection is the reply to send, already recorded; nothing ran.
-func (h *Host) checkInput(req *hostv1.InvokeRequest, start time.Time) (contract.Contract, *contract.Input, *hostv1.InvokeResponse) {
+// it. A rejection is the reply to send; nothing ran.
+func (h *Host) checkInput(req *hostv1.InvokeRequest) (contract.Contract, *contract.Input, *hostv1.InvokeResponse) {
 	c, err := h.contracts.get(req.GetArtifact().GetContract())
 	if err != nil {
 		return nil, nil, invokeError("failed_precondition", fmt.Errorf("compile contract: %w", err))
@@ -579,7 +599,6 @@ func (h *Host) checkInput(req *hostv1.InvokeRequest, start time.Time) (contract.
 		Message:    "input violates the version's input schema",
 		Violations: violations,
 	}}}
-	h.records.add(record(h.cfg.Name, req.GetInvocation(), resp, start, time.Time{}))
 	return nil, nil, resp
 }
 
@@ -736,7 +755,7 @@ func (h *Host) publishInvocation(inv *functionsv1.Invocation, log *slog.Logger) 
 // any, otherwise room in the memory budget for a cold boot, evicting warm
 // instances of other artifacts, least recently used first, when needed. A
 // returned instance with no driver instance is booting and must be acquired.
-func (h *Host) admit(a *hostv1.Artifact) (*liveInstance, error) {
+func (h *Host) admit(ctx context.Context, a *hostv1.Artifact) (*liveInstance, error) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 	if idle := h.warm[a.GetId()]; len(idle) > 0 {
@@ -756,6 +775,7 @@ func (h *Host) admit(a *hostv1.Artifact) (*liveInstance, error) {
 		}
 		h.unwarmLocked(victim)
 		delete(h.instances, victim.key)
+		h.metrics.WarmEvicted(ctx, telemetry.EvictedForMemory, 1)
 		h.tasks.Go(func() { h.kill(victim) })
 	}
 	return h.trackLocked(a), nil
@@ -841,6 +861,7 @@ func (h *Host) expireWarm(now time.Time) {
 		}
 	}
 	h.mu.Unlock()
+	h.metrics.WarmEvicted(h.background, telemetry.EvictedForIdle, len(expired))
 	for _, live := range expired {
 		h.release(live)
 	}
@@ -888,6 +909,7 @@ func (h *Host) boot(live *liveInstance) {
 		return
 	}
 	live.ready(instance, kind, "")
+	h.metrics.InstanceStarted(h.background, kind, telemetry.PurposePrewarm)
 	h.mu.Lock()
 	defer h.mu.Unlock()
 	if _, served := h.artifacts[id]; h.draining || !served {

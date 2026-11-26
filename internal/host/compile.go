@@ -84,7 +84,7 @@ func (h *Host) handleCompile(ctx context.Context, data []byte) proto.Message {
 		return kept
 	}
 
-	live, err := h.admit(artifact)
+	live, err := h.admit(ctx, artifact)
 	if err != nil {
 		return compileError(admitCode(err), err)
 	}
@@ -120,6 +120,15 @@ func (h *Host) handleCompile(ctx context.Context, data []byte) proto.Message {
 	}
 	log.Info("compile ready", "key", key, "bytes", len(res.GetOutput()), "took", time.Since(start).Round(time.Millisecond))
 	return &hostv1.CompileResponse{Result: &hostv1.CompileResponse_Layer{Layer: layer}, BuildLog: logs.String()}
+}
+
+// countCompile is handleCompile, counting the compiles this host had room for.
+func (h *Host) countCompile(ctx context.Context, data []byte) proto.Message {
+	reply := h.handleCompile(ctx, data)
+	if resp, ok := reply.(*hostv1.CompileResponse); ok && resp.GetError().GetCode() != "resource_exhausted" {
+		h.metrics.SourceCompiled(ctx, resp.GetError() != nil)
+	}
+	return reply
 }
 
 // keptLayer answers a compile whose layer is already kept at key, and is

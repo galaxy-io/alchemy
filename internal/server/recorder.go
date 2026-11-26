@@ -80,12 +80,14 @@ func (s *Service) writeBatch(ctx context.Context, invs []*functionsv1.Invocation
 	err := s.store.InsertInvocations(ctx, s.insertParams(invs, override))
 	switch {
 	case err == nil:
+		s.metrics.RecordsStored(ctx, len(invs))
 		return nil
 	case !refused(err):
 		s.log.Warn("write invocation records", "count", len(invs), "err", err)
 		return err
 	case len(invs) == 1:
 		s.log.Error("invocation record was refused and is dropped", "invocation_id", invs[0].GetId(), "err", err)
+		s.metrics.RecordRefused(ctx)
 		return nil
 	}
 	s.log.Warn("write invocation records; retrying one at a time", "count", len(invs), "err", err)

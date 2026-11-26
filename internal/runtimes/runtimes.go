@@ -39,6 +39,16 @@ var All = []Runtime{
 	{ID: "rust", Label: "Rust 1.99", Tag: "rust:1.99", BuildTag: "rust:1.99-build", HandlerPath: "main.rs", Icon: "rust", starter: "rs"},
 }
 
+// ID is the id of the runtime that image is under imagePrefix, and "" when it is none.
+func ID(imagePrefix, image string) string {
+	for _, r := range All {
+		if image == imagePrefix+"/"+r.Tag {
+			return r.ID
+		}
+	}
+	return ""
+}
+
 // BuildImage is the image that compiles a source landing on image, when
 // image is a runtime under imagePrefix that needs one, and "" otherwise.
 func BuildImage(imagePrefix, image string) string {
