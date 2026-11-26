@@ -5,7 +5,7 @@ import { EMPTY_VALUE } from "@galaxy-io/dls/utils/format";
 
 import type { Invocation } from "@/gen/functions/v1/invocations_pb";
 
-import FunctionNameWithRuntimeIcon from "@/components/functions/FunctionNameWithRuntimeIcon";
+import FunctionName from "@/components/functions/FunctionName";
 import InvocationStartKind from "@/components/invocations/InvocationStartKind";
 import KeyValueList from "@/components/KeyValueList";
 import KeyValueListRow from "@/components/KeyValueListRow";
@@ -28,7 +28,7 @@ const InvocationDrawerFacts: FC<InvocationDrawerFactsProps> = ({ invocation }) =
           href={createAlchemyHref(AlchemyPath.FUNCTION, { id: invocation.functionId })}
           as={RouterLink}
         >
-          <FunctionNameWithRuntimeIcon functionId={invocation.functionId} />
+          <FunctionName functionId={invocation.functionId} />
         </Link>
       }
     />

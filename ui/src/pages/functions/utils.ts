@@ -4,13 +4,10 @@ import { match } from "ts-pattern";
 
 import { CodeEditorLanguage } from "@galaxy-io/dls/editor/CodeEditor";
 import type { JsonValue } from "@galaxy-io/dls/json/JsonViewer";
-import { GalaxyTheme } from "@galaxy-io/dls/theme/enums";
 
 import {
-  type Function as AlchemyFunction,
   type FunctionSpec,
   FunctionSpecSchema,
-  type FunctionVersion,
   type Runtime,
   type SourceFile,
   SourceSchema,
@@ -38,11 +35,6 @@ import {
   parseArrowField,
 } from "@/utils/arrow";
 import { isJsonObject, parseJson } from "@/utils/json";
-
-export const getFunctionCurrentVersion = (
-  alchemyFunction: AlchemyFunction,
-): FunctionVersion | undefined =>
-  alchemyFunction.currentVersion?.id ? alchemyFunction.currentVersion : undefined;
 
 export const getFunctionNameError = (name: string) => {
   if (!name) return "Name is required";
@@ -90,26 +82,6 @@ export const createFunctionSpecJson = (spec: FunctionSpec): JsonValue => ({
     },
   }),
 });
-
-export const getFunctionRuntime = (
-  runtimes: Runtime[],
-  image: string | undefined,
-): Runtime | undefined => runtimes.find((runtime) => runtime.image === image);
-
-export const getFunctionVersionRuntime = (
-  runtimes: Runtime[],
-  version: FunctionVersion | undefined,
-): Runtime | undefined =>
-  version?.spec?.source ? getFunctionRuntime(runtimes, version.spec.image) : undefined;
-
-export const getFunctionRuntimeIconUrl = (
-  runtime: Pick<Runtime, "darkIconUrl" | "lightIconUrl">,
-  theme: GalaxyTheme.DARK | GalaxyTheme.LIGHT,
-) =>
-  match(theme)
-    .with(GalaxyTheme.DARK, () => runtime.darkIconUrl)
-    .with(GalaxyTheme.LIGHT, () => runtime.lightIconUrl)
-    .exhaustive();
 
 const getFunctionSourceExtension = (path: string) => path.split(".").pop() ?? "";
 

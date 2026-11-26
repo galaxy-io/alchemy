@@ -8,7 +8,7 @@ import { useGalaxyTheme } from "@galaxy-io/dls/theme/useGalaxyTheme";
 
 import type { Runtime } from "@/gen/functions/v1/functions_pb";
 
-import { getFunctionRuntimeIconUrl } from "@/pages/functions/utils";
+import { getFunctionRuntimeIconUrl } from "@/components/functions/utils";
 
 const FunctionRuntimeImage = styled.img<{ $size: number }>`
   display: block;

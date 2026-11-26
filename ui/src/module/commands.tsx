@@ -7,9 +7,8 @@ import { useNavigate } from "@tanstack/react-router";
 import type { CommandPaletteItem } from "@galaxy-io/dls/navigation/CommandPalette";
 
 import { FUNCTION_CREATE_TITLE } from "@/components/functions/constants";
-
-import FunctionRuntimeIcon from "@/pages/functions/components/FunctionRuntimeIcon";
-import { getFunctionCurrentVersion, getFunctionVersionRuntime } from "@/pages/functions/utils";
+import FunctionRuntimeIcon from "@/components/functions/FunctionRuntimeIcon";
+import { getFunctionCurrentVersion, getFunctionVersionRuntime } from "@/components/functions/utils";
 
 import {
   ALCHEMY_COMMAND_GROUP_CREATE,

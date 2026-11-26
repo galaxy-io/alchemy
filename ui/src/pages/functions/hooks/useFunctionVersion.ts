@@ -1,6 +1,6 @@
 import type { FunctionVersion } from "@/gen/functions/v1/functions_pb";
 
-import { getFunctionCurrentVersion } from "@/pages/functions/utils";
+import { getFunctionCurrentVersion } from "@/components/functions/utils";
 
 import { useFunctionParams, useFunctionSearch } from "@/module/hooks";
 
