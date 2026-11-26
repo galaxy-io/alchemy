@@ -142,6 +142,16 @@ The vendored PostgreSQL and NATS charts are disabled by default. See the [Bitnam
   {{- end }}
 {{- end }}
 
+## Observability parameters
+
+| Key | Type | Default | Description |
+|-----|------|---------|-------------|
+{{- range .Values }}
+  {{- if hasPrefix "observability." .Key }}
+| {{ .Key }} | {{ .Type }} | {{ if .Default }}{{ .Default }}{{ else }}{{ .AutoDefault }}{{ end }} | {{ if .Description }}{{ .Description }}{{ else }}{{ .AutoDescription }}{{ end }} |
+  {{- end }}
+{{- end }}
+
 ## Server parameters
 
 | Key | Type | Default | Description |

@@ -26,6 +26,16 @@ data:
   # Observability
   LOG_LEVEL: {{ .Values.host.logLevel | quote }}
   LOG_FORMAT: {{ .Values.host.logFormat | quote }}
+  {{- with .Values.observability.otel.endpoint }}
+  OTEL_SERVICE_NAME: {{ include "alchemy.host.fullname" $ | quote }}
+  OTEL_EXPORTER_OTLP_ENDPOINT: {{ . | quote }}
+  {{- with $.Values.observability.otel.protocol }}
+  OTEL_EXPORTER_OTLP_PROTOCOL: {{ . | quote }}
+  {{- end }}
+  {{- with $.Values.observability.otel.resourceAttributes }}
+  OTEL_RESOURCE_ATTRIBUTES: {{ include "alchemy.otelResourceAttributes" . | quote }}
+  {{- end }}
+  {{- end }}
   # Function logs
   LOGS_BUCKET: {{ .Values.functionLogs.bucket | quote }}
   # Build layers
