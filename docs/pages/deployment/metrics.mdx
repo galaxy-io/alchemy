@@ -1,0 +1,199 @@
+---
+title: "Export metrics"
+sidebarTitle: "Metrics"
+description: "Send server and host metrics to an OTLP endpoint, and what each metric counts."
+---
+
+The server and every host export OpenTelemetry metrics over OTLP. Export is off
+until an endpoint is set, and nothing else about Alchemy changes when it is on.
+Only metrics are exported, so the endpoint can be one that accepts nothing else,
+such as Prometheus.
+
+## Turn it on
+
+Set the endpoint in the chart. The server and the hosts get the same settings,
+each with its own service name.
+
+```yaml
+observability:
+  otel:
+    endpoint: http://prometheus.monitoring:9090/api/v1/otlp
+    protocol: http/protobuf
+    resourceAttributes:
+      io.getgalaxy.tenant.id: acme
+```
+
+Outside the chart, set the standard variables on both processes. They are listed
+under [Shared](/pages/deployment/configuration#shared).
+
+Every process adds its hostname as `service.instance.id`, so replicas of the
+server and each host export their own series, and its build version as
+`service.version`. Set either attribute yourself in `OTEL_RESOURCE_ATTRIBUTES`
+to override it. Metrics are exported once a minute and once more when a process stops, which
+waits at most 10 seconds for the endpoint. Export errors are logged at `WARN`.
+
+Metrics are reported under the instrumentation scope
+`github.com/galaxy-io/alchemy`, versioned with the build.
+
+## Names in Prometheus
+
+Metric names and units follow OpenTelemetry's conventions: lowercase,
+dot-separated, with the unit in the metric's metadata rather than its name.
+Prometheus's default OTLP translation turns dots into underscores, adds the unit
+and adds `_total` to counters, so a metric is queried as:
+
+| OpenTelemetry | Unit | Prometheus |
+|---|---|---|
+| `alchemy.invocations` | `{invocation}` | `alchemy_invocations_total` |
+| `alchemy.invocation.run.duration` | `s` | `alchemy_invocation_run_duration_seconds` (with `_bucket`, `_sum` and `_count`) |
+| `alchemy.invocation.input.size` | `By` | `alchemy_invocation_input_size_bytes_total` |
+| `alchemy.host.memory.committed` | `By` | `alchemy_host_memory_committed_bytes` |
+| `alchemy.queue.waiting` | `{invocation}` | `alchemy_queue_waiting` |
+
+A unit in braces, such as `{invocation}`, only names what is counted and adds
+nothing. Attribute keys get the same treatment: `alchemy.function.id` is the
+label `alchemy_function_id`.
+
+## Attributes
+
+| Attribute | Values |
+|---|---|
+| `alchemy.function.id` | The function's id |
+| `alchemy.invocation.status` | `succeeded`, `failed`, `errored`, `rejected` or `canceled` |
+| `alchemy.invocation.mode` | `sync` or `async` |
+| `alchemy.start.kind` | `cold_boot`, `snapshot_restore` or `warm`, and `none` when no microVM was used |
+| `alchemy.build.status` | `ready` or `failed` |
+| `alchemy.runtime.name` | `python`, `node`, `go` or `rust`, and `image` for a function that brings its own |
+| `alchemy.handback.reason` | `no_room` or `concurrency_limit` |
+| `alchemy.instance.purpose` | `invocation` or `prewarm` |
+| `alchemy.instance.state` | `booting`, `ready`, `busy` or `releasing` |
+| `alchemy.eviction.reason` | `memory`, `idle` or `version` |
+| `alchemy.firecracker.version` | The host's Firecracker version |
+| `alchemy.guest.kernel` | The guest kernel the host boots microVMs with |
+| `error.type` | What kind of failure it was, set only on failures |
+
+No metric carries a tenant, a version, an invocation id or error text. Set the
+tenant as a resource attribute, such as `io.getgalaxy.tenant.id`.
+
+## Invocations
+
+Each invocation is counted once in `alchemy.invocations`. The host that ended it
+counts it. A server counts it only when it ended before any host took it, as
+when no host answered by the deadline.
+
+| Metric | Type | Unit | Attributes | From | What it counts |
+|---|---|---|---|---|---|
+| `alchemy.invocations` | Counter | `{invocation}` | `alchemy.function.id`, `alchemy.invocation.status`, `alchemy.invocation.mode`, `alchemy.start.kind` | Host, server | Invocations that ended |
+| `alchemy.invocation.failures` | Counter | `{invocation}` | `alchemy.function.id`, `error.type` | Host | Function errors, with `error.type` `raised`, `crashed`, `timeout`, `output_invalid` or `input_invalid` |
+| `alchemy.invocation.run.duration` | Histogram | `s` | `alchemy.function.id`, `alchemy.invocation.status` | Host | Time inside the function |
+| `alchemy.invocation.acquire.duration` | Histogram | `s` | `alchemy.function.id`, `alchemy.start.kind` | Host | Time to have a microVM ready, which is the cold start |
+| `alchemy.invocation.queue.duration` | Histogram | `s` | | Host | Time from accepted until a host had room to start it |
+| `alchemy.invocation.retries` | Counter | `{retry}` | `alchemy.function.id` | Host | Failed attempts that run again |
+| `alchemy.invocation.handbacks` | Counter | `{handback}` | `alchemy.handback.reason` | Host | Invocations a host gave back without running, for `no_room` or `concurrency_limit` |
+| `alchemy.invocation.input.size` | Counter | `By` | `alchemy.function.id` | Host | Input bytes of ended invocations |
+| `alchemy.invocation.output.size` | Counter | `By` | `alchemy.function.id` | Host | Output bytes of ended invocations |
+| `alchemy.host.invocations` | Gauge | `{invocation}` | `alchemy.function.id` | Host | Invocations running now |
+| `alchemy.invoke.duration` | Histogram | `s` | `alchemy.function.id`, `alchemy.invocation.status` | Server | Time a caller of a synchronous invocation waited, queue included |
+| `alchemy.invoke.replays` | Counter | `{call}` | `alchemy.function.id` | Server | Calls answered from an earlier invocation by idempotency key |
+
+`alchemy.invoke.duration` is the caller's view and `alchemy.invocations` is what
+ran. A call whose caller went away is `canceled` in the first and can still be
+`succeeded` in the second.
+
+An invocation whose host died while running it is not counted, unless the queue
+hands it to another host before its deadline. A synchronous invocation whose
+attempt failed, and whose retry was still queued at its deadline, is counted as
+`errored` by the host that drops it.
+
+## Builds
+
+| Metric | Type | Unit | Attributes | From | What it counts |
+|---|---|---|---|---|---|
+| `alchemy.function.builds` | Counter | `{build}` | `alchemy.function.id`, `alchemy.build.status`, `alchemy.runtime.name`, `error.type` | Server | Version builds that ended. `error.type` is why a failed build failed |
+| `alchemy.function.build.last_failure.time` | Gauge | `s` | `alchemy.function.id` | Server | When the function's build last failed, as a Unix timestamp |
+| `alchemy.function.build.duration` | Histogram | `s` | `alchemy.build.status`, `alchemy.runtime.name` | Server | Time the server spent on a build |
+| `alchemy.function.build.resumes` | Counter | `{build}` | | Server | Builds taken over from a server that left them |
+| `alchemy.host.builds` | Counter | `{build}` | `alchemy.build.status` | Host | Artifact builds on a host, including the ones a host does when it first takes a version's invocation |
+| `alchemy.host.build.duration` | Histogram | `s` | `alchemy.build.status` | Host | Time an artifact build took on a host |
+| `alchemy.host.compiles` | Counter | `{compile}` | `alchemy.build.status` | Host | Source compiles on a host |
+
+A build is counted by the server that wrote its result. A build released by a
+stopping server, or taken over by another one, is counted once, by the server
+that finished it.
+
+A failed build's `error.type` is the stage it failed in, or what the platform
+lacked to run it.
+
+| `error.type` | What failed |
+|---|---|
+| `spec` | Reading the version's spec or compiling its contract |
+| `compile` | Compiling the source |
+| `build` | Building the image into an artifact |
+| `no_host` | No host was available to compile or build it |
+| `timeout` | A host did not answer in time |
+
+`alchemy.function.build.last_failure.time` holds a value from a function's first
+failed build until the server stops. The latest failure in a deployment is
+`max(alchemy_function_build_last_failure_time_seconds)`.
+
+## Queue and history
+
+| Metric | Type | Unit | From | What it counts |
+|---|---|---|---|---|
+| `alchemy.queue.waiting` | Gauge | `{invocation}` | Server | Invocations queued that no host has taken |
+| `alchemy.queue.running` | Gauge | `{invocation}` | Server | Invocations hosts hold |
+| `alchemy.records.written` | Counter | `{record}` | Server | Invocation records written to PostgreSQL |
+| `alchemy.records.refused` | Counter | `{record}` | Server | Records PostgreSQL refused, which are dropped |
+
+Every server reports the same queue depth, so read the queue gauges with `max`,
+not `sum`.
+
+## Hosts
+
+| Metric | Type | Unit | Attributes | What it counts |
+|---|---|---|---|---|
+| `alchemy.host.slots` | Gauge | `{slot}` | | Invocations the host can hold at once |
+| `alchemy.host.busy_slots` | Gauge | `{slot}` | | Invocations the host holds |
+| `alchemy.host.memory.budget` | Gauge | `By` | | Guest memory the host may commit, 0 for no limit |
+| `alchemy.host.memory.committed` | Gauge | `By` | | Guest memory of live microVMs |
+| `alchemy.host.instances` | Gauge | `{instance}` | `alchemy.instance.state` | MicroVMs that are `booting`, `ready`, `busy` or `releasing`. `ready` is the warm pool |
+| `alchemy.host.artifacts` | Gauge | `{version}` | | Function versions the host serves |
+| `alchemy.host.rootfs.cache.size` | Gauge | `By` | | Size of the root filesystem cache |
+| `alchemy.host.rootfs.cache.images` | Gauge | `{image}` | | Images in the root filesystem cache |
+| `alchemy.host.info` | Gauge | | `alchemy.firecracker.version`, `alchemy.guest.kernel` | Always 1 |
+| `alchemy.host.instance.starts` | Counter | `{instance}` | `alchemy.start.kind`, `alchemy.instance.purpose` | MicroVMs booted or restored, for an `invocation` or a `prewarm` |
+| `alchemy.host.warm.evictions` | Counter | `{instance}` | `alchemy.eviction.reason` | Warm microVMs released for `memory`, for being `idle` or with their `version` |
+| `alchemy.host.version.evictions` | Counter | `{version}` | | Versions the host stopped serving |
+
+Count the `alchemy.host.slots` series for the number of hosts, and sum them for
+the fleet's slots.
+
+## Counting with `increase`
+
+A counter is first exported when it is first added to, and Prometheus's
+`increase` and `rate` cannot see the first value of a new series. The counters
+with no attributes, and the host counters whose attributes take a few known
+values, are exported at zero from the start, so every increase of theirs is
+counted.
+
+A counter with `alchemy.function.id` starts a series the first time something
+happens to that function, so `increase` misses the first event of each series.
+For something rare, such as a failed build, that is most of them. To count over
+a window, add the increase of the series that existed before it to the last
+value of the series created inside it:
+
+```promql
+sum(increase(alchemy_function_builds_total{alchemy_build_status="failed"}[1h])
+    and alchemy_function_builds_total offset 1h)
+
+sum(last_over_time(alchemy_function_builds_total{alchemy_build_status="failed"}[1h])
+    unless alchemy_function_builds_total offset 1h)
+```
+
+## Cost of the per-function series
+
+The three histograms with `alchemy.function.id` are the expensive part. Every
+host and every server exports its own series, so the two host histograms cost 40
+to 100 series for each function on each host that runs it, and the server one 20
+to 60 more on each server. That is small at tens of functions and a few hosts,
+and worth watching at thousands of functions or many hosts.
