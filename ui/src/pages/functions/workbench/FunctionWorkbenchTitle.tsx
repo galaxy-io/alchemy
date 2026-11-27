@@ -2,8 +2,7 @@ import type { FC } from "react";
 
 import { LockIcon } from "@phosphor-icons/react";
 
-import Icon, { IconVariant } from "@galaxy-io/dls/icons/Icon";
-import Flex, { AlignItems } from "@galaxy-io/dls/layout/Flex";
+import Icon, { IconVariant, IconWeight } from "@galaxy-io/dls/icons/Icon";
 import Tabs, { type TabItem, TabsSize, TabsVariant } from "@galaxy-io/dls/navigation/Tabs";
 
 import FunctionSourceFileIcon from "@/pages/functions/components/FunctionSourceFileIcon";
@@ -19,32 +18,33 @@ interface FunctionWorkbenchTitleProps {
 
 const FunctionWorkbenchTitle: FC<FunctionWorkbenchTitleProps> = ({ file, path }) => {
   const { data } = useListRuntimesQuery();
+  const readOnly = isFunctionWorkbenchReadOnlyFile(file);
   const items: TabItem[] = [
     {
       id: file,
       label: path,
-      leading: <FunctionSourceFileIcon path={path} runtimes={data?.runtimes ?? []} />,
+      leading: readOnly ? (
+        <Icon
+          component={LockIcon}
+          size={16}
+          weight={IconWeight.FILL}
+          variant={IconVariant.TERTIARY}
+          ariaLabel={FUNCTION_WORKBENCH_READ_ONLY_LABEL}
+        />
+      ) : (
+        <FunctionSourceFileIcon path={path} runtimes={data?.runtimes ?? []} />
+      ),
     },
   ];
 
   return (
-    <Flex alignItems={AlignItems.CENTER} gap={8} minWidth={0}>
-      <Tabs
-        ariaLabel="File"
-        items={items}
-        value={file}
-        variant={TabsVariant.PILL}
-        size={TabsSize.SMALL}
-      />
-      {isFunctionWorkbenchReadOnlyFile(file) && (
-        <Icon
-          component={LockIcon}
-          variant={IconVariant.SECONDARY}
-          ariaLabel={FUNCTION_WORKBENCH_READ_ONLY_LABEL}
-          tooltip={FUNCTION_WORKBENCH_READ_ONLY_LABEL}
-        />
-      )}
-    </Flex>
+    <Tabs
+      ariaLabel="File"
+      items={items}
+      value={file}
+      variant={TabsVariant.PILL}
+      size={TabsSize.SMALL}
+    />
   );
 };
 

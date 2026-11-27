@@ -7,6 +7,7 @@ import Widget, { WidgetVariant } from "@galaxy-io/dls/widget/Widget";
 import type { Runtime } from "@/gen/functions/v1/functions_pb";
 import type { Template } from "@/gen/functions/v1/templates_pb";
 
+import FunctionRuntimeIcon from "@/components/functions/FunctionRuntimeIcon";
 import IconTile from "@/components/IconTile";
 
 import {
@@ -14,7 +15,6 @@ import {
   CREATE_FUNCTION_MODAL_TEMPLATE_TILE_SIZE,
 } from "@/pages/functions/components/create/constants";
 import CreateFunctionModalTemplateLockup from "@/pages/functions/components/create/steps/components/CreateFunctionModalTemplateLockup";
-import FunctionRuntimeIcon from "@/pages/functions/components/FunctionRuntimeIcon";
 
 interface CreateFunctionModalTemplateOptionProps {
   template: Template;

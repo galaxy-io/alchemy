@@ -7,6 +7,8 @@ import { useNavigate } from "@tanstack/react-router";
 import type { CommandPaletteItem } from "@galaxy-io/dls/navigation/CommandPalette";
 
 import { FUNCTION_CREATE_TITLE } from "@/components/functions/constants";
+import FunctionRuntimeIcon from "@/components/functions/FunctionRuntimeIcon";
+import { getFunctionCurrentVersion, getFunctionVersionRuntime } from "@/components/functions/utils";
 
 import {
   ALCHEMY_COMMAND_GROUP_CREATE,
@@ -27,6 +29,7 @@ import type { AlchemyLayoutSearch } from "@/module/schemas";
 import { AlchemyNavItem, Flow } from "@/module/types";
 
 import { useListFunctionsQuery } from "@/api/queries/functions";
+import { useListRuntimesQuery } from "@/api/queries/runtimes";
 
 const ROOT_PATH = "/";
 
@@ -44,6 +47,7 @@ export const useAlchemyCommandItems = ({
   const openFlow = useAlchemyFlowOpen();
 
   const { data: functionsData } = useListFunctionsQuery({ options: { transport } });
+  const { data: runtimesData } = useListRuntimesQuery({ options: { transport } });
 
   return useMemo(() => {
     const from = mountedBase ?? base ?? ROOT_PATH;
@@ -79,15 +83,22 @@ export const useAlchemyCommandItems = ({
         group: ALCHEMY_COMMAND_GROUP_CREATE,
         onSelect: openCreateFunction,
       },
-      ...(functionsData?.functions ?? []).map((alchemyFunction) => ({
-        id: `function-${alchemyFunction.id}`,
-        label: alchemyFunction.name,
-        description: alchemyFunction.description || undefined,
-        icon: ALCHEMY_NAV_ITEM_TO_ICON_MAP[AlchemyNavItem.FUNCTIONS],
-        group: ALCHEMY_COMMAND_GROUP_FUNCTIONS,
-        onSelect: () =>
-          navigateFromBase(AlchemyPath.FUNCTION, { params: { id: alchemyFunction.id } }),
-      })),
+      ...(functionsData?.functions ?? []).map((alchemyFunction) => {
+        const runtime = getFunctionVersionRuntime(
+          runtimesData?.runtimes ?? [],
+          getFunctionCurrentVersion(alchemyFunction),
+        );
+        return {
+          id: `function-${alchemyFunction.id}`,
+          label: alchemyFunction.name,
+          description: alchemyFunction.description || undefined,
+          leading: runtime ? <FunctionRuntimeIcon runtime={runtime} /> : undefined,
+          icon: runtime ? undefined : ALCHEMY_NAV_ITEM_TO_ICON_MAP[AlchemyNavItem.FUNCTIONS],
+          group: ALCHEMY_COMMAND_GROUP_FUNCTIONS,
+          onSelect: () =>
+            navigateFromBase(AlchemyPath.FUNCTION, { params: { id: alchemyFunction.id } }),
+        };
+      }),
     ];
-  }, [base, mountedBase, navigate, openFlow, functionsData?.functions]);
+  }, [base, mountedBase, navigate, openFlow, functionsData?.functions, runtimesData?.runtimes]);
 };

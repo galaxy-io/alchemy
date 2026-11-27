@@ -10,6 +10,8 @@ import Modal from "@galaxy-io/dls/modal/Modal";
 
 import type { Function as AlchemyFunction } from "@/gen/functions/v1/functions_pb";
 
+import { getFunctionCurrentVersion } from "@/components/functions/utils";
+
 import CreateFunctionModalProvider, {
   useCreateFunctionModalState,
 } from "@/pages/functions/components/create/CreateFunctionModalProvider";
@@ -29,7 +31,6 @@ import {
   CreateFunctionModalMode,
   CreateFunctionModalStep,
 } from "@/pages/functions/components/create/types";
-import { getFunctionCurrentVersion } from "@/pages/functions/utils";
 
 import type { AlchemyReturnSearch } from "@/module/paths";
 

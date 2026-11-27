@@ -7,7 +7,7 @@ import { IconWeight } from "@galaxy-io/dls/icons/Icon";
 
 import type { Function as AlchemyFunction } from "@/gen/functions/v1/functions_pb";
 
-import { getFunctionCurrentVersion } from "@/pages/functions/utils";
+import { getFunctionCurrentVersion } from "@/components/functions/utils";
 
 import { useAlchemyFlowOpen, useAlchemyNavigate } from "@/module/hooks";
 import { AlchemyPath } from "@/module/paths";

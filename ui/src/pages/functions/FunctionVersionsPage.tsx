@@ -10,7 +10,8 @@ import { useToast } from "@galaxy-io/dls/toast/useToast";
 
 import { CreateFunctionVersionRequestSchema } from "@/gen/functions/v1/functions_pb";
 
-import { getFunctionCurrentVersion } from "@/pages/functions/utils";
+import { getFunctionCurrentVersion } from "@/components/functions/utils";
+
 import { FUNCTION_VERSIONS_TABLE_COLUMNS } from "@/pages/functions/versions/constants";
 import FunctionVersionsDetails from "@/pages/functions/versions/FunctionVersionsDetails";
 import FunctionVersionsTableRowActions from "@/pages/functions/versions/FunctionVersionsTableRowActions";

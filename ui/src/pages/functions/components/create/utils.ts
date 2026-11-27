@@ -12,6 +12,8 @@ import type {
 } from "@/gen/functions/v1/functions_pb";
 import type { Template } from "@/gen/functions/v1/templates_pb";
 
+import { getFunctionRuntime } from "@/components/functions/utils";
+
 import {
   CREATE_FUNCTION_MODAL_CONTRACT_DEFAULT_CALLER,
   CREATE_FUNCTION_MODAL_CONTRACT_SIDE_TO_LABEL_MAP,
@@ -53,7 +55,6 @@ import {
   decodeFunctionSourceFiles,
   encodeFunctionSourceFile,
   getFunctionEnvHints,
-  getFunctionRuntime,
 } from "@/pages/functions/utils";
 
 import type { AlchemyFlowContract } from "@/module/schemas";
