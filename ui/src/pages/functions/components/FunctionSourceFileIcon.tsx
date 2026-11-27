@@ -6,7 +6,8 @@ import Icon, { IconVariant } from "@galaxy-io/dls/icons/Icon";
 
 import type { Runtime } from "@/gen/functions/v1/functions_pb";
 
-import FunctionRuntimeIcon from "@/pages/functions/components/FunctionRuntimeIcon";
+import FunctionRuntimeIcon from "@/components/functions/FunctionRuntimeIcon";
+
 import { getFunctionSourceRuntime } from "@/pages/functions/utils";
 
 interface FunctionSourceFileIconProps {

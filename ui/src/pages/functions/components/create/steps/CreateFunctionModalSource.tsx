@@ -10,6 +10,8 @@ import Grid from "@galaxy-io/dls/layout/Grid";
 import { FontFamily } from "@galaxy-io/dls/theme/enums";
 import Widget from "@galaxy-io/dls/widget/Widget";
 
+import FunctionRuntimeIcon from "@/components/functions/FunctionRuntimeIcon";
+
 import {
   useCreateFunctionModalActions,
   useCreateFunctionModalState,
@@ -21,7 +23,6 @@ import {
 import CreateFunctionModalEnv from "@/pages/functions/components/create/steps/components/CreateFunctionModalEnv";
 import CreateFunctionModalSourceKind from "@/pages/functions/components/create/steps/components/CreateFunctionModalSourceKind";
 import CreateFunctionModalTemplateOption from "@/pages/functions/components/create/steps/components/CreateFunctionModalTemplateOption";
-import FunctionRuntimeIcon from "@/pages/functions/components/FunctionRuntimeIcon";
 import { FunctionSourceKind } from "@/pages/functions/types";
 
 const CreateFunctionModalSource: FC = () => {

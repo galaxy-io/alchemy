@@ -5,8 +5,9 @@ import Text, { TextSize, TextWeight } from "@galaxy-io/dls/text/Text";
 
 import type { Runtime } from "@/gen/functions/v1/functions_pb";
 
+import FunctionRuntimeIcon from "@/components/functions/FunctionRuntimeIcon";
+
 import { FUNCTION_CARD_ICON_SIZE } from "@/pages/functions/components/card/constants";
-import FunctionRuntimeIcon from "@/pages/functions/components/FunctionRuntimeIcon";
 
 interface FunctionCardHeaderProps {
   name: string;

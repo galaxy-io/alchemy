@@ -5,9 +5,10 @@ import Box from "@galaxy-io/dls/layout/Box";
 
 import type { Function as AlchemyFunction } from "@/gen/functions/v1/functions_pb";
 
+import { getFunctionCurrentVersion } from "@/components/functions/utils";
+
 import { FUNCTION_PAGE_VERSION_SELECT_WIDTH } from "@/pages/functions/components/header/constants";
 import { useFunctionVersion } from "@/pages/functions/hooks/useFunctionVersion";
-import { getFunctionCurrentVersion } from "@/pages/functions/utils";
 
 import { useAlchemySearchUpdate } from "@/module/hooks";
 import type { FunctionSearch } from "@/module/schemas";
