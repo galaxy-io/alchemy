@@ -10,3 +10,9 @@ export enum ObservabilityRefreshInterval {
   THIRTY_MINUTES = "30M",
   ONE_HOUR = "1H",
 }
+
+export enum ObservabilityInvocationsGroup {
+  NONE = "NONE",
+  STATUS = "STATUS",
+  FUNCTION = "FUNCTION",
+}

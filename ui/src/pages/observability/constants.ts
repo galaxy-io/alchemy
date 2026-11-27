@@ -8,11 +8,14 @@ import {
 } from "@/components/invocations/constants";
 
 import {
+  ObservabilityInvocationsGroup,
   ObservabilityRefreshInterval,
   ObservabilityTrafficFill,
 } from "@/pages/observability/types";
 
 export const OBSERVABILITY_DEFAULT_TRAFFIC_FILL = ObservabilityTrafficFill.VOLUME;
+
+export const OBSERVABILITY_DEFAULT_INVOCATIONS_GROUP = ObservabilityInvocationsGroup.STATUS;
 
 export const OBSERVABILITY_DEFAULT_REFRESH_INTERVAL = ObservabilityRefreshInterval.ONE_MINUTE;
 
@@ -39,6 +42,8 @@ export const OBSERVABILITY_REFRESH_INTERVAL_TO_MS_MAP: Record<
 };
 
 export const OBSERVABILITY_REFRESH_INTERVAL_SELECT_WIDTH = 160;
+
+export const OBSERVABILITY_WORDMARK_SIZE = 20;
 
 export const OBSERVABILITY_CHART_HEIGHT = 240;
 export const OBSERVABILITY_CHART_MIN_WIDTH = 420;

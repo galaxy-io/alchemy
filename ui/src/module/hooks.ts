@@ -14,9 +14,11 @@ import { INVOCATIONS_DEFAULT_TIMEFRAME } from "@/components/invocations/constant
 
 import { FUNCTION_WORKBENCH_DEFAULT_FILE } from "@/pages/functions/workbench/constants";
 import {
+  OBSERVABILITY_DEFAULT_INVOCATIONS_GROUP,
   OBSERVABILITY_DEFAULT_REFRESH_INTERVAL,
   OBSERVABILITY_DEFAULT_TRAFFIC_FILL,
 } from "@/pages/observability/constants";
+import { ObservabilityInvocationsGroup } from "@/pages/observability/types";
 
 import {
   type AlchemyPath,
@@ -133,12 +135,21 @@ export const useObservabilitySearch = () =>
     structuralSharing: true,
     select: (search) => {
       const parsed = observabilitySearchSchema.parse(search);
+      const invocationsGroup = parsed.invocationsGroup ?? OBSERVABILITY_DEFAULT_INVOCATIONS_GROUP;
       return {
         timeframe: parsed.timeframe ?? INVOCATIONS_DEFAULT_TIMEFRAME,
         traffic: parsed.traffic ?? OBSERVABILITY_DEFAULT_TRAFFIC_FILL,
         refreshInterval: parsed.refreshInterval ?? OBSERVABILITY_DEFAULT_REFRESH_INTERVAL,
         invocationsBucket: parsed.invocationsBucket,
-        invocationsStatus: parsed.invocationsStatus,
+        invocationsGroup,
+        invocationsStatus:
+          invocationsGroup === ObservabilityInvocationsGroup.STATUS
+            ? parsed.invocationsStatus
+            : undefined,
+        invocationsFunction:
+          invocationsGroup === ObservabilityInvocationsGroup.FUNCTION
+            ? parsed.invocationsFunction
+            : undefined,
       };
     },
   });
