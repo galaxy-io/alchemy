@@ -183,6 +183,23 @@ galaxy:
     alchemy: ""
     filament: ""
 
+observability:
+  otel:
+    # -- OTLP endpoint the server and hosts export metrics to, stored in the
+    # ConfigMaps as `OTEL_EXPORTER_OTLP_ENDPOINT`. Use an `http://` scheme for
+    # plaintext in-cluster collectors. Empty disables export.
+    endpoint: ""
+
+    # -- OTLP transport, stored in the ConfigMaps as `OTEL_EXPORTER_OTLP_PROTOCOL`.
+    # Valid values are `grpc` (collector port 4317) and `http/protobuf` (port 4318).
+    # Empty defaults to `grpc`.
+    protocol: ""
+
+    # -- Resource attributes added to every metric, stored in the ConfigMaps
+    # as `OTEL_RESOURCE_ATTRIBUTES` (for example
+    # `io.getgalaxy.tenant.id: acme`). Only used when `endpoint` is set.
+    resourceAttributes: {}
+
 server:
   image:
     # -- Server image repository.

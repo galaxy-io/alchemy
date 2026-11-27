@@ -19,8 +19,18 @@ Both the server and the host read these.
 | `ARTIFACTS_BUCKET` | unset | `artifacts.bucket` | Bucket for build layers, in the same form. Unset means functions are built from images only |
 | `LOG_LEVEL` | `INFO` | `server.logLevel`, `host.logLevel` | `DEBUG`, `INFO`, `WARN` or `ERROR` |
 | `LOG_FORMAT` | `json` | `server.logFormat`, `host.logFormat` | `json` or `text` |
+| `OTEL_EXPORTER_OTLP_ENDPOINT` | unset | `observability.otel.endpoint` | OTLP endpoint metrics are exported to. Unset exports nothing |
+| `OTEL_EXPORTER_OTLP_METRICS_ENDPOINT` | unset | | Metrics endpoint, used as given, in place of the shared one |
+| `OTEL_EXPORTER_OTLP_PROTOCOL` | `grpc` | `observability.otel.protocol` | `grpc` or `http/protobuf`. Any other value stops the process at start |
+| `OTEL_EXPORTER_OTLP_METRICS_PROTOCOL` | unset | | Metrics protocol, in place of the shared one, in the same form |
+| `OTEL_METRICS_EXPORTER` | unset | | `none` turns metric export off, even with an endpoint set |
+| `OTEL_SDK_DISABLED` | `false` | | `true` turns metric export off, even with an endpoint set |
+| `OTEL_RESOURCE_ATTRIBUTES` | unset | `observability.otel.resourceAttributes` | Attributes added to every metric, as `key=value` pairs joined by commas |
+| `OTEL_SERVICE_NAME` | SDK default | set to each component's name | Service name attached to metrics |
 
 The default URLs point at the local development stack. Set them in every real deployment.
+
+See [Metrics](/pages/deployment/metrics) for what the `OTEL_*` variables turn on.
 
 ## Server
 

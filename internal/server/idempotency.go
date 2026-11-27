@@ -115,6 +115,7 @@ func (s *Service) replay(ctx context.Context, start time.Time, inv *invocation, 
 	default:
 	}
 	inv.discard()
+	s.metrics.CallReplayed(ctx, cv.row.FunctionID)
 	resp := &functionsv1.InvokeResponse{InvocationId: prior.GetId(), Version: prior.GetVersion(), Stats: prior.GetStats(), Attempts: prior.GetAttempts(), Replayed: true}
 	if fe := prior.GetError(); fe != nil {
 		resp.Result = &functionsv1.InvokeResponse_Error{Error: fe}

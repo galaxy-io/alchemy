@@ -133,6 +133,14 @@ The vendored PostgreSQL and NATS charts are disabled by default. See the [Bitnam
 |-----|------|---------|-------------|
 | galaxy.productUrls | object | `{"alchemy":"","filament":""}` | Where each Galaxy product's UI is served, e.g. `alchemy: https://alchemy.example.com` (`GALAXY_<PRODUCT>_URL`). Products link to each other through these and send people back only to them. Set the same block on every product. |
 
+## Observability parameters
+
+| Key | Type | Default | Description |
+|-----|------|---------|-------------|
+| observability.otel.endpoint | string | `""` | OTLP endpoint the server and hosts export metrics to, stored in the ConfigMaps as `OTEL_EXPORTER_OTLP_ENDPOINT`. Use an `http://` scheme for plaintext in-cluster collectors. Empty disables export. |
+| observability.otel.protocol | string | `""` | OTLP transport, stored in the ConfigMaps as `OTEL_EXPORTER_OTLP_PROTOCOL`. Valid values are `grpc` (collector port 4317) and `http/protobuf` (port 4318). Empty defaults to `grpc`. |
+| observability.otel.resourceAttributes | object | `{}` | Resource attributes added to every metric, stored in the ConfigMaps as `OTEL_RESOURCE_ATTRIBUTES` (for example `io.getgalaxy.tenant.id: acme`). Only used when `endpoint` is set. |
+
 ## Server parameters
 
 | Key | Type | Default | Description |

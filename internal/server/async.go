@@ -128,11 +128,13 @@ func (s *Service) queueAsync(ctx context.Context, inv *invocation, cv *compiledV
 	}
 	if err := inv.sentTo(ctx, queuedHost); err != nil {
 		inv.errored(err.Error())
+		inv.countUnserved(ctx)
 		return nil, err
 	}
 	if err := s.queue.Publish(ctx, req); err != nil {
 		inv.notSent()
 		inv.errored(err.Error())
+		inv.countUnserved(ctx)
 		return nil, platformError(ctx, err)
 	}
 	if rec := s.tracker.settle(accepted.GetId()); rec != nil {

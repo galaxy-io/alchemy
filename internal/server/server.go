@@ -24,6 +24,7 @@ import (
 	"github.com/galaxy-io/alchemy/datastore/postgres"
 	"github.com/galaxy-io/alchemy/datastore/postgres/sqlcgen"
 	"github.com/galaxy-io/alchemy/internal/bus"
+	"github.com/galaxy-io/alchemy/internal/telemetry"
 )
 
 // Config tunes the service's limits and defaults.
@@ -142,6 +143,7 @@ type Service struct {
 	log       *slog.Logger
 	tracker   *invocationTracker // invocations this server holds
 	queue     *bus.InvokeQueue
+	metrics   *telemetry.Set
 
 	// background scopes builds and subscriptions to the service's life.
 	background context.Context
@@ -172,8 +174,8 @@ type compiledVersion struct {
 // artifactBucket, either of which may be nil, and keeping tenant secrets in
 // secrets, which may be nil too. It sets up the bus's streams, starts
 // listening to hosts and other servers, and starts writing invocation
-// records.
-func New(ctx context.Context, cfg Config, store *postgres.Store, b *bus.Bus, logBucket, artifactBucket *blob.Bucket, secrets secret.Secrets, log *slog.Logger) (*Service, error) {
+// records. It records metrics to metrics, which may be nil.
+func New(ctx context.Context, cfg Config, store *postgres.Store, b *bus.Bus, logBucket, artifactBucket *blob.Bucket, secrets secret.Secrets, metrics *telemetry.Set, log *slog.Logger) (*Service, error) {
 	bg, stop := context.WithCancel(context.Background())
 	s := &Service{
 		cfg:        cfg,
@@ -184,6 +186,7 @@ func New(ctx context.Context, cfg Config, store *postgres.Store, b *bus.Bus, log
 		secrets:    secrets,
 		log:        log,
 		tracker:    newTracker(),
+		metrics:    metrics,
 		background: bg,
 		stop:       stop,
 		versions:   make(map[string]*compiledVersion),
@@ -210,6 +213,11 @@ func New(ctx context.Context, cfg Config, store *postgres.Store, b *bus.Bus, log
 		return nil, err
 	}
 	s.queue = queue
+	if err := metrics.WatchQueue(queue.Depth); err != nil {
+		stop()
+		return nil, fmt.Errorf("watch invoke queue: %w", err)
+	}
+	metrics.Started(ctx, telemetry.Server)
 	if err := s.syncFunctionConfigs(ctx); err != nil {
 		stop()
 		return nil, err

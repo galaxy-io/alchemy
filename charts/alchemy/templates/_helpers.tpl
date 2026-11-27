@@ -94,6 +94,15 @@ app.kubernetes.io/component: host
 {{- end -}}
 
 
+{{/* A map as comma-joined key=value pairs. */}}
+{{- define "alchemy.otelResourceAttributes" -}}
+{{- $pairs := list -}}
+{{- range $key, $value := . -}}
+{{- $pairs = append $pairs (printf "%s=%s" $key $value) -}}
+{{- end -}}
+{{- join "," $pairs -}}
+{{- end -}}
+
 {{/* User's existingSecret, else the chart's own Secret. */}}
 {{- define "alchemy.secretName" -}}
 {{- .Values.existingSecret | default (printf "%s-runtime" (include "alchemy.fullname" .)) -}}

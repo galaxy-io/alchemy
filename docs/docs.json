@@ -148,7 +148,8 @@
           "pages/deployment/configuration",
           "pages/deployment/storage",
           "pages/deployment/authentication",
-          "pages/deployment/autoscaling"
+          "pages/deployment/autoscaling",
+          "pages/deployment/metrics"
         ]
       },
       {

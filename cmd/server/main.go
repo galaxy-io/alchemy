@@ -29,6 +29,7 @@ import (
 	"github.com/galaxy-io/alchemy/api/metrics/v1/metricsv1connect"
 	"github.com/galaxy-io/alchemy/cmd/internal/identity"
 	"github.com/galaxy-io/alchemy/cmd/internal/logger"
+	"github.com/galaxy-io/alchemy/cmd/internal/otel"
 	"github.com/galaxy-io/alchemy/cmd/internal/secrets"
 	"github.com/galaxy-io/alchemy/datastore/postgres"
 	"github.com/galaxy-io/alchemy/internal/bus"
@@ -137,7 +138,13 @@ func run(log *slog.Logger) error { //nolint:funlen // reads every server setting
 		defer func() { _ = closer.Close() }()
 	}
 
-	svc, err := server.New(ctx, cfg, store, b, bucket, artifacts, provider, log)
+	metrics, flushMetrics, err := otel.FromEnv(ctx, log)
+	if err != nil {
+		return err
+	}
+	defer flushMetrics()
+
+	svc, err := server.New(ctx, cfg, store, b, bucket, artifacts, provider, metrics, log)
 	if err != nil {
 		return err
 	}

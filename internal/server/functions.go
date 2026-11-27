@@ -19,6 +19,8 @@ import (
 	"github.com/galaxy-io/alchemy/datastore/postgres/sqlcgen"
 	"github.com/galaxy-io/alchemy/internal/bus"
 	"github.com/galaxy-io/alchemy/internal/contract"
+	"github.com/galaxy-io/alchemy/internal/runtimes"
+	"github.com/galaxy-io/alchemy/internal/telemetry"
 )
 
 const maxNameLen = 128
@@ -347,6 +349,8 @@ func (s *Service) build(v *sqlcgen.FunctionVersion) {
 	defer cancel()
 	log := s.log.With("function_id", v.FunctionID, "version", v.Version)
 
+	start := time.Now()
+	failure := telemetry.BuildFailedSpec
 	spec, err := decodeSpec(v.Spec)
 	if err == nil {
 		_, err = contract.Compile(spec.GetContract())
@@ -354,12 +358,13 @@ func (s *Service) build(v *sqlcgen.FunctionVersion) {
 	var artifact *hostv1.Artifact
 	var layers []*hostv1.Layer
 	var compileLog, buildLog string
-	start := time.Now()
 	if err == nil {
+		failure = telemetry.BuildFailedCompile
 		layers, compileLog, err = s.versionLayers(ctx, v, spec)
 	}
 	var fn *sqlcgen.Function
 	if err == nil {
+		failure = telemetry.BuildFailedBuild
 		fn, err = s.store.GetFunction(ctx, sqlcgen.GetFunctionParams{TenantID: v.TenantID, ID: v.FunctionID})
 	}
 	if err == nil {
@@ -378,6 +383,7 @@ func (s *Service) build(v *sqlcgen.FunctionVersion) {
 	}
 	finish := sqlcgen.FinishFunctionVersionBuildParams{ID: v.ID, BuildStartedAt: v.BuildStartedAt, BuildLog: buildLog}
 	if err != nil {
+		failure = buildFailure(failure, err)
 		finish.Status = sqlcgen.FunctionVersionStatusFailed
 		finish.StatusMessage = err.Error()
 		if finish.BuildLog == "" {
@@ -401,12 +407,34 @@ func (s *Service) build(v *sqlcgen.FunctionVersion) {
 		log.Error("record build result", "err", err)
 		return
 	}
+	s.metrics.FunctionBuilt(ctx, telemetry.FunctionBuild{Function: row.FunctionID, Status: string(row.Status), Runtime: s.runtimeOf(spec), Failure: failure, Took: time.Since(start)})
 	_ = s.store.TouchFunction(context.WithoutCancel(ctx), v.FunctionID)
 	if artifact != nil {
 		s.mu.Lock()
 		s.versions[v.ID] = &compiledVersion{row: row, spec: spec, artifact: artifact}
 		s.mu.Unlock()
 	}
+}
+
+// buildFailure is why a build that failed in stage failed: for want of a
+// host, for running out of time, or otherwise in the stage itself.
+func buildFailure(stage telemetry.BuildFailure, err error) telemetry.BuildFailure {
+	switch {
+	case errors.Is(err, errNoHosts):
+		return telemetry.BuildFailedNoHost
+	case errors.Is(err, context.DeadlineExceeded):
+		return telemetry.BuildFailedTimeout
+	default:
+		return stage
+	}
+}
+
+// runtimeOf is the runtime spec is built on, or that it brings an image of its own.
+func (s *Service) runtimeOf(spec *functionsv1.FunctionSpec) string {
+	if id := runtimes.ID(s.cfg.RuntimeImagePrefix, spec.GetImage()); id != "" {
+		return id
+	}
+	return telemetry.RuntimeImage
 }
 
 // requestBuild builds spec on the least busy live host, trying the next
@@ -653,6 +681,7 @@ func (s *Service) resumeStaleBuilds() {
 	}
 	for _, v := range rows {
 		s.log.Warn("resuming a build its server left behind", "function_id", v.FunctionID, "version", v.Version)
+		s.metrics.BuildResumed(s.background)
 		s.tasks.Go(func() { s.build(v) })
 	}
 }
